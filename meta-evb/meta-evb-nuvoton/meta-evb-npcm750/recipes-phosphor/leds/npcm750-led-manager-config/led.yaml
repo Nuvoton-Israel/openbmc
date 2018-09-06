@@ -1,0 +1,52 @@
+BmcBooted:
+    heartbeat:
+        Action: 'Blink'
+        DutyOn: 50
+        Period: 1000
+PowerOn:
+    identify:
+        Action: 'Blink'
+        DutyOn: 50
+        Period: 1000
+Npcm7xx_blink_0:
+    heartbeat:
+        Action: 'Blink'
+        DutyOn: 50
+        Period: 1000
+    identify:
+        Action: 'Blink'
+        DutyOn: 50
+        Period: 1000
+Npcm7xx_blink_1:
+    heartbeat:
+        Action: 'Blink'
+        DutyOn: 90
+        Period: 1000
+    identify:
+        Action: 'Blink'
+        DutyOn: 10
+        Period: 1000
+Npcm7xx_blink_2:
+    heartbeat:
+        Action: 'Blink'
+        DutyOn: 98
+        Period: 10
+    identify:
+        Action: 'Blink'
+        DutyOn: 2
+        Period: 10
+Npcm7xx_on_off_0:
+    heartbeat:
+        Action: 'On'
+        Period: 1000
+    identify:
+        Action: 'Off'
+        Period: 1000
+Npcm7xx_on_off_1:
+    heartbeat:
+        Action: 'Off'
+        Period: 1000
+    identify:
+        Action: 'On'
+        Period: 1000
+
