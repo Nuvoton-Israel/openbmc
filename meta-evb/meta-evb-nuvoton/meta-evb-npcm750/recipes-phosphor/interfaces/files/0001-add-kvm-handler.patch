@@ -1,0 +1,101 @@
+From 5471c6cb69558d7679dd3b7a6a6c524d0477e27f Mon Sep 17 00:00:00 2001
+From: kwliu <kwliu@nuvoton.com>
+Date: Mon, 20 Aug 2018 13:31:37 +0800
+Subject: [PATCH] add kvm handler
+
+---
+ obmc/wsgi/apps/rest_dbus.py | 61 ++++++++++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
+ mode change 100644 => 100755 obmc/wsgi/apps/rest_dbus.py
+
+diff --git a/obmc/wsgi/apps/rest_dbus.py b/obmc/wsgi/apps/rest_dbus.py
+old mode 100644
+new mode 100755
+index 5eaffb7..25c1da7
+--- a/obmc/wsgi/apps/rest_dbus.py
++++ b/obmc/wsgi/apps/rest_dbus.py
+@@ -1036,6 +1036,65 @@ class HostConsoleHandler(RouteHandler):
+         ping_sender = Greenlet.spawn(send_ws_ping, wsock, WEBSOCKET_TIMEOUT)
+         gevent.joinall([wsock_reader, sock_reader, ping_sender])
+ 
++class HostKvmHandler(RouteHandler):
++    verbs = ['GET']
++    # Naming the route kvm, because the numbering will help
++    # on multi-bmc/multi-host systems.
++    rules = ['/kvmws']
++
++    def __init__(self, app, bus):
++        super(HostKvmHandler, self).__init__(
++            app, bus, self.verbs, self.rules)
++
++    def find(self, **kw):
++        pass
++
++    def setup(self, **kw):
++        pass
++
++    def read_wsock(self, wsock, sock):
++        while True:
++            try:
++                incoming = wsock.receive()
++                if incoming:
++                    # Read websocket, write to UNIX socket
++                    sock.send(incoming)
++            except Exception as e:
++                sock.close()
++                return
++
++    def read_sock(self, sock, wsock):
++        max_sock_read_len = 3840000
++        while True:
++            try:
++                outgoing = sock.recv(max_sock_read_len)
++                if outgoing:
++                    # Read UNIX socket, write to websocket
++                    wsock.send(outgoing, binary=True)
++            except Exception as e:
++                wsock.close()
++                return
++
++    def do_get(self):
++        wsock = request.environ.get('wsgi.websocket')
++        if not wsock:
++            abort(400, 'Expected WebSocket based request.')
++
++        HOST = '127.0.0.1'
++        PORT = 5900
++        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
++
++        try:
++            sock.connect((HOST, PORT))
++        except Exception as e:
++            abort(500, str(e))
++
++        wsock_reader = Greenlet.spawn(self.read_wsock, wsock, sock)
++        sock_reader = Greenlet.spawn(self.read_sock, sock, wsock)
++        ping_sender = Greenlet.spawn(send_ws_ping, wsock, WEBSOCKET_TIMEOUT)
++        gevent.joinall([wsock_reader, sock_reader, ping_sender])
++
++
+ 
+ class ImagePutHandler(RouteHandler):
+     ''' Handles the /upload/image/<filename> route. '''
+@@ -1509,6 +1568,7 @@ class App(Bottle):
+         if self.have_wsock:
+             self.event_handler = EventHandler(self, self.bus)
+             self.host_console_handler = HostConsoleHandler(self, self.bus)
++            self.host_kvm_handler = HostKvmHandler(self, self.bus)
+         self.instance_handler = InstanceHandler(self, self.bus)
+ 
+     def install_handlers(self):
+@@ -1526,6 +1586,7 @@ class App(Bottle):
+         if self.have_wsock:
+             self.event_handler.install()
+             self.host_console_handler.install()
++            self.host_kvm_handler.install()
+         # this has to come last, since it matches everything
+         self.instance_handler.install()
+ 
+-- 
+2.17.1
+

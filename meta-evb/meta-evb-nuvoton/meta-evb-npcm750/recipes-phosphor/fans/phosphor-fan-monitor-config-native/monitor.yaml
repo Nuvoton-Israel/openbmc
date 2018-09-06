@@ -1,0 +1,11 @@
+fans:
+  - inventory: /system/chassis/motherboard/fan1
+    allowed_out_of_range_time: 30
+    deviation: 20
+    num_sensors_nonfunc_for_fan_nonfunc: 1
+    sensors:
+      - name: fan1
+        has_target: true
+        target_interface: xyz.openbmc_project.Control.FanPwm
+        factor: 0.18
+        offset: 365
