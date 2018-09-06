@@ -1,0 +1,8 @@
+[Unit]
+Description=obmc-ikvm
+
+[Service]
+ExecStart={bindir}/obmc-ikvm
+
+[Install]
+RequiredBy={SYSTEMD_DEFAULT_TARGET}
