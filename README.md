@@ -29,7 +29,7 @@ sudo dnf groupinstall "C Development Tools and Libraries"
 ```
 ### 2) Download the source
 ```
-git clone git@github.com:openbmc/openbmc.git
+git clone https://github.com/Nuvoton-Israel/openbmc.git
 cd openbmc
 ```
 
@@ -43,15 +43,15 @@ then move to the next step. Additional examples can be found in the
 
 Machine | TEMPLATECONF
 --------|---------
+evb-npcm750 | ```meta-evb/meta-evb-nuvoton/meta-evb-npcm750/conf```
 Palmetto | ```meta-ibm/meta-palmetto/conf```
 Zaius| ```meta-ingrasys/meta-zaius/conf```
 Witherspoon| ```meta-ibm/meta-witherspoon/conf```
 Romulus| ```meta-ibm/meta-romulus/conf```
 
-
-As an example target Palmetto
+As an example target npcm750 evaluation board
 ```
-export TEMPLATECONF=meta-ibm/meta-palmetto/conf
+export TEMPLATECONF=meta-evb/meta-evb-nuvoton/meta-evb-npcm750/conf
 ```
 
 ### 4) Build
@@ -61,75 +61,46 @@ export TEMPLATECONF=meta-ibm/meta-palmetto/conf
 bitbake obmc-phosphor-image
 ```
 
-Additional details can be found in the [docs](https://github.com/openbmc/docs)
-repository.
+### 5) build images
+After building finished the built Images will found at:
+<OpenBMC_folder>/build/tmp/deploy/images/evb-npcm750
+The relvant Images to use to upload the OpenBMC on the EVB are:
 
-## Build Validation and Testing
-Commits submitted by members of the OpenBMC GitHub community are compiled and
-tested via our [Jenkins](https://openpower.xyz/) server.  Commits are run
-through two levels of testing.  At the repository level the makefile `make
-check` directive is run.  At the system level, the commit is built into a
-firmware image and run with an arm-softmmu QEMU model against a barrage of
-[CI tests](https://openpower.xyz/job/openbmc-test-qemu-ci/).
+1. image-bmc - The entire 32MB image including BootBlock, u-boot, linux kernel
+               and file system, can be programmed into the beginning of flash
+2. image-u-boot - Includes only BootBlock and u-boot and their headers can be
+                  programmed into the beginning of flash
+3. image-kernel - FIT image that includes linux kernel, device tree and an
+                  initial file system, can be loaded to the linux area in flash
+4. image-rofs - Main (and large) OpenBMC file system, can be loaded to the
+                rofs area in flash
 
-Commits submitted by non-members do not automatically proceed through CI
-testing. After visual inspection of the commit, a CI run can be manually
-performed by the reviewer.
+### Note
+All the files above are Image links to the latest build images, 
+for copy the files to SD or USB storage device please make sure 
+you copying the Images and not the links
 
-Automated testing against the QEMU model along with supported systems are
-performed.  The OpenBMC project uses the
-[Robot Framework](http://robotframework.org/) for all automation.  Our
-complete test repository can be found
-[here](https://github.com/openbmc/openbmc-test-automation).
+#### 6) Programming the images
+For programming the OpenBMC to the EVB SPI flash go to:
+[npcm7xx-poleg/evaluation-board](https://github.com/Nuvoton-Israel/nuvoton-info/tree/master/npcm7xx-poleg/evaluation-board)
+See the [readme.txt](https://github.com/Nuvoton-Israel/nuvoton-info/blob/master/npcm7xx-poleg/evaluation-board/readme.txt)
+and follow the [NPCM7xx_OpenBMC_Programming.pdf](https://github.com/Nuvoton-Israel/nuvoton-info/blob/master/npcm7xx-poleg/evaluation-board/sw_deliverables/NPCM7xx_OpenBMC_Programming.pdf) instructions.
 
-## Submitting Patches
-Support of additional hardware and software packages is always welcome.
-Please follow the [contributing guidelines](https://github.com/openbmc/docs/blob/master/CONTRIBUTING.md)
-when making a submission.  It is expected that contributions contain test
-cases.
+#### 7) OpenBMC user login
+after the OpenBMC boot please enter the following login and password:
 
-## Bug Reporting
-[Issues](https://github.com/openbmc/openbmc/issues) are managed on
-GitHub.  It is recommended you search through the issues before opening
-a new one.
+```
+Phosphor OpenBMC (Phosphor OpenBMC Project Reference Distro) 0.1.0 evb-npcm750 ttyS0
 
-## Features of OpenBMC
+evb-npcm750 login: root
+Password: 0penBmc (first letter zero and not capital o)
+```
 
-**Feature List**
-* REST Management
-* IPMI
-* SSH based SOL
-* Power and Cooling Management
-* Event Logs
-* Zeroconf discoverable
-* Sensors
-* Inventory
-* LED Management
-* Host Watchdog
-* Simulation
-* Code Update Support for multiple BMC/BIOS images
-
-**Features In Progress**
-* Full IPMI 2.0 Compliance with DCMI
-* Verified Boot
-* HTML5 Java Script Web User Interface
-* BMC RAS
-
-**Features Requested but need help**
-* OpenCompute Redfish Compliance
-* OpenBMC performance monitoring
-* cgroup user management and policies
-* Remote KVM
-* Remote USB
-* OpenStack Ironic Integration
-* QEMU enhancements
-
-
-## Finding out more
-Dive deeper in to OpenBMC by opening the [docs](https://github.com/openbmc/docs)
-repository.
+#### 8) More information
+For more info follow the readme.txt in:
+[ftp://ftp.nuvoton.co.il/outgoing/Eval_Board](ftp://ftp.nuvoton.co.il/outgoing/Eval_Board) at the section:
+"Loading to Evaluation Board and running instructions".
+In order to get a password for the ftp please contact BMC_Marketing@Nuvoton.com
 
 ## Contact
-- Mail: openbmc@lists.ozlabs.org [https://lists.ozlabs.org/listinfo/openbmc](https://lists.ozlabs.org/listinfo/openbmc)
-- IRC: #openbmc on freenode.net
-- Riot: [#openbmc:matrix.org](https://riot.im/app/#/room/#openbmc:matrix.org)
+- Mail: tomer.maimon@nuvoton.com,  avi.fishman@nuvoton.com or BMC_Marketing@Nuvoton.com
