@@ -20,6 +20,7 @@ OBMC_IMAGE_EXTRA_INSTALL_append = " phosphor-ipmi-kcs"
 OBMC_IMAGE_EXTRA_INSTALL_append = " phosphor-cooling-type"
 
 IMAGE_INSTALL_append = " obmc-mgr-sensor \
+                         bmcweb \
                          obmc-ikvm \
                          phosphor-webui \
                          phosphor-ipmi-host \
