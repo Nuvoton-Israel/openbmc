@@ -1,11 +1,21 @@
 diff --git a/arch/arm/boot/dts/nuvoton-npcm750-evb.dts b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
-index ab635c5ea2db..4aa885c1dac4 100644
+index 22e41066a753..416dcf0952cd 100644
 --- a/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
 +++ b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
-@@ -165,38 +165,17 @@
- 						reg = <0x0080000 0x80000>;
- 						read-only;
- 						};
+@@ -156,48 +156,21 @@
+ 					compatible = "fixed-partitions";
+ 					#address-cells = <1>;
+ 					#size-cells = <1>;
+-					bbuboot1@0 {
+-						label = "bb-uboot-1";
+-						reg = <0x0000000 0x80000>;
+-						read-only;
+-						};
+-					bbuboot2@80000 {
+-						label = "bb-uboot-2";
+-						reg = <0x0080000 0x80000>;
+-						read-only;
+-						};
 -					envparam@100000 {
 -						label = "env-param";
 -						reg = <0x0100000 0x40000>;
@@ -14,7 +24,10 @@ index ab635c5ea2db..4aa885c1dac4 100644
 -					spare@140000 {
 -						label = "spare";
 -						reg = <0x0140000 0xC0000>;
--						};
++					u-boot@0 {
++						label = "u-boot";
++						reg = <0x0000000 0x100000>;
+ 						};
  					kernel@200000 {
  						label = "kernel";
 -						reg = <0x0200000 0x400000>;
