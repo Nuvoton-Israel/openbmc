@@ -1,33 +1,32 @@
 diff --git a/arch/arm/boot/dts/nuvoton-npcm750-evb.dts b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
-index 22e41066a753..416dcf0952cd 100644
+index 22e41066a753..1316d6a794d6 100644
 --- a/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
 +++ b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
-@@ -156,48 +156,21 @@
+@@ -156,48 +156,26 @@
  					compatible = "fixed-partitions";
  					#address-cells = <1>;
  					#size-cells = <1>;
 -					bbuboot1@0 {
 -						label = "bb-uboot-1";
--						reg = <0x0000000 0x80000>;
++					u-boot@0 {
++						label = "u-boot";
+ 						reg = <0x0000000 0x80000>;
 -						read-only;
 -						};
 -					bbuboot2@80000 {
 -						label = "bb-uboot-2";
 -						reg = <0x0080000 0x80000>;
 -						read-only;
--						};
--					envparam@100000 {
--						label = "env-param";
--						reg = <0x0100000 0x40000>;
--						read-only;
--						};
+ 						};
+ 					envparam@100000 {
+ 						label = "env-param";
+ 						reg = <0x0100000 0x40000>;
+ 						read-only;
+ 						};
 -					spare@140000 {
 -						label = "spare";
 -						reg = <0x0140000 0xC0000>;
-+					u-boot@0 {
-+						label = "u-boot";
-+						reg = <0x0000000 0x100000>;
- 						};
+-						};
  					kernel@200000 {
  						label = "kernel";
 -						reg = <0x0200000 0x400000>;
@@ -57,7 +56,7 @@ index 22e41066a753..416dcf0952cd 100644
 -						reg = <0x1300000 0x0>;
 +					rwfs@1e00000 {
 +						label = "rwfs";
-+						reg = <0x01e00000 0x100000>;
++						reg = <0x1e00000 0x100000>;
  					};
  				};
  			};
