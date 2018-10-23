@@ -49,4 +49,13 @@ Npcm7xx_on_off_1:
     identify:
         Action: 'On'
         Period: 1000
+enclosure_identify:
+    heartbeat:
+        Action: 'Blink'
+        DutyOn: 50
+        Period: 1000
+    identify:
+        Action: 'Blink'
+        DutyOn: 50
+        Period: 1000
 
