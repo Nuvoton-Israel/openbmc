@@ -17,6 +17,7 @@ UBOOT_IMAGE_NAME = "evb-npcm750.u-boot"
 
 OBMC_IMAGE_EXTRA_INSTALL_append = " phosphor-ipmi-host"
 OBMC_IMAGE_EXTRA_INSTALL_append = " phosphor-ipmi-kcs"
+OBMC_IMAGE_EXTRA_INSTALL_append = " phosphor-ipmi-net"
 OBMC_IMAGE_EXTRA_INSTALL_append = " phosphor-cooling-type"
 
 IMAGE_INSTALL_append = " obmc-mgr-sensor \
