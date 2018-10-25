@@ -1,0 +1,95 @@
+diff --git a/selutility.cpp b/selutility.cpp
+index 5935de2..c2e1169 100644
+--- a/selutility.cpp
++++ b/selutility.cpp
+@@ -1,5 +1,6 @@
+ #include <chrono>
+ #include <vector>
++#include <math.h>
+ #if __has_include(<filesystem>)
+ #include <filesystem>
+ #elif __has_include(<experimental/filesystem>)
+@@ -19,6 +20,7 @@ namespace std {
+ #include "types.hpp"
+ #include "utils.hpp"
+ 
++extern const ipmi::sensor::IdInfoMap sensors;
+ extern const ipmi::sensor::InvObjectIDMap invSensors;
+ using namespace phosphor::logging;
+ using InternalFailure =
+@@ -37,6 +39,8 @@ GetSELEntryResponse prepareSELEntry(
+         const std::string& objPath,
+         ipmi::sensor::InvObjectIDMap::const_iterator iter)
+ {
++    unsigned long reading = 0;
++    unsigned long threshold = 0;
+     GetSELEntryResponse record {};
+ 
+     sdbusplus::bus::bus bus{ipmid_get_sd_bus_connection()};
+@@ -96,7 +100,65 @@ GetSELEntryResponse prepareSELEntry(
+ 
+     record.sensorType = iter->second.sensorType;
+     record.sensorNum = iter->second.sensorID;
+-    record.eventData1 = iter->second.eventOffset;
++
++    // threshold type event, put reading and thrshold value into SEL record
++    if (iter->second.eventReadingType == 0x01)
++    {
++        static constexpr auto searchStr = "AdditionalData";
++        auto iterData = entryData.find(searchStr);
++        if (iterData != entryData.end())
++        {
++            auto additionalData = sdbusplus::message::variant_ns::get<std::vector<std::string>>(iterData->second);
++            constexpr auto reading_str = "READING=";
++            constexpr auto threshold_str = "THRESHOLD=";
++            for(const auto& entry: additionalData)
++            {
++                auto found = entry.find(reading_str);
++                if(std::string::npos != found)
++                {
++                    reading = std::stoul(entry.substr(found + strlen(reading_str)));
++                }
++                found = entry.find(threshold_str);
++                if(std::string::npos != found)
++                {
++                    threshold = std::stoul(entry.substr(found + strlen(threshold_str)));
++                }
++            }
++        }
++
++        record.eventData1 = iter->second.eventOffset | (0x5 << 4);
++        const auto info = sensors.find(iter->second.sensorID);
++        if (info == sensors.end())
++        {
++            log<level::ERR>("Error in finding SensorID in invSensors",
++                             entry("SensorID=0x%x", iter->second.sensorID));
++        }
++        else
++        {
++            double value;
++            ipmi::sensor::Info sensorInfo = info->second;
++            if (reading)
++            {
++                value = reading * pow(10,
++                        sensorInfo.scale - sensorInfo.exponentR);
++
++                record.eventData2 = static_cast<uint8_t>(
++                        (value - sensorInfo.scaledOffset) / sensorInfo.coefficientM);
++            }
++            if (threshold)
++            {
++                value = threshold * pow(10,
++                        sensorInfo.scale - sensorInfo.exponentR);
++
++                record.eventData3 = static_cast<uint8_t>(
++                        (value - sensorInfo.scaledOffset) / sensorInfo.coefficientM);
++            }
++        }
++    }
++    else
++    {
++        record.eventData1 = iter->second.eventOffset;
++    }
+ 
+     // Read Resolved from the log entry.
+     static constexpr auto propResolved = "Resolved";

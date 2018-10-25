@@ -1,0 +1,64 @@
+diff --git a/xyz/openbmc_project/Sensor/Threshold.metadata.yaml b/xyz/openbmc_project/Sensor/Threshold.metadata.yaml
+index 1ebaf51..8d4bbd5 100644
+--- a/xyz/openbmc_project/Sensor/Threshold.metadata.yaml
++++ b/xyz/openbmc_project/Sensor/Threshold.metadata.yaml
+@@ -1,10 +1,18 @@
+ - name: CriticalHigh
+   level: ERR
+   meta:
+-    - str: "SENSOR_DATA=%s"
+-      type: string
++    - str: "READING=%u"
++      type: uint32
++    - str: "THRESHOLD=%u"
++      type: uint32
++  inherits:
++    - xyz.openbmc_project.Common.Callout.Inventory
+ - name: CriticalLow
+   level: ERR
+   meta:
+-    - str: "SENSOR_DATA=%s"
+-      type: string
++    - str: "READING=%u"
++      type: uint32
++    - str: "THRESHOLD=%u"
++      type: uint32
++  inherits:
++    - xyz.openbmc_project.Common.Callout.Inventory
+diff --git a/xyz/openbmc_project/Sensor/Threshold/Critical.interface.yaml b/xyz/openbmc_project/Sensor/Threshold/Critical.interface.yaml
+index c575bb5..e40f28f 100644
+--- a/xyz/openbmc_project/Sensor/Threshold/Critical.interface.yaml
++++ b/xyz/openbmc_project/Sensor/Threshold/Critical.interface.yaml
+@@ -38,6 +38,14 @@ properties:
+ 
+           CriticalAlarmLow may be set to False to clear an alarm condition.
+           The behavior of setting CriticalAlarmLow to True is undefined.
++    - name: EventHigh
++      type: boolean
++      description: >
++            Generate a Event if WarningAlarmHigh is changed from False to True
++    - name: EventLow
++      type: boolean
++      description: >
++            Generate a Event if WarningAlarmLow is changed from False to True
+ 
+ 
+ # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
+diff --git a/xyz/openbmc_project/Sensor/Threshold/Warning.interface.yaml b/xyz/openbmc_project/Sensor/Threshold/Warning.interface.yaml
+index 9f4822b..08c57ec 100644
+--- a/xyz/openbmc_project/Sensor/Threshold/Warning.interface.yaml
++++ b/xyz/openbmc_project/Sensor/Threshold/Warning.interface.yaml
+@@ -39,5 +39,13 @@ properties:
+ 
+           WarningAlarmLow may be set to False to clear an alarm condition.
+           The behavior of setting WarningAlarmLow to True is undefined.
++    - name: EventHigh
++      type: boolean
++      description: >
++            Generate a Event if WarningAlarmHigh is changed from False to True
++    - name: EventLow
++      type: boolean
++      description: >
++            Generate a Event if WarningAlarmLow is changed from False to True
+ 
+ # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
