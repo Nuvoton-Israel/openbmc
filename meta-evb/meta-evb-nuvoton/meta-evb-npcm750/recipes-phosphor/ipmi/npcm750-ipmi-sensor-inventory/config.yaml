@@ -1,0 +1,47 @@
+0x02:
+  sensorType: 0x01
+  path: /xyz/openbmc_project/sensors/temperature/temp1
+  sensorReadingType: 0x01
+  multiplierM: 1
+  offsetB: -127
+  bExp: 0
+  # Result exponent field in Type 1 SDR(2's complement, signed)
+  rExp: 0
+  unit: xyz.openbmc_project.Sensor.Value.Unit.DegreesC
+  # Applies for analog sensors, the actual reading value for the sensor is
+  # Value * 10^N
+  scale: -3
+  mutability: Mutability::Write|Mutability::Read
+  serviceInterface: org.freedesktop.DBus.Properties
+  readingType: readingData
+  sensorNamePattern: nameLeaf
+  interfaces:
+    xyz.openbmc_project.Sensor.Value:
+      Value:
+        Offsets:
+          0xFF:
+            type: int64_t
+
+0x03:
+  sensorType: 0x01
+  path: /xyz/openbmc_project/sensors/temperature/temp2
+  sensorReadingType: 0x01
+  multiplierM: 1
+  offsetB: -127
+  bExp: 0
+  # Result exponent field in Type 1 SDR(2's complement, signed)
+  rExp: 0
+  unit: xyz.openbmc_project.Sensor.Value.Unit.DegreesC
+  # Applies for analog sensors, the actual reading value for the sensor is
+  # Value * 10^N
+  scale: -3
+  mutability: Mutability::Write|Mutability::Read
+  serviceInterface: org.freedesktop.DBus.Properties
+  readingType: readingData
+  sensorNamePattern: nameLeaf
+  interfaces:
+    xyz.openbmc_project.Sensor.Value:
+      Value:
+        Offsets:
+          0xFF:
+            type: int64_t
