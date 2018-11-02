@@ -1,0 +1,25 @@
+/xyz/openbmc_project/inventory/system:
+  sensorID: 0x01
+  sensorType: 0x12
+  eventReadingType: 0x6F
+  offset: 0x02
+/xyz/openbmc_project/sensors/temperature/temp1/critical_high:
+  sensorID: 0x02
+  sensorType: 0x01
+  eventReadingType: 0x01
+  offset: 0x09
+/xyz/openbmc_project/sensors/temperature/temp1/critical_low:
+  sensorID: 0x02
+  sensorType: 0x01
+  eventReadingType: 0x01
+  offset: 0x02
+/xyz/openbmc_project/sensors/temperature/temp2/critical_high:
+  sensorID: 0x03
+  sensorType: 0x01
+  eventReadingType: 0x01
+  offset: 0x09
+/xyz/openbmc_project/sensors/temperature/temp2/critical_low:
+  sensorID: 0x03
+  sensorType: 0x01
+  eventReadingType: 0x01
+  offset: 0x02

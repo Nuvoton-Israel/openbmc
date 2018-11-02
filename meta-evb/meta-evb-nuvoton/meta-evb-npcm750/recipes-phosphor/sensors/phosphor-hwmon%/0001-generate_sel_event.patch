@@ -1,0 +1,188 @@
+diff --git a/mainloop.cpp b/mainloop.cpp
+index cf5baaf..104bc6d 100644
+--- a/mainloop.cpp
++++ b/mainloop.cpp
+@@ -53,8 +53,26 @@ decltype(
+     Thresholds<WarningObject>::alarmLo) Thresholds<WarningObject>::alarmLo =
+     &WarningObject::warningAlarmLow;
+ decltype(
++    Thresholds<WarningObject>::currAlarmLo) Thresholds<WarningObject>::currAlarmLo =
++    &WarningObject::warningAlarmLow;
++decltype(
+     Thresholds<WarningObject>::alarmHi) Thresholds<WarningObject>::alarmHi =
+     &WarningObject::warningAlarmHigh;
++decltype(
++    Thresholds<WarningObject>::currAlarmHi) Thresholds<WarningObject>::currAlarmHi =
++    &WarningObject::warningAlarmHigh;
++decltype(
++    Thresholds<WarningObject>::eventLo) Thresholds<WarningObject>::eventLo =
++    &WarningObject::eventLow;
++decltype(
++    Thresholds<WarningObject>::eventHi) Thresholds<WarningObject>::eventHi =
++    &WarningObject::eventHigh;
++decltype(
++    Thresholds<WarningObject>::geteventLo) Thresholds<WarningObject>::geteventLo =
++    &WarningObject::eventLow;
++decltype(
++    Thresholds<WarningObject>::geteventHi) Thresholds<WarningObject>::geteventHi =
++    &WarningObject::eventHigh;
+ 
+ // Initialization for Critical Objects
+ decltype(Thresholds<CriticalObject>::setLo) Thresholds<CriticalObject>::setLo =
+@@ -69,8 +87,26 @@ decltype(
+     Thresholds<CriticalObject>::alarmLo) Thresholds<CriticalObject>::alarmLo =
+     &CriticalObject::criticalAlarmLow;
+ decltype(
++    Thresholds<CriticalObject>::currAlarmLo) Thresholds<CriticalObject>::currAlarmLo =
++    &CriticalObject::criticalAlarmLow;
++decltype(
+     Thresholds<CriticalObject>::alarmHi) Thresholds<CriticalObject>::alarmHi =
+     &CriticalObject::criticalAlarmHigh;
++decltype(
++    Thresholds<CriticalObject>::currAlarmHi) Thresholds<CriticalObject>::currAlarmHi =
++    &CriticalObject::criticalAlarmHigh;
++decltype(
++    Thresholds<CriticalObject>::eventLo) Thresholds<CriticalObject>::eventLo =
++    &CriticalObject::eventLow;
++decltype(
++    Thresholds<CriticalObject>::eventHi) Thresholds<CriticalObject>::eventHi =
++    &CriticalObject::eventHigh;
++decltype(
++    Thresholds<CriticalObject>::geteventLo) Thresholds<CriticalObject>::geteventLo =
++    &CriticalObject::eventLow;
++decltype(
++    Thresholds<CriticalObject>::geteventHi) Thresholds<CriticalObject>::geteventHi =
++    &CriticalObject::eventHigh;
+ 
+ std::string MainLoop::getID(SensorSet::container_t::const_reference sensor)
+ {
+@@ -370,6 +406,7 @@ void MainLoop::read()
+             {
+                 auto& objInfo = std::get<ObjectInfo>(i.second);
+                 auto& obj = std::get<Object>(objInfo);
++                auto& path = std::get<std::string>(objInfo);
+ 
+                 auto it = obj.find(InterfaceType::STATUS);
+                 if (it != obj.end())
+@@ -407,10 +444,10 @@ void MainLoop::read()
+                             valueIface->value(value);
+                             break;
+                         case InterfaceType::WARN:
+-                            checkThresholds<WarningObject>(iface.second, value);
++                            checkThresholds<WarningObject>(path, iface.second, value);
+                             break;
+                         case InterfaceType::CRIT:
+-                            checkThresholds<CriticalObject>(iface.second,
++                            checkThresholds<CriticalObject>(path, iface.second,
+                                                             value);
+                             break;
+                         default:
+diff --git a/thresholds.hpp b/thresholds.hpp
+index c483665..0dd22c9 100644
+--- a/thresholds.hpp
++++ b/thresholds.hpp
+@@ -1,7 +1,12 @@
+ #pragma once
+ 
++#include <phosphor-logging/elog-errors.hpp>
++#include <xyz/openbmc_project/Sensor/Threshold/error.hpp>
++#include <xyz/openbmc_project/Logging/Entry/server.hpp>
+ #include "env.hpp"
+ 
++using namespace phosphor::logging;
++using namespace sdbusplus::xyz::openbmc_project::Sensor::Threshold::Error;
+ /** @class Thresholds
+  *  @brief Threshold type traits.
+  *
+@@ -29,6 +34,12 @@ struct Thresholds<WarningObject>
+     static int64_t (WarningObject::*const getHi)() const;
+     static bool (WarningObject::*const alarmLo)(bool);
+     static bool (WarningObject::*const alarmHi)(bool);
++    static bool (WarningObject::*const currAlarmHi)() const;
++    static bool (WarningObject::*const currAlarmLo)() const;
++    static bool (WarningObject::*const eventLo)(bool);
++    static bool (WarningObject::*const eventHi)(bool);
++    static bool (WarningObject::*const geteventLo)() const;
++    static bool (WarningObject::*const geteventHi)() const;
+ };
+ 
+ /**@brief Thresholds specialization for critical thresholds. */
+@@ -44,6 +55,12 @@ struct Thresholds<CriticalObject>
+     static int64_t (CriticalObject::*const getHi)() const;
+     static bool (CriticalObject::*const alarmLo)(bool);
+     static bool (CriticalObject::*const alarmHi)(bool);
++    static bool (CriticalObject::*const currAlarmHi)() const;
++    static bool (CriticalObject::*const currAlarmLo)() const;
++    static bool (CriticalObject::*const eventLo)(bool);
++    static bool (CriticalObject::*const eventHi)(bool);
++    static bool (CriticalObject::*const geteventLo)() const;
++    static bool (CriticalObject::*const geteventHi)() const;
+ };
+ 
+ /** @brief checkThresholds
+@@ -57,13 +74,33 @@ struct Thresholds<CriticalObject>
+  *  @param[in] value - The sensor reading to compare to thresholds.
+  */
+ template <typename T>
+-void checkThresholds(std::experimental::any& iface, int64_t value)
++void checkThresholds(std::string path, std::experimental::any& iface, int64_t value)
+ {
+     auto realIface = std::experimental::any_cast<std::shared_ptr<T>>(iface);
+     auto lo = (*realIface.*Thresholds<T>::getLo)();
+     auto hi = (*realIface.*Thresholds<T>::getHi)();
++    auto curr_alarmHi =  (*realIface.*Thresholds<T>::currAlarmHi)();
++    auto curr_alarmLo =  (*realIface.*Thresholds<T>::currAlarmLo)();
++    auto eventLo =  (*realIface.*Thresholds<T>::geteventLo)();
++    auto eventHi =  (*realIface.*Thresholds<T>::geteventHi)();
++    std::string InvPath = path;
+     (*realIface.*Thresholds<T>::alarmLo)(value <= lo);
+     (*realIface.*Thresholds<T>::alarmHi)(value >= hi);
++	if (eventHi && (value >= hi) && (curr_alarmHi == false)) {
++        InvPath.append("/critical_high");
++		log<level::ERR>("Sensor exceeds upper bound",
++                        entry("CALLOUT_INVENTORY_PATH=%s", InvPath.c_str()),
++                        entry("READING=%lld", value),
++                        entry("THRESHOLD=%lld", hi));
++		commit<CriticalHigh>();
++	} else if (eventLo && (value <= lo) && (curr_alarmLo == false)) {
++        InvPath.append("/critical_low");
++        log<level::ERR>("Sensor exceeds lower bound",
++                        entry("CALLOUT_INVENTORY_PATH=%s", InvPath.c_str()),
++                        entry("READING=%lld", value),
++                        entry("THRESHOLD=%lld", lo));
++		commit<CriticalLow>();
++	}
+ }
+ 
+ /** @brief addThreshold
+@@ -88,9 +125,21 @@ auto addThreshold(const std::string& sensorType, const std::string& sensorID,
+     auto& objPath = std::get<std::string>(info);
+     auto& obj = std::get<Object>(info);
+     std::shared_ptr<T> iface;
++    std::set<std::string> events;
+ 
+     auto tLo = env::getEnv(Thresholds<T>::envLo, sensorType, sensorID);
+     auto tHi = env::getEnv(Thresholds<T>::envHi, sensorType, sensorID);
++    auto Event = env::getEnv("EVENT", sensorType, sensorID);
++    if (!Event.empty())
++    {
++        std::stringstream ss(Event);
++        std::string item;
++        while (std::getline(ss, item, ','))
++        {
++            events.insert(item);
++        }
++    }
++
+     if (!tLo.empty() && !tHi.empty())
+     {
+         iface = std::make_shared<T>(bus, objPath.c_str(), deferSignals);
+@@ -100,6 +149,8 @@ auto addThreshold(const std::string& sensorType, const std::string& sensorID,
+         (*iface.*Thresholds<T>::setHi)(hi);
+         (*iface.*Thresholds<T>::alarmLo)(value <= lo);
+         (*iface.*Thresholds<T>::alarmHi)(value >= hi);
++        (*iface.*Thresholds<T>::eventLo)(events.find(Thresholds<T>::envLo) != events.end());
++        (*iface.*Thresholds<T>::eventHi)(events.find(Thresholds<T>::envHi) != events.end());
+         auto type = Thresholds<T>::type;
+         obj[type] = iface;
+     }

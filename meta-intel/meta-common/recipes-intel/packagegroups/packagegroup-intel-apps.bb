@@ -2,7 +2,6 @@ SUMMARY = "OpenBMC for Intel - Applications"
 PR = "r1"
 
 inherit packagegroup
-inherit obmc-phosphor-license
 
 PROVIDES = "${PACKAGES}"
 PACKAGES = " \
@@ -47,5 +46,6 @@ SUMMARY_${PN}-system = "Intel System"
 RDEPENDS_${PN}-system = " \
         obmc-mgr-system \
         bmcweb \
+        entity-manager \
         phosphor-webui \
         "

@@ -1,0 +1,12 @@
+[Unit]
+Description=Phosphor Reset Button%i
+
+[Service]
+Restart=always
+ExecStart=/usr/bin/env button_reset.exe
+SyslogIdentifier=button_reset.exe
+Type=dbus
+BusName={BUSNAME}
+
+[Install]
+WantedBy={SYSTEMD_DEFAULT_TARGET}

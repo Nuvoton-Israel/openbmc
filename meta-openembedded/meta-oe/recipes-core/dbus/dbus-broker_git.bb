@@ -8,16 +8,16 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=7b486c2338d225a1405d979ed2c15ce8"
 
 DEPENDS = "dbus glib-2.0 expat"
 
-PV = "9+git${SRCPV}"
-SRCREV = "ccd06b284892182af569e69046262331150e3536"
+PV = "16+git${SRCPV}"
+SRCREV = "fc874afa0992d0c75ec25acb43d344679f0ee7d2"
 
 SRC_URI = "git://github.com/bus1/dbus-broker;protocol=git"
-SRC_URI += "file://0001-Comment-rst2man-related-stuff.patch"
-SRC_URI += "file://0002-Correct-including-directory-for-conf.patch"
 
 S = "${WORKDIR}/git"
 
 inherit meson pkgconfig systemd distro_features_check
+
+EXTRA_OEMESON += "-Ddocs=false"
 
 REQUIRED_DISTRO_FEATURES = "systemd"
 

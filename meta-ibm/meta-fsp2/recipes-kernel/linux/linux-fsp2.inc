@@ -4,7 +4,7 @@ LICENSE = "GPLv2"
 
 KCONFIG_MODE="--alldefconfig"
 
-KSRC ?= "git://github.com/openbmc/linux;protocol=git;branch=dev-4.13"
+KSRC ?= "git://github.com/openbmc/linux;protocol=git;branch=dev-4.17"
 SRC_URI = "${KSRC}"
 
 LINUX_VERSION_EXTENSION ?= "-${SRCREV}"
@@ -13,6 +13,7 @@ PV = "${LINUX_VERSION}+git${SRCPV}"
 
 COMPATIBLE_MACHINE_${MACHINE} = "^${MACHINE}$"
 KERNEL_CLASSES ?= "kernel-uimage"
+KERNEL_IMAGETYPE ?= "uImage"
 
 do_patch_append() {
     for DTB in "${KERNEL_DEVICETREE}"; do
