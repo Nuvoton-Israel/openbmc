@@ -1,0 +1,182 @@
+commit d4996f2a37674e9820eec1b9c08946efe61cb69d
+Author: Medad <ctcchien@nuvoton.com>
+Date:   Thu Oct 4 14:13:30 2018 +0800
+
+    [PATCH] add vm handler
+
+diff --git a/obmc/wsgi/apps/rest_dbus.py b/obmc/wsgi/apps/rest_dbus.py
+index 25c1da7..5c2e0bb 100755
+--- a/obmc/wsgi/apps/rest_dbus.py
++++ b/obmc/wsgi/apps/rest_dbus.py
+@@ -1079,7 +1079,6 @@ class HostKvmHandler(RouteHandler):
+         wsock = request.environ.get('wsgi.websocket')
+         if not wsock:
+             abort(400, 'Expected WebSocket based request.')
+-
+         HOST = '127.0.0.1'
+         PORT = 5900
+         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+@@ -1094,7 +1093,143 @@ class HostKvmHandler(RouteHandler):
+         ping_sender = Greenlet.spawn(send_ws_ping, wsock, WEBSOCKET_TIMEOUT)
+         gevent.joinall([wsock_reader, sock_reader, ping_sender])
+ 
++class HostVMHandler(RouteHandler):
++    verbs = ['GET']
++    # Naming the route vm, because the numbering will help
++    # on multi-bmc/multi-host systems.
++    rules = ['/vmws']
++
++    def __init__(self, app, bus):
++        super(HostVMHandler, self).__init__(
++            app, bus, self.verbs, self.rules)
++
++    def find(self, **kw):
++        pass
++
++    def setup(self, **kw):
++        pass
++
++    def read_wsock(self, wsock, sock, server):
++        while True:
++            try:
++                incoming = wsock.receive()
++                if incoming:
++                    # Read websocket, write to UNIX socket
++                    sock.send(incoming)
++            except Exception as e:
++                os.system("echo \"\" > /sys/kernel/config/usb_gadget/mass_storage/UDC")
++                os.system("echo \"\" > /sys/kernel/config/usb_gadget/mass_storage/functions/mass_storage.0/lun.0/file")
++                os.system("nbd-client -d /dev/nbd0")
++                sock.close()
++                server.close()
++                return
++
++    def read_sock(self, sock, wsock, server):
++        max_sock_read_len = 3840000
++        while True:
++            try:
++                outgoing = sock.recv(max_sock_read_len)
++                if outgoing:
++                    # Read TCP socket, write to websocket
++                    wsock.send(outgoing, binary=True)
++            except Exception as e:
++                os.system("echo \"\" > /sys/kernel/config/usb_gadget/mass_storage/UDC")
++                os.system("echo \"\" > /sys/kernel/config/usb_gadget/mass_storage/functions/mass_storage.0/lun.0/file")
++                os.system("nbd-client -d /dev/nbd0")
++                wsock.close()
++                server.close()
++                return
++
++    def wait_sock(self, wsock):
++        bind_ip = "127.0.0.1"
++        port = 10809
++        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
++        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
++        server.bind((bind_ip,port))
++        server.listen(1)
++        print "[*] Listening on %s:%d" % (bind_ip, port)
++        sock, addr = server.accept()
++        print "[*] Acepted connection from: %s:%d" % (addr[0],addr[1])
++
++        wsock_reader = Greenlet.spawn(self.read_wsock, wsock, sock, server)
++        sock_reader = Greenlet.spawn(self.read_sock, sock, wsock, server)
++        ping_sender = Greenlet.spawn(send_ws_ping, wsock, WEBSOCKET_TIMEOUT)
++        gevent.joinall([wsock_reader, sock_reader, ping_sender])
++
++    def launch_nbd_client(self):
++        os.system("nbd-client 127.0.0.1 10809 /dev/nbd0 -b 512 -N poleg-nbd&")
++
++    def do_get(self):
++        wsock = request.environ.get('wsgi.websocket')
++        if not wsock:
++            abort(400, 'Expected WebSocket based request.')
++        sock_waiter = Greenlet.spawn(self.wait_sock, wsock)
++        nbd_client = Greenlet.spawn(self.launch_nbd_client);
++        gevent.joinall([sock_waiter,nbd_client])
++
++class HostENMSTGHandler(RouteHandler):
++    verbs = ['GET']
++    # Naming the route vm, because the numbering will help
++    # on multi-bmc/multi-host systems.
++    rules = ['/enablemstgws']
++
++    def __init__(self, app, bus):
++        super(HostENMSTGHandler, self).__init__(
++            app, bus, self.verbs, self.rules)
++
++    def find(self, **kw):
++        pass
++
++    def setup(self, **kw):
++        pass
++
++    def do_get(self):
++        wsock = request.environ.get('wsgi.websocket')
++        if not wsock:
++            abort(400, 'Expected WebSocket based request.')
++
++        os.system("mkdir -p /sys/kernel/config/usb_gadget/mass_storage")
++        os.system("mkdir -p /sys/kernel/config/usb_gadget/mass_storage/configs/c.1")
++        os.system("mkdir -p /sys/kernel/config/usb_gadget/mass_storage/functions/mass_storage.0")
++        os.system("mkdir -p /sys/kernel/config/usb_gadget/mass_storage/strings/0x409")
++        os.system("mkdir -p /sys/kernel/config/usb_gadget/mass_storage/configs/c.1/strings/0x409")
++        os.system("echo 0xa4a5 > /sys/kernel/config/usb_gadget/mass_storage/idProduct")
++        os.system("echo 0x0525 > /sys/kernel/config/usb_gadget/mass_storage/idVendor")
++        os.system("echo poleg750 > /sys/kernel/config/usb_gadget/mass_storage/strings/0x409/serialnumber")
++        os.system("echo nuvoton > /sys/kernel/config/usb_gadget/mass_storage/strings/0x409/manufacturer")
++        os.system("echo \"Mass Storage Gadget\" > /sys/kernel/config/usb_gadget/mass_storage/strings/0x409/product")
++        os.system("echo \"Conf 1\" > /sys/kernel/config/usb_gadget/mass_storage/configs/c.1/strings/0x409/configuration")
++        os.system("echo 120 > /sys/kernel/config/usb_gadget/mass_storage/configs/c.1/MaxPower")
++        os.system("ln -s /sys/kernel/config/usb_gadget/mass_storage/functions/mass_storage.0 /sys/kernel/config/usb_gadget/mass_storage/configs/c.1")
++
++        os.system("echo /dev/nbd0 > /sys/kernel/config/usb_gadget/mass_storage/functions/mass_storage.0/lun.0/file")
++        os.system("echo f0838000.udc > /sys/kernel/config/usb_gadget/mass_storage/UDC")
++        wsock.close()
++
++class HostDISMSTGHandler(RouteHandler):
++    verbs = ['GET']
++    # Naming the route vm, because the numbering will help
++    # on multi-bmc/multi-host systems.
++    rules = ['/disablemstgws']
++
++    def __init__(self, app, bus):
++        super(HostDISMSTGHandler, self).__init__(
++            app, bus, self.verbs, self.rules)
++
++    def find(self, **kw):
++        pass
++
++    def setup(self, **kw):
++        pass
++
++    def do_get(self):
++        wsock = request.environ.get('wsgi.websocket')
++        if not wsock:
++            abort(400, 'Expected WebSocket based request.')
+ 
++        os.system("echo \"\" > /sys/kernel/config/usb_gadget/mass_storage/UDC")
++        os.system("echo \"\" > /sys/kernel/config/usb_gadget/mass_storage/functions/mass_storage.0/lun.0/file")
++        wsock.close()
+ 
+ class ImagePutHandler(RouteHandler):
+     ''' Handles the /upload/image/<filename> route. '''
+@@ -1569,6 +1704,9 @@ class App(Bottle):
+             self.event_handler = EventHandler(self, self.bus)
+             self.host_console_handler = HostConsoleHandler(self, self.bus)
+             self.host_kvm_handler = HostKvmHandler(self, self.bus)
++            self.host_vm_handler = HostVMHandler(self, self.bus)
++            self.host_enmstg_handler = HostENMSTGHandler(self, self.bus)
++            self.host_dismstg_handler = HostDISMSTGHandler(self, self.bus)
+         self.instance_handler = InstanceHandler(self, self.bus)
+ 
+     def install_handlers(self):
+@@ -1587,6 +1725,9 @@ class App(Bottle):
+             self.event_handler.install()
+             self.host_console_handler.install()
+             self.host_kvm_handler.install()
++            self.host_vm_handler.install()
++            self.host_enmstg_handler.install()
++            self.host_dismstg_handler.install()
+         # this has to come last, since it matches everything
+         self.instance_handler.install()
+ 
