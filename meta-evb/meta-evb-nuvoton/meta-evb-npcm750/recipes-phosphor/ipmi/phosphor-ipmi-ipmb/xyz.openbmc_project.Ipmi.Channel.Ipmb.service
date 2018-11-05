@@ -1,0 +1,12 @@
+[Unit]
+Description=Phosphor IPMI IPMB DBus Bridge
+After=phosphor-ipmi-host.service
+
+[Service]
+Restart=always
+ExecStart={sbindir}/ipmbbridged
+Type=dbus
+BusName={BUSNAME}
+
+[Install]
+WantedBy={SYSTEMD_DEFAULT_TARGET}
