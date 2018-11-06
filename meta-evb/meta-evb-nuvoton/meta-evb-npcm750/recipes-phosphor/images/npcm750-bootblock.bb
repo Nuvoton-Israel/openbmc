@@ -1,4 +1,3 @@
-
 # TODO: LICENSE is being set to "CLOSED" to allow you to at least start building - if
 # this is not accurate with respect to the licensing of the software being built (it
 # will not be in most cases) you must specify the correct value before using this
@@ -6,10 +5,12 @@
 LICENSE = "CLOSED"
 LIC_FILES_CHKSUM = ""
 
-SRC_URI = "https://github.com/Nuvoton-Israel/npcm7xx-bootblock/releases/download/10.08.07/Poleg_bootblock_google.bin"
-SRC_URI[md5sum] = "79d286ffc197ba1935073915c9ac2ac1"
+SRC_URI = "git://github.com/Nuvoton-Israel/npcm7xx-bootblock;protocol=git"
+SRC_URI[md5sum] = "cf8daa5f4636ed1ff952618e435af028"
 
-SRCREV = "${AUTOREV}"
+SRCREV = "10.09.02"
+
+S = "${WORKDIR}/git"
 
 inherit deploy
 
@@ -17,7 +18,7 @@ BOOTBLOCK ?= "bootblock.bin"
 
 do_deploy () {
 	install -d ${DEPLOYDIR}
-	install -m 644 ${WORKDIR}/Poleg_bootblock_google.bin ${DEPLOYDIR}/${BOOTBLOCK}
+	install -m 644 Poleg_bootblock.bin ${DEPLOYDIR}/${BOOTBLOCK}
 }
 
 addtask deploy before do_build after do_compile
