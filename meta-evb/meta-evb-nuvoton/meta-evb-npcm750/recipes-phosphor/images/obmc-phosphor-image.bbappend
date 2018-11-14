@@ -1,11 +1,3 @@
-do_generate_static[depends] += "u-boot-fw-utils-nuvoton:do_populate_sysroot"
-do_generate_static[depends] += "u-boot-nuvoton:do_populate_sysroot"
-do_generate_static[depends] += "npcm750-bootblock:do_deploy"
-do_generate_static[depends] += "npcm7xx-signit-native:do_populate_sysroot"
-do_generate_static[depends] += "npcm7xx-bingo-native:do_populate_sysroot"
-do_generate_static[depends] += "npcm7xx-uut-native:do_populate_sysroot"
-do_generate_static[depends] += "npcm7xx-igps-native:do_populate_sysroot"
-
 inherit npcm7xx-image
 
 FLASH_UBOOT_OFFSET = "0"
@@ -34,8 +26,22 @@ IMAGE_INSTALL_append = " bmcweb \
                          iperf2 \
                        "
 
-do_prepare_merged_bb_uboot () {
+# start generate mtd image only after scrits, tools and inputs are ready 
+do_generate_static[depends] += " \
+        u-boot-fw-utils-nuvoton:do_populate_sysroot \
+        u-boot-nuvoton:do_populate_sysroot          \
+        npcm750-bootblock:do_deploy                 \
+        npcm7xx-signit-native:do_populate_sysroot   \
+        npcm7xx-bingo-native:do_populate_sysroot    \
+        npcm7xx-uut-native:do_populate_sysroot      \
+        npcm7xx-igps-native:do_populate_sysroot     \
+        "
 
+# do_generate_ubi_tar will use the outputs of do_generate_static
+do_generate_ubi_tar[depends] += "${PN}:do_generate_static"
+
+do_prepare_merged_bb_uboot () {
+	echo "OSHRI: ${IMAGE_FSTYPES}" 
 	# take Nuvoton's EB inputs
 	python ${IGPS_DIR}/UpdateInputsBinaries_EB.py
 
@@ -50,7 +56,7 @@ do_prepare_merged_bb_uboot () {
 	cp ${IGPS_OUTPUT_MERGED_BIN} ${UBOOT_BIN}.merged
 
 	# rename the merged image to be the "real" u-boot, later will be used
-	# by do_generate_static (after will be restored by o_npcm7xx_bb_uboot_end)  
+	# by do_generate_static (after will be restored)  
 	cp ${UBOOT_BIN} ${UBOOT_BIN}.plan 
 	cp ${UBOOT_BIN}.merged ${UBOOT_BIN}
 }
@@ -66,8 +72,8 @@ do_generate_static_prepend () {
     bb.build.exec_func("do_prepare_merged_bb_uboot", d)
 }
 
-do_generate_static_append () {
+do_generate_ubi_tar_append () {
 
-    bb.build.exec_func("do_restore_uboot", d)
+    do_restore_uboot
 }
 
