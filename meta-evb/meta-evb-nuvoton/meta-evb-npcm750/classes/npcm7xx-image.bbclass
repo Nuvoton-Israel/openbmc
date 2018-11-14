@@ -1,0 +1,9 @@
+IGPS_DIR = "${STAGING_DIR}/usr/bin/igps"
+IGPS_IMAGE_GENERATION_DIR = "${IGPS_DIR}/ImageGeneration"
+IGPS_IMAGE_PROGRAMMING_DIR = "${IGPS_DIR}/ImageProgramming"
+IGPS_OUTPUTS_BASIC_DIR = "${IGPS_IMAGE_GENERATION_DIR}/output_binaries/Basic"
+IGPS_OUTPUT_MERGED_BIN = "${IGPS_OUTPUTS_BASIC_DIR}/mergedBootBlockAndUboot.bin"
+
+BOOTBLOCK_BIN = "${DEPLOY_DIR_IMAGE}/Poleg_bootblock.bin"
+UBOOT_BIN = "${DEPLOY_DIR_IMAGE}/u-boot.${UBOOT_SUFFIX}"
+

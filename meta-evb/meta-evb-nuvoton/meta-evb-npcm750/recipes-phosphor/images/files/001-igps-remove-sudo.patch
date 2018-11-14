@@ -1,0 +1,39 @@
+diff --git a/ImageGeneration/BinaryGenerator.py b/ImageGeneration/BinaryGenerator.py
+index d3ec8d6..2e615ab 100644
+--- a/ImageGeneration/BinaryGenerator.py
++++ b/ImageGeneration/BinaryGenerator.py
+@@ -10,7 +10,7 @@ import os
+ 
+ 
+ bingo = "bingo"
+-linux_prefix = "sudo ./"
++linux_prefix = "./"
+ 
+ 
+ class BingoError(Exception):
+diff --git a/ImageGeneration/BinarySignatureGenerator.py b/ImageGeneration/BinarySignatureGenerator.py
+index 3fc0034..5509715 100644
+--- a/ImageGeneration/BinarySignatureGenerator.py
++++ b/ImageGeneration/BinarySignatureGenerator.py
+@@ -10,7 +10,7 @@ import os
+ 
+ 
+ signit = "signit"
+-linux_prefix = "sudo ./"
++linux_prefix = "./"
+ 
+ 
+ class SignitError(Exception):
+diff --git a/ImageProgramming/UartUpdate.py b/ImageProgramming/UartUpdate.py
+index 35364f2..8f4efd2 100644
+--- a/ImageProgramming/UartUpdate.py
++++ b/ImageProgramming/UartUpdate.py
+@@ -9,7 +9,7 @@ import sys
+ import os
+ 
+ uartUpdateTool = "Uartupdatetool"
+-linux_prefix = "sudo ./"
++linux_prefix = "./"
+ 
+ serialportnum_file = os.path.join(".", "SerialPortNumber.txt")
+ serialportbaudrate_file = os.path.join(".", "SerialPortBaudRate.txt")
