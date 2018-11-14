@@ -5,6 +5,8 @@
 LICENSE = "CLOSED"
 LIC_FILES_CHKSUM = ""
 
+inherit npcm7xx-image
+
 SRC_URI = "git://github.com/Nuvoton-Israel/npcm7xx-bootblock;protocol=git"
 SRC_URI[md5sum] = "cf8daa5f4636ed1ff952618e435af028"
 
@@ -14,11 +16,9 @@ S = "${WORKDIR}/git"
 
 inherit deploy
 
-BOOTBLOCK ?= "bootblock.bin"
-
 do_deploy () {
 	install -d ${DEPLOYDIR}
-	install -m 644 Poleg_bootblock.bin ${DEPLOYDIR}/${BOOTBLOCK}
+	install -m 644 Poleg_bootblock.bin ${DEPLOYDIR}/
 }
 
 addtask deploy before do_build after do_compile
