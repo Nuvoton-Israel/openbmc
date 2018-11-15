@@ -10,6 +10,9 @@ FLASH_RWFS_OFFSET = "30720"
 FLASH_UBI_RWFS_SIZE = "6144"
 FLASH_UBI_RWFS_TXT_SIZE = "6MiB"
 
+SIGNING_KEY = "${STAGING_DIR_NATIVE}${datadir}/Nuvoton.priv"
+SIGNING_KEY_DEPENDS = "phosphor-nuvoton-signing-key-native:do_populate_sysroot"
+
 OBMC_IMAGE_EXTRA_INSTALL_append = " phosphor-ipmi-host"
 OBMC_IMAGE_EXTRA_INSTALL_append = " phosphor-ipmi-kcs"
 OBMC_IMAGE_EXTRA_INSTALL_append = " phosphor-ipmi-net"
@@ -24,6 +27,7 @@ IMAGE_INSTALL_append = " bmcweb \
                          lmsensors-sensord \
                          lmsensors-sensors \
                          iperf2 \
+                         phosphor-image-signing \
                        "
 
 # start generate mtd image only after scrits, tools and inputs are ready 
@@ -77,3 +81,12 @@ do_generate_ubi_tar_append () {
     do_restore_uboot
 }
 
+make_image_links_append () {
+	# link image-u-boot-merged under obmc-phosphor-image folder to u-boot.bin.merged
+	ln -sf ${DEPLOY_DIR_IMAGE}/u-boot.${UBOOT_SUFFIX}.merged image-u-boot-merged
+}
+
+do_mk_static_symlinks_append () {
+	# link image-u-boot-merged under deploy folder to u-boot.bin.merged
+	ln -sf u-boot.${UBOOT_SUFFIX}.merged ${IMGDEPLOYDIR}/image-u-boot-merged
+}
