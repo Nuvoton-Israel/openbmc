@@ -39,6 +39,7 @@ Please submit any patches against the NPCM750 evaluation board layer to the main
     + [OBMC iKVM](#obmc-ikvm)
     + [SOL](#sol)
     + [VM](#vm)
+    + [Firmware Update](#firmware-update)
   * [System](#system)
     + [Time](#time)
     + [Sensor](#sensor)
@@ -257,6 +258,43 @@ Virtual Media (VM) is to emulate an USB drive on remote host PC via Network Bloc
 
 **Maintainer**
 * Medad CChien
+
+### Firmware Update
+<img align="right" width="30%" src="https://cdn.rawgit.com/NTC-CCBG/snapshots/0f22742/openbmc/firmware-update.png">
+
+Virtual Media (VM) is to emulate an USB drive on remote host PC via Network Block Device(NBD) and Mass Storage(MSTG).
+
+**Source URL**
+
+* [https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/images](https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/images)
+
+**How to use**
+
+1. Upload update package from webui, then you will see
+    ```
+    Activate   
+    ```
+    > if you select activate, then you will see activation dialog at item 2 
+      
+    ```
+    Delete
+    ```
+    > If you select delete, then the package will be deleted right now
+ 
+2. Confirm BMC firmware file activation
+    ```
+    ACTIVATE FIRMWARE FILE WITHOUT REBOOTING BMC
+    ```
+    > if you select this, you need to reboot BMC manually, and shutdown application will run update script to flash image into spi flash
+    
+    ```
+    ACTIVATE FIRMWARE FILE AND AUTOMATICALLY REBOOT BMC
+    ```
+    > if you select this, BMC will shutdown right now, and shutdown application will run update script to flash image into spi flash
+
+**Maintainer**
+* Medad CChien
+
 
 ## System
 
@@ -802,3 +840,4 @@ image-rwfs    |  0 MB  | middle layer of the overlayfs, rw files in this partiti
 * 2018.10.05 Update webui and  patch of webui and interface and vm-own.png
 * 2018.10.11 Add Sensor
 * 2018.11.16 Add obmc-ikvm support in bmcweb 
+* 2018.11.22 Enable firmware update support 
