@@ -1,0 +1,6 @@
+FILESEXTRAPATHS_prepend := "${THISDIR}/${PN}:"
+
+SRCREV = "162be7b8b816ff34d08b8d5db461de067356b4d9"
+SRC_URI += "file://0001-bmcweb-support-obmc-ikvm.patch"
+
+EXTRA_OECMAKE += "-DBMCWEB_ENABLE_KVM=OFF -DBMCWEB_ENABLE_OBMC_IKVM=ON"
