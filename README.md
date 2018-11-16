@@ -102,5 +102,9 @@ For more info follow the readme.txt in:
 "Loading to Evaluation Board and running instructions".
 In order to get a password for the ftp please contact BMC_Marketing@Nuvoton.com
 
+#### 9) Enabled features
+For more info of openbmc features we enabled in:
+[https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750](https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750)
+
 ## Contact
 - Mail: tomer.maimon@nuvoton.com,  avi.fishman@nuvoton.com or BMC_Marketing@Nuvoton.com
