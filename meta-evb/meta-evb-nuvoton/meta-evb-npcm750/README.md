@@ -42,6 +42,7 @@ Please submit any patches against the NPCM750 evaluation board layer to the main
   * [System](#system)
     + [Time](#time)
     + [Sensor](#sensor)
+    + [LED](#led)
   * [IPMI / DCMI](#ipmi--dcmi)
     + [SOL IPMI](#sol-ipmi)
 - [IPMI Comamnds Verified](#ipmi-comamnds-verified)
@@ -524,6 +525,39 @@ Later on, ipmi tool on host side can send IPMI command to BMC to get SEL events,
 **Maintainer**
 
 * Stanley Chu 
+
+### LED
+<img align="right" width="30%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/db6eec1/openbmc/led.png">  
+
+Turning on ServerLED will make **hearbeat** and **identify** leds on EVB start blinking
+
+**Source URL**
+* [https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/leds](https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/leds)
+
+**How to use**
+* Add enclosure_identify in LED [config file](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/leds/npcm750-led-manager-config/led.yaml)
+  ```
+  enclosure_identify:
+    heartbeat:
+        Action: 'Blink'
+        DutyOn: 50
+        Period: 1000
+    identify:
+        Action: 'Blink'
+        DutyOn: 50
+        Period: 1000
+
+  ```
+
+* Modify BSP layer [config](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/conf/machine/evb-npcm750.conf) to select npcm750 LED config file
+  ```
+  PREFERRED_PROVIDER_virtual/phosphor-led-manager-config-native = "npcm750-led-manager-config-native"
+  ```
+
+**Maintainer**
+
+* Stanley Chu 
+
 
 ## IPMI / DCMI
 
