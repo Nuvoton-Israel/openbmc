@@ -28,7 +28,7 @@ Please submit any patches against the NPCM750 evaluation board layer to the main
 * Medad CChien, <CTCCHIEN@nuvoton.com>
 * Tyrone Ting, <KFTING@nuvoton.com>
 * Stanley Chu, <YSCHU@nuvoton.com>
-* Tim Li, <CHLI30@nuvoton.com>
+* Tim Lee, <CHLI30@nuvoton.com>
 
 # Table of Contents
 
@@ -44,6 +44,7 @@ Please submit any patches against the NPCM750 evaluation board layer to the main
     + [Time](#time)
     + [Sensor](#sensor)
     + [LED](#led)
+    + [FAN](#fan)
   * [IPMI / DCMI](#ipmi--dcmi)
     + [SOL IPMI](#sol-ipmi)
   * [Features In Progressing](#features-in-progressing)
@@ -427,7 +428,7 @@ Virtual Media (VM) is to emulate an USB drive on remote host PC via Network Bloc
     timedatectl list-timezones
     ```
 **Maintainer**  
-* Tim Li
+* Tim Lee
 
 ### Sensor
 <img align="right" width="30%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/e1d1733/openbmc/sensor.png">  
@@ -598,6 +599,38 @@ Turning on ServerLED will make **hearbeat** and **identify** leds on EVB start b
 
 * Oshri Alkob
 * Stanley Chu
+
+
+### FAN
+In Poleg, we support four FAN slots and FAN RPMS will dynamic adjustment according temperature variation. However, before using FAN function, you need to provide 12V external power into FLOPPY PWR on Poleg, 12V connect to PIN 4 and GND connect to PIN 2 of FLOPPY PWR.
+
+**Source URL**
+
+Default Web-UI only show one Fan Tach Fan1, and Poleg support four Fan Tach. Thus, we modify this file to support four Fan Tach.
+* [https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/sensors/phosphor-hwmon%25/obmc/hwmon/ahb/apb/pwm-fan-controller%40103000.conf](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/sensors/phosphor-hwmon%25/obmc/hwmon/ahb/apb/pwm-fan-controller%40103000.conf)
+    
+    **How to use**  
+    <img align="right" width="30%" src="https://cdn.rawgit.com/NTC-CCBG/snapshots/5745760/openbmc/fan.png">
+    * Monitor FAN RPMS by **Web-UI** `Server health`  
+      ->`Sensors`
+    * Enable FAN dynamic adjustment with temperature variation by command  
+      ```
+      systemctl start obmc-chassis-poweron@0.target  
+      ```
+      
+      This command will trigger systemd to execute chassis poweron target this unit. Due to FAN control function related to Host control, if you didn't connect to Host with your Poleg EVB, you can use this command to slmulate FAN control function.
+    * Test FAN RPMS by command
+      ```
+      echo 25 > /sys/class/hwmon/hwmon2/pwm1
+      echo 50 > /sys/class/hwmon/hwmon2/pwm2
+      echo 100 > /sys/class/hwmon/hwmon2/pwm3
+      echo 255 > /sys/class/hwmon/hwmon2/pwm6
+      ```
+      We can set pwm value (0-255) for pwm1-3, and 6 to control FAN1-4 RPMS value by echo command and the result will show on Web-UI
+
+**Maintainer**  
+* Oshri Alkob
+* Tim Lee
 
 
 ## IPMI / DCMI
@@ -861,3 +894,4 @@ image-rwfs    |  0 MB  | middle layer of the overlayfs, rw files in this partiti
 * 2018.10.11 Add Sensor
 * 2018.11.16 Add obmc-ikvm support in bmcweb 
 * 2018.11.22 Enable firmware update support 
+* 2018.11.23 Update Sensor description about FAN How to use
