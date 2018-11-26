@@ -1,9 +1,10 @@
 SUMMARY = "Phosphor OpenBMC IPMB to DBUS"
 DESCRIPTION = "Phosphor OpenBMC IPMB to DBUS."
 PR = "r1"
+LICENSE = "Apache-2.0"
+LIC_FILES_CHKSUM = "file://${PHOSPHORBASE}/COPYING.apache-2.0;md5=34400b68072d710fecd0a2940a0d1658"
 
 inherit autotools pkgconfig
-inherit obmc-phosphor-license
 inherit obmc-phosphor-dbus-service
 
 DBUS_SERVICE_${PN} = "xyz.openbmc_project.Ipmi.Channel.Ipmb.service"
