@@ -47,6 +47,7 @@ Please submit any patches against the NPCM750 evaluation board layer to the main
     + [FAN](#fan)
   * [IPMI / DCMI](#ipmi--dcmi)
     + [SOL IPMI](#sol-ipmi)
+    + [Message Bridging](#message-bridging)
   * [Features In Progressing](#features-in-progressing)
   * [Features Planned](#features-planned)
 - [IPMI Comamnds Verified](#ipmi-comamnds-verified)
@@ -688,6 +689,242 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
 
 * Tyrone Ting
 * Stanley Chu
+
+### Message Bridging
+
+BMC Message Bridging provides a mechanism for routing IPMI Messages between different media.
+
+Please refer to [IPMI Website](https://www.intel.com/content/www/us/en/servers/ipmi/ipmi-home.html) for details about Message Bridging.
+
+  * KCS to IPMB
+  <img align="right" width="30%" src="https://cdn.rawgit.com/NTC-CCBG/icons/522a8e05/kcs2ipmb.png">
+  
+The command "Send Message" is used to routing IPMI messages from KCS to IPMB via System Interface.
+
+Later, the response to the bridged request is received by the BMC and routed into the Receive Message Queue and it is retrieved using a Get Message command.
+
+The patch integrates the [kcsbridge](https://github.com/openbmc/kcsbridge), [ipmid](https://github.com/openbmc/phosphor-host-ipmid) and [ipmbbridge](https://gerrit.openbmc-project.xyz/#/c/openbmc/ipmbbridge/+/11130/) projects.
+
+It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) and Supermicro MBD-X9SCL-F-0.
+
+**Source URL**
+
+* [https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/images](https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/images)
+* [https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/ipmi](https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/ipmi)
+* [https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-kernel/linux](https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-kernel/linux)
+
+**How to use**
+
+1. The user is expected to know how to follow the instructions in the section **Setting up your OpenBMC project** in [Nuvoton-Israel/openbmc](https://github.com/Nuvoton-Israel/openbmc) to build and program an OpenBMC image into Poleg EVBs.  
+    * Prepare a PC (which is referred as a build machine here) for building and programming the OpenBMC image.  
+      > _The user is also expected to have general knowledge of ACPI/UEFI and know how to update the DSDT table in linux and build/update a linux kernel/driver._  
+
+2. Prepare two Nuvoton Poleg EVBs. One is named Poleg EVB A and the other is Poleg EVB B.
+
+    * Connect **pin 3-4** of J4 on Poleg EVB A with corresponding pins of J4 on Poleg EVB B, **one on one**.  
+    * Connect **pin 12** of J3 on Poleg EVB A with corresponding pin of J3 on Poleg EVB B, **one on one**.  
+    * The connection needs a **1k** resistor and a **3.3v** supply from Poleg EVB A.  
+      > _The component name of 3.3v supply is P4._
+
+3. Follow instructions from step-1, step-2, step-3 and step-5 in [SOL](#sol) **How to use** section to set up your workstation, Poleg EVB A and Supermicro MBD-X9SCL-F-0.  
+    > _Follow instructions from step-1 and step-5 in [SOL](#sol) **How to use** section to set up Poleg EVB B_.  
+
+4. Install Ubuntu 14.04 64bit on Supermicro MBD-X9SCL-F-0 for the verification and login as a normal user.  
+    > _The user is required to own root privileges on Ubuntu._
+
+5. Poleg EVB A is configured to have its own slave address **0x10**. Poleg EVB B is configured to have its own slave address **0x58**.
+
+    > _Poleg EVB A treats Poleg EVB B as its attached device on SMBUS/I2C bus and vice versa._
+
+6. In the build machine, download [Nuvoton-Israel/openbmc](https://github.com/Nuvoton-Israel/openbmc) git repository.  
+
+    * Download [linux-nuvoton_%.bbappend](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-patches/recipes-kernel/linux/linux-nuvoton_%25.bbappend) and overwrite the same original file located under **meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-kernel/linux** folder in the downloaded openbmc directory of the build machine.  
+    * Download [enable-i2cslave.cfg](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-patches/recipes-kernel/linux/enable-i2cslave.cfg) under **meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-kernel/linux/linux-nuvoton** folder in the downloaded openbmc directory of the build machine.  
+    * Download [0001-meta-evb-npcm750-enable-i2c-slave-function.patch](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-patches/recipes-kernel/linux/0x10/0001-meta-evb-npcm750-enable-i2c-slave-function.patch) under **meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-kernel/linux/linux-nuvoton** folder in the downloaded openbmc directory of the build machine to configure Poleg EVB A's own slave address as **0x10**.  
+    * In the build machine, rebuild the linux kernel for OpenBMC. As an example, enter the following command in a terminal window (build environment is configured in advance):  
+      ```
+      bitbake -C fetch virtual/kernel
+      ```
+    * In the build machine, rebuild the OpenBmc image. As an example, enter the following command in a terminal window (build environment is configured in advance):  
+      ```
+      bitbake obmc-phosphor-image
+      ```
+
+    * Follow the section **Programming the images** of [Nuvoton-Israel/openbmc](https://github.com/Nuvoton-Israel/openbmc) to program the updated image into Poleg EVB A.
+
+7. Download patches to meet the requirement of step-5 for Poleg EVB B.
+
+    * Download [0001-meta-evb-npcm750-enable-i2c-slave-function.patch](https://github.com/warp5tw/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-patches/recipes-kernel/linux/0x58/0001-meta-evb-npcm750-enable-i2c-slave-function.patch) and overwrite the same original file located under **meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-kernel/linux/linux-nuvoton** folder in the downloaded openbmc directory of the build machine to configure Poleg EVB B's own slave address as **0x58**.  
+    * In the build machine, rebuild the linux kernel for OpenBMC. As an example, enter the following command in a terminal window (build environment is configured in advance):  
+      ```
+      bitbake -C fetch virtual/kernel
+      ```
+
+    * Download [kcs_to_ipmb_message_bridging.patch](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-patches/recipes-phosphor/ipmi/phosphor-ipmi-ipmb/kcs_to_ipmb_message_bridging.patch) under the **meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/ipmi/phosphor-ipmi-ipmb** folder in the downloaded openbmc directory of the build machine.  
+    * In the build machine, open a terminal window and navigate to the **meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/ipmi/phosphor-ipmi-ipmb** folder in the downloaded openbmc directory.  
+    * Enter the following command in the terminal window in the build machine.  
+      ```
+      patch -p1 < ./kcs_to_ipmb_message_bridging.patch
+      ```
+
+    * In the build machine, rebuild the ipmbbridge for OpenBMC. As an example, enter the following command in a terminal window (build environment is configured in advance):  
+      ```
+      bitbake -C fetch phosphor-ipmi-ipmb
+      ```
+
+    * In the build machine, rebuild the OpenBmc image. As an example, enter the following command in a terminal window (build environment is configured in advance):  
+      ```
+      bitbake obmc-phosphor-image
+      ```
+
+    * Follow the section **Programming the images** of [Nuvoton-Israel/openbmc](https://github.com/Nuvoton-Israel/openbmc) to program the updated image into Poleg EVB B.
+
+8. Modify the system interface driver in Ubuntu 14.04 on Supermicro MBD-X9SCL-F-0 to communicate with Poleg EVB A.
+
+    * Download the kernel source code of Ubuntu 14.04 on Supermicro MBD-X9SCL-F-0 and locate the system interface driver source code.  
+    * Locate the code in the function **init_ipmi_si** of ipmi_si_intf.c.
+      ```
+      enum ipmi_addr_src type = SI_INVALID;
+      ```
+
+    * Add the code next to the sentence "enum ipmi_addr_src type = SI_INVALID".
+      ```
+      return -1;
+      ```
+
+    * Rebuild the system interface driver and replace ipmi_si.ko of Ubuntu 14.04 with the one just rebuilt on Supermicro MBD-X9SCL-F-0.  
+      > _The original ipmi_si.ko is located at /lib/modules/\`$(uname -r)\`/kernel/drivvers/char/ipmi_
+
+    * Undo the "return -1" modification in the function **init_ipmi_si** of ipmi_si_intf.c.  
+      + Rebuild the system interface driver again and leave the regenerated ipmi_si.ko in the kernel source code ipmi directory for system interface driver.
+
+    * Reboot Ubuntu 14.04 on Supermicro MBD-X9SCL-F-0.
+
+9. Update the DSDT table in Ubuntu 14.04 on Supermicro MBD-X9SCL-F-0.  
+
+    * Study the section **How to build a custom DSDT into an initrd** of [overriding-dsdt](https://01.org/zh/linux-acpi/documentation/overriding-dsdt) and [initrd_table_override.txt](https://www.kernel.org/doc/Documentation/acpi/initrd_table_override.txt) to override DSDT in the initrd image of Ubuntu 14.04 and rebuild the Ubuntu kernel on Supermicro MBD-X9SCL-F-0.
+    * In the DSDT table, update the OEMRevision field in DefinitionBlock.  
+    * In the DSDT table, create two objects used for accessing Poleg EVB A KCS devices via 0x4E, 0x4F.  
+      ```
+      Name (IDTP, 0x0CA4)  
+      Name (ICDP, 0x0CA5)  
+      ```
+
+    * Locate the code section like below.  
+      ```
+      Device (SPMI)
+      {
+          ...
+          Name (_STR, Unicode ("IPMI_KCS"))  
+          Name (_UID, Zero)
+      ```
+    * Add the codes below following the sentence "Name (_UID, Zero)".  
+      ```
+      OperationRegion (IPST, SystemIO, ICDP, One)
+      Field (IPST, ByteAcc, NoLock, Preserve)
+      {
+          STAS,   8
+      }
+      ```
+
+    * Locate the code section like below in the same SPMI code section just mentioned.  
+      ```
+      Method (_STA, 0, NotSerialized)
+      ...
+      If (LEqual (Local0, 0xFF))
+      {
+      ...
+      ```
+    * Add the codes below inside the "If" sentence scope.
+      ```
+      Store (0x11, LDN)
+      Store (0x1,  ACTR)
+      Store (0x0C, IOAH)
+      Store (0xA4, IOAL)
+      Store (0x0C, IOH2)
+      Store (0xA5, IOL2)
+      ```
+
+    * Rebuild the modified DSDT table and regenerate the initrd image of Ubuntu 14.04 on Supermicro MBD-X9SCL-F-0.  
+    * Reboot Supermicro MBD-X9SCL-F-0 to load the overriden DSDT.
+
+10. (Optional)Create shell scripts in Ubuntu 14.04 on Supermicro MBD-X9SCL-F-0.
+
+    * The scripts here are just for convenience and for reference.  
+    * Download and build [ioport-1.2.tar.gz](https://people.redhat.com/rjones/ioport/files/ioport-1.2.tar.gz).  
+      + Locate the generated **outb** executive.
+    * Create a script named "kcs_switch.sh" for example to configure the access to the kcs device of Poleg EVB A from Supermicro MBD-X9SCL-F-0.  
+    * The user needs to modify the path to the outb executive in the script (kcs_switch.sh) below.  
+      ```
+      #!/bin/sh
+      outb 0x4e 0x07
+      outb 0x4f 0x11
+
+      outb 0x4e 0x30
+      outb 0x4f 0x1
+
+      outb 0x4e 0x60
+      outb 0x4f 0x0C
+      outb 0x4e 0x61
+      outb 0x4f 0xA4
+      outb 0x4e 0x62
+      outb 0x4f 0x0C
+      outb 0x4e 0x63
+      outb 0x4f 0xA5
+      ```
+
+     * Create a script name "insert_ipmi_mod.sh" for example to use the regenerated KCS driver in the kernel source code ipmi directory metioned in step-8.  
+     * The user needs to modify the path to the KCS driver in insert_ipmi_mod.sh below.  
+
+       ```
+       #!/bin/sh
+       sudo insmod ./ipmi_devintf.ko
+       sudo insmod ./ipmi_si.ko
+       ```
+
+    * Make sure that two scripts above are executable.
+
+11. Install the ipmiutil in Ubuntu 14.04 on Supermicro MBD-X9SCL-F-0.
+
+    * Download, extract, build and install [ipmiutil-3.1.2.tar.gz](http://sourceforge.net/projects/ipmiutil/files/ipmiutil-3.1.2.tar.gz).  
+    * Open a terminal window and navigate to the extracted folder of ipmiutil-3.1.2.tar.gz.  
+    * Input the following command in the terminal window.
+      ```
+      sudo ./scripts/ipmi_if.sh
+      ```
+    * This generates /var/lib/ipmiutil/ipmi_if.txt.  
+    * Edit /var/lib/ipmiutil/ipmi_if.txt with the root privilege. 
+    * The value for "Base Address:" is **0x0000000000000CA2 (I/O)** and modify it to **0x0000000000000CA4 (I/O)**.
+
+12. Test message bridging.
+
+    * Power up or reboot Poleg EVB A and Poleg EVB B. Make sure that login screens of Poleg EVBs are displayed on the terminal window (e.g. Tera Term) on your workstation.
+    * Power up or reboot Supermicro MBD-X9SCL-F-0 and login into Ubuntu 14.04 as a normal user.  
+      + Open a terminal window and execute **kcs_switch.sh** and **insert_ipmi_mod.sh** created in step-10 with the root privilege.
+      + If the scripts are not created, input the contents of **kcs_switch.sh** and **insert_ipmi_mod.sh** except the #!/bin/sh line manually.
+      + The user can use the following command in a terminal window under Ubuntu 14.04 on Supermicro MBD-X9SCL-F-0 to verify Poleg system interface.
+        ```
+        dmesg | grep -i "bmc"
+        ```
+      
+      + The user can check the man_id. For example, the man_id is **0x000000** for this case.
+    * Enter the following command in a terminal window as a normal user of Ubuntu 14.04 on Supermicro MBD-X9SCL-F-0.  
+      ```
+      sudo ipmiutil cmd 18 34 02 10 18 d8 20 0e 01 d1 -x -s -j -F kcs
+      ```
+      > _The example command in the data field of "Send Message" command is "Get Device ID"._
+
+    * Enter the following command in a terminal window as a normal user of Ubuntu 14.04 on Supermicro MBD-X9SCL-F-0.  
+      ```
+      sudo ipmiutil cmd 18 33 -x -s -j -F kcs
+      ```
+      > _The response to "Get Device ID" command might be "respData[len=26]: 1c 33 00 02 1e c2 58 00 01 00 00 00 02 03 02 00 00 00 00 00 00 00 00 00 00 a0"._
+
+
+**Maintainer**
+
+* Stanley Chu
+* Tyrone Ting
 
 ## Features In Progressing
 * User management
