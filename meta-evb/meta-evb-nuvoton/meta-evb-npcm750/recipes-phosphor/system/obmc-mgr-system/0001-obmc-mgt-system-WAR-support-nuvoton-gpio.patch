@@ -1,0 +1,36 @@
+From 0eb0bd9fbc19661f155f79db46ba46550055a85e Mon Sep 17 00:00:00 2001
+From: kwliu <kwliu@nuvoton.com>
+Date: Mon, 19 Nov 2018 12:59:41 +0800
+Subject: [PATCH] obmc-mgt-system: WAR: support nuvoton gpio
+
+---
+ pysystemmgr/obmc/system/__init__.py | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
+
+diff --git a/obmc/system/__init__.py b/obmc/system/__init__.py
+index 7bcea9e..c186561 100644
+--- a/obmc/system/__init__.py
++++ b/obmc/system/__init__.py
+@@ -7,7 +7,7 @@ def find_gpio_base(path="/sys/class/gpio/"):
+     for gc in glob(join(path, pattern)):
+         with open(join(gc, "label")) as f:
+             label = f.readline().strip()
+-        if label == "1e780000.gpio":
++        if label == "/pinctrl@f0800000/gpio@f0010000":
+             with open(join(gc, "base")) as f:
+                 return int(f.readline().strip())
+     # trigger a file not found exception
+@@ -19,9 +19,4 @@ GPIO_BASE = find_gpio_base()
+ 
+ def convertGpio(name):
+     offset = int(''.join(list(filter(str.isdigit, name))))
+-    port = list(filter(str.isalpha, name.upper()))
+-    a = ord(port[-1]) - ord('A')
+-    if len(port) > 1:
+-        a += 26
+-    base = a * 8 + GPIO_BASE
+-    return base + offset
++    return GPIO_BASE + offset
+-- 
+2.17.1
+
