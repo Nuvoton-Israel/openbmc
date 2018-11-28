@@ -1,0 +1,17 @@
+
+[Unit]
+Description=Intel Power Control%i
+Wants=mapper-wait@-org-openbmc-managers-System.service
+After=mapper-wait@-org-openbmc-managers-System.service
+
+[Service]
+Restart=always
+RestartSec=3
+ExecStart=/usr/bin/env power-control
+SyslogIdentifier=power-control
+Type=dbus
+BusName={BUSNAME}
+
+[Install]
+WantedBy={SYSTEMD_DEFAULT_TARGET}
+

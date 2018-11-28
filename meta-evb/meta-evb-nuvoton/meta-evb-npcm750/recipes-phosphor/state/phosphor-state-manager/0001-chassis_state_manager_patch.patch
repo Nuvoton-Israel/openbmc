@@ -1,0 +1,79 @@
+From 1db74893be5c2fbb3eb788ff37add21b87e33bdd Mon Sep 17 00:00:00 2001
+From: CH Li <chli30@nuvoton.com>
+Date: Thu, 15 Nov 2018 17:53:07 +0800
+Subject: [PATCH] chassis_state_manager_patch
+
+---
+ chassis_state_manager.cpp | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/chassis_state_manager.cpp b/chassis_state_manager.cpp
+index d721460..b22db35 100644
+--- a/chassis_state_manager.cpp
++++ b/chassis_state_manager.cpp
+@@ -61,35 +61,35 @@ void Chassis::subscribeToSystemdSignals()
+ //        has read property function
+ void Chassis::determineInitialState()
+ {
+-    sdbusplus::message::variant<int> pgood = -1;
++    sdbusplus::message::variant<int> PGood = -1;
+     auto method = this->bus.new_method_call(
+-        "org.openbmc.control.Power", "/org/openbmc/control/power0",
++        "xyz.openbmc_project.Chassis.Control.Power", "/xyz/openbmc_project/Chassis/Control/Power0",
+         "org.freedesktop.DBus.Properties", "Get");
+ 
+-    method.append("org.openbmc.control.Power", "pgood");
++    method.append("xyz.openbmc_project.Chassis.Control.Power", "PGood");
+     try
+     {
+         auto reply = this->bus.call(method);
+         if (reply.is_method_error())
+         {
+             log<level::ERR>(
+-                "Error in response message - could not get initial pgood");
++                "Error in response message - could not get initial PGood");
+             goto fail;
+         }
+ 
+         try
+         {
+-            reply.read(pgood);
++            reply.read(PGood);
+         }
+         catch (const SdBusError& e)
+         {
+-            log<level::ERR>("Error in bus response - bad encoding of pgood",
++            log<level::ERR>("Error in bus response - bad encoding of PGood",
+                             entry("ERROR=%s", e.what()),
+                             entry("REPLY_SIG=%s", reply.get_signature()));
+             goto fail;
+         }
+ 
+-        if (pgood == 1)
++        if (PGood == 1)
+         {
+             log<level::INFO>("Initial Chassis State will be On",
+                              entry("CHASSIS_CURRENT_POWER_STATE=%s",
+@@ -117,8 +117,8 @@ void Chassis::determineInitialState()
+     }
+     catch (const SdBusError& e)
+     {
+-        // It's acceptable for the pgood state service to not be available
+-        // since it will notify us of the pgood state when it comes up.
++        // It's acceptable for the PGood state service to not be available
++        // since it will notify us of the PGood state when it comes up.
+         if (e.name() != nullptr &&
+             strcmp("org.freedesktop.DBus.Error.ServiceUnknown", e.name()) == 0)
+         {
+@@ -126,7 +126,7 @@ void Chassis::determineInitialState()
+         }
+ 
+         // Only log for unexpected error types.
+-        log<level::ERR>("Error performing call to get pgood",
++        log<level::ERR>("Error performing call to get PGood",
+                         entry("ERROR=%s", e.what()));
+         goto fail;
+     }
+-- 
+2.7.4
+
