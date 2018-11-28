@@ -1,0 +1,34 @@
+From db795475fa666e90f69402786ff474d4fd6817c8 Mon Sep 17 00:00:00 2001
+From: kwliu <kwliu@nuvoton.com>
+Date: Mon, 19 Nov 2018 13:26:13 +0800
+Subject: [PATCH] power-control: WAR: pull-up for 1
+
+---
+ power-control/src/power_control.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/power-control/src/power_control.cpp b/power-control/src/power_control.cpp
+index 9d15a06..3b9a3c7 100644
+--- a/power-control/src/power_control.cpp
++++ b/power-control/src/power_control.cpp
+@@ -55,7 +55,7 @@ int32_t PowerControl::setPowerState(int32_t newState)
+     For BMC (power control), just need to notify host (PCH) to switch
+     power, don't need to judge it should power on or off.
+     */
+-    buf = '0';
++    buf = '1';
+     ret = ::write(power_up_fd, &buf, sizeof(buf));
+     if (ret < 0)
+     {
+@@ -68,7 +68,7 @@ int32_t PowerControl::setPowerState(int32_t newState)
+     std::this_thread::sleep_for(
+         std::chrono::milliseconds(POWER_UP_PIN_PULSE_TIME_MS));
+ 
+-    buf = '1';
++    buf = '0';
+     ret = ::write(power_up_fd, &buf, sizeof(buf));
+     if (ret < 0)
+     {
+-- 
+2.17.1
+

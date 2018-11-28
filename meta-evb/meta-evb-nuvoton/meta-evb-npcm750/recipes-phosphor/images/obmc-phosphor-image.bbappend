@@ -29,6 +29,10 @@ IMAGE_INSTALL_append = " bmcweb \
                          lmsensors-sensors \
                          iperf2 \
                          phosphor-image-signing \
+                         x86-power-control \
+                         obmc-mgr-system \
+                         obmc-mgr-inventory \
+                         evb-npcm750-config \
                        "
 
 # start generate mtd image only after scrits, tools and inputs are ready 

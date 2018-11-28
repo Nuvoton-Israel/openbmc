@@ -1,0 +1,25 @@
+From d400fe39b99a191afd073331dd4e6ed2e40f022c Mon Sep 17 00:00:00 2001
+From: CH Li <chli30@nuvoton.com>
+Date: Thu, 22 Nov 2018 11:20:33 +0800
+Subject: [PATCH] Set Watchdog ExpireAction as None
+
+---
+ xyz/openbmc_project/State/Watchdog.interface.yaml | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/xyz/openbmc_project/State/Watchdog.interface.yaml b/xyz/openbmc_project/State/Watchdog.interface.yaml
+index f76dbf2..a8459f1 100644
+--- a/xyz/openbmc_project/State/Watchdog.interface.yaml
++++ b/xyz/openbmc_project/State/Watchdog.interface.yaml
+@@ -32,7 +32,7 @@ properties:
+       type: enum[self.Action]
+       description: >
+           The action the watchdog should perform when it expires.
+-      default: 'HardReset'
++      default: 'None'
+     - name: Interval
+       type: uint64
+       description: >
+-- 
+2.7.4
+
