@@ -40,6 +40,7 @@ Please submit any patches against the NPCM750 evaluation board layer to the main
     + [Serial Over Lan](#serial-over-lan)
     + [Remote Virtual Media](#remote-virtual-media)
     + [BMC Firmware Update](#bmc-firmware-update)
+    + [Server Power Operations](#server-power-operations)
   * [System](#system)
     + [Time](#time)
     + [Sensor](#sensor)
@@ -309,6 +310,65 @@ Virtual Media (VM) is to emulate an USB drive on remote host PC via Network Bloc
 
 **Maintainer**
 * Medad CChien
+
+### Server Power Operations
+<img align="right" width="30%" src="https://cdn.rawgit.com/NTC-CCBG/snapshots/0f20d6b/openbmc/power.png">
+
+Server Power Operations are using to Power on/Warm reboot/Cold reboot/Orderly shutdown/Immediately shutdown remote host PC.
+
+**Source URL**
+
+* [https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/chassis](https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/chassis)
+
+**How to use**
+
+1. Server Power on
+    ```
+    Press Power on button from Server control -> Server power operations by WebUI   
+    ```
+    > When OpenBMC is used within a server, the obmc-host-start@.target is what drives the boot of the system 
+ 
+2. Server Power off (Soft)
+    ```
+    Press Orderly shutdown button from Server control -> Server power operations by WebUI   
+    ```
+    > The soft server power off function is encapsulated in the obmc-host-shutdown@.target that is soft in that it notifies the host of the power off request and gives it a certain amount of time to shut itself down 
+ 
+3. Server Power off (Hard)
+    ```
+    Press Immediate shutdown button from Server control -> Server power operations by WebUI   
+    ```
+    > The hard server power off is encapsulated in the obmc-chassis-hard-poweroff@.target that will force the stopping of the soft power off service if running, and immediately cut power to the system 
+ 
+4. Server Reboot (Warm)
+    ```
+    Press Warm reboot button from Server control -> Server power operations by WebUI   
+    ```
+    > The warm reboot of the server is encapsulated in the obmc-host-reboot@.target that will utilize the server power off (soft) target (obmc-host-shutdown@.target) and then, once that completes, start the host power on target (obmc-host-start@.target) 
+ 
+5. Server Reboot (Cold)
+    ```
+    Press Cold reboot button from Server control -> Server power operations by WebUI   
+    ```
+    > The cold reboot of the server is shutdown server immediately, then restarts it. This target will utilize the Immediate shutdown target (obmc-chassis-hard-poweroff@.target) and then, start the host power on target (obmc-host-start@.target) 
+ 
+6. Configure Reaction of Power Button in Ubuntu (remote host PC)
+    ```
+    gsettings set org.gnome.settings-daemon.plugins.power button-power 'shutdown'   
+    ```
+    > When you press the power button on your computer (Ubuntu OS) you’re prompted with a list of options – this is the “interactive” shutdown. You need to open terminal and run the above command to change reaction that power button automatically runs a shutdown without having to use the interactive shutdown prompt 
+
+    > If your remote host PC is running Windows OS that default reaction is initiate an orderly shutdown by logging off and then shutting down. Thus, Windows OS didn't need to configure reaction of Power Button 
+ 
+7. Connect Poleg with remote host PC
+    ```
+    Using two jump wires, one is connect to PC side PWRON pin from pin 5 of PC FRONT PANEL on Poleg
+    The other one is connect to PC side PWRON GND pin from pin 6 of FRONT PANEL on Poleg   
+    ```
+    > You need to check the schematic of Poleg about the PC FRONT PANEL (J13) for POWER_SW and RESET_SW
+
+**Maintainer**
+* Tim Lee
 
 
 ## System
@@ -1143,3 +1203,4 @@ image-rwfs    |  0 MB  | middle layer of the overlayfs, rw files in this partiti
 * 2018.11.16 Add obmc-ikvm support in bmcweb 
 * 2018.11.22 Enable firmware update support 
 * 2018.11.23 Update Sensor description about FAN How to use
+* 2018.11.29 Update Server power operations of Server control about How to use
