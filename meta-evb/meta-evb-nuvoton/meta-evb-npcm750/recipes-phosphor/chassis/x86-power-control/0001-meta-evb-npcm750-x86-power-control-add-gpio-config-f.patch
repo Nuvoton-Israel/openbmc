@@ -1,0 +1,64 @@
+From 055fa8658f6cfc1785e72f0f874c6d61379d0aee Mon Sep 17 00:00:00 2001
+From: CH Li <chli30@nuvoton.com>
+Date: Thu, 29 Nov 2018 17:35:53 +0800
+Subject: [PATCH] meta-evb-npcm750: x86-power-control: add gpio config for
+ RESET_UP_PIN
+
+---
+ power-control/inc/power_control.hpp | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/power-control/inc/power_control.hpp b/power-control/inc/power_control.hpp
+index bc87cf6..13907c8 100644
+--- a/power-control/inc/power_control.hpp
++++ b/power-control/inc/power_control.hpp
+@@ -27,7 +27,7 @@
+ 
+ //static constexpr size_t POLLING_INTERVAL_MS = 500;
+ 
+-const static constexpr char* PGOOD_PIN = "PGOOD";
++const static constexpr char* RESET_UP_PIN = "RESET_UP_PIN";
+ const static constexpr char* POWER_UP_PIN = "POWER_UP_PIN";
+ 
+ const static constexpr size_t POWER_UP_PIN_PULSE_TIME_MS = 200;
+@@ -59,16 +59,16 @@ struct PowerControl : sdbusplus::server::object_t<pwr_control>
+         char buf = '0';
+ 
+         // config gpio
+-        ret = configGpio(PGOOD_PIN, &pgood_fd, bus);
++        ret = configGpio(RESET_UP_PIN, &reset_up_fd, bus);
+         if (ret < 0)
+         {
+-            throw std::runtime_error("failed to config PGOOD_PIN");
++            throw std::runtime_error("failed to config RESET_UP_PIN");
+         }
+ 
+         ret = configGpio(POWER_UP_PIN, &power_up_fd, bus);
+         if (ret < 0)
+         {
+-            closeGpio(pgood_fd);
++            closeGpio(reset_up_fd);
+             throw std::runtime_error("failed to config POWER_UP_PIN");
+         }
+ /*
+@@ -90,7 +90,7 @@ struct PowerControl : sdbusplus::server::object_t<pwr_control>
+ 
+     ~PowerControl()
+     {
+-        closeGpio(pgood_fd);
++        closeGpio(reset_up_fd);
+         closeGpio(power_up_fd);
+     }
+ 
+@@ -172,7 +172,7 @@ struct PowerControl : sdbusplus::server::object_t<pwr_control>
+ 
+   private:
+     int power_up_fd;
+-    int pgood_fd;
++    int reset_up_fd;
+     sdbusplus::bus::bus& bus;
+     sd_event_io_handler_t callbackHandler;
+ };
+-- 
+2.7.4
+
