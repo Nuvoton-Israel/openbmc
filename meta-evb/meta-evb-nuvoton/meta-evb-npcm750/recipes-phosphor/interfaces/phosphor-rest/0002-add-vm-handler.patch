@@ -1,22 +1,8 @@
-commit d4996f2a37674e9820eec1b9c08946efe61cb69d
-Author: Medad <ctcchien@nuvoton.com>
-Date:   Thu Oct 4 14:13:30 2018 +0800
-
-    [PATCH] add vm handler
-
 diff --git a/obmc/wsgi/apps/rest_dbus.py b/obmc/wsgi/apps/rest_dbus.py
-index 25c1da7..5c2e0bb 100755
+index 3fd2494..86a8933 100755
 --- a/obmc/wsgi/apps/rest_dbus.py
 +++ b/obmc/wsgi/apps/rest_dbus.py
-@@ -1079,7 +1079,6 @@ class HostKvmHandler(RouteHandler):
-         wsock = request.environ.get('wsgi.websocket')
-         if not wsock:
-             abort(400, 'Expected WebSocket based request.')
--
-         HOST = '127.0.0.1'
-         PORT = 5900
-         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-@@ -1094,7 +1093,143 @@ class HostKvmHandler(RouteHandler):
+@@ -1194,7 +1194,133 @@ class HostKvmHandler(RouteHandler):
          ping_sender = Greenlet.spawn(send_ws_ping, wsock, WEBSOCKET_TIMEOUT)
          gevent.joinall([wsock_reader, sock_reader, ping_sender])
  
@@ -85,7 +71,7 @@ index 25c1da7..5c2e0bb 100755
 +
 +    def launch_nbd_client(self):
 +        os.system("nbd-client 127.0.0.1 10809 /dev/nbd0 -b 512 -N poleg-nbd&")
-+
+ 
 +    def do_get(self):
 +        wsock = request.environ.get('wsgi.websocket')
 +        if not wsock:
@@ -111,10 +97,6 @@ index 25c1da7..5c2e0bb 100755
 +        pass
 +
 +    def do_get(self):
-+        wsock = request.environ.get('wsgi.websocket')
-+        if not wsock:
-+            abort(400, 'Expected WebSocket based request.')
-+
 +        os.system("mkdir -p /sys/kernel/config/usb_gadget/mass_storage")
 +        os.system("mkdir -p /sys/kernel/config/usb_gadget/mass_storage/configs/c.1")
 +        os.system("mkdir -p /sys/kernel/config/usb_gadget/mass_storage/functions/mass_storage.0")
@@ -131,7 +113,6 @@ index 25c1da7..5c2e0bb 100755
 +
 +        os.system("echo /dev/nbd0 > /sys/kernel/config/usb_gadget/mass_storage/functions/mass_storage.0/lun.0/file")
 +        os.system("echo f0838000.udc > /sys/kernel/config/usb_gadget/mass_storage/UDC")
-+        wsock.close()
 +
 +class HostDISMSTGHandler(RouteHandler):
 +    verbs = ['GET']
@@ -150,17 +131,12 @@ index 25c1da7..5c2e0bb 100755
 +        pass
 +
 +    def do_get(self):
-+        wsock = request.environ.get('wsgi.websocket')
-+        if not wsock:
-+            abort(400, 'Expected WebSocket based request.')
- 
 +        os.system("echo \"\" > /sys/kernel/config/usb_gadget/mass_storage/UDC")
 +        os.system("echo \"\" > /sys/kernel/config/usb_gadget/mass_storage/functions/mass_storage.0/lun.0/file")
-+        wsock.close()
  
  class ImagePutHandler(RouteHandler):
      ''' Handles the /upload/image/<filename> route. '''
-@@ -1569,6 +1704,9 @@ class App(Bottle):
+@@ -1806,6 +1932,9 @@ class App(Bottle):
              self.event_handler = EventHandler(self, self.bus)
              self.host_console_handler = HostConsoleHandler(self, self.bus)
              self.host_kvm_handler = HostKvmHandler(self, self.bus)
@@ -170,7 +146,7 @@ index 25c1da7..5c2e0bb 100755
          self.instance_handler = InstanceHandler(self, self.bus)
  
      def install_handlers(self):
-@@ -1587,6 +1725,9 @@ class App(Bottle):
+@@ -1825,6 +1954,9 @@ class App(Bottle):
              self.event_handler.install()
              self.host_console_handler.install()
              self.host_kvm_handler.install()

@@ -1,11 +1,23 @@
-commit 5b1bbba0cbc7840554191fff8bac9c44a1923922
-Author: Medad <ctcchien@nuvoton.com>
-Date:   Thu Oct 4 14:10:48 2018 +0800
+From f2de186327046d7d89c5a936476aec591409e4e5 Mon Sep 17 00:00:00 2001
+From: Medad <ctcchien@nuvoton.com>
+Date: Fri, 30 Nov 2018 09:22:24 +0800
+Subject: [PATCH] [PATCH] Implement VM in webui 	1. vmws is websocket 	2.
+ enablemstgws and disablemstgws are http request
 
-    [PATCH] Implement VM in webui
+---
+ app/index.js                          |   5 +-
+ app/vm/controllers/nbd/nbd.js         | 360 ++++++++++++++++++++++++++++++++++
+ app/vm/controllers/vm-controller.html |  25 +++
+ app/vm/controllers/vm-controller.js   | 103 ++++++++++
+ app/vm/index.js                       |  28 +++
+ 5 files changed, 520 insertions(+), 1 deletion(-)
+ create mode 100644 app/vm/controllers/nbd/nbd.js
+ create mode 100644 app/vm/controllers/vm-controller.html
+ create mode 100644 app/vm/controllers/vm-controller.js
+ create mode 100644 app/vm/index.js
 
 diff --git a/app/index.js b/app/index.js
-index 6418deb..2ce1646 100644
+index 8a9dbae..b908dfb 100644
 --- a/app/index.js
 +++ b/app/index.js
 @@ -86,6 +86,9 @@ import phosphor_templates from './templates.js';
@@ -395,7 +407,7 @@ index 0000000..c5997c4
 +
 diff --git a/app/vm/controllers/vm-controller.html b/app/vm/controllers/vm-controller.html
 new file mode 100644
-index 0000000..22e99a4
+index 0000000..1a2eabf
 --- /dev/null
 +++ b/app/vm/controllers/vm-controller.html
 @@ -0,0 +1,25 @@
@@ -427,10 +439,10 @@ index 0000000..22e99a4
 \ No newline at end of file
 diff --git a/app/vm/controllers/vm-controller.js b/app/vm/controllers/vm-controller.js
 new file mode 100644
-index 0000000..5adc183
+index 0000000..91387fa
 --- /dev/null
 +++ b/app/vm/controllers/vm-controller.js
-@@ -0,0 +1,105 @@
+@@ -0,0 +1,103 @@
 +/**
 + * Controller for vm
 + *
@@ -511,10 +523,9 @@ index 0000000..5adc183
 +                $scope.mountbutton = false;
 +                $scope.umountbutton = true;
 +
-+                enableusbws = new WebSocket("wss://"+host+"/enablemstgws");
-+                enableusbws.binaryType = 'arraybuffer';
-+                enableusbws.onopen = this._on_enablemstgws_open.bind(this);
-+
++                var xmlHttp = new XMLHttpRequest();
++                xmlHttp.open( "GET", "/enablemstgws", false );
++                xmlHttp.send( null );
 +
 +            };
 +
@@ -526,10 +537,9 @@ index 0000000..5adc183
 +                $scope.mountbutton = true;
 +                $scope.umountbutton = false;
 +
-+                disableusbws = new WebSocket("wss://"+host+"/disablemstgws");
-+                disableusbws.binaryType = 'arraybuffer';
-+                disableusbws.onopen = this._on_disablemstgws_open.bind(this);
-+
++                var xmlHttp = new XMLHttpRequest();
++                xmlHttp.open( "GET", "/disablemstgws", false );
++                xmlHttp.send( null );
 +
 +            };
 +        }
@@ -570,3 +580,6 @@ index 0000000..c86dfc8
 +})(window.angular);
 +
 +
+-- 
+2.7.4
+
