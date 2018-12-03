@@ -322,50 +322,42 @@ Server Power Operations are using to Power on/Warm reboot/Cold reboot/Orderly sh
 
 **How to use**
 
-1. Server Power on
-    ```
-    Press Power on button from Server control -> Server power operations by WebUI   
-    ```
-    > When OpenBMC is used within a server, the obmc-host-start@.target is what drives the boot of the system 
- 
-2. Server Power off (Soft)
-    ```
-    Press Orderly shutdown button from Server control -> Server power operations by WebUI   
-    ```
-    > The soft server power off function is encapsulated in the obmc-host-shutdown@.target that is soft in that it notifies the host of the power off request and gives it a certain amount of time to shut itself down 
- 
-3. Server Power off (Hard)
-    ```
-    Press Immediate shutdown button from Server control -> Server power operations by WebUI   
-    ```
-    > The hard server power off is encapsulated in the obmc-chassis-hard-poweroff@.target that will force the stopping of the soft power off service if running, and immediately cut power to the system 
- 
-4. Server Reboot (Warm)
-    ```
-    Press Warm reboot button from Server control -> Server power operations by WebUI   
-    ```
-    > The warm reboot of the server is encapsulated in the obmc-host-reboot@.target that will utilize the server power off (soft) target (obmc-host-shutdown@.target) and then, once that completes, start the host power on target (obmc-host-start@.target) 
- 
-5. Server Reboot (Cold)
-    ```
-    Press Cold reboot button from Server control -> Server power operations by WebUI   
-    ```
-    > The cold reboot of the server is shutdown server immediately, then restarts it. This target will utilize the Immediate shutdown target (obmc-chassis-hard-poweroff@.target) and then, start the host power on target (obmc-host-start@.target) 
- 
-6. Configure Reaction of Power Button in Ubuntu (remote host PC)
-    ```
-    gsettings set org.gnome.settings-daemon.plugins.power button-power 'shutdown'   
-    ```
-    > When you press the power button on your computer (Ubuntu OS) you’re prompted with a list of options – this is the “interactive” shutdown. You need to open terminal and run the above command to change reaction that power button automatically runs a shutdown without having to use the interactive shutdown prompt 
+1. Connect pins of the **PWRON** header on generic motherboard to the **J13** header on Poleg EVB
+    * Depend on your motherboard, you need to find **PWRON** header and connect to **pin5-6** of **J13** header on Poleg EVB.
+      > _You can check the schematic of Poleg EVB about **J13** that **pin5-6** for **POWER_SW** and **pin3-4** for **RESET_SW**. According to server power operations design on OpenBMC that only use **POWER_SW** currently, so we just use this pin for demo._  
 
-    > If your remote host PC is running Windows OS that default reaction is initiate an orderly shutdown by logging off and then shutting down. Thus, Windows OS didn't need to configure reaction of Power Button 
- 
-7. Connect Poleg with remote host PC
-    ```
-    Using two jump wires, one is connect to PC side PWRON pin from pin 5 of PC FRONT PANEL on Poleg
-    The other one is connect to PC side PWRON GND pin from pin 6 of FRONT PANEL on Poleg   
-    ```
-    > You need to check the schematic of Poleg about the PC FRONT PANEL (J13) for POWER_SW and RESET_SW
+2. Configure reaction of power button on generic motherboard's OS
+    * When motherboard's OS is running **Linux** and you press **PWRON** header on motherboard, your're prompted with at list of options - this is the **interactive** shutdown. The OS will go **Orderly shutdown** for a while if you didn't select any action from it. If you don't want this interactive shutdown pop up and hope OS go **Orderly shutdown** directly, you can enter below command in terminal before testing:  
+      ```
+      gsettings set org.gnome.settings-daemon.plugins.power button-power 'shutdown'  
+      ```
+    * When motherboard's OS is running **Windows** and you press **PWRON** header on motherboard, the default reaction is **Orderly shutdown**. Thus, you didn't need to configure reaction of power button in Windows. But, if you find the default reaction is not **Orderly shutdown**, please check `Control Panel`->`Power Options`->`System Settings` in Windows OS.  
+
+    * About Watchdog patch
+
+      There is **phosphor-watchdog** package be inlcuded in OpenBMC now. The watchdog daemon is started on host power on, which is used to monitor if host is alive. In normal case, when host starts, it will send IPMI commands to kick watchdog and so everything would work fine. If host fails to start, the watchdog eventually timeout. However, this watchdog timerout default expire action is **HardReset** that be defined at [Watchdog.interface.yaml](https://github.com/openbmc/phosphor-dbus-interfaces/blob/master/xyz/openbmc_project/State/Watchdog.interface.yaml) in **phosphor-dbus-interfaces** that will cause host re rebooted after power on.  
+
+      Currently, we just using Poleg EVB with generic motherboard that have some limitations, thus when we using Ubuntu or Windows 7 as host OS, we didn't receive watchdog off IPMI command be sent from OS or BIOS side, so watchdog timeout default expire action will be triggered and host will be rebooted after we pressing `Power on` button from `Server control` ->`Server power operations` of WebUI that is unexpected behavior. However, we've provided a patch to make `Power on` function work normally for demo purpose, if youyour host will send watchdog off IPMI command normally then you can remove this patch [0001-Set-Watchdog-ExpireAction-as-None.patch](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/dbus/phosphor-dbus-interfaces/0001-Set-Watchdog-ExpireAction-as-None.patch) in [phosphor-dbus-interfaces_%.bbappend](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/dbus/phosphor-dbus-interfaces_%25.bbappend).  
+
+3. Server Power on
+    * Press `Power on` button from `Server control` ->`Server power operations` of WebUI.  
+      > _When OpenBMC is used within a server, the [obmc-host-start@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-host-start%40.target) is what drives the boot of the system._  
+
+4. Server Power off (Soft)
+    * Press `Orderly shutdown` button from `Server control` ->`Server power operations` of WebUI.  
+      > _The soft server power off function is encapsulated in the [obmc-host-shutdown@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-host-shutdown%40.target) that is soft in that it notifies the host of the power off request and gives it a certain amount of time to shut itself down._  
+
+5. Server Power off (Hard)
+    * Press `Immediate shutdown` button from `Server control` ->`Server power operations` of WebUI.  
+      > _The hard server power off is encapsulated in the [obmc-chassis-hard-poweroff@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-chassis-hard-poweroff%40.target) that will force the stopping of the soft power off service if running, and immediately cut power to the system._  
+
+6. Server Reboot (Warm)
+    * Press `Warm reboot` button from `Server control` ->`Server power operations` of WebUI.  
+      > _The warm reboot of the server is encapsulated in the [obmc-host-reboot@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-host-reboot%40.target) that will utilize the server power off (soft) target [obmc-host-shutdown@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-host-shutdown%40.target) and then, once that completes, start the host power on target [obmc-host-start@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-host-start%40.target)._  
+
+7. Server Reboot (Cold)
+    * Press `Cold reboot` button from `Server control` ->`Server power operations` of WebUI.  
+      > _The cold reboot of the server is shutdown server immediately, then restarts it. This target will utilize the Immediate shutdown target [obmc-chassis-hard-poweroff@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-chassis-hard-poweroff%40.target) and then, start the host power on target [obmc-host-start@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-host-start%40.target)._  
 
 **Maintainer**
 * Tim Lee
