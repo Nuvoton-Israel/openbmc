@@ -324,7 +324,7 @@ Server Power Operations are using to Power on/Warm reboot/Cold reboot/Orderly sh
 
 1. Connect pins of the **PWRON** header on generic motherboard to the **J13** header on Poleg EVB
     * Depend on your motherboard, you need to find **PWRON** header and connect to **pin5-6** of **J13** header on Poleg EVB.
-      > _You can check the schematic of Poleg EVB about **J13** that **pin5-6** for **POWER_SW** and **pin3-4** for **RESET_SW**. According to server power operations design on OpenBMC that only use **POWER_SW** currently, so we just use this pin for demo._  
+      > _You can check the schematic of Poleg EVB about **J13** that **pin5-6** for **POWER_SW** and **pin3-4** for **RESET_SW**. However, according to `Server power operations` design on WebUI that only use **POWER_SW** pin for `Warm reboot`, `Cold reboot`, `Orderly shutdown` and `Immediate shutdown` function implementation. Thus, we didn't need to use **RESET_SW** pin for those power operations on WebUI._  
 
 2. Configure reaction of power button on generic motherboard's OS
     * When motherboard's OS is running **Linux** and you press **PWRON** header on motherboard, your're prompted with at list of options - this is the **interactive** shutdown. The OS will go **Orderly shutdown** for a while if you didn't select any action from it. If you don't want this interactive shutdown pop up and hope OS go **Orderly shutdown** directly, you can enter below command in terminal before testing:  
