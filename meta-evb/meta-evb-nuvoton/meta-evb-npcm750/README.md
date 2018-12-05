@@ -314,7 +314,7 @@ Virtual Media (VM) is to emulate an USB drive on remote host PC via Network Bloc
 ### Server Power Operations
 <img align="right" width="30%" src="https://cdn.rawgit.com/NTC-CCBG/snapshots/0f20d6b/openbmc/power.png">
 
-Server Power Operations are using to Power on/Warm reboot/Cold reboot/Orderly shutdown/Immediately shutdown remote host PC.
+Server Power Operations are using to Power on/Warm reboot/Cold reboot/Orderly shutdown/Immediate shutdown remote host PC.
 
 **Source URL**
 
@@ -327,7 +327,7 @@ Server Power Operations are using to Power on/Warm reboot/Cold reboot/Orderly sh
       > _You can check the schematic of Poleg EVB about **J13** that **pin5-6** for **POWER_SW** and **pin3-4** for **RESET_SW**. However, according to `Server power operations` design on WebUI that only use **POWER_SW** pin for `Warm reboot`, `Cold reboot`, `Orderly shutdown` and `Immediate shutdown` function implementation. Thus, we didn't need to use **RESET_SW** pin for those power operations on WebUI._  
 
 2. Configure reaction of power button on generic motherboard's OS
-    * When motherboard's OS is running **Linux** and you press **PWRON** header on motherboard, your're prompted with at list of options - this is the **interactive** shutdown. The OS will go **Orderly shutdown** for a while if you didn't select any action from it. If you don't want this interactive shutdown pop up and hope OS go **Orderly shutdown** directly, you can enter below command in terminal before testing:  
+    * When motherboard's OS is running **Linux** and you press **PWRON** header on motherboard, you're prompted with a list of options - this is the **interactive** shutdown. The OS will go **Orderly shutdown** for a while if you didn't select any action from it. If you don't want this interactive shutdown pop up and hope OS go **Orderly shutdown** directly, you can enter below command in terminal before testing:  
       ```
       gsettings set org.gnome.settings-daemon.plugins.power button-power 'shutdown'  
       ```
@@ -335,7 +335,7 @@ Server Power Operations are using to Power on/Warm reboot/Cold reboot/Orderly sh
 
     * About Watchdog patch
 
-      There is **phosphor-watchdog** package be inlcuded in OpenBMC now. The watchdog daemon is started on host power on, which is used to monitor if host is alive. In normal case, when host starts, it will send IPMI commands to kick watchdog and so everything would work fine. If host fails to start, the watchdog eventually timeout. However, this watchdog timerout default expire action is **HardReset** that be defined at [Watchdog.interface.yaml](https://github.com/openbmc/phosphor-dbus-interfaces/blob/master/xyz/openbmc_project/State/Watchdog.interface.yaml) in **phosphor-dbus-interfaces** that will cause host re rebooted after power on.  
+      There is **phosphor-watchdog** package be included in OpenBMC now. The watchdog daemon is started on host power on, which is used to monitor if host is alive. In normal case, when host starts, it will send IPMI commands to kick watchdog and so everything would work fine. If host fails to start, the watchdog eventually timeout. However, this watchdog timeout default expire action is **HardReset** that be defined at [Watchdog.interface.yaml](https://github.com/openbmc/phosphor-dbus-interfaces/blob/master/xyz/openbmc_project/State/Watchdog.interface.yaml) in **phosphor-dbus-interfaces** that will cause host re rebooted after power on.  
 
       Currently, we just using Poleg EVB with generic motherboard that have some limitations, thus when we using Ubuntu or Windows as host OS, we didn't receive watchdog off IPMI command be sent from OS or BIOS side, so watchdog timeout default expire action will be triggered and host will be rebooted after we pressing `Power on` button from `Server control` ->`Server power operations` of WebUI that is unexpected behavior. However, we've provided a patch to make `Power on` function work normally for demo purpose, if your host will send watchdog off IPMI command normally then you can remove this patch [0001-Set-Watchdog-ExpireAction-as-None.patch](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/dbus/phosphor-dbus-interfaces/0001-Set-Watchdog-ExpireAction-as-None.patch) in [phosphor-dbus-interfaces_%.bbappend](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/dbus/phosphor-dbus-interfaces_%25.bbappend).  
 
