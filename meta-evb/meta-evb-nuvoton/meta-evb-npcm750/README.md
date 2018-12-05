@@ -323,7 +323,7 @@ Server Power Operations are using to Power on/Warm reboot/Cold reboot/Orderly sh
 **How to use**
 
 1. Connect pins of the **PWRON** header on generic motherboard to the **J13** header on Poleg EVB
-    * Depend on your motherboard, you need to find **PWRON** header and connect to **pin5-6** of **J13** header on Poleg EVB.
+    * Depending on your motherboard, you need to find **PWRON** header and connect to **pin5-6** of **J13** header on Poleg EVB.
       > _You can check the schematic of Poleg EVB about **J13** that **pin5-6** for **POWER_SW** and **pin3-4** for **RESET_SW**. However, according to `Server power operations` design on WebUI that only use **POWER_SW** pin for `Warm reboot`, `Cold reboot`, `Orderly shutdown` and `Immediate shutdown` function implementation. Thus, we didn't need to use **RESET_SW** pin for those power operations on WebUI._  
 
 2. Configure reaction of power button on generic motherboard's OS
@@ -335,13 +335,13 @@ Server Power Operations are using to Power on/Warm reboot/Cold reboot/Orderly sh
 
     * About Watchdog patch
 
-      There is **phosphor-watchdog** package be included in OpenBMC now. The watchdog daemon is started on host power on, which is used to monitor if host is alive. In normal case, when host starts, it will send IPMI commands to kick watchdog and so everything would work fine. If host fails to start, the watchdog eventually timeout. However, this watchdog timeout default expire action is **HardReset** that be defined at [Watchdog.interface.yaml](https://github.com/openbmc/phosphor-dbus-interfaces/blob/master/xyz/openbmc_project/State/Watchdog.interface.yaml) in **phosphor-dbus-interfaces** that will cause host re rebooted after power on.  
+      There is a package **phosphor-watchdog** included in OpenBMC now. The watchdog daemon is started on host's power on, which is used to monitor if host is alive. In normal case, when host starts, it will send IPMI commands to kick watchdog and so everything would work fine. If host fails to start, the watchdog eventually timeout. However, the default watchdog timeout action is **HardReset** which is defined at [Watchdog.interface.yaml](https://github.com/openbmc/phosphor-dbus-interfaces/blob/master/xyz/openbmc_project/State/Watchdog.interface.yaml) in **phosphor-dbus-interfaces** that will cause host rebooted after power on.  
 
-      Currently, we just using Poleg EVB with generic motherboard that have some limitations, thus when we using Ubuntu or Windows as host OS, we didn't receive watchdog off IPMI command be sent from OS or BIOS side, so watchdog timeout default expire action will be triggered and host will be rebooted after we pressing `Power on` button from `Server control` ->`Server power operations` of WebUI that is unexpected behavior. However, we've provided a patch to make `Power on` function work normally for demo purpose, if your host will send watchdog off IPMI command normally then you can remove this patch [0001-Set-Watchdog-ExpireAction-as-None.patch](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/dbus/phosphor-dbus-interfaces/0001-Set-Watchdog-ExpireAction-as-None.patch) in [phosphor-dbus-interfaces_%.bbappend](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/dbus/phosphor-dbus-interfaces_%25.bbappend).  
+      Currently, we just use Poleg EVB with generic motherboard that has some limitations, thus when we use Ubuntu or Windows as host OS, we didn't receive watchdog off IPMI commands sent from OS or BIOS side, so the default watchdog timeout action will be triggered and host will be rebooted after we pressed `Power on` button from `Server control` ->`Server power operations` of WebUI, and that is unexpected behavior. However, we've provided a patch to make `Power on` function work normally for demo purpose, if your host will send watchdog off IPMI command normally then you can remove this patch [0001-Set-Watchdog-ExpireAction-as-None.patch](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/dbus/phosphor-dbus-interfaces/0001-Set-Watchdog-ExpireAction-as-None.patch) from [phosphor-dbus-interfaces_%.bbappend](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/dbus/phosphor-dbus-interfaces_%25.bbappend).  
 
 3. Server Power on
     * Press `Power on` button from `Server control` ->`Server power operations` of WebUI.  
-      > _When OpenBMC is used within a server, the [obmc-host-start@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-host-start%40.target) is what drives the boot of the system._  
+      > _[obmc-host-start@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-host-start%40.target) is the one driving the boot of the system._  
 
 4. Server Power off (Soft)
     * Press `Orderly shutdown` button from `Server control` ->`Server power operations` of WebUI.  
