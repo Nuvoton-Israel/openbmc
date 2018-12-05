@@ -3,9 +3,10 @@ DESCRIPTION = "Daemon to support IPMI protocol over network"
 HOMEPAGE = "https://github.com/openbmc/phosphor-net-ipmid"
 PR = "r1"
 PV = "1.0+git${SRCPV}"
+LICENSE = "Apache-2.0"
+LIC_FILES_CHKSUM = "file://LICENSE;md5=e3fc50a88d0a364313df4b21ef20c29e"
 
 inherit autotools pkgconfig
-inherit obmc-phosphor-license
 inherit obmc-phosphor-systemd
 
 DEPENDS += "autoconf-archive-native"
@@ -24,7 +25,7 @@ GROUPADD_PARAM_${PN} = "ipmi"
 
 SRC_URI += "git://github.com/openbmc/phosphor-net-ipmid"
 SRC_URI += "file://ipmi-net-firewall.sh"
-SRCREV = "b00f8f7fdbe850ac6dc431713a10764031f5a0ec"
+SRCREV = "472a37be3a4f6585fa2d30cdc69a27c38771c0bf"
 
 S = "${WORKDIR}/git"
 

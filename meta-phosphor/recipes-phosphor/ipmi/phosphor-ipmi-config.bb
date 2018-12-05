@@ -1,7 +1,8 @@
 SUMMARY = "Phosphor IPMI daemon configuration"
 PR = "r1"
+LICENSE = "Apache-2.0"
+LIC_FILES_CHKSUM = "file://${PHOSPHORBASE}/COPYING.apache-2.0;md5=34400b68072d710fecd0a2940a0d1658"
 
-inherit obmc-phosphor-license
 inherit allarch
 
 SRC_URI = " \
@@ -10,6 +11,8 @@ SRC_URI = " \
     file://dcmi_sensors.json \
     file://dev_id.json \
     file://power_reading.json \
+    file://channel_access.json \
+    file://channel_config.json \
     "
 
 FILES_${PN} = " \
@@ -18,6 +21,8 @@ FILES_${PN} = " \
     ${datadir}/ipmi-providers/dcmi_sensors.json \
     ${datadir}/ipmi-providers/dev_id.json \
     ${datadir}/ipmi-providers/power_reading.json \
+    ${datadir}/ipmi-providers/channel_access.json \
+    ${datadir}/ipmi-providers/channel_config.json \
     "
 
 do_fetch[noexec] = "1"
@@ -37,4 +42,9 @@ do_install() {
         ${D}${datadir}/ipmi-providers/dev_id.json
     install -m 0644 -D ${WORKDIR}/power_reading.json \
         ${D}${datadir}/ipmi-providers/power_reading.json
+    install -m 0644 -D ${WORKDIR}/channel_access.json \
+        ${D}${datadir}/ipmi-providers/channel_access.json
+    install -m 0644 -D ${WORKDIR}/channel_config.json \
+        ${D}${datadir}/ipmi-providers/channel_config.json
+
 }

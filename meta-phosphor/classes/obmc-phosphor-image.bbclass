@@ -14,6 +14,7 @@
 # - obmc-inventory                    - OpenBMC inventory support
 # - obmc-leds                         - OpenBMC LED support
 # - obmc-logging-mgmt                 - OpenBMC logging management
+# - obmc-remote-logging-mgmt          - OpenBMC remote logging management
 # - obmc-sensors                      - OpenBMC sensor support
 # - obmc-settings-mgmt                - OpenBMC settings management
 # - obmc-software                     - OpenBMC software management
@@ -22,8 +23,9 @@
 # - obmc-debug-collector              - OpenBMC debug collector
 
 inherit core-image
-inherit obmc-phosphor-license
 inherit obmc-phosphor-utils
+
+LICENSE = "Apache-2.0"
 
 FEATURE_PACKAGES_obmc-bmc-state-mgmt ?= "packagegroup-obmc-apps-bmc-state-mgmt"
 FEATURE_PACKAGES_obmc-chassis-mgmt ?= "${@cf_enabled(d, 'obmc-phosphor-chassis-mgmt', 'virtual-obmc-chassis-mgmt')}"
@@ -37,6 +39,7 @@ FEATURE_PACKAGES_obmc-host-state-mgmt ?= "packagegroup-obmc-apps-host-state-mgmt
 FEATURE_PACKAGES_obmc-inventory ?= "packagegroup-obmc-apps-inventory"
 FEATURE_PACKAGES_obmc-leds ?= "packagegroup-obmc-apps-leds"
 FEATURE_PACKAGES_obmc-logging-mgmt ?= "${@df_enabled(d, 'obmc-logging-mgmt', 'packagegroup-obmc-apps-logging')}"
+FEATURE_PACKAGES_obmc-remote-logging-mgmt ?= "packagegroup-obmc-apps-remote-logging"
 FEATURE_PACKAGES_obmc-net-ipmi ?= "phosphor-ipmi-net"
 FEATURE_PACKAGES_obmc-sensors ?= "packagegroup-obmc-apps-sensors"
 FEATURE_PACKAGES_obmc-software ?= "packagegroup-obmc-apps-software"
@@ -65,6 +68,7 @@ IMAGE_FEATURES += " \
         obmc-inventory \
         obmc-leds \
         obmc-logging-mgmt \
+        obmc-remote-logging-mgmt \
         obmc-net-ipmi \
         obmc-sensors \
         obmc-software \
@@ -85,6 +89,7 @@ CORE_IMAGE_EXTRA_INSTALL_append = " bash \
         i2c-tools \
         obmc-console \
         pam-plugin-access \
+        pam-ipmi \
         ${OBMC_IMAGE_EXTRA_INSTALL} \
         ffdc \
         rsync \

@@ -8,14 +8,16 @@ LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=86d3f3a95c324c9479bd8986968f4327"
 
 SRC_URI += "git://github.com/openbmc/pam-ipmi"
-SRCREV = "388c061fb5f28ebe7ce95690bd7b2f4e14cf68a6"
+SRCREV = "a32999cde49845ff904f1c7d48a6154b44002db3"
 S = "${WORKDIR}/git"
 
 inherit autotools pkgconfig
 
+DEPENDS += "autoconf-archive-native"
 DEPENDS += "openssl libpam"
 
 FILES_${PN} += " \
                ${base_libdir}/security/ \
                ${sysconfdir}/key_file \
+               ${sysconfdir}/ipmi_pass \
                "

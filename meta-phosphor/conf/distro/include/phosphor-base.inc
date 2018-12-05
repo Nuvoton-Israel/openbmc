@@ -64,9 +64,6 @@ SANITY_TESTED_DISTROS ?= " \
 
 OELAYOUT_ABI = "12"
 
-# add poky sanity bbclass
-INHERIT += "poky-sanity"
-
 # QA check settings - a little stricter than the OE-Core defaults
 WARN_TO_ERROR_QA = "already-stripped compile-host-path install-host-path \
                     installed-vs-shipped ldflags pn-overrides rpaths staticdev \
@@ -74,10 +71,7 @@ WARN_TO_ERROR_QA = "already-stripped compile-host-path install-host-path \
 WARN_QA_remove = "${WARN_TO_ERROR_QA}"
 ERROR_QA_append = " ${WARN_TO_ERROR_QA}"
 
-require conf/distro/include/poky-world-exclude.inc
 require conf/distro/include/no-static-libs.inc
-require conf/distro/include/yocto-uninative.inc
-INHERIT += "uninative"
 
 DISTRO = "openbmc-phosphor"
 DISTRO_NAME = "Phosphor OpenBMC (Phosphor OpenBMC Project Reference Distro)"
@@ -138,8 +132,6 @@ PREFERRED_VERSION_python-pygobject = "2.%"
 
 include conf/distro/include/openbmc-phosphor/${MACHINE}.inc
 
-INHERIT_remove = " uninative"
-
 KERNEL_FEATURES_append = " phosphor-gpio-keys"
 KERNEL_FEATURES_remove_qemuall = " phosphor-gpio-keys"
 
@@ -155,5 +147,6 @@ SKIP_META_VIRT_SANITY_CHECK = "1"
 # compressed to the root filesystem, and probably doesn't
 # make sense on a BMC anyway.
 BAD_RECOMMENDATIONS_pn-obmc-phosphor-image = "udev-hwdb"
+BAD_RECOMMENDATIONS_pn-obmc-phosphor-image += "shared-mime-info"
 
 LAYER_CONF_VERSION ?= "8"

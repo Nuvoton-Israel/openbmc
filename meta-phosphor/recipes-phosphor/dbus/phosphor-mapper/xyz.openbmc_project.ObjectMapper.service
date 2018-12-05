@@ -6,14 +6,15 @@ After=dbus.service
 [Service]
 Restart=always
 Type=dbus
-ExecStart=/usr/bin/env phosphor-mapper \
-        --path_namespaces="${{MAPPER_NAMESPACES}}" \
-        --interface_namespaces="${{MAPPER_INTERFACES}}"
+ExecStart=/usr/bin/env mapperx \
+        --service-namespaces="${{MAPPER_SERVICES}}" \
+        --interface-namespaces="${{MAPPER_INTERFACES}}" \
+        --service-blacklists="${{MAPPER_SERVICEBLACKLISTS}}"
 SyslogIdentifier=phosphor-mapper
 BusName={BUSNAME}
 TimeoutStartSec=300
+RestartSec=5
 EnvironmentFile={envfiledir}/obmc/mapper
-Environment="PYTHONUNBUFFERED=1"
 
 [Install]
 WantedBy={SYSTEMD_DEFAULT_TARGET}

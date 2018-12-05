@@ -2,12 +2,13 @@ SUMMARY = "Phosphor OpenBMC IPMI daemon"
 DESCRIPTION = "Phosphor OpenBMC IPMI router and plugin libraries"
 PR = "r1"
 PV = "1.0+git${SRCPV}"
+LICENSE = "Apache-2.0"
+LIC_FILES_CHKSUM = "file://LICENSE;md5=86d3f3a95c324c9479bd8986968f4327"
 
 RRECOMMENDS_${PN} += "packagegroup-obmc-ipmid-providers-libs"
 
 inherit autotools pkgconfig
 inherit obmc-phosphor-ipmiprovider-symlink
-inherit obmc-phosphor-license
 inherit obmc-phosphor-sdbus-service
 inherit obmc-phosphor-systemd
 inherit phosphor-ipmi-host
@@ -34,6 +35,7 @@ DEPENDS += "virtual/phosphor-ipmi-fru-merge-config"
 DEPENDS += "virtual/phosphor-ipmi-sensor-inventory"
 DEPENDS += "virtual/phosphor-ipmi-channel-config"
 DEPENDS += "boost"
+DEPENDS += "sdeventplus"
 
 VIRTUAL-RUNTIME_ipmi-config ?= "phosphor-ipmi-config"
 

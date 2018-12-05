@@ -4,10 +4,11 @@ DESCRIPTION = "An error and event log daemon application, and \
 HOMEPAGE = "https://github.com/openbmc/phosphor-logging"
 PR = "r1"
 PV = "1.0+git${SRCPV}"
+LICENSE = "Apache-2.0"
+LIC_FILES_CHKSUM = "file://LICENSE;md5=e3fc50a88d0a364313df4b21ef20c29e"
 
 inherit autotools pkgconfig
 inherit pythonnative
-inherit obmc-phosphor-license
 inherit obmc-phosphor-dbus-service
 inherit phosphor-logging
 inherit phosphor-dbus-yaml
@@ -54,7 +55,7 @@ FILES_phosphor-rsyslog-config += " \
 "
 
 SRC_URI += "git://github.com/openbmc/phosphor-logging"
-SRCREV = "aabb92ef56c4faa8f05487e9fcdf83f1053f1a22"
+SRCREV = "30047bf9647215951ba5dfe21ceb3e58a1b405a4"
 
 S = "${WORKDIR}/git"
 

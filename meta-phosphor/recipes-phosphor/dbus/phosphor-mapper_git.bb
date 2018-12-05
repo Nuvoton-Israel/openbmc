@@ -38,7 +38,7 @@ RDEPENDS_${PN} += " \
         "
 SRC_URI += "git://github.com/openbmc/phosphor-objmgr"
 
-SRCREV = "cfe3e4424efbf16d56a7570af0579ef574fd74f6"
+SRCREV = "6a39e8c727efb53b5902904d932c6308eb7f393e"
 
 S = "${WORKDIR}/git"
 
@@ -53,16 +53,22 @@ FILES_${PN}_remove = "${libdir}/lib*.so.* ${libdir}/*"
 # from the native sysroot /usr/share/phosphor-mapper filesystem.
 python do_emit_env() {
     path = d.getVar('STAGING_DIR_NATIVE', True) + \
-        d.getVar('namespace_dir', True)
-    paths = []
-    for p in os.listdir(path):
-        paths.append(os.sep.join(p.split('-')))
+        d.getVar('service_dir', True)
+    services = []
+    for s in os.listdir(path):
+        services.append('.'.join(s.split('-')))
 
     path = d.getVar('STAGING_DIR_NATIVE', True) + \
         d.getVar('interface_dir', True)
     interfaces = []
     for i in os.listdir(path):
         interfaces.append('.'.join(i.split('-')))
+
+    path = d.getVar('STAGING_DIR_NATIVE', True) + \
+        d.getVar('serviceblacklist_dir', True)
+    service_blacklists = []
+    for x in os.listdir(path):
+        service_blacklists.append('.'.join(x.split('-')))
 
     path = [d.getVar('D', True) + d.getVar('envfiledir', True)]
     path.append('obmc')
@@ -73,11 +79,12 @@ python do_emit_env() {
     if not os.path.exists(parent):
         os.makedirs(parent)
     with open(path, 'w+') as fd:
-        fd.write('MAPPER_NAMESPACES="{}"'.format(' '.join(paths)))
+        fd.write('MAPPER_SERVICES="{}"'.format(' '.join(services)))
         fd.write('\n')
         fd.write('MAPPER_INTERFACES="{}"'.format(' '.join(interfaces)))
+        fd.write('\n')
+        fd.write('MAPPER_SERVICEBLACKLISTS="{}"'.format(' '.join(service_blacklists)))
         fd.write('\n')
 }
 
 do_install[postfuncs] += "do_emit_env"
-do_install[vardeps] += "PHOSPHOR_MAPPER_NAMESPACES"
