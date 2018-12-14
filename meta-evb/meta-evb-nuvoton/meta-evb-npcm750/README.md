@@ -272,6 +272,15 @@ Virtual Media (VM) is to emulate an USB drive on remote host PC via Network Bloc
     * After `Mount USB`, click `UnMount USB` to emulate unplugging the usb disk from host platform
     * After `UnMount USB`, click `Stop VM` to stop VM network service, or click `Mount USB` to hook USB disk to host platform.
 
+**Performance**
+
+1. APP
+    * Read: 512KB
+    * Write: 2MB
+
+2. Web
+    * Read: 512KB
+
 **Maintainer**
 * Medad CChien
 
