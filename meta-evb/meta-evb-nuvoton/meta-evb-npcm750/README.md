@@ -49,6 +49,9 @@ Please submit any patches against the NPCM750 evaluation board layer to the main
   * [IPMI / DCMI](#ipmi--dcmi)
     + [SOL IPMI](#sol-ipmi)
     + [Message Bridging](#message-bridging)
+  * [JTAG Master](#jtag-master)
+    + [Remote Debugging](#remote-debugging)
+    + [CPLD / FPGA Programming](#cpld--fpga-programming)
   * [Features In Progressing](#features-in-progressing)
   * [Features Planned](#features-planned)
 - [IPMI Comamnds Verified](#ipmi-comamnds-verified)
@@ -271,15 +274,6 @@ Virtual Media (VM) is to emulate an USB drive on remote host PC via Network Bloc
     * After `Start VM`, click `Mount USB` to hook the emulated usb disk to host platform, or click `Stop VM` to stop VM network service.
     * After `Mount USB`, click `UnMount USB` to emulate unplugging the usb disk from host platform
     * After `UnMount USB`, click `Stop VM` to stop VM network service, or click `Mount USB` to hook USB disk to host platform.
-
-**Performance**
-
-1. APP
-    * Read: 512KB
-    * Write: 2MB
-
-2. Web
-    * Read: 512KB
 
 **Maintainer**
 * Medad CChien
@@ -998,10 +992,87 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
 * Stanley Chu
 * Tyrone Ting
 
+## JTAG Master
+JTAG master is implemented on BMC to debug host CPU or program CPLD or FPGA device.  
+
+### Remote Debugging
+Administrator can operate on local guest machine to debug remote motherboard CPU. Local machine sends debug commands to BMC via network interface, and then BMC handles these commands by shifting JTAG instructions or data to host CPU via JTAG interface. BMC will also get returned data of current instruction shifted out from host CPU and send returned data back to guest machine.   
+
+**How to use**
+
+1. Prepare a Poleg EVB and a target board (in our test, we use NUC950).
+2. Connect pins of Jtag on NUC950 to Poleg EVB:
+    * Connect Jtag TCK pin to pin2 of J11 on Poleg EVB.
+    * Connect Jtag TDI pin to pin8 of J11 on Poleg EVB.
+    * Connect Jtag TDO pin to pin7 of J11 on Poleg EVB.
+    * Connect Jtag TMS pin to pin10 of J11 on Poleg EVB.
+3. Prepare Jtag driver module and Jtag socket svc deamon:
+    * Jtag driver
+      * make sure the kernel config is enabled:
+        ```
+        CONFIG_NUVOTON_JTAG=y
+        ```
+    * Jtag socket svc daemon:
+      * In the build machine, build daemon by:
+        ```
+        bitbake jtag-socket-svc
+        ```
+      * Copy generated daemon "jtag_socket_svc" to Poleg EVB. "jtag_socket_svc" should be loacted at \<openbmc folder\>/build/tmp/work/armv7a-openbmc-linux-gnueabi/jtag-socket-svc/\<version\>/image/usr/bin/
+4. Prepare a guest PC and jtag client tool which will send At scale debug commands to daemon "jtag_socket_svc" on Poleg EVB via ethernet.
+    * Here is an example jtag client tool for NUC950 (target board)
+      * Download the example tool from https://github.com/Nuvoton-Israel/openbmc-util/tree/master/jtag_socket_client_arm  
+      * Make sure that python3 is installed on the guest PC.
+5. Configure the ethernet communication between Poelg EVB and a guest PC:
+    * Connect an ethernet cable between your workstation and J12 header of Poleg EVB.
+    * Configure guest PC' ip address to 192.168.2.101 and the netmask to 255.255.255.0 as an example here.
+    * Configure Poleg EVB ip address to 192.168.2.100 and the netmask to 255.255.255.0. For example, input the following command in the terminal connected to Poleg EVB on your workstation and press enter key.
+      ```
+      ifconfig eth2 192.168.2.100 netmask 255.255.255.0
+      ```
+6. Run Jtag socket svc daemon:
+    * Run daemon "jtag_socket_svc" by inputing the following command in the terminal connected to Poleg EVB:
+      ```
+      ./jtag_socket_svc
+      ```
+    * Make sure the NUC950(target board) is powered on and Jtag connection is ready.
+    * Control NUC950(target board) via Jtag by jtag client tool on guest PC:
+      * Launch client jtag tool
+        ```
+        python jtag_client.py
+        ```
+      * List commands the jtag client tool supports:
+        ```
+        jtag_client>>>?
+        ```
+      * Halt the target board:
+        ```
+        jtag_client>>>halt
+        ```
+      * Restore the target board:
+        ```
+        jtag_client>>>go
+        ```
+### CPLD / FPGA Programming
+**How to use**
+1. Connect Poleg EVB to CPLD/FPGA device by JTAG interface.  
+2. Build Programming Tool  
+   ```
+   bitbake loadsvf
+   ```
+3. Copy loadsvf executable binary from build/tmp/work/armv7a-openbmc-linux-gnueabi/loadsvf/<version>/image/usr/bin/ to Poleg EVB.  
+4. Put CPLD/FPGA image in USB disk and mount the USB disk on Poleg EVB
+5. run loadsvf on Poleg to program CPLD/FPGA
+   ```
+   loadsvf -s ${usb_mount_point}/fpga.svf -d /dev/jtag_drv
+   ```  
+   For more usages of loadsvf, please check [here](https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-support/loadsvf)  
+
+**Maintainer**
+* Stanley Chu
+
 ## Features In Progressing
 * User management
 * Host power control/monitor
-* JTAG - FPGA/CPLD Programing
 * Verified Boot - Kernel/ROFS verification
 * Remote USB- Standalone VM application
 * Remote KVM - V4L2 for KVM
