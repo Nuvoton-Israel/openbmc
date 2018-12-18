@@ -993,10 +993,11 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
 * Tyrone Ting
 
 ## JTAG Master
-JTAG master is implemented on BMC to debug host CPU or program CPLD or FPGA device.  
+JTAG master is implemented on BMC to debug host CPU or program CPLD / FPGA device.  
 
 ### Remote Debugging
-Administrator can operate on local guest machine to debug remote motherboard CPU. Local machine sends debug commands to BMC via network interface, and then BMC handles these commands by shifting JTAG instructions or data to host CPU via JTAG interface. BMC will also get returned data of current instruction shifted out from host CPU and send returned data back to guest machine.   
+<img align="right" width="30%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/a15e29c/openbmc/jtag_remotedebug.png">  
+Administrator can operate his own machine (guest) to debug CPU on remote server. Administrator's machine sends debug commands to remote BMC via network, and then BMC translates these commands and shifts JTAG instructions or data to host CPU, collect returned data shifted out from host CPU, and sends returned data back to administrator's machine via network.   
 
 **How to use**
 
@@ -1053,6 +1054,8 @@ Administrator can operate on local guest machine to debug remote motherboard CPU
         jtag_client>>>go
         ```
 ### CPLD / FPGA Programming
+The motherboard on server might have CPLD or FPGA components that require downloading firmware to these devices whenever server is powered on. BMC can help on this to program CPLD/FPGA via JTAG.
+
 **How to use**
 1. Connect Poleg EVB to CPLD/FPGA device by JTAG interface.  
 2. Build Programming Tool  
