@@ -237,7 +237,7 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
 * Tyrone Ting
 
 ### Remote Virtual Media
-<img align="right" width="30%" src="https://cdn.rawgit.com/NTC-CCBG/snapshots/1ecfa33/openbmc/vm-own.png">
+<img align="right" width="30%" src="https://cdn.rawgit.com/NTC-CCBG/snapshots/e0ebcf2/openbmc/vm-own.png">
 
 Virtual Media (VM) is to emulate an USB drive on remote host PC via Network Block Device(NBD) and Mass Storage(MSTG).
 
@@ -274,6 +274,26 @@ Virtual Media (VM) is to emulate an USB drive on remote host PC via Network Bloc
     * After `Start VM`, click `Mount USB` to hook the emulated usb disk to host platform, or click `Stop VM` to stop VM network service.
     * After `Mount USB`, click `UnMount USB` to emulate unplugging the usb disk from host platform
     * After `UnMount USB`, click `Stop VM` to stop VM network service, or click `Mount USB` to hook USB disk to host platform.
+
+**Performance**
+
+* **APP** stands for QT application runs on
+windows/linux
+* **Web** stands for JavaScript NBD Server runs on browser
+* Support functions
+
+    Target\OP| Read       | Write   |
+    :---------|:--------- |:------- |
+    USB Device|  APP only |APP only |
+    Image     |  APP/Web  |APP only |
+* Speed
+
+    Server\OP| Read     | Write |
+    :--------|:-------- |:------|
+    APP      |  512KB/s |2MB/s  |
+    Web      |  512KB/s |NULL   |
+    > _Note:
+    Every read request should get data from NBD Server via network, but each write request just pass data to filesystem, and filesystem will deals with passing data to NBD Server, so read takes more time than write._
 
 **Maintainer**
 * Medad CChien
