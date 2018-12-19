@@ -50,7 +50,7 @@ do_generate_static[depends] += " \
 do_generate_ubi_tar[depends] += "${PN}:do_generate_static"
 
 do_prepare_merged_bb_uboot () {
-	echo "OSHRI: ${IMAGE_FSTYPES}" 
+
 	# take Nuvoton's EB inputs
 	python ${IGPS_DIR}/UpdateInputsBinaries_EB.py
 
@@ -88,10 +88,10 @@ do_generate_ubi_tar_append () {
 
 make_image_links_append () {
 	# link image-u-boot-merged under obmc-phosphor-image folder to u-boot.bin.merged
-	ln -sf ${DEPLOY_DIR_IMAGE}/u-boot.${UBOOT_SUFFIX}.merged image-u-boot-merged
+	ln -sf ${DEPLOY_DIR_IMAGE}/u-boot.${UBOOT_SUFFIX}.merged image-u-boot
 }
 
 do_mk_static_symlinks_append () {
 	# link image-u-boot-merged under deploy folder to u-boot.bin.merged
-	ln -sf u-boot.${UBOOT_SUFFIX}.merged ${IMGDEPLOYDIR}/image-u-boot-merged
+	ln -sf u-boot.${UBOOT_SUFFIX}.merged ${IMGDEPLOYDIR}/image-u-boot
 }
