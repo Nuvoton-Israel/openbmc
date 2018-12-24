@@ -1,0 +1,13 @@
+[Unit]
+Description=Phosphor Buttons
+
+[Service]
+Restart=always
+RestartSec=3
+ExecStart=/usr/sbin/buttons
+SyslogIdentifier=buttons
+Type=dbus
+BusName=xyz.openbmc_project.Chassis.Buttons
+
+[Install]
+WantedBy=obmc-standby.target
