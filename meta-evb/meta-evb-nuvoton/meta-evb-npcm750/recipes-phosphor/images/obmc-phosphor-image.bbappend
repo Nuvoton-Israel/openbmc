@@ -33,6 +33,8 @@ IMAGE_INSTALL_append = " bmcweb \
                          obmc-mgr-system \
                          obmc-mgr-inventory \
                          evb-npcm750-config \
+                         obmc-libobmc-intf \
+                         obmc-phosphor-buttons \
                        "
 
 # start generate mtd image only after scrits, tools and inputs are ready 
