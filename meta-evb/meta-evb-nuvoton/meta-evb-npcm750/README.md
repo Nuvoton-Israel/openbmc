@@ -41,6 +41,7 @@ Please submit any patches against the NPCM750 evaluation board layer to the main
     + [Remote Virtual Media](#remote-virtual-media)
     + [BMC Firmware Update](#bmc-firmware-update)
     + [Server Power Operations](#server-power-operations)
+  * [Chassis Buttons](#chassis-buttons)
   * [System](#system)
     + [Time](#time)
     + [Sensor](#sensor)
@@ -381,6 +382,56 @@ Server Power Operations are using to Power on/Warm reboot/Cold reboot/Orderly sh
 7. Server Reboot (Cold)
     * Press `Cold reboot` button from `Server control` ->`Server power operations` of WebUI.  
       > _The cold reboot of the server is shutdown server immediately, then restarts it. This target will utilize the Immediate shutdown target [obmc-chassis-hard-poweroff@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-chassis-hard-poweroff%40.target) and then, start the host power on target [obmc-host-start@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-host-start%40.target)._  
+
+**Maintainer**
+* Tim Lee
+
+
+### Chassis Buttons
+
+Chassis Buttons POWER/RESET/ID can be used to power on/off, reset host server and identify this server to IT people's management console.
+
+**Source URL**
+
+* [https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/chassis](https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/chassis)
+
+**How to use**
+
+1. Connect pins of the **PWRON** header on generic motherboard to the **J13** header on Poleg EVB.
+    * Depending on your motherboard, you need to find **PWRON** header and connect to **pin5-6** of **J13** header on Poleg EVB.
+      > _You can check the schematic of Poleg EVB about **J13** that **pin5-6** for **POWER_SW**._  
+
+2. Prepare 3 buttons with sensing pins pulled high when not pressed, and sensed low level when pressed. Connect sensing pins of them with the **J23** GPIOs header of Poleg EVB, one on one.
+    * Power button
+
+      Connect Power button sensing pin to **pin1** of header **J23** of Poleg EVB.  
+    * Reset button
+
+      Connect Reset button sensing pin to **pin2** of header **J23** of Poleg EVB.  
+    * ID button
+
+      Connect ID button sensing pin to **pin3** of header **J23** of Poleg EVB.  
+    * Alternative GPIO pins for buttons
+
+      On header **J23** of Poleg EVB are 10 available GPIO pins available for customer application. Here, GPIO120 (pin1) was used to sense Power button, GPIO122 (pin2) was used to sense Reset button, and GPIO124 (pin3) was used to sense ID button.  
+
+      If other GPIO pins are preferred, please modify the file [gpio_defs.json](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/skeleton/obmc-libobmc-intf/gpio_defs.json) , and connect corresponding pins of header **J23** of Poleg EVB to button sensing pins, respectively.  
+
+      Content below is a part of **gpio_defs.json** for this sample:
+      ```
+      "name": "POWER_BUTTON",
+      "num": 120,
+      "direction": "both"
+
+      "name": "RESET_BUTTON",
+      "num": 122,
+      "direction": "both"
+
+      "name": "ID_BTN",
+      "num": 124,
+      "direction": "both"
+      ```
+      > _**name** here is referred in code and fixed, please don't modify it. **num**  means GPIO pin number and changeable here, **direction** should be set as both here because these pins will serve as input pins, with both rising and falling edge interrupt enabled._  
 
 **Maintainer**
 * Tim Lee
@@ -1097,8 +1148,6 @@ The motherboard on server might have CPLD or FPGA components that require downlo
 * User management
 * Host power control/monitor
 * Verified Boot - Kernel/ROFS verification
-* Remote USB- Standalone VM application
-* Remote KVM - V4L2 for KVM
 
 ## Features Planned
 * Improve sensor/event framework
@@ -1181,17 +1230,17 @@ The motherboard on server might have CPLD or FPGA components that require downlo
 | **Chassis Device Commands** |  |  |  |
 | Get Chassis Capabilities |  |  |  |
 | Get Chassis Status |  |  |  |
-| Chassis Control |  |  |  |
-| Chassis Reset |  |  |  |
-| Chassis Identify | V |  | V |
+| Chassis Control | [V](#chassis-buttons) |  |  |
+| Chassis Reset | [V](#chassis-buttons) |  |  |
+| Chassis Identify | [V](#chassis-buttons) |  | V |
 | Set Front Panel Button Enables |  |  |  |
 | Set Chassis Capabilities |  |  |  |
 | Set Power Restore Policy |  |  |  |
-| Set Power Cycle Interval |  |  |  |
-| Get System Restart Cause |  |  |  |
+| Set Power Cycle Interval | V |  |  |
+| Get System Restart Cause | V |  |  |
 | Set System Boot Options |  |  |  |
 | Get System Boot Options |  |  |  |
-| Get POH Counter |  |  |  |
+| Get POH Counter | V |  |  |
 | **Event Commands** |  |  |  |
 | Set Event Receiver |  |  |  |
 | Get Event Receiver |  |  |  |
@@ -1299,3 +1348,4 @@ image-rwfs    |  0 MB  | middle layer of the overlayfs, rw files in this partiti
 * 2018.11.22 Enable firmware update support 
 * 2018.11.23 Update Sensor description about FAN How to use
 * 2018.11.29 Update Server power operations of Server control about How to use
+* 2018.12.27 Add Chassis Buttons about How to use
