@@ -277,7 +277,7 @@ then
 	cp $rodir/usr/bin/openssl /usr/bin
 	cp $rodir/usr/lib/libssl* /usr/lib
 	cp $rodir/usr/lib/libcrypto* /usr/lib
-	cp $rodir/etc/activationdata/OpenBMC/publickey /publickey-root
+	cp $rodir/etc/activationdata/*/publickey /publickey-root
 	umount $rodir
 
 	publickey_result=$(verifypublickey publickey)
