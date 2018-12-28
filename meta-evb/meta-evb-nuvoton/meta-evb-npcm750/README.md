@@ -252,6 +252,8 @@ Virtual Media (VM) is to emulate an USB drive on remote host PC via Network Bloc
 **How to use**
 
 1. Clone a physical usb drive to an image file
+    > _NOTICE : You can skip this step, if you enable VM via APP._
+
     * For Linux - use tool like **dd**
       ```
       dd if=/dev/sda of=usb.img bs=1M count=100
@@ -263,18 +265,30 @@ Virtual Media (VM) is to emulate an USB drive on remote host PC via Network Bloc
     * For Windows - use tool like **Win32DiskImager.exe**
 
     > _NOTICE : A simple *.iso file cannot work for this._
- 
-2. Switch to webpage of VM on your browser
-    ```
-    https://XXX.XXX.XXX.XXX/#/vm
-    ```
-    > _Please login to BMC first._
 
-3. Operations of VM
-    * After `Chose File`, click `Start VM` to start VM network service (still not hook USB disk to host platform)
-    * After `Start VM`, click `Mount USB` to hook the emulated usb disk to host platform, or click `Stop VM` to stop VM network service.
-    * After `Mount USB`, click `UnMount USB` to emulate unplugging the usb disk from host platform
-    * After `UnMount USB`, click `Stop VM` to stop VM network service, or click `Mount USB` to hook USB disk to host platform.
+2. Enable Virtual Media
+
+    2.1 VM-WEB
+    * Login to BMC and switch to webpage of VM on your browser
+        ```
+        https://XXX.XXX.XXX.XXX/#/vm
+        ```
+    *  Operations
+        * After `Chose an Image File`, click `Start VM` to start VM network service (still not hook USB disk to host platform)
+        * After `Start VM`, click `Mount USB` to hook the emulated usb disk to host platform, or click `Stop VM` to stop VM network service.
+        * After `Mount USB`, click `UnMount USB` to emulate unplugging the usb disk from host platform
+        * After `UnMount USB`, click `Stop VM` to stop VM network service, or click `Mount USB` to hook USB disk to host platform.
+
+    2.2 VM-APP
+    * Launch windows/linux application
+        > _NOTICE : use `sudo` to launch app in linux and install `nmap` first_
+
+    *  Operations
+        * After `Chose an Image File` or `Select an USB Drive`, click `Search` to check which BMCs are on line
+        * Select any on line BMC and key in `Account/Password` and click `Start VM` to start VM network service (still not hook USB disk to host platform)
+        * After `Start VM`, click `Mount USB` to hook the emulated usb disk to host platform, or click `Stop VM` to stop VM network service.
+        * After `Mount USB`, click `UnMount USB` to emulate unplugging the usb disk from host platform
+        * After `UnMount USB`, click `Stop VM` to stop VM network service, or click `Mount USB` to hook USB disk to host platform.
 
 **Performance**
 
@@ -283,10 +297,10 @@ windows/linux
 * **Web** stands for JavaScript NBD Server runs on browser
 * Support functions
 
-    Target\OP| Read       | Write   |
-    :---------|:--------- |:------- |
-    USB Device|  APP only |APP only |
-    Image     |  APP/Web  |APP only |
+    Image Source\OP| Read      | Write   |
+    :--------------|:--------- |:------- |
+    USB Drive      |  APP only |APP only |
+    Image          |  APP/Web  |APP only |
 * Speed
 
     Server\OP| Read     | Write |
