@@ -50,6 +50,8 @@ Please submit any patches against the NPCM750 evaluation board layer to the main
   * [IPMI / DCMI](#ipmi--dcmi)
     + [SOL IPMI](#sol-ipmi)
     + [Message Bridging](#message-bridging)
+  * [LDAP for User Management ](#ldap-for-user-management)
+    + [LDAP Server Setup](#ldap-server-setup)
   * [JTAG Master](#jtag-master)
     + [Remote Debugging](#remote-debugging)
     + [CPLD / FPGA Programming](#cpld--fpga-programming)
@@ -153,11 +155,13 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
 1. Prepare a Poleg EVB with up-to-date boot block, Uboot and OpenBMC versions with this SOL patch applied.  Check with Nuvoton support for the most recent versions.
 
 2. Prepare a Supermicro MBD-X9SCL-F-0 motherboard and a LPC cable.
+
     > _The UEFI firmware version in Supermicro MBD-X9SCL-F-0 for verification is 2.15.1234._
 
 3. Connect pins of the **JTPM** header on **Supermicro MBD-X9SCL-F-0** to the **J10** header on **Poleg EVB** with the LPC cable:
+
     * Connect **pin 1-3, 5, 7-8, 10-12, 15-17** of JTPM with corresponding pins of J10, **one on one**.
-  
+
 4. Steps to copy UEFI SOL related drivers to a USB drive.  
 
     * Format the USB drive in FAT or FAT32.  
@@ -182,6 +186,7 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
     * Configure serial port 1 to **IO=3E8h; IRQ=5**, and then disable it.  
     * Go back to the main UEFI setting.  
     * Navigate to `Boot` menu option and select `UEFI: Built-in EFI Shell` as Boot Option #1.  
+
       + Make sure that the rest boot options are set to **Disabled**.  
     * Navigate to `Exit` menu option and select `Save changes and Reset`.  
     * Press `Yes` in the prompt window and it will reboot then.  
@@ -195,7 +200,7 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
     * Input the following command at UEFI shell prompt, press enter key and the prompt will show **fs0:\>** from now.  
       ```
       fs0:  
-	    ```
+      ```
     * Input the following command at UEFI shell prompt and press the enter key.  
       ```
       load PolegSerialDxe.efi  
@@ -203,7 +208,7 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
     * Input the following command at UEFI shell prompt and press the enter key.  
       ```
       load TerminalDxe.efi  
-	    ```
+      ```
     * Unplug the usb drive.  
     * Input the following command at UEFI shell prompt, press the enter key and it will route to the UEFI setting. 
       ```
@@ -223,7 +228,7 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
 
     * Please disable the proxy setting for this test if it's configured.
     * Launch a browser in your workstation and navigate to https://192.168.0.2.  
-    * By pass the secure warning and continue to the website.  
+    * Bypass the secure warning and continue to the website.  
     * Enter the BMC Username and Password (defaults: **root/0penBmc**).  
     * You will see the OpenBMC management screen.  
     * Click `Server control` at the left side of the OpenBMC management screen.  
@@ -329,12 +334,12 @@ Virtual Media (VM) is to emulate an USB drive on remote host PC via Network Bloc
     Activate   
     ```
     > if you select activate, then you will see activation dialog at item 2 
-      
+    
     ```
     Delete
     ```
     > If you select delete, then the package will be deleted right now
- 
+
 2. Confirm BMC firmware file activation
     ```
     ACTIVATE FIRMWARE FILE WITHOUT REBOOTING BMC
@@ -362,6 +367,7 @@ Server Power Operations are using to Power on/Warm reboot/Cold reboot/Orderly sh
 
 1. Connect pins of the **PWRON** header on generic motherboard to the **J13** header on Poleg EVB
     * Depending on your motherboard, you need to find **PWRON** header and connect to **pin5-6** of **J13** header on Poleg EVB.
+
       > _You can check the schematic of Poleg EVB about **J13** that **pin5-6** for **POWER_SW** and **pin3-4** for **RESET_SW**. However, according to `Server power operations` design on WebUI that only use **POWER_SW** pin for `Warm reboot`, `Cold reboot`, `Orderly shutdown` and `Immediate shutdown` function implementation. Thus, we didn't need to use **RESET_SW** pin for those power operations on WebUI._  
 
 2. Configure reaction of power button on generic motherboard's OS
@@ -379,22 +385,27 @@ Server Power Operations are using to Power on/Warm reboot/Cold reboot/Orderly sh
 
 3. Server Power on
     * Press `Power on` button from `Server control` ->`Server power operations` of WebUI.  
+
       > _[obmc-host-start@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-host-start%40.target) is the one driving the boot of the system._  
 
 4. Server Power off (Soft)
     * Press `Orderly shutdown` button from `Server control` ->`Server power operations` of WebUI.  
+
       > _The soft server power off function is encapsulated in the [obmc-host-shutdown@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-host-shutdown%40.target) that is soft in that it notifies the host of the power off request and gives it a certain amount of time to shut itself down._  
 
 5. Server Power off (Hard)
     * Press `Immediate shutdown` button from `Server control` ->`Server power operations` of WebUI.  
+
       > _The hard server power off is encapsulated in the [obmc-chassis-hard-poweroff@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-chassis-hard-poweroff%40.target) that will force the stopping of the soft power off service if running, and immediately cut power to the system._  
 
 6. Server Reboot (Warm)
     * Press `Warm reboot` button from `Server control` ->`Server power operations` of WebUI.  
+
       > _The warm reboot of the server is encapsulated in the [obmc-host-reboot@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-host-reboot%40.target) that will utilize the server power off (soft) target [obmc-host-shutdown@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-host-shutdown%40.target) and then, once that completes, start the host power on target [obmc-host-start@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-host-start%40.target)._  
 
 7. Server Reboot (Cold)
     * Press `Cold reboot` button from `Server control` ->`Server power operations` of WebUI.  
+
       > _The cold reboot of the server is shutdown server immediately, then restarts it. This target will utilize the Immediate shutdown target [obmc-chassis-hard-poweroff@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-chassis-hard-poweroff%40.target) and then, start the host power on target [obmc-host-start@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-host-start%40.target)._  
 
 **Maintainer**
@@ -455,8 +466,8 @@ Chassis Buttons POWER/RESET/ID can be used to power on/off, reset host server an
 
 ### Time
   * **SNTP**  
-  	Network Time Protocol (NTP) is a networking protocol for clock synchronization between computer systems over packet-switched, variable-latency data networks.
-    
+    	Network Time Protocol (NTP) is a networking protocol for clock synchronization between computer systems over packet-switched, variable-latency data networks.
+
     **systemd-timesyncd** is a daemon that has been added for synchronizing the system clock across the network. It implements an **SNTP (Simple NTP)** client. This daemon runs with minimal privileges, and has been hooked up with **systemd-networkd** to only operate when network connectivity is available.
         
     The modification time of the file **/var/lib/systemd/timesync/clock** indicates the timestamp of the last successful synchronization (or at least the **systemd build date**, in case synchronization was not possible).
@@ -473,7 +484,7 @@ Chassis Buttons POWER/RESET/ID can be used to power on/off, reset host server an
       timedatectl set-ntp true  
       ```
       >_timedatectl result will show **systemd-timesyncd.service active: yes**_ 
-
+    
       If NTP is Enabled and network is Connected (Using **eth2** connect to router), we will see the item **systemd-timesyncd.service active** is **yes** and **System clock synchronized** is **yes**. Thus, system time will sync from NTP server to get current time.
     * Get NTP status  
       ```
@@ -498,15 +509,15 @@ Chassis Buttons POWER/RESET/ID can be used to power on/off, reset host server an
         >_[Time]  
         >\#NTP=  
         >\#FallbackNTP=time1.google.com time2.google.com time3.google.com time4.google.com_  
-	
+    
     	By default, systemd-timesyncd uses the Google Public NTP servers **time[1-4].google.com**, if no other NTP configuration is available. To add time servers or change the provided ones, **uncomment** the relevant line and list their host name or IP separated by a space. For example, we setup NB windows 10 system as NTP server with IP **192.168.1.128**  
         >_[Time]  
         >**NTP=192.168.1.128**  
     	>\#FallbackNTP=time1.google.com time2.google.com time3.google.com time4.google.com_
-
+    
     * Poleg connect to local NTP server of windows 10 system  
       Connect to NB through **eth0** EMAC interface, and set static IP **192.168.1.15**  
-
+    
       ```
       ifconfig eth0 up
       ifconfig eth0 192.168.1.15
@@ -542,44 +553,45 @@ Chassis Buttons POWER/RESET/ID can be used to power on/off, reset host server an
   * **Time settings**  
     **Phosphor-time-manager** provides two objects on D-Bus
       >_/xyz/openbmc_project/time/bmc  
-      >/xyz/openbmc_project/time/host_  
+      >
+      > >/xyz/openbmc_project/time/host_  
 
       **BMC time** is used by journal event log record, and **Host time** is used by Host do IPMI Set SEL Time command to sync BMC time from Host mechanism in an era of BMC without any network interface.  
       Currently, we cannot set Host time no matter what we use **busctl**, **REST API** or **ipmitool set time set** command. Due to **phosphor-settingd** this daemon set default TimeOwner is BMC and TimeSyncMethod is NTP. Thus, when TimeOwner is BMC that is not allow to set Host time anyway.
 
       A summary of which cases the time can be set on BMC or HOST
 
-	  Mode      | Owner | Set BMC Time  | Set Host Time
-	  --------- | ----- | ------------- | -------------------
-	  NTP       | BMC   | Fail to set   | Not allowed (Default setting)
-	  NTP       | HOST  | Not allowed   | Not allowed
-	  NTP       | SPLIT | Fail to set   | OK
-	  NTP       | BOTH  | Fail to set   | Not allowed
-	  MANUAL    | BMC   | OK            | Not allowed
-	  MANUAL    | HOST  | Not allowed   | OK
-	  MANUAL    | SPLIT | OK            | OK
-	  MANUAL    | BOTH  | OK            | OK
+      Mode      | Owner | Set BMC Time  | Set Host Time
+      --------- | ----- | ------------- | -------------------
+      NTP       | BMC   | Fail to set   | Not allowed (Default setting)
+      NTP       | HOST  | Not allowed   | Not allowed
+      NTP       | SPLIT | Fail to set   | OK
+      NTP       | BOTH  | Fail to set   | Not allowed
+      MANUAL    | BMC   | OK            | Not allowed
+      MANUAL    | HOST  | Not allowed   | OK
+      MANUAL    | SPLIT | OK            | OK
+      MANUAL    | BOTH  | OK            | OK
 
       If user would like to set Host time that need to set Owner to SPLIT in NTP mode or set Owner to HOST/SPLIT/BOTH in MANUAL mode. However, change Host time will not effect BMC time and journal event log timestamp.
 
-	**Set Time Owner to Split**
-	```
-	### With busctl on BMC
+    **Set Time Owner to Split**
+    ```
+    ### With busctl on BMC
     busctl set-property xyz.openbmc_project.Settings \
        /xyz/openbmc_project/time/owner xyz.openbmc_project.Time.Owner \
        TimeOwner s xyz.openbmc_project.Time.Owner.Owners.Split
-
-	### With REST API on remote host
-	curl -c cjar -b cjar -k -H "Content-Type: application/json" -X  PUT  -d \
+    
+    ### With REST API on remote host
+    curl -c cjar -b cjar -k -H "Content-Type: application/json" -X  PUT  -d \
        '{"data": "xyz.openbmc_project.Time.Owner.Owners.Split" }' \
        https://${BMC_IP}/xyz/openbmc_project/time/owner/attr/TimeOwner
-	```
-	**TimeZone**  
+    ```
+    **TimeZone**  
     According OpenBMC current design that only support UTC TimeZone now, we can use below command to get current support TimeZone on Poleg
     ```
     timedatectl list-timezones
     ```
-**Maintainer**  
+    **Maintainer**  
 * Tim Lee
 
 ### Sensor
@@ -714,7 +726,7 @@ Later on, ipmi tool on host side can send IPMI command to BMC to get SEL events,
       13 | 10/04/2018 | 09:33:24 | Temperature #0x03 | Upper Critical going high | Asserted
       14 | 10/04/2018 | 09:33:31 | Temperature #0x03 | Upper Critical going high | Asserted
     ```
- 
+
 **Maintainer**
 
 * Stanley Chu 
@@ -760,7 +772,7 @@ In Poleg, we support four FAN slots and FAN RPMS will dynamic adjustment accordi
 
 Default Web-UI only show one Fan Tach Fan1, and Poleg support four Fan Tach. Thus, we modify this file to support four Fan Tach.
 * [https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/sensors/phosphor-hwmon%25/obmc/hwmon/ahb/apb/pwm-fan-controller%40103000.conf](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/sensors/phosphor-hwmon%25/obmc/hwmon/ahb/apb/pwm-fan-controller%40103000.conf)
-    
+  
     **How to use**  
     <img align="right" width="30%" src="https://cdn.rawgit.com/NTC-CCBG/snapshots/5745760/openbmc/fan.png">
     * Monitor FAN RPMS by **Web-UI** `Server health`  
@@ -810,6 +822,7 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
 1. Please follow instructions from step-1 to step-7 in [SOL](#sol) **How to use** section to configure your workstation, NPCM750 solution and Supermicro MBD-X9SCL-F-0.
 
 2. Download the [ipmiutil](http://ipmiutil.sourceforge.net/) according to the host OS in your workstation.
+
    > _Here it's assumed that the host OS is Windows 7 and ipmiutil for Windows is downloaded and used accordingly._
 
 3. Run SOL:
@@ -821,6 +834,7 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
       ipmiutil sol -N 192.168.0.2 -U admin -P 0penBmc -J 3 -V 4 -a  
       ```
     * (Optional) If the area doesn't display the UEFI setting clearly, the user could press the **Esc** key once.  
+
       + It shows a prompt window named `Exit Without Saving`, choose `No` and press enter key to refresh the area for showing UEFI setting entirely.  
     * (Optional) Configure the `Properties` of the command window  to see the entire output of SOL.  
       > _Screen Buffer Size Width: 200_  
@@ -848,8 +862,8 @@ BMC Message Bridging provides a mechanism for routing IPMI Messages between diff
 Please refer to [IPMI Website](https://www.intel.com/content/www/us/en/servers/ipmi/ipmi-home.html) for details about Message Bridging.
 
   * KCS to IPMB
-  <img align="right" width="30%" src="https://cdn.rawgit.com/NTC-CCBG/icons/522a8e05/kcs2ipmb.png">
-  
+    <img align="right" width="30%" src="https://cdn.rawgit.com/NTC-CCBG/icons/522a8e05/kcs2ipmb.png">
+
 The command "Send Message" is used to routing IPMI messages from KCS to IPMB via System Interface.
 
 Later, the response to the bridged request is received by the BMC and routed into the Receive Message Queue and it is retrieved using a Get Message command.
@@ -868,6 +882,7 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
 
 1. The user is expected to know how to follow the instructions in the section **Setting up your OpenBMC project** in [Nuvoton-Israel/openbmc](https://github.com/Nuvoton-Israel/openbmc) to build and program an OpenBMC image into Poleg EVBs.  
     * Prepare a PC (which is referred as a build machine here) for building and programming the OpenBMC image.  
+
       > _The user is also expected to have general knowledge of ACPI/UEFI and know how to update the DSDT table in linux and build/update a linux kernel/driver._  
 
 2. Prepare two Nuvoton Poleg EVBs. One is named Poleg EVB A and the other is Poleg EVB B.
@@ -875,12 +890,15 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
     * Connect **pin 3-4** of J4 on Poleg EVB A with corresponding pins of J4 on Poleg EVB B, **one on one**.  
     * Connect **pin 12** of J3 on Poleg EVB A with corresponding pin of J3 on Poleg EVB B, **one on one**.  
     * The connection needs a **1k** resistor and a **3.3v** supply from Poleg EVB A.  
+
       > _The component name of 3.3v supply is P4._
 
 3. Follow instructions from step-1, step-2, step-3 and step-5 in [SOL](#sol) **How to use** section to set up your workstation, Poleg EVB A and Supermicro MBD-X9SCL-F-0.  
+
     > _Follow instructions from step-1 and step-5 in [SOL](#sol) **How to use** section to set up Poleg EVB B_.  
 
 4. Install Ubuntu 14.04 64bit on Supermicro MBD-X9SCL-F-0 for the verification and login as a normal user.  
+
     > _The user is required to own root privileges on Ubuntu._
 
 5. Poleg EVB A is configured to have its own slave address **0x10**. Poleg EVB B is configured to have its own slave address **0x58**.
@@ -905,7 +923,7 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
 
 7. Download patches to meet the requirement of step-5 for Poleg EVB B.
 
-    * Download [0001-meta-evb-npcm750-enable-i2c-slave-function.patch](https://github.com/warp5tw/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-patches/recipes-kernel/linux/0x58/0001-meta-evb-npcm750-enable-i2c-slave-function.patch) and overwrite the same original file located under **meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-kernel/linux/linux-nuvoton** folder in the downloaded openbmc directory of the build machine to configure Poleg EVB B's own slave address as **0x58**.  
+    * Download [0001-meta-evb-npcm750-enable-i2c-slave-function.patch](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-patches/recipes-kernel/linux/0x58/0001-meta-evb-npcm750-enable-i2c-slave-function.patch) and overwrite the same original file located under **meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-kernel/linux/linux-nuvoton** folder in the downloaded openbmc directory of the build machine to configure Poleg EVB B's own slave address as **0x58**.  
     * In the build machine, rebuild the linux kernel for OpenBMC. As an example, enter the following command in a terminal window (build environment is configured in advance):  
       ```
       bitbake -C fetch virtual/kernel
@@ -944,9 +962,11 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
       ```
 
     * Rebuild the system interface driver and replace ipmi_si.ko of Ubuntu 14.04 with the one just rebuilt on Supermicro MBD-X9SCL-F-0.  
+
       > _The original ipmi_si.ko is located at /lib/modules/\`$(uname -r)\`/kernel/drivvers/char/ipmi_
 
     * Undo the "return -1" modification in the function **init_ipmi_si** of ipmi_si_intf.c.  
+
       + Rebuild the system interface driver again and leave the regenerated ipmi_si.ko in the kernel source code ipmi directory for system interface driver.
 
     * Reboot Ubuntu 14.04 on Supermicro MBD-X9SCL-F-0.
@@ -1003,6 +1023,7 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
 
     * The scripts here are just for convenience and for reference.  
     * Download and build [ioport-1.2.tar.gz](https://people.redhat.com/rjones/ioport/files/ioport-1.2.tar.gz).  
+
       + Locate the generated **outb** executive.
     * Create a script named "kcs_switch.sh" for example to configure the access to the kcs device of Poleg EVB A from Supermicro MBD-X9SCL-F-0.  
     * The user needs to modify the path to the outb executive in the script (kcs_switch.sh) below.  
@@ -1050,7 +1071,7 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
 12. Test message bridging.
 
     * Power up or reboot Poleg EVB A and Poleg EVB B. Make sure that login screens of Poleg EVBs are displayed on the terminal window (e.g. Tera Term) on your workstation.
-    * Power up or reboot Supermicro MBD-X9SCL-F-0 and login into Ubuntu 14.04 as a normal user.  
+    * Power up or reboot Supermicro MBD-X9SCL-F-0 and log in Ubuntu 14.04 as a normal user.  
       + Open a terminal window and execute **kcs_switch.sh** and **insert_ipmi_mod.sh** created in step-10 with the root privilege.
       + If the scripts are not created, input the contents of **kcs_switch.sh** and **insert_ipmi_mod.sh** except the #!/bin/sh line manually.
       + The user can use the following command in a terminal window under Ubuntu 14.04 on Supermicro MBD-X9SCL-F-0 to verify Poleg system interface.
@@ -1076,6 +1097,273 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
 
 * Stanley Chu
 * Tyrone Ting
+
+## LDAP for User Management
+<img align="right" width="30%" src="https://cdn.rawgit.com/NTC-CCBG/snapshots/b6fdec0d/openbmc/ldap-login-via-ssh.png">
+<img align="right" width="30%" src="https://cdn.rawgit.com/NTC-CCBG/snapshots/eed57a62/openbmc/access_ldap_via_poleg.PNG">
+
+The Lightweight Directory Access Protocol (LDAP) is an open, vendor-neutral, industry standard application protocol for accessing and maintaining distributed directory information services over an Internet Protocol (IP) network.
+
+LDAP is specified in a series of Internet Engineering Task Force (IETF) Standard Track publications called Request for Comments (RFCs), using the description language ASN.1.
+
+A common use of LDAP is to provide a central place to store usernames and passwords. This allows many different applications and services to connect to the LDAP server to validate users.
+
+**Source URL**
+
+* [https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/dlc/ldap-support-user-management](https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/dlc/ldap-support-user-management)
+* [https://github.com/Nuvoton-Israel/openbmc-util/tree/master/ldap_server](https://github.com/Nuvoton-Israel/openbmc-util/tree/master/ldap_server)
+
+### LDAP Server Setup
+
+**How to use**
+
+1. The user is expected to know how to follow the instructions in the section **Setting up your OpenBMC project** in [Nuvoton-Israel/openbmc](https://github.com/Nuvoton-Israel/openbmc) to build and program an OpenBMC image into Poleg EVBs. 
+    > _Prepare a PC which builds OpenBMC. (called the build machine hereafter)_  
+    > _The user is also expected to have knowledge of LDAP and its operations._
+
+2. Install Ubuntu 16.04 64 bit (called Ubuntu hereafter) on a PC which is used as a LDAP server and log in it with an account with root privilege.
+
+3. Set up the LDAP server and its configurations in Ubuntu. 
+
+    * Open a terminal and input the following commands to install required software packages in advance.
+
+      ```
+      sudo apt-get install git
+      sudo apt-get install libsasl2-dev
+      sudo apt-get install g++
+      wget http://download.oracle.com/berkeley-db/db-4.8.30.zip
+      unzip db-4.8.30.zip
+      cd db-4.8.30
+      cd build_unix/
+      ../dist/configure --prefix=/usr/local --enable-cxxmake
+      sudo make install
+      ```
+    * Install OpenSSL
+      + Download [openssl-1.0.2j.tar.gz](https://ftp.openssl.org/source/old/1.0.2/openssl-1.0.2j.tar.gz).
+      + Extract openssl-1.0.2j.tar.gz.
+      + Open a terminal, navigate to the extracted folder and input the following commands to install OpenSSL.
+        ```
+        ./config shared --prefix=/usr/local
+        make
+        make test
+        sudo make install
+        ```
+    * Install OpenLDAP
+      + Download OpenLDAP from [https://github.com/openldap/openldap](https://github.com/openldap/openldap)
+
+        > _git clone https://github.com/openldap/openldap_
+
+      + Open a terminal and input the following command to build and install OpenLDAP.
+        ```
+        ./configure CPPFLAGS="-I/usr/local/include -I/usr/local/include/openssl" LDFLAGS="-L/usr/local/lib -Wl,-rpath,/usr/local/lib" --prefix=/usr/local  --enable-syncprov=yes --enable-crypt=yes --enable-accesslog=yes --enable-auditlog=yes --enable-constraint=yes --enable-ppolicy=yes --enable-modules --enable-mdb --enable-spasswd --enable-debug=yes --enable-syslog --enable-slapd --enable-cleartext --enable-monitor --enable-overlays -with-threads --enable-rewrite --enable-syncprov=yes --with-tls=openssl 
+        ```
+          > _The description above is one line only._
+
+        ```
+        make depend 
+        make
+        sudo make install
+        ```
+    * Execute LDAP server
+      + Open a terminal and input the following command.
+
+        ```
+        sudo /usr/local/libexec/slapd -d 1 -h 'ldaps:/// ldap:/// ldapi:///'
+        ```
+          > _To stop LDAP server execution, press Ctrl key and C key at the same time in the terminal._  
+          > _Now please stop the LDAP server execution._
+
+    * Generate security configurations for the LDAP server running in Ubuntu.
+      > _Here a two-stage signing process is applied._  
+      > _You could also use the self-signed CA and cert for the configuration if your company uses them._
+
+      + Generate the CA key and cert. Open a terminal and input the following commands.
+        ```
+        openssl ecparam -genkey -name prime256v1 -out ca_server.key  
+        openssl req -x509 -new -key ca_server.key -days 3650 -out ca_server.pem -subj '/C=OO/ST=OO/L=OO/O= OO/OU= OO /CN= OO'
+        ```
+
+        > _Define these **OO** for the arguments **C**, **ST**, etc. according to your configurations._  
+        > _Please refer to the following link for explanations of the arguments **C**, **ST**, etc._  
+        > _[https://www.shellhacks.com/create-csr-openssl-without-prompt-non-interactive/](https://www.shellhacks.com/create-csr-openssl-without-prompt-non-interactive/)._
+
+      + Generate the LDAP key and CSR. In the same terminal, input the following commands.
+        ```
+        openssl ecparam -genkey -name prime256v1 -out ldap_server.key  
+        openssl req -new -key ldap_server.key -out ldap_server.csr -subj '/C=OO /ST=OO /L=OO/O=OO/OU=OO/CN=ldap.example.com'
+        ```
+
+        > _Define these **OO** for the arguments **C**, **ST**, etc. according to your configurations._  
+        > _Note that the field **CN** in ldap_server.csr must be set to the fully qualified domain name of the LDAP server._
+
+      + Generate ldap cert signed with CA cert. In the same terminal, input the following command.
+        ```
+        openssl x509 -req -days 365 -CA ca_server.pem -CAkey ca_server.key -CAcreateserial -CAserial serial -in ldap_server.csr -out ldap_server.pem
+        ```
+
+    * Store and specify locations of keys and certs.
+      + Edit /usr/local/etc/openldap/slapd.conf in Ubuntu with root privilege to update fields as examples shown below.
+        > _TLSCACertificateFile /etc/ldap/ca_certs.pem_  
+        > _TLSCertificateFile /etc/ssl/certs/ldap_server.pem_  
+        > _TLSCertificateKeyFile /etc/ssl/private/ldap_server.key_  
+        > _TLSCACertificatePath /etc/ldap_
+      
+      + Copy ca_certs.pem, ldap_server.pem and ldap_server.key into locations specified above with root privilege.
+
+    * Add LDAP schema and LDIF.
+      + Download [user_exp.schema](https://github.com/Nuvoton-Israel/openbmc-util/blob/master/ldap_server/schema/user_exp.schema) and save it at /usr/local/etc/openldap/schema with root privilege in Ubuntu.
+      + Modify /usr/local/etc/openldap/slapd.conf in Ubuntu with root privilege to specify the schema just saved.
+        > _include /usr/local/etc/openldap/schema/user_exp.schema_
+
+      + Download [bdn.ldif](https://github.com/Nuvoton-Israel/openbmc-util/blob/master/ldap_server/ldif/bdn.ldif), [ap_group.ldif](https://github.com/Nuvoton-Israel/openbmc-util/blob/master/ldap_server/ldif/ap_group.ldif), [bmc.ldif](https://github.com/Nuvoton-Israel/openbmc-util/blob/master/ldap_server/ldif/bmc.ldif), [group.ldif](https://github.com/Nuvoton-Israel/openbmc-util/blob/master/ldap_server/ldif/group.ldif), [people.ldif](https://github.com/Nuvoton-Israel/openbmc-util/blob/master/ldap_server/ldif/people.ldif) and [privRole.ldif](https://github.com/Nuvoton-Israel/openbmc-util/blob/master/ldap_server/ldif/privRole.ldif) to a temporary folder in Ubuntu.
+      + Open a terminal, navigate to the temporary folder for storing LDIF and input the following commands to add these LDIF into the LDAD server in Ubuntu.
+        ```
+        sudo slapadd -l ./bdn.ldif
+        sudo slapadd -l ./ap_group.ldif
+        sudo slapadd -l ./bmc.ldif
+        sudo slapadd -l ./group.ldif
+        sudo slapadd -l ./people.ldif
+        sudo slapadd -l ./privRole.ldif
+        ```
+
+    * Execute LDAP server.
+      + Open a terminal and input the following command in the terminal.
+      ```
+      sudo /usr/local/libexec/slapd -d 1 -h 'ldaps:/// ldap:/// ldapi:///'
+      ```
+
+4. Setup LDAP client configuration on Poleg.
+
+    * Open a terminal in the build machine and navigate to the directory which contains OpenBMC source codes. The directory is called **OPENBMCDIR** hereafter.
+      + Copy all directories and their containing files from [https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/dlc/ldap-support-user-management](https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/dlc/ldap-support-user-management) under OPENBMCDIR/meta-evb/meta-evb-nuvoton/meta-evb-npcm750 directory according to their default hierarchy.
+
+    * Update OPENBMCDIR/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/nss-pam-ldapd/files/nslcd.conf. (optional)
+      + The IP address for the LDAP server in Ubuntu is configured as **192.168.0.101**. Modify the field **uri ldap** in nslcd.conf according to your network configuration.
+        > _uri ldap://192.168.0.101/_
+
+      + The modification above is done in OpenBmc build time. If you would like to modify **uri** in OpenBmc run time, follow the instructions below after logging into Poleg in the console program (like Tera Term) with the root account (root/0penBmc).
+        > _The console program is used to display a debug console provided by Poleg._
+
+        ```
+        vi /etc/nslcd.conf
+        ```
+
+        > _Locate the line **uri ldap://192.168.0.101/**. Modify the field **uri ldap** according to your network configuration._
+
+        ```
+        systemctl stop nslcd
+        systemctl start nslcd
+        ```
+
+    * In the build machine, open a terminal window (build environment is configured in advance and the working directory is at OPENBMCDIR/build) to input the following commands to build the OpenBMC image.
+      ```
+      bitbake -C fetch libpam
+      bitbake -C fetch pamela
+      bitbake -C fetch nss-pam-ldapd
+      bitbake -C fetch dropbear
+      bitbake -C fetch phosphor-rest
+      bitbake -C fetch phosphor-webui
+      bitbake obmc-phosphor-image
+      ```
+    * Follow the section **Programming the images** of [Nuvoton-Israel/openbmc](https://github.com/Nuvoton-Israel/openbmc) to program the updated image into Poleg.
+
+5. Test LDAP server.
+
+   * Connect Poleg(J12 header) to the PC running Ubuntu with an ethernet cable and power on Poleg.
+   * Log in Poleg from the console program (like Tera Term) with the root account (root/0penBmc).
+     > _The console program is used to display a debug console provided by Poleg._
+
+   * Set up IP addresses for Poleg and Ubuntu so that they can ping each other.
+     + For example, set Poleg's IP address to 192.168.0.2. Input the following command in the console program.
+       ```
+       ifconfig eth2 192.168.0.2
+       ```
+
+       > _Please replace **192.168.0.2** with your IP configuration for Poleg._
+
+   * Execute the following command in the console program.
+     ```
+     ldapsearch -ZZ -h 192.168.0.101 -D "cn=admin,dc=ldap,dc=example,dc=com" -b "dc=ldap,dc=example,dc=com" -w secret
+     ```  
+     > _Please replace **192.168.0.101** with your IP configuration for Ubuntu._  
+     > _The ldapsearch example is to display all the data stored in the LDAP server using a TLS connection._
+
+   * You could use the account **user1** stored in the LDAP server to log in WebUI running on Poleg.
+   <div align="center">
+   <img width="30%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/c8c60b29/openbmc/user1_logininfo.png">
+   <img width="30%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/c8c60b29/openbmc/user2_logininfo.png">
+   </div>
+   <div align="center">
+   <img width="30%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/c8c60b29/openbmc/email_info.png">
+   <img width="30%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/c8c60b29/openbmc/webserver_info.png">
+   </div>
+   <div align="center">
+   <img width="30%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/c8c60b29/openbmc/bmc1_info.png">
+   <img width="30%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/c8c60b29/openbmc/bmc2_info.png">
+   </div>
+
+     + Some descriptions about the LDIF used by the LDAP server and authentication process are provided here. Please refer to the six snapshots just above.
+       > _To login using an account, the authentication logic has to check the following criteria._  
+       > _**bmc-uid**: It stands for the BMC machine that the account is used to login. The BMC machines are grouped by DN **ou=ap_group,dc=ldap,dc=example,dc=com**. One BMC machine can be in multiple groups at the same time. (see **ap_group** below)_  
+       > _**ap_group**: Applications like web server, email, ftp and so on are deployed on the servers attched by BMC machines. Therefore, grouping by applications is taken into the authentication process. The authentication refuses an account to log in some BMC machine if that machine is not deployed under the certain **ap_group** the account also joins._  
+       > _**people**: It contains the account information (login/privileges) stored in the LDAP server. An account can join multiple **ap_group** simutaneously._  
+       > _**user-login-disabled**: While this attribute's value is 1, it is not allowed to login with the account's membership of the specific **ap_group**_.  
+       > _**user-login-interface**: It's used as a channel via that the account logins for an **ap_group**. For example, **web** stands for logging in a BMC machine via WebUI. If **web** does not exist in any **user-login-interface** attributes an account owns under a certain ap_group, it means that the user cannot use this account to login as a member of the preferred ap_group via WebUI._
+
+     + Use an LDAP tool to modify the field **macAddress** of the DN **bmc-uid=bmc1,ou=bmc,dc=ldap,dc=example,dc=com** stored in the LDAP server.
+       > _The modification is to use the mac address of the ethernet module on the Poleg EVB you currently test with._
+
+     + To get the mac address desired, input the following command in the console program.
+       ```
+       ifconfig eth0
+       ```
+       > _Locate the keyword **HWaddr** displayed in the console program._  
+       > _Copy the value next to HWaddr to override the value of the field **macAddress** of the DN **bmc-uid=bmc1,ou=bmc,dc=ldap,dc=example,dc=com**._
+
+     + Launch a browser and navigate to the Poleg's IP address.
+       > _Bypass the secure warning and continue to the website._
+
+     + Use user1/123 to log in WebUI.
+       > _user1 is the login ID._  
+       > _123 is the login password._  
+       > _The **bmc-uid** for the BMC machine used for this test is bmc1. According to the LDIF provided, the BMC machine bmc1 is deployed under the **ap_group** email and the the BMC machine bmc2 is deployed under **ap_group** webserver. Also one can tell from the snapshots, user1 and user2 have different **user-login-interface** settings for the **ap_group** email and **ap_group** webserver respectively._  
+       > _User1 is able to log on bmc1 via WebUI since the following conditions are met: the BMC machine bmc1 is deployed under **ap_group** email.; user1 is a member of the **ap_group** email.; user1 has an **user-login-interface** setting as **web** for that group and value of user1's **user-login-disabled** attribute is not set._  
+       > _Although user2 is also a member of the **ap_group** email, it does not have an **user-login-interface** setting as **web** for that group. Under such conditions, user2 is not allowed to log on bmc1. User2 does have an **user-login-interface** setting as **web** for the **ap_group** webserver but bmc1 is not deployed under the **ap_group** webserver._  
+       > _The description above explains why user1 is used for this test._
+
+   * Password modification is also available to LDAP accounts via WebUI.
+     + Log in WebUI using user1/123 as mentioned in previous phrase.
+     + Navigate to `Users` menu item on the left panel and select it.
+     + A sub menu item `Manage user account` pops up and select it.
+     + Input the current password value for user1.
+       > _The password is set to 123 by default._  
+       > _The input location is right below **CURRENT PASSWORD** text area._
+
+     + Input a new password twice.
+       > _The input locations are right below **NEW PASSWORD** and **RETYPE NEW PASSWORD** text area._
+
+     + Press the `Save change` button.
+       > _A message **Success! User Password has been changed!** is expected to show then._
+
+     + Log out WebUI and login again with the new password for user1.
+
+    * Log in Poleg via SSH using an LDAP account.
+      + Make sure that configurations stated in Step 5 for Poleg and Ubuntu are set accordingly and ping between Ubuntu and Poleg is okay.
+      + Install **ssh** in Ubuntu with root privilege if ssh client is not available. Open a terminal and input the following command.
+        ```
+        sudo apt-get install ssh
+        ```
+
+      + Open a terminal in Ubuntu to log in Poleg using the LDAP account **user1** and its password via SSH. Input the following command in the terminal.
+        ```
+        ssh user1@192.168.0.2
+        ```
+        > _Please replace **192.168.0.2** with your IP configuration for Poleg._
+
+**Maintainer**
+
+* Tyrone Ting
+
 
 ## JTAG Master
 JTAG master is implemented on BMC to debug host CPU or program CPLD / FPGA device.  
@@ -1363,3 +1651,4 @@ image-rwfs    |  0 MB  | middle layer of the overlayfs, rw files in this partiti
 * 2018.11.23 Update Sensor description about FAN How to use
 * 2018.11.29 Update Server power operations of Server control about How to use
 * 2018.12.27 Add Chassis Buttons about How to use
+* 2019.01.02 Add LDAP server setup and test
