@@ -19,8 +19,8 @@ index 3fc0034..5509715 100644
  
  
  signit = "signit"
--linux_prefix = "sudo ./"
-+linux_prefix = "./"
+-linux_prefix = "sudo "
++linux_prefix = ""
  
  
  class SignitError(Exception):
