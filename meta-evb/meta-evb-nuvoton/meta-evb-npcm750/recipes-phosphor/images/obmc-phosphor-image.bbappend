@@ -48,8 +48,9 @@ do_generate_static[depends] += " \
         npcm7xx-igps-native:do_populate_sysroot     \
         "
 
-# do_generate_ubi_tar will use the outputs of do_generate_static
+# do_generate_ubi/static_tar will use the outputs of do_generate_static
 do_generate_ubi_tar[depends] += "${PN}:do_generate_static"
+do_generate_static_tar[depends] += "${PN}:do_generate_static"
 
 do_prepare_merged_bb_uboot () {
 
