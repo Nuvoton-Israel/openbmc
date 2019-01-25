@@ -18,23 +18,19 @@ OBMC_IMAGE_EXTRA_INSTALL_append = " phosphor-ipmi-kcs"
 OBMC_IMAGE_EXTRA_INSTALL_append = " phosphor-ipmi-net"
 OBMC_IMAGE_EXTRA_INSTALL_append = " phosphor-cooling-type"
 
-IMAGE_INSTALL_append = " bmcweb \
-                         obmc-ikvm \
+IMAGE_INSTALL_append = " obmc-ikvm \
+			 phosphor-gevent \
+                         phosphor-rest \
                          phosphor-webui \
                          phosphor-ipmi-host \
-                         phosphor-ipmi-ipmb-legacy \
                          lmsensors-fancontrol \
                          lmsensors-pwmconfig \
                          lmsensors-sensord \
                          lmsensors-sensors \
                          iperf2 \
                          phosphor-image-signing \
-                         x86-power-control \
                          obmc-mgr-system \
                          obmc-mgr-inventory \
-                         evb-npcm750-config \
-                         obmc-libobmc-intf \
-                         obmc-phosphor-buttons \
                        "
 
 # start generate mtd image only after scrits, tools and inputs are ready 

@@ -10,7 +10,7 @@ inherit npcm7xx-image
 SRC_URI = "git://github.com/Nuvoton-Israel/npcm7xx-bootblock;protocol=git"
 SRC_URI[md5sum] = "cf8daa5f4636ed1ff952618e435af028"
 
-SRCREV = "10.09.02"
+SRCREV = "10.09.05"
 
 S = "${WORKDIR}/git"
 
