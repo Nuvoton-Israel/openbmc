@@ -1,0 +1,565 @@
+commit 4a8e79629ba6c2e277cd49999de8e1dec6b384c6
+Author: YSChu <yschu@nuvoton.com>
+Date:   Tue Jan 29 15:56:48 2019 +0800
+
+    support SendMessage/GetMessage commands
+
+diff --git a/Makefile.am b/Makefile.am
+index 48aa48f..359935a 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -11,7 +11,8 @@ ipmid_SOURCES = \
+ 	settings.cpp \
+ 	host-cmd-manager.cpp \
+ 	utils.cpp \
+-	oemrouter.cpp
++	oemrouter.cpp \
++	ipmb-msg-queue.cpp
+ nodist_ipmid_SOURCES = ipmiwhitelist.cpp
+ 
+ libipmi20_BUILT_LIST = \
+@@ -90,6 +91,7 @@ libipmi20_la_SOURCES = \
+ 	ipmi_fru_info_area.cpp \
+ 	read_fru_data.cpp \
+ 	sensordatahandler.cpp \
++	messagehandler.cpp \
+ 	$(libipmi20_BUILT_LIST)
+ 
+ @CODE_COVERAGE_RULES@
+diff --git a/ipmb-msg-queue.cpp b/ipmb-msg-queue.cpp
+new file mode 100644
+index 0000000..3a674a8
+--- /dev/null
++++ b/ipmb-msg-queue.cpp
+@@ -0,0 +1,186 @@
++#include "config.h"
++#include "ipmb-msg-queue.hpp"
++#include <chrono>
++#include <phosphor-logging/elog-errors.hpp>
++#include <phosphor-logging/log.hpp>
++#include <sdbusplus/message/types.hpp>
++#include <sdbusplus/timer.hpp>
++#include <utils.hpp>
++#include <xyz/openbmc_project/Common/error.hpp>
++#include <xyz/openbmc_project/State/Host/server.hpp>
++
++namespace phosphor
++{
++namespace host
++{
++namespace command
++{
++
++constexpr auto MAPPER_BUSNAME = "xyz.openbmc_project.ObjectMapper";
++constexpr auto MAPPER_PATH = "/xyz/openbmc_project/object_mapper";
++constexpr auto MAPPER_INTERFACE = "xyz.openbmc_project.ObjectMapper";
++constexpr auto HOST_STATE_PATH = "/xyz/openbmc_project/state/host0";
++constexpr auto HOST_STATE_INTERFACE = "xyz.openbmc_project.State.Host";
++constexpr auto HOST_TRANS_PROP = "RequestedHostTransition";
++
++// For throwing exceptions
++using namespace phosphor::logging;
++using InternalFailure =
++    sdbusplus::xyz::openbmc_project::Common::Error::InternalFailure;
++
++namespace sdbusRule = sdbusplus::bus::match::rules;
++namespace variant_ns = sdbusplus::message::variant_ns;
++
++IpmbMessageQueue::IpmbMessageQueue(sdbusplus::bus::bus& bus) :
++    bus(bus), timer(std::bind(&IpmbMessageQueue::hostTimeout, this)),
++    hostTransitionMatch(
++        bus,
++        sdbusRule::propertiesChanged(HOST_STATE_PATH, HOST_STATE_INTERFACE),
++        std::bind(&IpmbMessageQueue::clearQueueOnPowerOn, this, std::placeholders::_1))
++{
++    // Nothing to do here.
++}
++
++IpmbMsg IpmbMessageQueue::GetMessage()
++{
++    log<level::INFO>("Retrieve message from Queue");
++    // Stop the timer. Don't have to Err failure doing so.
++    auto r = timer.stop();
++    if (r < 0)
++    {
++        log<level::ERR>("Failure to STOP the timer",
++                        entry("ERROR=%s", strerror(-r)));
++    }
++
++    if (this->workQueue.empty())
++    {
++		std::vector<uint8_t> empty {};
++        log<level::INFO>("Queue is empty!");
++
++        return std::make_pair(0, empty);
++    }
++
++    // Pop the processed entry off the queue
++    auto msg = this->workQueue.front();
++    this->workQueue.pop();
++
++    // Check for another entry in the queue and kick it off
++    this->checkQueueAndAlertHost();
++	#if 0
++    // Start the timer for this transaction
++    auto time = std::chrono::duration_cast<std::chrono::microseconds>(
++        std::chrono::seconds(IPMI_SMS_ATN_ACK_TIMEOUT_SECS));
++
++    r = timer.start(time);
++    if (r < 0)
++    {
++        log<level::ERR>("Error starting timer for control host");
++    }
++	#endif
++
++    return msg;
++}
++
++// Called when initial timer goes off post sending SMS_ATN
++void IpmbMessageQueue::hostTimeout()
++{
++    log<level::ERR>("Message queue timeout hit!");
++
++    clearQueue();
++}
++
++void IpmbMessageQueue::clearQueue()
++{
++    while (!this->workQueue.empty())
++    {
++        /* discard the messages in queue */
++        this->workQueue.pop();
++
++    }
++}
++
++// Called for alerting the host
++void IpmbMessageQueue::checkQueueAndAlertHost()
++{
++    if (this->workQueue.size() >= 1)
++    {
++        log<level::DEBUG>("Asserting SMS Attention");
++
++        std::string IPMI_PATH("/org/openbmc/HostIpmi/1");
++        std::string IPMI_INTERFACE("org.openbmc.HostIpmi");
++
++        auto host = ::ipmi::getService(this->bus, IPMI_INTERFACE, IPMI_PATH);
++
++        // Start the timer for this transaction
++        auto time = std::chrono::duration_cast<std::chrono::microseconds>(
++            std::chrono::seconds(IPMI_SMS_ATN_ACK_TIMEOUT_SECS));
++
++        auto r = timer.start(time);
++        if (r < 0)
++        {
++            log<level::ERR>("Error starting timer for control host");
++            return;
++        }
++
++        auto method =
++            this->bus.new_method_call(host.c_str(), IPMI_PATH.c_str(),
++                                      IPMI_INTERFACE.c_str(), "setAttention");
++        auto reply = this->bus.call(method);
++
++        if (reply.is_method_error())
++        {
++            log<level::ERR>("Error in setting SMS attention");
++            elog<InternalFailure>();
++        }
++        log<level::DEBUG>("SMS Attention asserted");
++    }
++}
++
++void IpmbMessageQueue::AddMessage(IpmbMsg msg)
++{
++    log<level::INFO>("push data to Queue");
++
++    this->workQueue.emplace(msg);
++
++    if (this->workQueue.size() == 1)
++    {
++        this->checkQueueAndAlertHost();
++    }
++
++    return;
++}
++
++void IpmbMessageQueue::clearQueueOnPowerOn(sdbusplus::message::message& msg)
++{
++    namespace server = sdbusplus::xyz::openbmc_project::State::server;
++
++    ::ipmi::DbusInterface interface;
++    ::ipmi::PropertyMap properties;
++
++    msg.read(interface, properties);
++
++    if (properties.find(HOST_TRANS_PROP) == properties.end())
++    {
++        return;
++    }
++
++    auto& requestedState =
++        variant_ns::get<std::string>(properties.at(HOST_TRANS_PROP));
++
++    if (server::Host::convertTransitionFromString(requestedState) ==
++        server::Host::Transition::On)
++    {
++        clearQueue();
++    }
++}
++
++bool IpmbMessageQueue::empty()
++{
++    if(this->workQueue.empty())
++        return true;
++    return false;
++}
++
++} // namespace command
++} // namespace host
++} // namespace phosphor
+diff --git a/ipmb-msg-queue.hpp b/ipmb-msg-queue.hpp
+new file mode 100644
+index 0000000..b25b6a6
+--- /dev/null
++++ b/ipmb-msg-queue.hpp
+@@ -0,0 +1,142 @@
++#pragma once
++
++#include <queue>
++#include <sdbusplus/bus.hpp>
++#include <sdbusplus/bus/match.hpp>
++#include <sdbusplus/timer.hpp>
++#include <tuple>
++
++typedef struct
++{
++    union
++    {
++        struct
++        {
++            /** @brief IPMB Connection Header Format */
++            uint8_t address;
++            uint8_t rsNetFnLUN; /// @brief responder's net function and logical
++                                /// unit number
++            uint8_t checksum1;  /// @brief checksum computed on first two bytes
++                                /// of IPMB_HEADER
++            /** @brief IPMB Header */
++            uint8_t rqSA;     /// @brief requester's slave address, LS bit=0
++            uint8_t rqSeqLUN; /// @brief requester's sequence number and logical
++                              /// unit number
++            uint8_t cmd; /// @brief command required by the network identify the
++                         /// type of rqts
++            uint8_t data[]; /// @brief payload
++        } Req;              /// @brief IPMB request header
++        struct
++        {
++            uint8_t address;
++            /** @brief IPMB Connection Header Format */
++            uint8_t rqNetFnLUN; /// @brief requester's net function and logical
++                                /// unit number
++            uint8_t checksum1;  /// @brief checksum computed on first two bytes
++                                /// of IPMB_HEADER
++            /** @brief IPMB Header */
++            uint8_t rsSA;     /// @brief responder's slave address, LS bit=0
++            uint8_t rsSeqLUN; /// @brief responder's sequence number and logical
++                              /// unit number
++            uint8_t cmd; /// @brief command required by the network identify the
++                         /// type of rqts
++            uint8_t completionCode; /// @brief IPMB nodes return a Completion
++                                    /// Code in all response msgs
++            uint8_t data[];         /// @brief payload
++        } Resp;                     /// @brief IPMB response header
++    } Header;                       /// @brief IPMB frame header
++} __attribute__((packed)) IPMB_HEADER;
++
++namespace phosphor
++{
++namespace host
++{
++namespace command
++{
++using ChannelNum = uint8_t;
++using IpmbData = std::vector<uint8_t>;
++using IpmbMsg = std::pair<ChannelNum, IpmbData>;
++
++/** @class
++ *  @brief Manages Messages that are to be sent to Host
++ */
++class IpmbMessageQueue
++{
++    public:
++        IpmbMessageQueue() = delete;
++        ~IpmbMessageQueue() = default;
++        IpmbMessageQueue(const IpmbMessageQueue&) = delete;
++        IpmbMessageQueue& operator=(const IpmbMessageQueue&) = delete;
++        IpmbMessageQueue(IpmbMessageQueue&&) = delete;
++        IpmbMessageQueue& operator=(IpmbMessageQueue&&) = delete;
++
++        /** @brief Constructs IpmbMessageQueue object
++         *
++         *  @param[in] bus   - dbus handler
++         *  @param[in] event - pointer to sd_event
++         */
++    	explicit IpmbMessageQueue(sdbusplus::bus::bus& bus);
++
++        /** @brief Extracts the next entry in the Message Queue */
++        IpmbMsg GetMessage();
++
++        /** @brief Add new entry to Message Queue */
++        void AddMessage(IpmbMsg msg);
++
++        /** @brief queue is empty or not */
++        bool empty();
++
++
++    private:
++        /** @brief Check if anything in queue and alert host if so */
++        void checkQueueAndAlertHost();
++
++        /** @brief  Call back interface on message timeouts to host.
++         *
++         *  @detail When this happens, a failure message would be sent
++         *          to all the commands that are in the Queue and queue
++         *          will be purged
++         */
++        void hostTimeout();
++
++        /** @brief Clears the command queue
++         *
++         *  @detail Clears the command queue and calls all callbacks
++         *          specifying the command wasn't successful.
++         */
++        void clearQueue();
++
++        /** @brief Clears the command queue on a power on
++         *
++         *  @detail The properties changed handler for the
++         *          RequestedHostTransition property.  When this property
++         *          changes to 'On', this function will purge the command
++         *          queue.
++         *
++         *          This is done to avoid having commands that were issued
++         *          before the host powers on from getting sent to the host,
++         *          either due to race conditions around state transitions
++         *          or from a user doing something like requesting an already
++         *          powered off system to power off again and then immediately
++         *          requesting a power on.
++         *
++         *  @param[in] msg - the sdbusplus message containing the property
++         */
++        void clearQueueOnPowerOn(sdbusplus::message::message& msg);
++
++        /** @brief Reference to the dbus handler */
++        sdbusplus::bus::bus& bus;
++
++        /** @brief Queue to store the IPMB Messages */
++        std::queue<IpmbMsg> workQueue{};
++
++        /** @brief Timer for commands to host */
++        phosphor::Timer timer;
++
++        /** @brief Match handler for the requested host state */
++        sdbusplus::bus::match_t hostTransitionMatch;
++};
++
++} // namespace command
++} // namespace host
++} // namespace phosphor
+diff --git a/messagehandler.cpp b/messagehandler.cpp
+new file mode 100644
+index 0000000..b3184aa
+--- /dev/null
++++ b/messagehandler.cpp
+@@ -0,0 +1,191 @@
++#include <numeric>
++#include <phosphor-logging/log.hpp>
++#include <phosphor-logging/elog-errors.hpp>
++#include "host-ipmid/ipmid-api.h"
++#include "host-ipmid/ipmid-host-cmd.hpp"
++#include "config.h"
++#include "transporthandler.hpp"
++#include "ipmb-msg-queue.hpp"
++
++#include <stdio.h>
++//#include <mapper.h>
++
++#define IPMI_CMD_GET_MESSAGE 0x33
++#define IPMI_CMD_SEND_MESSAGE 0x34
++#define IPMI_CC_DATA_NOT_AVAILABLE 0x80
++
++#define CHANNEL_IPMB 	2
++#define IPMB_MIN_SIZE	7
++
++const char *HOST_IPMI_OBJ = "/org/openbmc/HostIpmi";
++const char *IPMB_INTF = "org.openbmc.Ipmb";
++
++void register_netfn_app_oem_functions() __attribute__((constructor));
++
++using namespace phosphor::logging;
++
++namespace {
++// Static storage to keep the object alive during process life
++std::unique_ptr<sdbusplus::server::interface::interface> intf
++                __attribute__((init_priority(101)));
++std::unique_ptr<phosphor::host::command::IpmbMessageQueue> MsgQueue
++                __attribute__((init_priority(101)));
++
++}
++
++ipmi_ret_t ipmi_app_send_message(ipmi_netfn_t netfn, ipmi_cmd_t cmd,
++                             ipmi_request_t request, ipmi_response_t response,
++                             ipmi_data_len_t data_len, ipmi_context_t context)
++
++{
++    uint8_t *p = (uint8_t*) request;
++    int channel = (*p) & CHANNEL_MASK;
++    uint16_t req_len = *data_len;
++    uint8_t ipmb_netfn, lun, ipmb_cmd, seq;
++    IPMB_HEADER *ipmbBuffer = (IPMB_HEADER *)(p + 1);
++    // Status code.
++    ipmi_ret_t rc = IPMI_CC_OK;
++    if (req_len < IPMB_MIN_SIZE + 1) {
++        log<level::ERR>("IPMI Send Message: Invalid Data");
++	    rc = IPMI_CC_INVALID;
++        return rc;
++    }
++	#if 0
++    fprintf(stderr, "IPMB header: rsSA 0x%x rsNetFnLUN 0x%x rqSA 0x%x rqSeqLUN 0x%x cmd 0x%x\n",
++        ipmbBuffer->Header.Req.address,
++        ipmbBuffer->Header.Req.rsNetFnLUN,
++        ipmbBuffer->Header.Req.rqSA,
++        ipmbBuffer->Header.Req.rqSeqLUN,
++        ipmbBuffer->Header.Req.cmd);
++	#endif
++    *data_len = 0;
++
++    if (channel != CHANNEL_IPMB) {
++	    rc = IPMI_CC_INVALID;
++        log<level::ERR>("IPMI Send Message: unsupported channel");
++        return rc;
++    }
++
++    // check checksum1
++    std::vector<uint8_t> data1(p+1, p+4);
++    uint8_t checksumVal = std::accumulate(data1.begin(), data1.end(), 0);
++    if (checksumVal != 0) {
++        log<level::ERR>("IPMI Send Message: Invalid Checksum1");
++	    rc = IPMI_CC_INVALID;
++        return rc;
++    }
++    // check checksum2
++    std::vector<uint8_t> data2(p+4, p+req_len);
++    checksumVal = std::accumulate(data2.begin(), data2.end(), 0);
++    if (checksumVal != 0) {
++        log<level::ERR>("IPMI Send Message: Invalid Checksum2");
++	    rc = IPMI_CC_INVALID;
++        return rc;
++    }
++
++    ipmb_netfn = ipmbBuffer->Header.Req.rsNetFnLUN >> 2; //netfn
++    lun = 0x2;  //rqLun = SMS lun (10b)
++    seq = ipmbBuffer->Header.Req.rqSeqLUN >> 2;  //rqSeq
++    ipmb_cmd = ipmbBuffer->Header.Req.cmd;
++    std::vector<uint8_t> ipmbdata(p+8, p+req_len);
++
++    sdbusplus::bus::bus bus(ipmid_get_sd_bus_connection());
++    sdbusplus::message::message mesg =
++        bus.new_signal(HOST_IPMI_OBJ, IPMB_INTF, "sendRequest");
++    mesg.append(seq, ipmb_netfn, lun, ipmb_cmd, ipmbdata);
++    mesg.signal_send();
++
++    return rc;
++}
++
++ipmi_ret_t ipmi_app_get_message(ipmi_netfn_t netfn, ipmi_cmd_t cmd,
++                             ipmi_request_t request, ipmi_response_t response,
++                             ipmi_data_len_t data_len, ipmi_context_t context)
++
++{
++    ipmi_ret_t rc = IPMI_CC_OK;
++    uint8_t channel_num;
++
++    auto msg = MsgQueue->GetMessage();
++    channel_num = msg.first;
++    std::vector<uint8_t> msg_data = msg.second;
++
++    if (msg_data.size() == 0) {
++        rc = IPMI_CC_DATA_NOT_AVAILABLE;
++        *data_len = 0;
++    } else {
++        memcpy(response, &channel_num, 1);
++        memcpy(static_cast<uint8_t*>(response) + 1, msg_data.data(),
++            msg_data.size());
++        *data_len = msg_data.size() + 1;
++    }
++
++    return rc;
++}
++
++static int ipmi_return_response(sd_bus_message *bus_msg, void *userdata,
++                           sd_bus_error *ret_error)
++{
++#define ipmbMaxDataSize    256
++#define ipmbMinDataSize    7
++    int64_t status = 0;
++	uint8_t rqLun = 0;
++    std::vector<uint8_t> dataReceived;
++
++    dataReceived.reserve(ipmbMaxDataSize);
++    auto mesg = sdbusplus::message::message(bus_msg);
++
++    do
++    {
++        mesg.read(dataReceived);
++
++        if (dataReceived.size() > ipmbMaxDataSize)
++        {
++            status = -1;
++            break;
++        }
++
++    } while (0);
++    if (dataReceived.size() < ipmbMinDataSize) {
++        fprintf(stderr, "invalid ipmb message\n");
++        status = -1;
++    }
++    rqLun = dataReceived.at(1) & 0x3;
++    // for SMS, store it to Message Queue
++    if (rqLun == 0x2) {
++        dataReceived.erase(dataReceived.begin()); //strip off leading slave address
++        MsgQueue->AddMessage(std::make_pair(CHANNEL_IPMB, dataReceived));
++    }
++
++    sdbusplus::message::message reply = mesg.new_method_return();
++    reply.append(status);
++    reply.method_return();
++
++    return 0;
++}
++
++static const sdbusplus::vtable::vtable_t ipmbVtable[] = {
++    sdbusplus::vtable::start(),
++    sdbusplus::vtable::method("returnRawResponse", "ay", "x", ipmi_return_response),
++    sdbusplus::vtable::signal("sendRequest", "yyyyay"),
++    sdbusplus::vtable::end()};
++
++#include <unistd.h>
++void register_netfn_app_oem_functions()
++{
++
++    // <Send Message Command>
++    ipmi_register_callback(NETFUN_APP, IPMI_CMD_SEND_MESSAGE, NULL, ipmi_app_send_message,
++                           PRIVILEGE_USER);
++    // <Get Message Command>
++    ipmi_register_callback(NETFUN_APP, IPMI_CMD_GET_MESSAGE, NULL, ipmi_app_get_message,
++                           PRIVILEGE_USER);
++
++    /* register a dbus object for IPMB interface */
++	auto& sdbusPlusHandler = ipmid_get_sdbus_plus_handler();
++    intf = std::make_unique<sdbusplus::server::interface::interface>(
++                        *sdbusPlusHandler, HOST_IPMI_OBJ, IPMB_INTF, ipmbVtable, nullptr);
++    MsgQueue = std::make_unique<phosphor::host::command::IpmbMessageQueue>(*sdbusPlusHandler);
++
++    return;
++}
