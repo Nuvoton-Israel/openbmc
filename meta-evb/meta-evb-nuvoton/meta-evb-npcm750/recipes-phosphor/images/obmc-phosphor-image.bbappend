@@ -36,7 +36,7 @@ IMAGE_INSTALL_append = " obmc-ikvm \
 # start generate mtd image only after scrits, tools and inputs are ready 
 do_generate_static[depends] += " \
         u-boot-fw-utils-nuvoton:do_populate_sysroot \
-        u-boot-nuvoton:do_populate_sysroot          \
+        u-boot-nuvoton:do_deploy          \
         npcm750-bootblock:do_deploy                 \
         npcm7xx-signit-native:do_populate_sysroot   \
         npcm7xx-bingo-native:do_populate_sysroot    \
