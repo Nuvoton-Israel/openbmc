@@ -1,8 +1,8 @@
 diff --git a/mainloop.cpp b/mainloop.cpp
-index cf5baaf..104bc6d 100644
+index db79134..872b1f8 100644
 --- a/mainloop.cpp
 +++ b/mainloop.cpp
-@@ -53,8 +53,26 @@ decltype(
+@@ -54,8 +54,26 @@ decltype(
      Thresholds<WarningObject>::alarmLo) Thresholds<WarningObject>::alarmLo =
      &WarningObject::warningAlarmLow;
  decltype(
@@ -29,7 +29,7 @@ index cf5baaf..104bc6d 100644
  
  // Initialization for Critical Objects
  decltype(Thresholds<CriticalObject>::setLo) Thresholds<CriticalObject>::setLo =
-@@ -69,8 +87,26 @@ decltype(
+@@ -70,8 +88,26 @@ decltype(
      Thresholds<CriticalObject>::alarmLo) Thresholds<CriticalObject>::alarmLo =
      &CriticalObject::criticalAlarmLow;
  decltype(
@@ -56,15 +56,15 @@ index cf5baaf..104bc6d 100644
  
  std::string MainLoop::getID(SensorSet::container_t::const_reference sensor)
  {
-@@ -370,6 +406,7 @@ void MainLoop::read()
-             {
+@@ -376,6 +412,7 @@ void MainLoop::read()
+                 int64_t value;
                  auto& objInfo = std::get<ObjectInfo>(i.second);
                  auto& obj = std::get<Object>(objInfo);
 +                auto& path = std::get<std::string>(objInfo);
  
                  auto it = obj.find(InterfaceType::STATUS);
                  if (it != obj.end())
-@@ -407,10 +444,10 @@ void MainLoop::read()
+@@ -421,10 +458,10 @@ void MainLoop::read()
                              valueIface->value(value);
                              break;
                          case InterfaceType::WARN:
@@ -78,24 +78,27 @@ index cf5baaf..104bc6d 100644
                              break;
                          default:
 diff --git a/thresholds.hpp b/thresholds.hpp
-index c483665..0dd22c9 100644
+index 188dc76..4f99765 100644
 --- a/thresholds.hpp
 +++ b/thresholds.hpp
-@@ -1,7 +1,12 @@
+@@ -1,10 +1,15 @@
  #pragma once
  
 +#include <phosphor-logging/elog-errors.hpp>
 +#include <xyz/openbmc_project/Sensor/Threshold/error.hpp>
 +#include <xyz/openbmc_project/Logging/Entry/server.hpp>
  #include "env.hpp"
+ #include "interface.hpp"
+ 
+ #include <cmath>
  
 +using namespace phosphor::logging;
 +using namespace sdbusplus::xyz::openbmc_project::Sensor::Threshold::Error;
  /** @class Thresholds
   *  @brief Threshold type traits.
   *
-@@ -29,6 +34,12 @@ struct Thresholds<WarningObject>
-     static int64_t (WarningObject::*const getHi)() const;
+@@ -32,6 +37,12 @@ struct Thresholds<WarningObject>
+     static SensorValueType (WarningObject::*const getHi)() const;
      static bool (WarningObject::*const alarmLo)(bool);
      static bool (WarningObject::*const alarmHi)(bool);
 +    static bool (WarningObject::*const currAlarmHi)() const;
@@ -107,8 +110,8 @@ index c483665..0dd22c9 100644
  };
  
  /**@brief Thresholds specialization for critical thresholds. */
-@@ -44,6 +55,12 @@ struct Thresholds<CriticalObject>
-     static int64_t (CriticalObject::*const getHi)() const;
+@@ -47,6 +58,12 @@ struct Thresholds<CriticalObject>
+     static SensorValueType (CriticalObject::*const getHi)() const;
      static bool (CriticalObject::*const alarmLo)(bool);
      static bool (CriticalObject::*const alarmHi)(bool);
 +    static bool (CriticalObject::*const currAlarmHi)() const;
@@ -120,14 +123,14 @@ index c483665..0dd22c9 100644
  };
  
  /** @brief checkThresholds
-@@ -57,13 +74,33 @@ struct Thresholds<CriticalObject>
+@@ -60,13 +77,33 @@ struct Thresholds<CriticalObject>
   *  @param[in] value - The sensor reading to compare to thresholds.
   */
  template <typename T>
--void checkThresholds(std::experimental::any& iface, int64_t value)
-+void checkThresholds(std::string path, std::experimental::any& iface, int64_t value)
+-void checkThresholds(std::any& iface, SensorValueType value)
++void checkThresholds(std::string path, std::any& iface, SensorValueType value)
  {
-     auto realIface = std::experimental::any_cast<std::shared_ptr<T>>(iface);
+     auto realIface = std::any_cast<std::shared_ptr<T>>(iface);
      auto lo = (*realIface.*Thresholds<T>::getLo)();
      auto hi = (*realIface.*Thresholds<T>::getHi)();
 +    auto curr_alarmHi =  (*realIface.*Thresholds<T>::currAlarmHi)();
@@ -137,21 +140,21 @@ index c483665..0dd22c9 100644
 +    std::string InvPath = path;
      (*realIface.*Thresholds<T>::alarmLo)(value <= lo);
      (*realIface.*Thresholds<T>::alarmHi)(value >= hi);
-+	if (eventHi && (value >= hi) && (curr_alarmHi == false)) {
++    if (eventHi && (value >= hi) && (curr_alarmHi == false)) {
 +        InvPath.append("/critical_high");
-+		log<level::ERR>("Sensor exceeds upper bound",
++        log<level::ERR>("Sensor exceeds upper bound",
 +                        entry("CALLOUT_INVENTORY_PATH=%s", InvPath.c_str()),
 +                        entry("READING=%lld", value),
 +                        entry("THRESHOLD=%lld", hi));
-+		commit<CriticalHigh>();
-+	} else if (eventLo && (value <= lo) && (curr_alarmLo == false)) {
++        commit<CriticalHigh>();
++    } else if (eventLo && (value <= lo) && (curr_alarmLo == false)) {
 +        InvPath.append("/critical_low");
 +        log<level::ERR>("Sensor exceeds lower bound",
 +                        entry("CALLOUT_INVENTORY_PATH=%s", InvPath.c_str()),
 +                        entry("READING=%lld", value),
 +                        entry("THRESHOLD=%lld", lo));
-+		commit<CriticalLow>();
-+	}
++        commit<CriticalLow>();
++    }
  }
  
  /** @brief addThreshold
@@ -176,8 +179,8 @@ index c483665..0dd22c9 100644
 +
      if (!tLo.empty() && !tHi.empty())
      {
-         iface = std::make_shared<T>(bus, objPath.c_str(), deferSignals);
-@@ -100,6 +149,8 @@ auto addThreshold(const std::string& sensorType, const std::string& sensorID,
+         static constexpr bool deferSignals = true;
+@@ -103,6 +152,8 @@ auto addThreshold(const std::string& sensorType, const std::string& sensorID,
          (*iface.*Thresholds<T>::setHi)(hi);
          (*iface.*Thresholds<T>::alarmLo)(value <= lo);
          (*iface.*Thresholds<T>::alarmHi)(value >= hi);
