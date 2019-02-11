@@ -1,10 +1,10 @@
 FILESEXTRAPATHS_prepend := "${THISDIR}/linux-nuvoton:"
 
-KBRANCH = "Poleg-4.17.04-OpenBMC"
-LINUX_VERSION = "4.17.4"
+KBRANCH = "Poleg-4.19.16-OpenBMC"
+LINUX_VERSION = "4.19.16"
 
 KSRC = "git://github.com/Nuvoton-Israel/linux;protocol=git;branch=${KBRANCH}"
-SRCREV = "1a6ae01151670ddd1e66699ffb9a50c31ee618a9"
+SRCREV = "4ece610a267570eb6b67a1bdb6da01d6c92697b3"
 
 SRC_URI += "file://evb-npcm750.cfg"
 SRC_URI += "file://enable-vcd-ece.cfg"
