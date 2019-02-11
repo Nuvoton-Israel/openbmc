@@ -1,33 +1,33 @@
-From 8cebfd531344b68e53158d21aedd2aa8cf3ce2fd Mon Sep 17 00:00:00 2001
+From c1b8eb088c6711598f1b46ad4009a706082594ec Mon Sep 17 00:00:00 2001
 From: kwliu <kwliu@nuvoton.com>
-Date: Thu, 15 Nov 2018 15:43:32 +0800
+Date: Mon, 11 Feb 2019 13:11:12 +0800
 Subject: [PATCH] bmcweb: support obmc-ikvm
 
+Signed-off-by: kwliu <kwliu@nuvoton.com>
 ---
  CMakeLists.txt         |   2 +
- include/obmc_ikvm.hpp  | 141 +++++++++++++++++++++++++++++++++++++++++++++++++
- settings.hpp.in        |   1 +
+ include/obmc_ikvm.hpp  | 141 +++++++++++++++++++++++++++++++++++++++++
  src/webserver_main.cpp |   5 ++
- 4 files changed, 149 insertions(+)
+ 3 files changed, 148 insertions(+)
  create mode 100755 include/obmc_ikvm.hpp
  mode change 100644 => 100755 src/webserver_main.cpp
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 80c132b..49cd083 100644
+index 2bd8a71..77b4a6b 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -14,6 +14,8 @@ option (BMCWEB_ENABLE_HOST_SERIAL_WEBSOCKET "Enable host serial websocket" ON)
- option (BMCWEB_ENABLE_STATIC_HOSTING "Enable hosting of static files.
-        For example, redfish schema and webui files" ON)
+@@ -33,6 +33,8 @@ option (BMCWEB_ENABLE_REDFISH_CPU_LOG "Enable CPU log service transactions
+        through Redfish.  Paths are under
+        '/redfish/v1/Managers/bmc/LogServices/CpuLog'." OFF)
  
 +option (BMCWEB_ENABLE_OBMC_IKVM "Enable OBMC IKVM websocket interfaces" OFF)
 +
- option (
-     BMCWEB_ENABLE_REDFISH_RAW_PECI "Enable PECI transactions through redfish"
-     OFF
+ # Insecure options.  Every option that starts with a BMCWEB_INSECURE flag should
+ # not be enabled by default for any platform, unless the author fully
+ # comprehends the implications of doing so.  In general, enabling these options
 diff --git a/include/obmc_ikvm.hpp b/include/obmc_ikvm.hpp
 new file mode 100755
-index 0000000..bbe9c68
+index 0000000..dcc4cb4
 --- /dev/null
 +++ b/include/obmc_ikvm.hpp
 @@ -0,0 +1,141 @@
@@ -150,7 +150,7 @@ index 0000000..bbe9c68
 +                boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::address::from_string(host), 5900);
 +                host_socket = std::make_unique<
 +                    boost::asio::ip::tcp::socket>(
-+                    conn.getIoService());
++                    conn.get_io_context());
 +                host_socket->async_connect(endpoint, connectHandler);
 +            }
 +        })
@@ -172,23 +172,13 @@ index 0000000..bbe9c68
 +}
 +} // namespace obmc_console
 +} // namespace crow
-\ No newline at end of file
-diff --git a/settings.hpp.in b/settings.hpp.in
-index ecb17ed..05fc55a 100644
---- a/settings.hpp.in
-+++ b/settings.hpp.in
-@@ -10,3 +10,4 @@
- #cmakedefine BMCWEB_INSECURE_DISABLE_XSS_PREVENTION
- #cmakedefine BMCWEB_ENABLE_REDFISH_RAW_PECI
- #cmakedefine BMCWEB_ENABLE_REDFISH_CPU_LOG
-+#cmakedefine BMCWEB_ENABLE_OBMC_IKVM
 diff --git a/src/webserver_main.cpp b/src/webserver_main.cpp
 old mode 100644
 new mode 100755
-index d141841..a29e516
+index 7c64f4c..7125607
 --- a/src/webserver_main.cpp
 +++ b/src/webserver_main.cpp
-@@ -22,6 +22,7 @@
+@@ -21,6 +21,7 @@
  #include <web_kvm.hpp>
  #include <webassets.hpp>
  #include <webserver_common.hpp>
@@ -196,7 +186,7 @@ index d141841..a29e516
  
  constexpr int defaultPort = 18080;
  
-@@ -81,6 +82,10 @@ int main(int argc, char** argv)
+@@ -80,6 +81,10 @@ int main(int argc, char** argv)
      crow::kvm::requestRoutes(app);
  #endif
  
@@ -208,5 +198,5 @@ index d141841..a29e516
      crow::redfish::requestRoutes(app);
  #endif
 -- 
-1.9.1
+2.17.1
 
