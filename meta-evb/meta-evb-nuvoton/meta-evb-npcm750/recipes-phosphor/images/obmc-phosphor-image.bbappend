@@ -19,8 +19,6 @@ OBMC_IMAGE_EXTRA_INSTALL_append = " phosphor-ipmi-net"
 OBMC_IMAGE_EXTRA_INSTALL_append = " phosphor-cooling-type"
 
 IMAGE_INSTALL_append = " obmc-ikvm \
-			 phosphor-gevent \
-                         phosphor-rest \
                          phosphor-webui \
                          phosphor-ipmi-host \
                          lmsensors-fancontrol \
@@ -33,7 +31,7 @@ IMAGE_INSTALL_append = " obmc-ikvm \
                          obmc-mgr-inventory \
                        "
 
-# start generate mtd image only after scrits, tools and inputs are ready 
+# start generate mtd image only after scrits, tools and inputs are ready
 do_generate_static[depends] += " \
         u-boot-fw-utils-nuvoton:do_populate_sysroot \
         u-boot-nuvoton:do_deploy          \
