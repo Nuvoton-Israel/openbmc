@@ -1,15 +1,18 @@
-From f2de186327046d7d89c5a936476aec591409e4e5 Mon Sep 17 00:00:00 2001
+From c37fbcd314b8159be87c070ec6ef6a585f5a886f Mon Sep 17 00:00:00 2001
 From: Medad <ctcchien@nuvoton.com>
 Date: Fri, 30 Nov 2018 09:22:24 +0800
-Subject: [PATCH] [PATCH] Implement VM in webui 	1. vmws is websocket 	2.
- enablemstgws and disablemstgws are http request
+Subject: [PATCH 2/2] Implement VM in webui
 
+1. vmws is websocket 2. enablemstgws and disablemstgws are http request
+
+Change-Id: Ib9555c9cde45d9f6fa6ca434767f7fec2fff36d4
+Signed-off-by: Medad <ctcchien@nuvoton.com>
 ---
  app/index.js                          |   5 +-
- app/vm/controllers/nbd/nbd.js         | 360 ++++++++++++++++++++++++++++++++++
- app/vm/controllers/vm-controller.html |  25 +++
- app/vm/controllers/vm-controller.js   | 103 ++++++++++
- app/vm/index.js                       |  28 +++
+ app/vm/controllers/nbd/nbd.js         | 360 ++++++++++++++++++++++++++
+ app/vm/controllers/vm-controller.html |  25 ++
+ app/vm/controllers/vm-controller.js   | 103 ++++++++
+ app/vm/index.js                       |  28 ++
  5 files changed, 520 insertions(+), 1 deletion(-)
  create mode 100644 app/vm/controllers/nbd/nbd.js
  create mode 100644 app/vm/controllers/vm-controller.html
@@ -17,10 +20,10 @@ Subject: [PATCH] [PATCH] Implement VM in webui 	1. vmws is websocket 	2.
  create mode 100644 app/vm/index.js
 
 diff --git a/app/index.js b/app/index.js
-index 8a9dbae..b908dfb 100644
+index 44d85e8..ab932d4 100644
 --- a/app/index.js
 +++ b/app/index.js
-@@ -86,6 +86,9 @@ import phosphor_templates from './templates.js';
+@@ -88,6 +88,9 @@ import user_accounts_controller from './users/controllers/user-accounts-controll
  import kvm_index from './kvm/index.js';
  import kvm_controller from './kvm/controllers/kvm-controller.js';
  
@@ -30,7 +33,7 @@ index 8a9dbae..b908dfb 100644
  window.angular && (function(angular) {
    'use strict';
  
-@@ -102,7 +105,7 @@ window.angular && (function(angular) {
+@@ -104,7 +107,7 @@ window.angular && (function(angular) {
              // Model resources
              'app.login', 'app.overview', 'app.serverControl',
              'app.serverHealth', 'app.configuration', 'app.users', 'app.redfish',
@@ -41,7 +44,7 @@ index 8a9dbae..b908dfb 100644
        .config([
 diff --git a/app/vm/controllers/nbd/nbd.js b/app/vm/controllers/nbd/nbd.js
 new file mode 100644
-index 0000000..c5997c4
+index 0000000..618ea1f
 --- /dev/null
 +++ b/app/vm/controllers/nbd/nbd.js
 @@ -0,0 +1,360 @@
@@ -341,7 +344,7 @@ index 0000000..c5997c4
 +        case NBD_CMD_TRIM:
 +            err = EPERM;
 +            break;
-+        
++
 +        default:
 +            this._log("invalid command 0x" + req.type.toString(16));
 +            err = EINVAL;
@@ -439,7 +442,7 @@ index 0000000..1a2eabf
 \ No newline at end of file
 diff --git a/app/vm/controllers/vm-controller.js b/app/vm/controllers/vm-controller.js
 new file mode 100644
-index 0000000..91387fa
+index 0000000..0b945b2
 --- /dev/null
 +++ b/app/vm/controllers/vm-controller.js
 @@ -0,0 +1,103 @@
@@ -581,5 +584,5 @@ index 0000000..c86dfc8
 +
 +
 -- 
-2.7.4
+2.17.1
 

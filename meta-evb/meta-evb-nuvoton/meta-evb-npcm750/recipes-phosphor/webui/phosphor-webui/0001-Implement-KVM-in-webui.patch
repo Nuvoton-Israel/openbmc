@@ -1,7 +1,7 @@
-From 0a6f304b24dd640ea6a338a45dc2d78c654727d3 Mon Sep 17 00:00:00 2001
-From: kwliu <kwliu@nuvoton.com>
-Date: Thu, 25 Oct 2018 14:55:55 +0800
-Subject: [PATCH 1/2] Implement KVM in webui
+From bb942728fb69dabe97a200948c4b4ea2a45b9447 Mon Sep 17 00:00:00 2001
+From: Ed Tanous <ed.tanous@intel.com>
+Date: Thu, 3 Jan 2019 12:58:09 +0800
+Subject: [PATCH] Implement KVM in webui
 
 This patchset is the beginings of the infrastructure to allow KVM
 sessions through the webui.  It should not be considered complete, and
@@ -9,7 +9,9 @@ requires a websocket capable VNC/RFB connection on the BMC.
 
 To access, open the url https://<hostname>/#kvm
 
-Change-Id: Icd0ae913125662ece7076328c09fef2c3ca073d8
+Change-Id: I9932fe116387aa81a8a627f8c5b0f568e0111892
+Signed-off-by: Ed Tanous <ed.tanous@intel.com>
+Signed-off-by: kwliu <kwliu@nuvoton.com>
 ---
  app/index.js                            |  6 +-
  app/kvm/controllers/kvm-controller.html |  5 ++
@@ -27,12 +29,12 @@ Change-Id: Icd0ae913125662ece7076328c09fef2c3ca073d8
  create mode 100644 app/kvm/styles/kvm.scss
 
 diff --git a/app/index.js b/app/index.js
-index d333dca..8a9dbae 100644
+index 2313016..44d85e8 100644
 --- a/app/index.js
 +++ b/app/index.js
-@@ -83,6 +83,9 @@ import user_accounts_controller from './users/controllers/user-accounts-controll
- 
- import phosphor_templates from './templates.js';
+@@ -85,6 +85,9 @@ import firmware_controller from './configuration/controllers/firmware-controller
+ import users_index from './users/index.js';
+ import user_accounts_controller from './users/controllers/user-accounts-controller.js';
  
 +import kvm_index from './kvm/index.js';
 +import kvm_controller from './kvm/controllers/kvm-controller.js';
@@ -40,7 +42,7 @@ index d333dca..8a9dbae 100644
  window.angular && (function(angular) {
    'use strict';
  
-@@ -98,7 +101,8 @@ window.angular && (function(angular) {
+@@ -100,7 +103,8 @@ window.angular && (function(angular) {
              'app.common.filters',
              // Model resources
              'app.login', 'app.overview', 'app.serverControl',
@@ -219,24 +221,24 @@ index 0000000..2f9e2c0
 +  flex: 1;
 +}
 diff --git a/app/styles/index.scss b/app/styles/index.scss
-index b324c86..80962ce 100644
+index b59ed44..cb596c2 100644
 --- a/app/styles/index.scss
 +++ b/app/styles/index.scss
-@@ -7,3 +7,4 @@ $charset: "UTF-8";
- @import "../server-health/styles/index.scss";
+@@ -8,3 +8,4 @@ $charset: "UTF-8";
  @import "../configuration/styles/index.scss";
  @import "../users/styles/index.scss";
+ @import "../redfish/styles/index.scss";
 +@import "../kvm/styles/index.scss";
 diff --git a/package.json b/package.json
-index 2163f15..21e9696 100644
+index b4db876..5c021c3 100644
 --- a/package.json
 +++ b/package.json
-@@ -73,7 +73,8 @@
-     "filter-chunk-webpack-plugin": "^2.1.0",
-     "mini-css-extract-plugin": "^0.4.2",
-     "svg-inline-loader": "^0.8.0",
--    "webpack-cli": "^3.1.0"
-+    "webpack-cli": "^3.1.0",
+@@ -75,7 +75,8 @@
+     "uglifyjs-webpack-plugin": "^1.3.0",
+     "webpack": "^4.28.3",
+     "webpack-cli": "^3.2.1",
+-    "webpack-dev-server": "^3.1.11"
++    "webpack-dev-server": "^3.1.11",
 +    "@novnc/novnc": "^1.0.0"
    },
    "license": "MIT",
