@@ -1,14 +1,14 @@
-commit 4a8e79629ba6c2e277cd49999de8e1dec6b384c6
+commit 41452d511f3224a9607267f06292f8954d9a1918
 Author: YSChu <yschu@nuvoton.com>
-Date:   Tue Jan 29 15:56:48 2019 +0800
+Date:   Tue Feb 12 13:36:15 2019 +0800
 
-    support SendMessage/GetMessage commands
+    phosphor-ipmi-host: support SendMessage/GetMessage commands
 
 diff --git a/Makefile.am b/Makefile.am
-index 48aa48f..359935a 100644
+index ac8449e..abbe151 100644
 --- a/Makefile.am
 +++ b/Makefile.am
-@@ -11,7 +11,8 @@ ipmid_SOURCES = \
+@@ -14,7 +14,8 @@ ipmid_SOURCES = \
  	settings.cpp \
  	host-cmd-manager.cpp \
  	utils.cpp \
@@ -18,7 +18,7 @@ index 48aa48f..359935a 100644
  nodist_ipmid_SOURCES = ipmiwhitelist.cpp
  
  libipmi20_BUILT_LIST = \
-@@ -90,6 +91,7 @@ libipmi20_la_SOURCES = \
+@@ -91,6 +92,7 @@ libipmi20_la_SOURCES = \
  	ipmi_fru_info_area.cpp \
  	read_fru_data.cpp \
  	sensordatahandler.cpp \
@@ -368,21 +368,20 @@ index 0000000..b25b6a6
 +} // namespace phosphor
 diff --git a/messagehandler.cpp b/messagehandler.cpp
 new file mode 100644
-index 0000000..b3184aa
+index 0000000..63ff77f
 --- /dev/null
 +++ b/messagehandler.cpp
-@@ -0,0 +1,191 @@
+@@ -0,0 +1,190 @@
 +#include <numeric>
 +#include <phosphor-logging/log.hpp>
 +#include <phosphor-logging/elog-errors.hpp>
-+#include "host-ipmid/ipmid-api.h"
-+#include "host-ipmid/ipmid-host-cmd.hpp"
++#include <ipmid/api.h>
++#include <ipmid-host/cmd.hpp>
 +#include "config.h"
 +#include "transporthandler.hpp"
 +#include "ipmb-msg-queue.hpp"
 +
 +#include <stdio.h>
-+//#include <mapper.h>
 +
 +#define IPMI_CMD_GET_MESSAGE 0x33
 +#define IPMI_CMD_SEND_MESSAGE 0x34
