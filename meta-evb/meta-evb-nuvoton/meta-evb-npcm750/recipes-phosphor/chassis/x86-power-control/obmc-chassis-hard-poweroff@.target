@@ -1,7 +1,7 @@
 [Unit]
 Description=Chassis%i (Hard Power Off)
-Wants={SYSTEMD_DEFAULT_TARGET}
-After={SYSTEMD_DEFAULT_TARGET}
+Wants=obmc-standby.target
+After=obmc-standby.target
 Wants=mapper-wait@-xyz-openbmc_project-Chassis-Control-Power%i.service
 After=mapper-wait@-xyz-openbmc_project-Chassis-Control-Power%i.service
 Conflicts=obmc-chassis-poweron@%i.target

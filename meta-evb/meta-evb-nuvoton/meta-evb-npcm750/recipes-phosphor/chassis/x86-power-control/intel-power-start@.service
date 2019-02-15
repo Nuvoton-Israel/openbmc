@@ -7,8 +7,8 @@ ConditionPathExists=!/run/openbmc/chassis@%i-on
 
 [Service]
 Type=oneshot
-ExecStart=/bin/sh -c "busctl call `mapper get-service /xyz/openbmc_project/Chassis/Control/Power%i` \
-          /xyz/openbmc_project/Chassis/Control/Power%i xyz.openbmc_project.Chassis.Control.Power setPowerState i 1"
+ExecStart=/bin/sh -c "busctl set-propetry `mapper get-service /xyz/openbmc_project/Chassis/Control/Power%i` \
+          /xyz/openbmc_project/Chassis/Control/Power%i xyz.openbmc_project.Chassis.Control.Power State i 1"
 SyslogIdentifier=intel-power-start
 StartLimitInterval=0
 

@@ -29,6 +29,8 @@ IMAGE_INSTALL_append = " obmc-ikvm \
                          phosphor-image-signing \
                          obmc-mgr-system \
                          obmc-mgr-inventory \
+                         x86-power-control \
+                         evb-npcm750-config \
                        "
 
 # start generate mtd image only after scrits, tools and inputs are ready

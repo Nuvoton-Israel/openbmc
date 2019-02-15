@@ -9,7 +9,7 @@ Conflicts=obmc-chassis-poweroff@%i.target
 [Service]
 RemainAfterExit=no
 Type=oneshot
-ExecStart=/bin/sh -c "if [ $(busctl get-property `mapper get-service /xyz/openbmc_project/Chassis/Control/Power%i` /xyz/openbmc_project/Chassis/Control/Power%i xyz.openbmc_project.Chassis.Control.Power pgood | sed 's/i\s*[1]/on/' | grep on | wc -l) != 0 ]; then mkdir -p /run/openbmc/ && touch /run/openbmc/chassis@%i-on; fi"
+ExecStart=/bin/sh -c "if [ $(busctl get-property `mapper get-service /xyz/openbmc_project/Chassis/Control/Power%i` /xyz/openbmc_project/Chassis/Control/Power%i xyz.openbmc_project.Chassis.Control.Power PGood | sed 's/i\s*[1]/on/' | grep on | wc -l) != 0 ]; then mkdir -p /run/openbmc/ && touch /run/openbmc/chassis@%i-on; fi"
 
 [Install]
 WantedBy=obmc-chassis-powerreset@%i.target
