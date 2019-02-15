@@ -10,8 +10,8 @@ RestartSec=3
 ExecStart=/usr/bin/env power-control
 SyslogIdentifier=power-control
 Type=dbus
-BusName={BUSNAME}
+BusName=xyz.openbmc_project.Chassis.Control.Power
 
 [Install]
-WantedBy={SYSTEMD_DEFAULT_TARGET}
+WantedBy=obmc-standby.target
 
