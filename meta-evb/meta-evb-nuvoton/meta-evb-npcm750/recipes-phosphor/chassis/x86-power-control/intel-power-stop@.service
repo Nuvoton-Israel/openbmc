@@ -7,8 +7,8 @@ Conflicts=obmc-host-start@%i.target
 
 [Service]
 Type=oneshot
-ExecStart=/bin/sh -c "busctl set-propetry `mapper get-service /xyz/openbmc_project/Chassis/Control/Power%i` \
-          /xyz/openbmc_project/Chassis/Control/Power%i xyz.openbmc_project.Chassis.Control.Power State i 0"
+ExecStart=/bin/sh -c "busctl call `mapper get-service /xyz/openbmc_project/Chassis/Control/Power%i` \
+          /xyz/openbmc_project/Chassis/Control/Power%i xyz.openbmc_project.Chassis.Control.Power setPowerState i 0"
 SyslogIdentifier=intel-power-stop
 StartLimitInterval=0
 
