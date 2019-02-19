@@ -1,27 +1,28 @@
-From 055fa8658f6cfc1785e72f0f874c6d61379d0aee Mon Sep 17 00:00:00 2001
+From 5ad79de6c61ee1e894b6fedfc2c7465c37a9d8b8 Mon Sep 17 00:00:00 2001
 From: CH Li <chli30@nuvoton.com>
-Date: Thu, 29 Nov 2018 17:35:53 +0800
+Date: Tue, 19 Feb 2019 11:39:35 +0800
 Subject: [PATCH] meta-evb-npcm750: x86-power-control: add gpio config for
  RESET_UP_PIN
 
 ---
- power-control/inc/power_control.hpp | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ power-control/inc/power_control.hpp | 19 +++++++++----------
+ power-control/src/power_control.cpp |  6 +++---
+ 2 files changed, 12 insertions(+), 13 deletions(-)
 
 diff --git a/power-control/inc/power_control.hpp b/power-control/inc/power_control.hpp
-index bc87cf6..13907c8 100644
+index f68b71d..b3397dd 100644
 --- a/power-control/inc/power_control.hpp
 +++ b/power-control/inc/power_control.hpp
 @@ -27,7 +27,7 @@
  
- //static constexpr size_t POLLING_INTERVAL_MS = 500;
+ // static constexpr size_t POLLING_INTERVAL_MS = 500;
  
 -const static constexpr char* PGOOD_PIN = "PGOOD";
 +const static constexpr char* RESET_UP_PIN = "RESET_UP_PIN";
  const static constexpr char* POWER_UP_PIN = "POWER_UP_PIN";
  
  const static constexpr size_t POWER_UP_PIN_PULSE_TIME_MS = 200;
-@@ -59,16 +59,16 @@ struct PowerControl : sdbusplus::server::object_t<pwr_control>
+@@ -57,16 +57,16 @@ struct PowerControl : sdbusplus::server::object_t<pwr_control>
          char buf = '0';
  
          // config gpio
@@ -40,8 +41,8 @@ index bc87cf6..13907c8 100644
 +            closeGpio(reset_up_fd);
              throw std::runtime_error("failed to config POWER_UP_PIN");
          }
- /*
-@@ -90,7 +90,7 @@ struct PowerControl : sdbusplus::server::object_t<pwr_control>
+         /*
+@@ -89,7 +89,7 @@ struct PowerControl : sdbusplus::server::object_t<pwr_control>
  
      ~PowerControl()
      {
@@ -50,7 +51,17 @@ index bc87cf6..13907c8 100644
          closeGpio(power_up_fd);
      }
  
-@@ -172,7 +172,7 @@ struct PowerControl : sdbusplus::server::object_t<pwr_control>
+@@ -165,14 +165,13 @@ struct PowerControl : sdbusplus::server::object_t<pwr_control>
+         return 0;
+     }
+ 
+-    bool forcePowerOff() override;
+-    // todo: when dbus interfaces is fixed, these should be override
+-    int32_t setPowerState(int32_t newState); // override;
+-    int32_t getPowerState();                 // override;
++    int32_t forcePowerOff() override;
++    int32_t setPowerState(int32_t newState) override;
++    int32_t getPowerState() override;
  
    private:
      int power_up_fd;
@@ -59,6 +70,37 @@ index bc87cf6..13907c8 100644
      sdbusplus::bus::bus& bus;
      sd_event_io_handler_t callbackHandler;
  };
+diff --git a/power-control/src/power_control.cpp b/power-control/src/power_control.cpp
+index 3014370..2e9aeea 100644
+--- a/power-control/src/power_control.cpp
++++ b/power-control/src/power_control.cpp
+@@ -15,7 +15,7 @@
+ */
+ #include "power_control.hpp"
+ 
+-bool PowerControl::forcePowerOff()
++int32_t PowerControl::forcePowerOff()
+ {
+     return true;
+ }
+@@ -53,7 +53,7 @@ int32_t PowerControl::setPowerState(int32_t newState)
+     For BMC (power control), just need to notify host (PCH) to switch
+     power, don't need to judge it should power on or off.
+     */
+-    buf = '0';
++    buf = '1';
+     ret = ::write(power_up_fd, &buf, sizeof(buf));
+     if (ret < 0)
+     {
+@@ -66,7 +66,7 @@ int32_t PowerControl::setPowerState(int32_t newState)
+     std::this_thread::sleep_for(
+         std::chrono::milliseconds(POWER_UP_PIN_PULSE_TIME_MS));
+ 
+-    buf = '1';
++    buf = '0';
+     ret = ::write(power_up_fd, &buf, sizeof(buf));
+     if (ret < 0)
+     {
 -- 
-2.7.4
+2.17.1
 
