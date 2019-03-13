@@ -1,0 +1,63 @@
+From f6dfba60e46a7a5d289b5dbfbf3d8a9d3e84ff7b Mon Sep 17 00:00:00 2001
+From: CH Li <chli30@nuvoton.com>
+Date: Wed, 13 Mar 2019 10:19:48 +0800
+Subject: [PATCH] meta-evb-npcm750: op-pwrctl: modify power pin control
+
+---
+ power_control_obj.c | 40 +++++++++++++++++++++++++++++------
+ 1 file changed, 34 insertions(+), 6 deletions(-)
+
+diff --git a/power_control_obj.c b/power_control_obj.c
+index dedcbe2..3c749ad 100644
+--- a/power_control_obj.c
++++ b/power_control_obj.c
+@@ -273,12 +273,40 @@ on_set_power_state(ControlPower *pwr,
+ 							power_gpio->power_up_outs[i].name, error);
+ 					continue;
+ 				}
+-				power_up_out = state ^ !power_gpio->power_up_pols[i];
+-				g_print("PowerControl: setting power up %s to %d\n",
+-						power_gpio->power_up_outs[i].name, (int)power_up_out);
+-				error = gpio_write(power_pin, power_up_out);
+-				if(error != GPIO_OK) {
+-					continue;
++				if (state){
++					g_print("Power requested state: %d\n",state);
++					power_up_out = state ^ power_gpio->power_up_pols[i];
++					g_print("PowerControl: setting power up %s to %d\n",
++							power_gpio->power_up_outs[i].name, (int)power_up_out);
++					error = gpio_write(power_pin, power_up_out);
++					if(error != GPIO_OK) {
++						continue;
++					}
++					sleep(1);
++					power_up_out = state ^ !power_gpio->power_up_pols[i];
++					g_print("PowerControl: setting power up %s to %d\n",
++							power_gpio->power_up_outs[i].name, (int)power_up_out);
++					error = gpio_write(power_pin, power_up_out);
++					if(error != GPIO_OK) {
++						continue;
++					}
++				} else{
++					g_print("Power requested state: %d\n",state);
++					power_up_out = state ^ !power_gpio->power_up_pols[i];
++					g_print("PowerControl: setting power up %s to %d\n",
++							power_gpio->power_up_outs[i].name, (int)power_up_out);
++					error = gpio_write(power_pin, power_up_out);
++					if(error != GPIO_OK) {
++						continue;
++					}
++					sleep(1);
++					power_up_out = state ^ power_gpio->power_up_pols[i];
++					g_print("PowerControl: setting power up %s to %d\n",
++							power_gpio->power_up_outs[i].name, (int)power_up_out);
++					error = gpio_write(power_pin, power_up_out);
++					if(error != GPIO_OK) {
++						continue;
++					}
+ 				}
+ 				gpio_close(power_pin);
+ 			}
+-- 
+2.17.1
+
