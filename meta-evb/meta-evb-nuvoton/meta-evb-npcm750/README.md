@@ -361,7 +361,7 @@ Server Power Operations are using to Power on/Warm reboot/Cold reboot/Orderly sh
 
 **Source URL**
 
-* [https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/chassis](https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/chassis)
+* [https://github.com/Nuvoton-Israel/openbmc/tree/v2.6-dev/meta-phosphor/recipes-phosphor/chassis/obmc-op-control-power](https://github.com/Nuvoton-Israel/openbmc/tree/v2.6-dev/meta-phosphor/recipes-phosphor/chassis/obmc-op-control-power)
 
 **How to use**
 
@@ -1652,3 +1652,4 @@ image-rwfs    |  0 MB  | middle layer of the overlayfs, rw files in this partiti
 * 2018.11.29 Update Server power operations of Server control about How to use
 * 2018.12.27 Add Chassis Buttons about How to use
 * 2019.01.02 Add LDAP server setup and test
+* 2019.03.13 Modify Server power operation of Server control about How to use
