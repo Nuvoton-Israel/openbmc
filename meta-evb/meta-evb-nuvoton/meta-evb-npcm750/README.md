@@ -361,7 +361,7 @@ Server Power Operations are using to Power on/Warm reboot/Cold reboot/Orderly sh
 
 **Source URL**
 
-* [https://github.com/Nuvoton-Israel/openbmc/tree/v2.6-dev/meta-phosphor/recipes-phosphor/chassis/obmc-op-control-power](https://github.com/Nuvoton-Israel/openbmc/tree/v2.6-dev/meta-phosphor/recipes-phosphor/chassis/obmc-op-control-power)
+* [https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-phosphor/recipes-phosphor/chassis/obmc-op-control-power](https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-phosphor/recipes-phosphor/chassis/obmc-op-control-power)
 
 **How to use**
 
@@ -383,27 +383,59 @@ Server Power Operations are using to Power on/Warm reboot/Cold reboot/Orderly sh
 
       Currently, we just use Poleg EVB with generic motherboard that has some limitations, thus when we use Ubuntu or Windows as host OS, we didn't receive watchdog off IPMI commands sent from OS or BIOS side, so the default watchdog timeout action will be triggered and host will be rebooted after we pressed `Power on` button from `Server control` ->`Server power operations` of WebUI, and that is unexpected behavior. However, we've provided a patch to make `Power on` function work normally for demo purpose, if your host will send watchdog off IPMI command normally then you can remove this patch [0001-Set-Watchdog-ExpireAction-as-None.patch](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/dbus/phosphor-dbus-interfaces/0001-Set-Watchdog-ExpireAction-as-None.patch) from [phosphor-dbus-interfaces_%.bbappend](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/dbus/phosphor-dbus-interfaces_%25.bbappend).  
 
-3. Server Power on
+3. Configure GPIO pin definitions for **POWER_SW**, **RESET_SW** and **PGOOD** on Poleg EVB
+
+    * Pin **POWER_SW** (GPIO219) is use to do all server power operations, pin **RESET_SW** (GPIO218) is reserve for reset operations, and **PGOOD** (GPIO126) is use to monitor DC real status that indicate `Server power` in WebUI.  
+
+    * If other GPIO pins are preferred, please modify the file [gpio_defs.json](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/skeleton/obmc-libobmc-intf/gpio_defs.json) .  
+
+    * Content below is a part of **gpio_defs.json** for this sample:
+      ```
+      "power_config": {
+          "power_good_in": "PGOOD",
+          "power_up_outs": [
+              {"name": "POWER_UP_PIN", "polarity": false}
+          ],
+          "reset_outs": [
+              {"name": "RESET_UP_PIN", "polarity": false}
+          ]
+      }
+
+      "name": "PGOOD",
+      "num": 126,
+      "direction": "in"
+
+      "name": "RESET_UP_PIN",
+      "num": 218,
+      "direction": "out"
+
+      "name": "POWER_UP_PIN",
+      "num": 219,
+      "direction": "out"
+      ```
+      > _"name" here is referred in code and fixed, please don't modify it. "num"  means GPIO pin number and changeable here, "direction" should be set as "in" for **PGOOD**, "out" for **RESET_UP_PIN** and **POWER_UP_PIN**, and "polarity" should be set as "false" for **RESET_UP_PIN** and **POWER_UP_PIN** accordind Poleg EVB schematic._  
+
+4. Server Power on
     * Press `Power on` button from `Server control` ->`Server power operations` of WebUI.  
 
       > _[obmc-host-start@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-host-start%40.target) is the one driving the boot of the system._  
 
-4. Server Power off (Soft)
+5. Server Power off (Soft)
     * Press `Orderly shutdown` button from `Server control` ->`Server power operations` of WebUI.  
 
       > _The soft server power off function is encapsulated in the [obmc-host-shutdown@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-host-shutdown%40.target) that is soft in that it notifies the host of the power off request and gives it a certain amount of time to shut itself down._  
 
-5. Server Power off (Hard)
+6. Server Power off (Hard)
     * Press `Immediate shutdown` button from `Server control` ->`Server power operations` of WebUI.  
 
       > _The hard server power off is encapsulated in the [obmc-chassis-hard-poweroff@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-chassis-hard-poweroff%40.target) that will force the stopping of the soft power off service if running, and immediately cut power to the system._  
 
-6. Server Reboot (Warm)
+7. Server Reboot (Warm)
     * Press `Warm reboot` button from `Server control` ->`Server power operations` of WebUI.  
 
       > _The warm reboot of the server is encapsulated in the [obmc-host-reboot@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-host-reboot%40.target) that will utilize the server power off (soft) target [obmc-host-shutdown@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-host-shutdown%40.target) and then, once that completes, start the host power on target [obmc-host-start@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-host-start%40.target)._  
 
-7. Server Reboot (Cold)
+8. Server Reboot (Cold)
     * Press `Cold reboot` button from `Server control` ->`Server power operations` of WebUI.  
 
       > _The cold reboot of the server is shutdown server immediately, then restarts it. This target will utilize the Immediate shutdown target [obmc-chassis-hard-poweroff@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-chassis-hard-poweroff%40.target) and then, start the host power on target [obmc-host-start@.target](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-phosphor/recipes-core/systemd/obmc-targets/obmc-host-start%40.target)._  
@@ -438,7 +470,7 @@ Chassis Buttons POWER/RESET/ID can be used to power on/off, reset host server an
       Connect ID button sensing pin to **pin3** of header **J23** of Poleg EVB.  
     * Alternative GPIO pins for buttons
 
-      On header **J23** of Poleg EVB are 10 available GPIO pins available for customer application. Here, GPIO120 (pin1) was used to sense Power button, GPIO122 (pin2) was used to sense Reset button, and GPIO124 (pin3) was used to sense ID button.  
+      On header **J23** of Poleg EVB are 10 available GPIO pins available for customer application. Here, GPIO120 (pin1) is use to sense Power button, GPIO122 (pin2) is use to sense Reset button, and GPIO124 (pin3) is use to sense ID button.  
 
       If other GPIO pins are preferred, please modify the file [gpio_defs.json](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/skeleton/obmc-libobmc-intf/gpio_defs.json) , and connect corresponding pins of header **J23** of Poleg EVB to button sensing pins, respectively.  
 
@@ -456,7 +488,7 @@ Chassis Buttons POWER/RESET/ID can be used to power on/off, reset host server an
       "num": 124,
       "direction": "both"
       ```
-      > _**name** here is referred in code and fixed, please don't modify it. **num**  means GPIO pin number and changeable here, **direction** should be set as both here because these pins will serve as input pins, with both rising and falling edge interrupt enabled._  
+      > _"name" here is referred in code and fixed, please don't modify it. "num"  means GPIO pin number and changeable here, "direction" should be set as "both" here because these pins will serve as input pins, with both rising and falling edge interrupt enabled._  
 
 **Maintainer**
 * Tim Lee
