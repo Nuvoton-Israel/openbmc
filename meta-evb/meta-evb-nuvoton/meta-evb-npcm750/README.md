@@ -1502,162 +1502,164 @@ The motherboard on server might have CPLD or FPGA components that require downlo
 | :--- | :---: | :---: | :---: |
 | **IPM Device Global Commands** |  |  |  |
 | Device ID | V | V | V |
-| Cold Reset | V |  | V |
-| Warm Reset | V |  | V |
-| Get Self Test Results | V |  | V |
-| Manufacturing Test On |  |  |  |
-| Set ACPI Power State | V |  | V |
-| Get ACPI Power State |  |  |  |
-| Get Device GUID | V |  | V |
-| Get NetFn Support |  |  |  |
-| Get Command Support |  |  |  |
-| Get Command Sub-function Support |  |  |  |
-| Get Configurable Commands |  |  |  |
-| Get Configurable Command Sub-functions |  |  |  |
-| Set Command Enables |  |  |  |
-| Get Command Enables |  |  |  |
-| Set Command Sub-function Enables |  |  |  |
-| Get Command Sub-function Enables |  |  |  |
-| Get OEM NetFn IANA Support |  |  |  |
+| Cold Reset | V | V | V |
+| Warm Reset | V | V | V |
+| Get Self Test Results | V | V | V |
+| Manufacturing Test On | - | - | - |
+| Set ACPI Power State | V | V | V |
+| Get ACPI Power State | V | V | V |
+| Get Device GUID | V | V | V |
+| Get NetFn Support | - | - | - |
+| Get Command Support | - | - | - |
+| Get Command Sub-function Support | - | - | - |
+| Get Configurable Commands | - | - | - |
+| Get Configurable Command Sub-functions | - | - | - |
+| Set Command Enables | - | - | - |
+| Get Command Enables | - | - | - |
+| Set Command Sub-function Enables | - | - | - |
+| Get Command Sub-function Enables | - | - | - |
+| Get OEM NetFn IANA Support | - | - | - |
 | **BMC Watchdog Timer Commands** |  |  |  |
-| Reset Watchdog Timer | V |  | V |
-| Set Watchdog Timer | V |  | V |
-| Get Watchdog Timer | V |  | V |
+| Reset Watchdog Timer | V | V | V |
+| Set Watchdog Timer | V | V | V |
+| Get Watchdog Timer | V | V | V |
 | **BMC Device and Messaging Commands** |  |  |  |
-| Set BMC Global Enables |  |  |  |
-| Get BMC Global Enables |  |  |  |
-| Clear Message Flags |  |  |  |
-| Get Message Flags | V |  | V |
-| Enable Message Channel Receive |  |  |  |
-| Get Message | V |  |  |
-| Send Message | V |  |  |
-| Read Event Message Buffer | V |  | V |
-| Get System GUID | V |  | V |
-| Set System Info Parameters |  |  |  |
-| Get System Info Parameters |  |  |  |
-| Get Channel Authentication Capabilities |  | V |  |
-| Get Session Challenge |  |  |  |
-| Activate Session |  |  |  |
-| Set Session Privilege Level |  | V |  |
-| Close Session |  | V |  |
-| Get Session Info |  |  |  |
-| Get AuthCode |  |  |  |
-| Set Channel Access |  |  |  |
-| Get Channel Access |  |  |  |
-| Get Channel Info Command |  |  |  |
-| User Access Command |  |  |  |
-| Get User Access Command |  |  |  |
-| Set User Name |  |  |  |
-| Get User Name Command |  |  |  |
-| Set User Password Command |  |  |  |
-| Activate Payload |  | V |  |
-| Deactivate Payload |  | V |  |
-| Get Payload Activation Status |  | V |  |
-| Get Payload Instance Info |  | V |  |
-| Set User Payload Access |  |  |  |
-| Get User Payload Access |  |  |  |
-| Get Channel Payload Support |  |  |  |
-| Get Channel Payload Version |  |  |  |
-| Get Channel OEM Payload Info |  |  |  |
-| Master Write-Read |  |  |  |
-| Get Channel Cipher Suites |  |  |  |
-| Suspend/Resume Payload Encryption |  |  |  |
-| Set Channel Security Keys |  |  |  |
-| Get System Interface Capabilities |  |  |  |
-| Firmware Firewall Configuration |  |  |  |
+| Set BMC Global Enables | V | V | V |
+| Get BMC Global Enables | V | V | V |
+| Clear Message Flags | - | - | - |
+| Get Message Flags | V | V | V |
+| Enable Message Channel Receive | - | - | - |
+| Get Message | V | - | - |
+| Send Message | V | - | - |
+| Read Event Message Buffer | V | V | V |
+| Get System GUID | V | V | V |
+| Set System Info Parameters | V | V | V |
+| Get System Info Parameters | V | V | V |
+| Get Channel Authentication Capabilities | V | V | V |
+| Get Session Challenge | - | - | - |
+| Activate Session | - | - | - |
+| Set Session Privilege Level | V | V | V |
+| Close Session | V | V | V |
+| Get Session Info | - | - | - |
+| Get AuthCode | - | - | - |
+| Set Channel Access | V | V | V |
+| Get Channel Access | V | V | V |
+| Get Channel Info Command | V | V | V |
+| User Access Command | V | V | V |
+| Get User Access Command | V | V | V |
+| Set User Name | V | V | V |
+| Get User Name Command | V | V | V |
+| Set User Password Command | V | V | V |
+| Activate Payload | - | V | - |
+| Deactivate Payload | - | V | - |
+| Get Payload Activation Status | - | V | - |
+| Get Payload Instance Info | - | V | - |
+| Set User Payload Access | - | - | - |
+| Get User Payload Access | - | - | - |
+| Get Channel Payload Support | - | - | - |
+| Get Channel Payload Version | - | - | - |
+| Get Channel OEM Payload Info | - | - | - |
+| Master Write-Read | - | - | - |
+| Get Channel Cipher Suites | V | V| V |
+| Suspend/Resume Payload Encryption | - | - | - |
+| Set Channel Security Keys | - | - | - |
+| Get System Interface Capabilities | - | - | - |
+| Firmware Firewall Configuration | - | - | - |
 | **Chassis Device Commands** |  |  |  |
-| Get Chassis Capabilities |  |  |  |
-| Get Chassis Status |  |  |  |
-| Chassis Control | [V](#chassis-buttons) |  |  |
-| Chassis Reset | [V](#chassis-buttons) |  |  |
-| Chassis Identify | [V](#chassis-buttons) |  | V |
-| Set Front Panel Button Enables |  |  |  |
-| Set Chassis Capabilities |  |  |  |
-| Set Power Restore Policy |  |  |  |
-| Set Power Cycle Interval | V |  |  |
-| Get System Restart Cause | V |  |  |
-| Set System Boot Options |  |  |  |
-| Get System Boot Options |  |  |  |
-| Get POH Counter | V |  |  |
+| Get Chassis Capabilities | V | V | V |
+| Get Chassis Status | V | V | V |
+| Chassis Control | [V](#chassis-buttons) | V | V |
+| Chassis Reset | [V](#chassis-buttons) | V | V |
+| Chassis Identify | [V](#chassis-buttons) | V | V |
+| Set Front Panel Button Enables | - | - | - |
+| Set Chassis Capabilities | V | V | V |
+| Set Power Restore Policy | V | V | V |
+| Set Power Cycle Interval | V | V | V |
+| Get System Restart Cause | - | - | - |
+| Set System Boot Options | V | V | V |
+| Get System Boot Options | V | V | V |
+| Get POH Counter | V | V | V |
 | **Event Commands** |  |  |  |
-| Set Event Receiver |  |  |  |
-| Get Event Receiver |  |  |  |
-| Platform Event |  |  |  |
+| Set Event Receiver | - | - | - |
+| Get Event Receiver | - | - | - |
+| Platform Event | - | - | - |
 | **PEF and Alerting Commands** |  |  |  |
-| Get PEF Capabilities |  |  |  |
-| Arm PEF Postpone Timer |  |  |  |
-| Set PEF Configuration Parameters |  |  |  |
-| Get PEF Configuration Parameters |  |  |  |
-| Set Last Processed Event ID |  |  |  |
-| Get Last Processed Event ID |  |  |  |
-| Alert Immediate |  |  |  |
-| PET Acknowledge |  |  |  |
+| Get PEF Capabilities | - | - | - |
+| Arm PEF Postpone Timer | - | - | - |
+| Set PEF Configuration Parameters | - | - | - |
+| Get PEF Configuration Parameters | - | - | - |
+| Set Last Processed Event ID | - | - | - |
+| Get Last Processed Event ID | - | - | - |
+| Alert Immediate | - | - | - |
+| PET Acknowledge | - | - | - |
 | **Sensor Device Commands** |  |  |  |
-| Get Device SDR Info | V |  | V |
-| Get Device SDR |  |  |  |
-| Reserve Device SDR Repository |  |  |  |
-| Get Sensor Reading Factors |  |  |  |
-| Set Sensor Hysteresis |  |  |  |
-| Get Sensor Hysteresis |  |  |  |
-| Set Sensor Threshold |  |  |  |
-| Get Sensor Threshold |  |  |  |
-| Set Sensor Event Enable |  |  |  |
-| Get Sensor Event Enable |  |  |  |
-| Re-arm Sensor Events |  |  |  |
-| Get Sensor Event Status |  |  |  |
-| Get Sensor Reading |  |  |  |
-| Set Sensor Type |  |  |  |
-| Get Sensor Type |  |  |  |
-| Set Sensor Reading And Event Status |  |  |  |
+| Get Device SDR Info | V | V | V |
+| Get Device SDR | V | V | V |
+| Reserve Device SDR Repository | V | V | V |
+| Get Sensor Reading Factors | - | - | - |
+| Set Sensor Hysteresis | - | - | - |
+| Get Sensor Hysteresis | - | - | - |
+| Set Sensor Threshold | - | - | - |
+| Get Sensor Threshold | V | V | V |
+| Set Sensor Event Enable | - | - | - |
+| Get Sensor Event Enable | - | - | - |
+| Re-arm Sensor Events | - | - | - |
+| Get Sensor Event Status | - | - | - |
+| Get Sensor Reading | V | V | V |
+| Set Sensor Type | - | - | - |
+| Get Sensor Type | V | V | V |
+| Set Sensor Reading And Event Status | V | V | V |
 | **FRU Device Commands** |  |  |  |
-| Get FRU Inventory Area Info |  |  |  |
-| Read FRU Data |  |  |  |
-| Write FRU Data |  |  |  |
+| Get FRU Inventory Area Info | V | V | V |
+| Read FRU Data | V | V | V |
+| Write FRU Data | V | V | V |
 | **SDR Device Commands** |  |  |  |
-| Get SDR Repository Info |  |  |  |
-| Get SDR Repository Allocation Info |  |  |  |
-| Reserve SDR Repository |  |  |  |
-| Get SDR |  |  |  |
-| Add SDR |  |  |  |
-| Partial Add SDR |  |  |  |
-| Delete SDR |  |  |  |
-| Clear SDR Repository |  |  |  |
-| Get SDR Repository Time |  |  |  |
-| Set SDR Repository Time |  |  |  |
-| Enter SDR Repository Update Mode |  |  |  |
-| Exit SDR Repository Update Mode |  |  |  |
-| Run Initialization Agent |  |  |  |
+| Get SDR Repository Info | V | V | V |
+| Get SDR Repository Allocation Info | - | - | - |
+| Reserve SDR Repository | V | V | V |
+| Get SDR | V | V | V |
+| Add SDR | V | V | V |
+| Partial Add SDR | - | - | - |
+| Delete SDR | - | - | - |
+| Clear SDR Repository | - | - | - |
+| Get SDR Repository Time | - | - | - |
+| Set SDR Repository Time | - | - | - |
+| Enter SDR Repository Update Mode | - | - | - |
+| Exit SDR Repository Update Mode | - | - | - |
+| Run Initialization Agent | - | - | - |
 | **SEL Device Commands** |  |  |  |
-| Get SEL Info | V |  | V |
-| Get SEL Allocation Info |  |  |  |
-| Reserve SEL | V |  | V |
-| Get SEL Entry | V |  | V |
-| Add SEL Entry | V |  | V |
-| Partial Add SEL Entry |  |  |  |
-| Delete SEL Entry | V |  | V |
-| Clear SEL | V |  | V |
-| Get SEL Time | [V](#time) |  | V |
-| Set SEL Time | [V](#time)|  | V |
-| Get Auxiliary Log Status |  |  |  |
-| Set Auxiliary Log Status |  |  |  |
-| Get SEL Time UTC Offset |  |  |  |
-| Set SEL Time UTC Offset |  |  |  |
+| Get SEL Info | V | V | V |
+| Get SEL Allocation Info | V | V | V |
+| Reserve SEL | V | V | V |
+| Get SEL Entry | V | V | V |
+| Add SEL Entry | V | V | V |
+| Partial Add SEL Entry | - | - | - |
+| Delete SEL Entry | V | V | V |
+| Clear SEL | V | V | V |
+| Get SEL Time | [V](#time) | V | V |
+| Set SEL Time | [V](#time)| V | V |
+| Get Auxiliary Log Status | - | - | - |
+| Set Auxiliary Log Status | - | - | - |
+| Get SEL Time UTC Offset | - | - | - |
+| Set SEL Time UTC Offset | - | - | - |
 | **LAN Device Commands** |  |  |  |
-| Set LAN Configuration Parameters |  |  |  |
-| Get LAN Configuration Parameters |  |  |  |
-| Suspend BMC ARPs |  |  |  |
-| Get IP/UDP/RMCP Statistics |  |  |  |
+| Set LAN Configuration Parameters | V | V | V |
+| Get LAN Configuration Parameters | V | V | V |
+| Suspend BMC ARPs | - | - | - |
+| Get IP/UDP/RMCP Statistics | - | - | - |
 | **Serial/Modem Device Commands** |  |  |  |
-| Set Serial/Modem Mux |  |  |  |
-| Set Serial Routing Mux |  |  |  |
-| SOL Activating |  |  |  |
-| Set SOL Configuration Parameters |  | V |  |
-| Get SOL Configuration Parameters |  | V |  |
+| Set Serial/Modem Mux | - | - | - |
+| Set Serial Routing Mux | - | - | - |
+| SOL Activating | - | V | - |
+| Set SOL Configuration Parameters | - | V | - |
+| Get SOL Configuration Parameters | - | V | - |
 | **Command Forwarding Commands** |  |  |  |
-| Forwarded Command |  |  |  |
-| Set Forwarded Commands |  |  |  |
-| Get Forwarded Commands |  |  |  |
-| Enable Forwarded Commands |  |  | . |
+| Forwarded Command | - | - | - |
+| Set Forwarded Commands | - | - | - |
+| Get Forwarded Commands | - | - | - |
+| Enable Forwarded Commands | - | - | - |
+> _V: Verified_  
+> _-: Unsupported_
 
 # Image Size
 Type          | Size    | Note                                                                                                     |
@@ -1689,3 +1691,4 @@ image-rwfs    |  0 MB  | middle layer of the overlayfs, rw files in this partiti
 * 2018.12.27 Add Chassis Buttons about How to use
 * 2019.01.02 Add LDAP server setup and test
 * 2019.03.13 Modify Server power operation of Server control about How to use
+* 2019.03.19 Update IPMI Comamnds Verified Table
