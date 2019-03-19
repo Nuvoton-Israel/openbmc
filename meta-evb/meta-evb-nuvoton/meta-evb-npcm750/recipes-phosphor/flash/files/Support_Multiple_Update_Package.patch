@@ -1,0 +1,249 @@
+diff --git a/image_verify.cpp b/image_verify.cpp
+index 7f0bca7..64eba88 100644
+--- a/image_verify.cpp
++++ b/image_verify.cpp
+@@ -99,30 +99,92 @@ bool Signature::verify()
+         // image specific publickey file name.
+         fs::path publicKeyFile(imageDirPath / PUBLICKEY_FILE_NAME);
+ 
+-        // Validate the BMC image files.
+-        for (const auto& bmcImage : bmcImages)
++        fs::path imagekernel(imageDirPath / "image-kernel");
++        fs::path imagekernelrofs(imageDirPath / "image-kernel-rofs");
++        fs::path imagebmc(imageDirPath / "image-bmc");
++
++        if (fs::exists(imagekernelrofs))
+         {
+-            // Build Image File name
+-            fs::path file(imageDirPath);
+-            file /= bmcImage;
++            // Validate the BMC image files.
++            for (const auto& bmcImage : bmcImagesNuvoton)
++            {
++                // Build Image File name
++                fs::path file(imageDirPath);
++                file /= bmcImage;
++
++                // Build Signature File name
++                fs::path sigFile(file);
++                sigFile.replace_extension(SIGNATURE_FILE_EXT);
+ 
+-            // Build Signature File name
+-            fs::path sigFile(file);
+-            sigFile.replace_extension(SIGNATURE_FILE_EXT);
++                // Verify the signature.
++                auto valid = verifyFile(file, sigFile, publicKeyFile, hashType);
++                if (valid == false)
++                {
++                    log<level::ERR>("Nuvoton Image file Signature Validation failed",
++                                    entry("IMAGE=%s", bmcImage.c_str()));
++                    return false;
++                }
++            }
++            log<level::DEBUG>("Successfully completed Signature vaildation.");
+ 
+-            // Verify the signature.
+-            auto valid = verifyFile(file, sigFile, publicKeyFile, hashType);
+-            if (valid == false)
++            return true;
++        }
++        else if (fs::exists(imagekernel))
++        {
++            // Validate the BMC image files.
++            for (const auto& bmcImage : bmcImages)
+             {
+-                log<level::ERR>("Image file Signature Validation failed",
+-                                entry("IMAGE=%s", bmcImage.c_str()));
+-                return false;
++                // Build Image File name
++                fs::path file(imageDirPath);
++                file /= bmcImage;
++
++                // Build Signature File name
++                fs::path sigFile(file);
++                sigFile.replace_extension(SIGNATURE_FILE_EXT);
++
++                // Verify the signature.
++                auto valid = verifyFile(file, sigFile, publicKeyFile, hashType);
++                if (valid == false)
++                {
++                    log<level::ERR>("Image file Signature Validation failed",
++                                    entry("IMAGE=%s", bmcImage.c_str()));
++                    return false;
++                }
+             }
++
++            log<level::DEBUG>("Successfully completed Signature vaildation.");
++
++            return true;
+         }
++        else if (fs::exists(imagebmc))
++        {
++            // Validate the BMC image files.
++            for (const auto& bmcImage : bmcImagesAll)
++            {
++                // Build Image File name
++                fs::path file(imageDirPath);
++                file /= bmcImage;
+ 
+-        log<level::DEBUG>("Successfully completed Signature vaildation.");
++                // Build Signature File name
++                fs::path sigFile(file);
++                sigFile.replace_extension(SIGNATURE_FILE_EXT);
+ 
+-        return true;
++                // Verify the signature.
++                auto valid = verifyFile(file, sigFile, publicKeyFile, hashType);
++                if (valid == false)
++                {
++                    log<level::ERR>("image-bmc Image file Signature Validation failed",
++                                    entry("IMAGE=%s", bmcImage.c_str()));
++                    return false;
++                }
++            }
++
++            log<level::DEBUG>("Successfully completed Signature vaildation.");
++
++            return true;
++        }
++        else
++            return false;
+     }
+     catch (const InternalFailure& e)
+     {
+diff --git a/images.hpp b/images.hpp
+index 97b8f7f..60a5ccb 100644
+--- a/images.hpp
++++ b/images.hpp
+@@ -11,8 +11,24 @@ namespace image
+ {
+ 
+ // BMC flash image file name list.
+-const std::vector<std::string> bmcImages = {"image-kernel", "image-rofs",
+-                                            "image-rwfs", "image-u-boot"};
++const std::vector<std::string> bmcImages = {"image-kernel","image-kernel.sig",
++                                            "image-rofs","image-rofs.sig",
++                                            "image-rwfs","image-rwfs.sig",
++                                            "image-u-boot","image-u-boot.sig",
++                                            "publickey","publickey.sig"
++                                            };
++
++// Nuvoton BMC flash image file name list.
++const std::vector<std::string> bmcImagesNuvoton = {"image-kernel-rofs","image-kernel-rofs.sig",
++                                                   "image-rwfs","image-rwfs.sig",
++                                                   "image-u-boot","image-u-boot.sig",
++                                                   "publickey","publickey.sig"
++                                                   };
++
++// image-bmc BMC flash image file name list.
++const std::vector<std::string> bmcImagesAll = {"image-bmc","image-bmc.sig",
++                                               "publickey","publickey.sig"
++                                               };
+ 
+ } // namespace image
+ } // namespace software
+diff --git a/item_updater.cpp b/item_updater.cpp
+index 6dd7a52..6f75aa4 100644
+--- a/item_updater.cpp
++++ b/item_updater.cpp
+@@ -368,12 +368,56 @@ ItemUpdater::ActivationStatus
+         }
+     }
+ 
+-    if (invalid)
++    if (!invalid)
+     {
+-        return ItemUpdater::ActivationStatus::invalid;
++        log<level::INFO>("find all the BMC image.");
++        return ItemUpdater::ActivationStatus::ready;
++    }
++    else
++    {
++        invalid = false;
++        for (auto& bmcImage : bmcImagesNuvoton)
++        {
++            fs::path file(filePath);
++            file /= bmcImage;
++            std::ifstream efile(file.c_str());
++            if (efile.good() != 1)
++            {
++                log<level::ERR>("Failed to find the Nuvoton BMC image.",
++                                entry("IMAGE=%s", bmcImage.c_str()));
++                invalid = true;
++            }
++        }
++    }
++    if (!invalid)
++    {
++        log<level::INFO>("find all the Nuvoton BMC image.");
++        return ItemUpdater::ActivationStatus::ready;
++    }
++    else
++    {
++        invalid = false;
++        for (auto& bmcImage : bmcImagesAll)
++        {
++            fs::path file(filePath);
++            file /= bmcImage;
++            std::ifstream efile(file.c_str());
++            if (efile.good() != 1)
++            {
++                log<level::ERR>("Failed to find the image-bmc BMC image.",
++                                entry("IMAGE=%s", bmcImage.c_str()));
++                invalid = true;
++            }
++        }
+     }
+ 
+-    return ItemUpdater::ActivationStatus::ready;
++    if (invalid)
++        return ItemUpdater::ActivationStatus::invalid;
++    else
++    {
++        log<level::INFO>("find image-bmc the BMC image.");
++        return ItemUpdater::ActivationStatus::ready;
++    }
+ }
+ 
+ void ItemUpdater::savePriority(const std::string& versionId, uint8_t value)
+diff --git a/static/flash.cpp b/static/flash.cpp
+index 82c2393..cc0640c 100644
+--- a/static/flash.cpp
++++ b/static/flash.cpp
+@@ -28,10 +28,33 @@ void Activation::flashWrite()
+     // the image to flash during reboot.
+     fs::path uploadDir(IMG_UPLOAD_DIR);
+     fs::path toPath(PATH_INITRAMFS);
+-    for (auto& bmcImage : phosphor::software::image::bmcImages)
++
++    fs::path imagekernelrofs(uploadDir / versionId / "image-kernel-rofs");
++    fs::path imagekernel(uploadDir / versionId / "image-kernel");
++    fs::path imagebmc(uploadDir / versionId / "image-bmc");
++    if (fs::exists(imagekernelrofs))
++    {
++        for (auto& bmcImage : phosphor::software::image::bmcImagesNuvoton)
++        {
++            fs::copy_file(uploadDir / versionId / bmcImage, toPath / bmcImage,
++                          fs::copy_options::overwrite_existing);
++        }
++    }
++    else if(fs::exists(imagekernel))
++    {
++        for (auto& bmcImage : phosphor::software::image::bmcImages)
++        {
++            fs::copy_file(uploadDir / versionId / bmcImage, toPath / bmcImage,
++                          fs::copy_options::overwrite_existing);
++        }
++    }
++    else if(fs::exists(imagebmc))
+     {
+-        fs::copy_file(uploadDir / versionId / bmcImage, toPath / bmcImage,
+-                      fs::copy_options::overwrite_existing);
++        for (auto& bmcImage : phosphor::software::image::bmcImagesAll)
++        {
++            fs::copy_file(uploadDir / versionId / bmcImage, toPath / bmcImage,
++                          fs::copy_options::overwrite_existing);
++        }
+     }
+ }
+ 

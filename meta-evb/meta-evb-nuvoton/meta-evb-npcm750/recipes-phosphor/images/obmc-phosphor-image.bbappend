@@ -5,13 +5,14 @@ FLASH_KERNEL_OFFSET = "2048"
 FLASH_UBI_OFFSET = "${FLASH_KERNEL_OFFSET}"
 FLASH_ROFS_OFFSET = "7680"
 FLASH_RWFS_OFFSET = "30720"
+FLASH_FIT_KERNEL_RO = "image-kernel-rofs"
 
 # UBI volume sizes in KB unless otherwise noted.
 FLASH_UBI_RWFS_SIZE = "6144"
 FLASH_UBI_RWFS_TXT_SIZE = "6MiB"
 
-SIGNING_KEY = "${STAGING_DIR_NATIVE}${datadir}/Nuvoton.priv"
-SIGNING_KEY_DEPENDS = "phosphor-nuvoton-signing-key-native:do_populate_sysroot"
+#SIGNING_KEY = "${STAGING_DIR_NATIVE}${datadir}/Nuvoton.key"
+#SIGNING_KEY_DEPENDS = "phosphor-nuvoton-signing-key-native:do_populate_sysroot"
 
 OBMC_IMAGE_EXTRA_INSTALL_append = " phosphor-ipmi-host"
 OBMC_IMAGE_EXTRA_INSTALL_append = " phosphor-ipmi-kcs"
@@ -72,8 +73,47 @@ do_prepare_merged_bb_uboot () {
 
 	# rename the merged image to be the "real" u-boot, later will be used
 	# by do_generate_static (after will be restored)  
-	cp ${UBOOT_BIN} ${UBOOT_BIN}.plan 
+	cp ${UBOOT_BIN} ${UBOOT_BIN}.plan
 	cp ${UBOOT_BIN}.merged ${UBOOT_BIN}
+
+	cd ${DEPLOY_DIR_IMAGE}
+	ln -sf ${IMGDEPLOYDIR}/${IMAGE_LINK_NAME}.${IMAGE_BASETYPE} image-rofs-pure
+
+	#
+	# Assemble the FIT image and sign kenel dtb initramfs rofs with key under ${DEPLOY_DIR_IMAGE}/uboot_fitkey
+	#
+	cp ${DEPLOY_DIR_IMAGE}/fitImage-its-${INITRAMFS_IMAGE}-${MACHINE}-rofs.its tmp.its
+	sed -i -- 's/NUVOTON_RO_OFFSET_IN_FIT/580000/g' tmp.its
+	mv tmp.its ${DEPLOY_DIR_IMAGE}/fitImage-its-${INITRAMFS_IMAGE}-${MACHINE}-rofs.its
+	uboot-mkimage -f "${DEPLOY_DIR_IMAGE}/fitImage-its-${INITRAMFS_IMAGE}-${MACHINE}-rofs.its" \
+					-k "${DEPLOY_DIR_IMAGE}/uboot_fitkey" \
+					"${DEPLOY_DIR_IMAGE}/${FLASH_FIT_KERNEL_RO}"
+
+
+}
+
+make_tar_of_nuvoton_images () {
+       type=$1
+       shift
+       extra_files="$@"
+
+       # Create the tar archive
+       tar -h -cvf ${IMGDEPLOYDIR}/${IMAGE_NAME}.$type.mtd.tar \
+               image-u-boot image-u-boot.sig image-rwfs image-rwfs.sig \
+               MANIFEST MANIFEST.sig publickey publickey.sig \
+               image-kernel-rofs \
+               $extra_files
+
+       cd ${IMGDEPLOYDIR}
+       ln -sf ${IMAGE_NAME}.$type.mtd.tar ${IMGDEPLOYDIR}/${IMAGE_LINK_NAME}.$type.mtd.tar
+}
+
+do_generate_ubi_tar_append () {
+
+	cd ${S}/ubi
+	ln -sf ${DEPLOY_DIR_IMAGE}/${FLASH_FIT_KERNEL_RO} image-kernel-rofs
+	make_signatures image-kernel-rofs
+	make_tar_of_nuvoton_images nuvoton ${signature_files}
 }
 
 do_restore_uboot () {
@@ -85,6 +125,13 @@ do_restore_uboot () {
 do_generate_static_prepend () {
 
     bb.build.exec_func("do_prepare_merged_bb_uboot", d)
+}
+
+do_generate_static_append () {
+    _append_image(os.path.join(d.getVar('DEPLOY_DIR_IMAGE', True),d.getVar('FLASH_FIT_KERNEL_RO', True)),
+                  int(d.getVar('FLASH_KERNEL_OFFSET', True)),
+                  int(d.getVar('FLASH_RWFS_OFFSET', True)))
+
 }
 
 do_generate_ubi_tar_append () {

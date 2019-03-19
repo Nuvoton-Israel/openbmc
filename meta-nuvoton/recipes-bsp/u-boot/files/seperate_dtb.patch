@@ -1,0 +1,15 @@
+diff --git a/configs/PolegSVB_defconfig b/configs/PolegSVB_defconfig
+index e88c061..62aee03 100644
+--- a/configs/PolegSVB_defconfig
++++ b/configs/PolegSVB_defconfig
+@@ -20,8 +20,8 @@ CONFIG_SHA256SUM_VERIFY=y
+ CONFIG_NUVOTON_POLEG_I2C=y
+ CONFIG_DM=y
+ CONFIG_OF_CONTROL=y
+-CONFIG_OF_SEPARATE=n
+-CONFIG_OF_EMBED=y
++CONFIG_OF_SEPARATE=y
++CONFIG_OF_EMBED=n
+ CONFIG_DM_I2C=y
+ CONFIG_DM_I2C_COMPAT=n
+ CONFIG_BOOTSTAGE=n

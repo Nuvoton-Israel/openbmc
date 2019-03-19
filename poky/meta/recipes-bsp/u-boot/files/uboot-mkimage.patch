@@ -1,0 +1,193 @@
+diff --git a/include/image.h b/include/image.h
+index a128a62..9569418 100644
+--- a/include/image.h
++++ b/include/image.h
+@@ -898,6 +898,7 @@ int bootz_setup(ulong image, ulong *start, ulong *end);
+ #define FIT_COMP_PROP		"compression"
+ #define FIT_ENTRY_PROP		"entry"
+ #define FIT_LOAD_PROP		"load"
++#define FIT_OFFSET_PROP		"offset"
+ 
+ /* configuration node */
+ #define FIT_KERNEL_PROP		"kernel"
+diff --git a/lib/libfdt/fdt_rw.c b/lib/libfdt/fdt_rw.c
+index 3dc7752..3315a66 100644
+--- a/lib/libfdt/fdt_rw.c
++++ b/lib/libfdt/fdt_rw.c
+@@ -494,3 +494,37 @@ int fdt_remove_unused_strings(const void *old, void *new)
+ 
+ 	return 0;
+ }
++
++int fdt_add_extra_rsv(char *new, char *old, int extra_rsv)
++{
++	int mem_rsv_off, struct_off, strings_off, struct_size;
++	int mem_rsv_size;
++	int org_rsv_size;
++
++	FDT_RW_CHECK_HEADER(old);
++
++	org_rsv_size = (fdt_num_mem_rsv(old)+1) * sizeof(struct fdt_reserve_entry);
++	mem_rsv_size = extra_rsv + org_rsv_size;
++	struct_size = fdt_size_dt_struct(old);
++
++	mem_rsv_off = FDT_ALIGN(sizeof(struct fdt_header), 8);
++	struct_off = mem_rsv_off + mem_rsv_size;
++	strings_off = struct_off + struct_size;
++
++	memset(new + mem_rsv_off + org_rsv_size, 0,
++		extra_rsv);
++	fdt_set_off_mem_rsvmap(new, mem_rsv_off);
++
++	memcpy(new + struct_off, old + fdt_off_dt_struct(old), struct_size);
++	fdt_set_off_dt_struct(new, struct_off);
++	fdt_set_size_dt_struct(new, struct_size);
++
++	memcpy(new + strings_off, old + fdt_off_dt_strings(old),
++		fdt_size_dt_strings(old));
++	fdt_set_off_dt_strings(new, strings_off);
++	fdt_set_size_dt_strings(new, fdt_size_dt_strings(old));
++
++	fdt_set_totalsize(new, _fdt_data_size(new));
++
++	return 0;
++}
+diff --git a/lib/libfdt/libfdt.h b/lib/libfdt/libfdt.h
+index 6af94cb..a6a769b 100644
+--- a/lib/libfdt/libfdt.h
++++ b/lib/libfdt/libfdt.h
+@@ -1298,6 +1298,7 @@ int fdt_finish(void *fdt);
+ int fdt_create_empty_tree(void *buf, int bufsize);
+ int fdt_open_into(const void *fdt, void *buf, int bufsize);
+ int fdt_pack(void *fdt);
++int fdt_add_extra_rsv(char *newfdt, char *oldfdt, int extra_rsv);
+ 
+ /**
+  * fdt_add_mem_rsv - add one memory reserve map entry
+diff --git a/tools/fit_image.c b/tools/fit_image.c
+index 6dcc88b..ff1da85 100644
+--- a/tools/fit_image.c
++++ b/tools/fit_image.c
+@@ -21,8 +21,114 @@
+ #include <stdarg.h>
+ #include <version.h>
+ #include <u-boot/crc.h>
++#include "libfdt_internal.h"
+ 
+ static image_header_t header;
++static void relocate_rofs(const char *fname)
++{
++	void *ptr;
++	int fd;
++	size_t size_inc;
++	struct stat sbuf;
++	int images_noffset;
++	ulong rofs_offset;
++	int noffset;
++	const uint32_t *data;
++	const void *rofs_data;
++	int len;
++	size_t size;
++
++	/* Load FIT blob into memory (we need to write hashes/signatures) */
++	fd = open(fname, O_RDWR | O_BINARY);
++
++	if (fd < 0) {
++		fprintf(stderr, "%s: Can't open %s: %s\n",
++			__func__, fname, strerror(errno));
++		return;
++	}
++
++	if (fstat(fd, &sbuf) < 0) {
++		fprintf(stderr, "%s: Can't stat %s: %s\n",
++			__func__, fname, strerror(errno));
++		goto err1;
++	}
++
++	errno = 0;
++	ptr = mmap(0, sbuf.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
++	if ((ptr == MAP_FAILED) || (errno != 0)) {
++		fprintf(stderr, "%s: Can't read %s: %s\n",
++			__func__, fname, strerror(errno));
++		goto err1;
++	}
++
++	/* check if ptr has a valid blob */
++	if (fdt_check_header(ptr)) {
++		fprintf(stderr, "%s: Invalid FIT blob\n", __func__);
++		goto err2;
++	}
++
++	images_noffset = fdt_path_offset(ptr, FIT_IMAGES_PATH);
++	if (images_noffset < 0) {
++		printf("Can't find images parent node '%s' (%s)\n",
++		       FIT_IMAGES_PATH, fdt_strerror(images_noffset));
++		goto err2;
++	}
++	noffset = fdt_node_offset_by_compatible(ptr, images_noffset, "rofs");
++	if (noffset < 0) {
++		goto err2;
++	}
++
++	data = fdt_getprop(ptr, noffset, FIT_OFFSET_PROP, &len);
++	if (data == NULL) {
++		goto err2;
++	}
++	rofs_offset = uimage_to_cpu(*data);
++
++	/* Get image data and data length */
++	if (fit_image_get_data(ptr, noffset, &rofs_data, &size)) {
++		goto err2;
++	}
++	if ((rofs_data - ptr) >= rofs_offset) {
++		goto err2;
++	}
++	size_inc = rofs_offset - (rofs_data - ptr);
++	if (size_inc % FDT_TAGSIZE)
++		goto err2;
++
++	if (size_inc) {
++		void *tmp;
++		munmap(ptr, sbuf.st_size);
++		sbuf.st_size += size_inc;
++		if (ftruncate(fd, sbuf.st_size)) {
++			fprintf(stderr, "Can't expand file: %s\n",
++				strerror(errno));
++			goto err1;
++		}
++		ptr = mmap(0, sbuf.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
++		if ((ptr == MAP_FAILED) || (errno != 0)) {
++			fprintf(stderr, "%s: mmap error\n", __func__);
++			goto err1;
++		}
++
++		tmp = malloc(sbuf.st_size);
++		if (tmp) {
++			memcpy(tmp, ptr, sbuf.st_size);
++			fdt_add_extra_rsv(ptr, tmp, size_inc);
++			free(tmp);
++		} else
++			printf("%s: unable to allocate buffer\n", __func__);
++	}
++
++	munmap(ptr, sbuf.st_size);
++	close(fd);
++	return;
++
++err2:
++	munmap(ptr, sbuf.st_size);
++err1:
++	close(fd);
++	printf("No rellocation of rofs\n");
++}
+ 
+ static int fit_add_file_data(struct image_tool_params *params, size_t size_inc,
+ 			     const char *tmpfile)
+@@ -690,6 +796,7 @@ static int fit_handle_file(struct image_tool_params *params)
+ 			params->cmdname, ret);
+ 		goto err_system;
+ 	}
++	relocate_rofs(tmpfile);
+ 
+ 	/* Move the data so it is external to the FIT, if requested */
+ 	if (params->external_data) {

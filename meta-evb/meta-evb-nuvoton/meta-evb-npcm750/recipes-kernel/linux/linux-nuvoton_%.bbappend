@@ -3,6 +3,10 @@ FILESEXTRAPATHS_prepend := "${THISDIR}/linux-nuvoton:"
 KBRANCH = "Poleg-4.17.04-OpenBMC"
 LINUX_VERSION = "4.17.4"
 
+DEPENDS += "phosphor-nuvoton-signing-key-native"
+UBOOT_SIGN_KEYDIR = "${DEPLOY_DIR_IMAGE}/uboot_fitkey/"
+UBOOT_SIGN_KEYNAME = "Nuvoton"
+
 KSRC = "git://github.com/Nuvoton-Israel/linux;protocol=git;branch=${KBRANCH}"
 SRCREV = "c1cb34fb8353ae81983cc64ac8fd488f13e68075"
 

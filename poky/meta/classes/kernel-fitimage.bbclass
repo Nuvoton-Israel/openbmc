@@ -36,6 +36,7 @@ python __anonymous () {
         if d.getVar('UBOOT_SIGN_ENABLE') == "1":
             uboot_pn = d.getVar('PREFERRED_PROVIDER_u-boot') or 'u-boot'
             d.appendVarFlag('do_assemble_fitimage', 'depends', ' %s:do_deploy' % uboot_pn)
+
 }
 
 # Options for the device tree compiler passed to mkimage '-D' feature:
@@ -100,7 +101,7 @@ EOF
 # $4 ... Compression type
 fitimage_emit_section_kernel() {
 
-	kernel_csum="sha1"
+	kernel_csum="sha256"
 
 	ENTRYPOINT="${UBOOT_ENTRYPOINT}"
 	if [ -n "${UBOOT_ENTRYSYMBOL}" ]; then
@@ -133,7 +134,7 @@ EOF
 # $3 ... Path to DTB image
 fitimage_emit_section_dtb() {
 
-	dtb_csum="sha1"
+	dtb_csum="sha256"
 
 	cat << EOF >> ${1}
                 fdt@${2} {
@@ -157,7 +158,7 @@ EOF
 # $3 ... Path to setup image
 fitimage_emit_section_setup() {
 
-	setup_csum="sha1"
+	setup_csum="sha256"
 
 	cat << EOF >> ${1}
                 setup@${2} {
@@ -184,7 +185,7 @@ EOF
 # $3 ... Path to ramdisk image
 fitimage_emit_section_ramdisk() {
 
-	ramdisk_csum="sha1"
+	ramdisk_csum="sha256"
 	ramdisk_ctype="none"
 	ramdisk_loadline=""
 	ramdisk_entryline=""
@@ -232,6 +233,120 @@ EOF
 }
 
 #
+# Emit the ROFS ITS DTB section
+#
+# $1 ... .its filename
+# $2 ... Image counter
+fitimage_emit_section_rofs() {
+
+       rofs_csum="sha256";
+
+       cat << EOF >> ${1}
+                rofs@${2} {
+                        description = "Read only file system";
+                        data = /incbin/("${3}");
+                        type="filesystem";
+                        arch = "arm";
+                       offset = <0xNUVOTON_RO_OFFSET_IN_FIT>;
+                       compatible = "rofs";
+                        hash@1 {
+                                algo = "${rofs_csum}";
+                        };
+                };
+EOF
+}
+
+#
+# Emit the fitImage ITS configuration section
+#
+# $1 ... .its filename
+# $2 ... Linux kernel ID
+# $3 ... DTB image name
+# $4 ... ramdisk ID
+# $5 ... config ID
+# $6 ... default flag
+fitimage_emit_section_config_rofs() {
+
+	conf_csum="sha256"
+	if [ -n "${UBOOT_SIGN_ENABLE}" ] ; then
+		conf_sign_keyname="${UBOOT_SIGN_KEYNAME}"
+	fi
+
+	# Test if we have any DTBs at all
+	conf_desc="Linux kernel"
+	kernel_line="kernel = \"kernel@${2}\";"
+	fdt_line=""
+	ramdisk_line=""
+	setup_line=""
+	default_line=""
+
+	if [ -n "${3}" ]; then
+		conf_desc="${conf_desc}, FDT blob"
+		fdt_line="fdt = \"fdt@${3}\";"
+	fi
+
+	if [ -n "${4}" ]; then
+		conf_desc="${conf_desc}, ramdisk"
+		ramdisk_line="ramdisk = \"ramdisk@${4}\";"
+	fi
+
+	if [ -n "${5}" ]; then
+		conf_desc="${conf_desc}, setup"
+		setup_line="setup = \"setup@${5}\";"
+	fi
+
+	if [ "${6}" = "1" ]; then
+		default_line="default = \"conf@${3}\";"
+	fi
+
+	cat << EOF >> ${1}
+                ${default_line}
+                conf@${3} {
+			description = "${6} ${conf_desc}";
+			${kernel_line}
+			${fdt_line}
+			${ramdisk_line}
+			loadables = "rofs@1";
+			${setup_line}
+			hash@1 {
+				algo = "${conf_csum}";
+			};
+EOF
+
+	if [ ! -z "${conf_sign_keyname}" ] ; then
+
+		sign_line="sign-images = \"kernel\""
+
+		if [ -n "${3}" ]; then
+			sign_line="${sign_line}, \"fdt\""
+		fi
+
+		if [ -n "${4}" ]; then
+			sign_line="${sign_line}, \"ramdisk\""
+		fi
+                sign_line="${sign_line}, \"loadables\""
+
+		if [ -n "${5}" ]; then
+			sign_line="${sign_line}, \"setup\""
+		fi
+
+		sign_line="${sign_line};"
+
+		cat << EOF >> ${1}
+			signature@1 {
+				algo = "${conf_csum},rsa2048";
+				key-name-hint = "${conf_sign_keyname}";
+				${sign_line}
+			};
+EOF
+	fi
+
+	cat << EOF >> ${1}
+        };
+EOF
+}
+
+#
 # Emit the fitImage ITS configuration section
 #
 # $1 ... .its filename
@@ -242,7 +357,7 @@ EOF
 # $6 ... default flag
 fitimage_emit_section_config() {
 
-	conf_csum="sha1"
+	conf_csum="sha256"
 	if [ -n "${UBOOT_SIGN_ENABLE}" ] ; then
 		conf_sign_keyname="${UBOOT_SIGN_KEYNAME}"
 	fi
@@ -317,6 +432,107 @@ EOF
 	cat << EOF >> ${1}
                 };
 EOF
+}
+
+#
+# Assemble fitImage
+#
+# $1 ... .its filename
+# $2 ... fitImage name
+# $3 ... include ramdisk
+fitimage_assemble_rofs() {
+	kernelcount=1
+	dtbcount=""
+	DTBS=""
+	ramdiskcount=${3}
+	rofscount=1
+	setupcount=""
+	rm -f ${1} arch/${ARCH}/boot/${2}
+
+	fitimage_emit_fit_header ${1}
+
+	#
+	# Step 1: Prepare a kernel image section.
+	#
+	fitimage_emit_section_maint ${1} imagestart
+
+	uboot_prep_kimage
+	fitimage_emit_section_kernel ${1} "${kernelcount}" "${DEPLOY_DIR_IMAGE}/linux.bin" "${linux_comp}"
+
+	#
+	# Step 2: Prepare a DTB image section
+	#
+	if [ -n "${KERNEL_DEVICETREE}" ]; then
+		dtbcount=1
+		for DTB in ${KERNEL_DEVICETREE}; do
+			if echo ${DTB} | grep -q '/dts/'; then
+				bbwarn "${DTB} contains the full path to the the dts file, but only the dtb name should be used."
+				DTB=`basename ${DTB} | sed 's,\.dts$,.dtb,g'`
+			fi
+			DTB_PATH="arch/${ARCH}/boot/dts/${DTB}"
+			if [ ! -e "${DTB_PATH}" ]; then
+				DTB_PATH="arch/${ARCH}/boot/${DTB}"
+			fi
+
+			DTB=$(echo "${DTB}" | tr '/' '_')
+			DTBS="${DTBS} ${DTB}"
+			fitimage_emit_section_dtb ${1} ${DTB} "${DEPLOY_DIR_IMAGE}/${DTB}"
+		done
+	fi
+
+	#
+	# Step 3: Prepare a setup section. (For x86)
+	#
+	if [ -e arch/${ARCH}/boot/setup.bin ]; then
+		setupcount=1
+		fitimage_emit_section_setup ${1} "${setupcount}" arch/${ARCH}/boot/setup.bin
+	fi
+
+	#
+	# Step 4: Prepare a ramdisk section.
+	#
+	if [ "x${ramdiskcount}" = "x1" ] ; then
+		# Find and use the first initramfs image archive type we find
+		for img in cpio.lz4 cpio.lzo cpio.lzma cpio.xz cpio.gz cpio; do
+			initramfs_path="${DEPLOY_DIR_IMAGE}/${INITRAMFS_IMAGE_NAME}.${img}"
+			echo "Using $initramfs_path"
+			if [ -e "${initramfs_path}" ]; then
+				fitimage_emit_section_ramdisk ${1} "${ramdiskcount}" "${initramfs_path}"
+				break
+			fi
+		done
+	fi
+
+	#
+	# Step 4.5: Prepare a rofs section
+	#
+	fitimage_emit_section_rofs ${1} "${rofscount}" "${DEPLOY_DIR_IMAGE}/image-rofs-pure"
+
+	fitimage_emit_section_maint ${1} sectend
+
+	# Force the first Kernel and DTB in the default config
+	kernelcount=1
+	if [ -n "${dtbcount}" ]; then
+		dtbcount=1
+	fi
+
+	#
+	# Step 5: Prepare a configurations section
+	#
+	fitimage_emit_section_maint ${1} confstart
+
+	if [ -n "${DTBS}" ]; then
+		i=1
+		for DTB in ${DTBS}; do
+			fitimage_emit_section_config_rofs ${1} "${kernelcount}" "${DTB}" "${ramdiskcount}" "${setupcount}" "`expr ${i} = ${dtbcount}`"
+			i=`expr ${i} + 1`
+		done
+	fi
+
+	fitimage_emit_section_maint ${1} sectend
+
+	fitimage_emit_section_maint ${1} fitend
+
 }
 
 #
@@ -446,6 +662,7 @@ do_assemble_fitimage_initramfs() {
 		test -n "${INITRAMFS_IMAGE}" ; then
 		cd ${B}
 		fitimage_assemble fit-image-${INITRAMFS_IMAGE}.its fitImage-${INITRAMFS_IMAGE} 1
+		fitimage_assemble_rofs fit-image-${INITRAMFS_IMAGE}-rofs.its fitImage-${INITRAMFS_IMAGE}-rofs 1
 	fi
 }
 
@@ -464,6 +681,7 @@ kernel_do_deploy_append() {
 		linux_bin_base_name="fitImage-linux.bin-${PV}-${PR}-${MACHINE}-${DATETIME}"
 		linux_bin_symlink_name=fitImage-linux.bin-${MACHINE}
 		install -m 0644 linux.bin ${DEPLOYDIR}/${linux_bin_base_name}.bin
+		install -m 0644 linux.bin ${DEPLOYDIR}/linux.bin
 
 		if [ -n "${INITRAMFS_IMAGE}" ]; then
 			echo "Copying fit-image-${INITRAMFS_IMAGE}.its source file..."
@@ -473,6 +691,12 @@ kernel_do_deploy_append() {
 			fit_initramfs_base_name="fitImage-${INITRAMFS_IMAGE_NAME}-${PV}-${PR}-${DATETIME}"
 			fit_initramfs_symlink_name=fitImage-${INITRAMFS_IMAGE_NAME}
 			install -m 0644 arch/${ARCH}/boot/fitImage-${INITRAMFS_IMAGE} ${DEPLOYDIR}/${fit_initramfs_base_name}.bin
+
+			echo "Copying fit-image-${INITRAMFS_IMAGE}-rofs.its source file..."
+			its_initramfs_base_name_rofs="fitImage-its-${INITRAMFS_IMAGE_NAME}-${PV}-${PR}-${DATETIME}-rofs"
+			its_initramfs_symlink_name_rofs=fitImage-its-${INITRAMFS_IMAGE_NAME}-rofs
+			install -m 0644 fit-image-${INITRAMFS_IMAGE}-rofs.its ${DEPLOYDIR}/${its_initramfs_base_name_rofs}.its
+			fit_initramfs_symlink_name=fitImage-${INITRAMFS_IMAGE_NAME}
 		fi
 
 		cd ${DEPLOYDIR}
@@ -482,6 +706,8 @@ kernel_do_deploy_append() {
 		if [ -n "${INITRAMFS_IMAGE}" ]; then
 			ln -sf ${its_initramfs_base_name}.its ${its_initramfs_symlink_name}.its
 			ln -sf ${fit_initramfs_base_name}.bin ${fit_initramfs_symlink_name}.bin
+
+			ln -sf ${its_initramfs_base_name_rofs}.its ${its_initramfs_symlink_name_rofs}.its
 		fi
 	fi
 }
