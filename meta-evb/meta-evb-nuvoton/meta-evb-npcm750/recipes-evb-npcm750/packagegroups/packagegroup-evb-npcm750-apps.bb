@@ -46,4 +46,5 @@ RDEPENDS_${PN}-system = " \
 		phosphor-image-signing \
 		openssl-bin \
 		bmcweb \
+		phosphor-host-postd \
         "

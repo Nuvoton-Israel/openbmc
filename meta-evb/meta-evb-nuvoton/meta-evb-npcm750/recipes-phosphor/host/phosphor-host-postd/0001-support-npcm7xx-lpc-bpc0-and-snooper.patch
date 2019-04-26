@@ -1,0 +1,133 @@
+From ea382ee275c78517764176401b0be2306a0b6dde Mon Sep 17 00:00:00 2001
+From: CH Li <chli30@nuvoton.com>
+Date: Thu, 25 Apr 2019 15:16:43 +0800
+Subject: [PATCH] support-npcm7xx-lpc-bpc0-and-snooper
+
+---
+ example.cpp | 93 +++++++++++++++++++++++++++++++++++++++++++++++++++--
+ main.cpp    |  2 +-
+ 2 files changed, 92 insertions(+), 3 deletions(-)
+
+diff --git a/example.cpp b/example.cpp
+index e644f2b..ac284a5 100644
+--- a/example.cpp
++++ b/example.cpp
+@@ -21,11 +21,100 @@
+ #include <iostream>
+ #include <memory>
+ 
++#include <fstream>
++#include <sstream>
++#include <time.h>
++
++using namespace std;
++
++#if 0
++bool on = false, off = false, bios = false;
++#else
++bool on = false;
++#endif
++
++char filename[50], filename2[100];
++
++static void get_filename(char *name)
++{
++	time_t t;
++	struct tm *tm;
++
++	int year, month, day;
++	int hour, minute, sec;
++
++	time(&t);
++	tm = localtime(&t);
++
++	year = tm->tm_year + 1900;
++	month = tm->tm_mon + 1;
++	day = tm->tm_mday;
++	hour = tm->tm_hour;
++	minute = tm->tm_min;
++	sec = tm->tm_sec;
++
++	sprintf(name, "%d_%d_%d_%d_%d_%d", year, month, day, hour, minute, sec);
++}
++
+ /* Example PostCode handler which simply prints them */
+ static void printPostcode(uint64_t postcode)
+ {
+-    /* Print output to verify the example program is receiving values. */
+-    std::printf("recv: 0x%" PRIx64 "\n", postcode);
++	std::fstream on_file, off_file, bios_file;
++	std::stringstream stream;
++
++	/* Print output to verify the example program is receiving values. */
++	std::printf("recv: 0x%" PRIx64 "\n", postcode);
++	stream << "0x" << std::hex << postcode;
++
++	if ((stream.str().compare("0x3") == 0) && (on == false)) {
++		get_filename(filename);
++		sprintf(filename2, "%s-ON", filename);
++		on = true;
++#if 0
++		off = false;
++		bios = false;
++#endif
++	}
++
++#if 0
++	else if ((stream.str().compare("0x5") == 0) && (off == false)) {
++		get_filename(filename);
++		sprintf(filename2, "%s-OFF", filename);
++		on = false;
++		off = true;
++		bios = false;
++	} else if ((stream.str().compare("0xa9") == 0) && (bios == false)) {
++		get_filename(filename);
++		sprintf(filename2, "%s-BIOS", filename);
++		on = false;
++		off = false;
++		bios = true;
++	}
++#endif
++
++	if (on) {
++		on_file.open (filename2, std::ios::app);
++		on_file << stream.str() << endl;
++		on_file.close();
++		if ((stream.str().compare("0xa0") == 0))
++			on = false;
++	}
++
++#if 0
++	else if (off) {
++		off_file.open (filename2, std::ios::app);
++		off_file << stream.str() << endl;
++		off_file.close();
++		if ((stream.str().compare("0x16") == 0))
++			off = false;
++	} else if (bios) {
++		bios_file.open (filename2, std::ios::app);
++		bios_file << stream.str() << endl;
++		bios_file.close();
++		if ((stream.str().compare("0xab") == 0))
++			bios = false;
++	}
++#endif
+ }
+ 
+ /*
+diff --git a/main.cpp b/main.cpp
+index 8928a5b..423a002 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -32,7 +32,7 @@
+ #include <sdeventplus/source/io.hpp>
+ #include <thread>
+ 
+-static const char* snoopFilename = "/dev/aspeed-lpc-snoop0";
++static const char* snoopFilename = "/dev/npcm7xx-lpc-bpc0";
+ static size_t codeSize = 1; /* Size of each POST code in bytes */
+ 
+ /*
+-- 
+2.17.1
+
