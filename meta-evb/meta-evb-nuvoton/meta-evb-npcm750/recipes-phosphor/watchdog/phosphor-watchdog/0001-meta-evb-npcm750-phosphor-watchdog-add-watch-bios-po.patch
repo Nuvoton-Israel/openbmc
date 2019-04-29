@@ -1,0 +1,59 @@
+From 3a45c3ad3b1257f04871c08a0fff060d789ebaab Mon Sep 17 00:00:00 2001
+From: CH Li <chli30@nuvoton.com>
+Date: Mon, 29 Apr 2019 15:56:17 +0800
+Subject: [PATCH] meta-evb-npcm750: phosphor-watchdog: add watch bios post code
+
+---
+ mainapp.cpp  |  9 +++++++++
+ watchdog.cpp | 15 +++++++++++++++
+ 2 files changed, 24 insertions(+)
+
+diff --git a/mainapp.cpp b/mainapp.cpp
+index b98b108..98c1223 100644
+--- a/mainapp.cpp
++++ b/mainapp.cpp
+@@ -214,6 +214,15 @@ int main(int argc, char* argv[])
+         Watchdog watchdog(bus, path.c_str(), event, std::move(actionTargetMap),
+                           std::move(fallback));
+ 
++        std::optional<sdbusplus::bus::match::match> watchPostcodeMatch;
++        watchPostcodeMatch.emplace(
++            bus,
++            sdbusplus::bus::match::rules::propertiesChanged(
++                "/xyz/openbmc_project/state/boot/raw",
++                "xyz.openbmc_project.State.Boot.Raw"),
++            std::bind(&Watchdog::resetTimeRemaining, std::ref(watchdog),
++                      false));
++
+         // Claim the bus
+         bus.request_name(service.c_str());
+ 
+diff --git a/watchdog.cpp b/watchdog.cpp
+index aed0443..88b2800 100644
+--- a/watchdog.cpp
++++ b/watchdog.cpp
+@@ -29,6 +29,21 @@ void Watchdog::resetTimeRemaining(bool enableWatchdog)
+     {
+         enabled(true);
+     }
++
++    // Get BIOS POST CODE value from DBus
++    sdbusplus::message::variant<uint64_t> Value = 0;
++    auto method = this->bus.new_method_call(
++        "xyz.openbmc_project.State.Boot.Raw", "/xyz/openbmc_project/state/boot/raw",
++        "org.freedesktop.DBus.Properties", "Get");
++
++    method.append("xyz.openbmc_project.State.Boot.Raw", "Value");
++
++    auto reply = this->bus.call(method);
++    reply.read(Value);
++
++    // Disable Watchdog when Host PC boot successfully
++    if (sdbusplus::message::variant_ns::get<uint64_t>(Value) == 160) // BIOS POST CODE: 0xa0
++        enabled(false);
+ }
+ 
+ // Enable or disable watchdog
+-- 
+2.17.1
+
