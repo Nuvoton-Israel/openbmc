@@ -1,0 +1,38 @@
+From c0f1032b205d83b9afd2541c59322555da35c43d Mon Sep 17 00:00:00 2001
+From: CH Li <chli30@nuvoton.com>
+Date: Wed, 24 Apr 2019 18:07:45 +0800
+Subject: [PATCH] disable watchdog when host boot successfully
+
+---
+ watchdog.cpp | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/watchdog.cpp b/watchdog.cpp
+index d529746..32c559a 100644
+--- a/watchdog.cpp
++++ b/watchdog.cpp
+@@ -29,6 +29,21 @@ void Watchdog::resetTimeRemaining(bool enableWatchdog)
+     {
+         enabled(true);
+     }
++
++    // Get BIOS POST CODE value from DBus
++    sdbusplus::message::variant<uint64_t> Value = 0;
++    auto method = this->bus.new_method_call(
++        "xyz.openbmc_project.State.Boot.Raw", "/xyz/openbmc_project/state/boot/raw",
++        "org.freedesktop.DBus.Properties", "Get");
++
++    method.append("xyz.openbmc_project.State.Boot.Raw", "Value");
++
++    auto reply = this->bus.call(method);
++    reply.read(Value);
++
++    // Disable Watchdog when Host PC boot successfully
++    if (sdbusplus::message::variant_ns::get<uint64_t>(Value) == 160) // BIOS POST CODE: 0xa0
++        enabled(false);
+ }
+ 
+ // Enable or disable watchdog
+-- 
+2.17.1
+
