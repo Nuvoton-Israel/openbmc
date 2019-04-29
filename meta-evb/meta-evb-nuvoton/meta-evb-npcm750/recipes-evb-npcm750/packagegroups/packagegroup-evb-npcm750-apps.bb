@@ -46,4 +46,5 @@ RDEPENDS_${PN}-system = " \
 		phosphor-image-signing \
 		openssl-bin \
 		iperf2 \
+		phosphor-host-postd \
         "
