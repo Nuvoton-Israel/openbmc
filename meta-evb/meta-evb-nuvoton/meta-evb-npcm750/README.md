@@ -47,6 +47,7 @@ Please submit any patches against the NPCM750 evaluation board layer to the main
     + [Sensor](#sensor)
     + [LED](#led)
     + [FAN](#fan)
+    + [BIOS POST Code](#bios-post-code)
   * [IPMI / DCMI](#ipmi--dcmi)
     + [SOL IPMI](#sol-ipmi)
     + [Message Bridging](#message-bridging)
@@ -832,6 +833,51 @@ Default Web-UI only show one Fan Tach Fan1, and Poleg support four Fan Tach. Thu
 
 **Maintainer**  
 * Oshri Alkoby
+* Tim Lee
+
+
+### BIOS POST Code
+In Poleg, we support a FIFO for monitoring BIOS POST Code. Typically, this feature is used by the BMC to "watch" host boot progress via port 0x80 writes made by the BIOS during the boot process.
+
+**Source URL**
+
+This is a patch for enabling BIOS POST Code feature in [phosphor-host-postd](https://github.com/openbmc/phosphor-host-postd) on Nuvoton's NPCM750.
+It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) and Supermicro MBD-X9SCL-F-0.
+
+* [https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/host/phosphor-host-postd](https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/host/phosphor-host-postd)
+  
+    **How to use**  
+    * Prepare a Poleg EVB with up-to-date boot block, Uboot and OpenBMC versions with this BIOS POST Code patch applied.  Check with Nuvoton support for the most recent versions.
+
+    * Prepare a Supermicro MBD-X9SCL-F-0 motherboard and a LPC cable.
+
+    * Connect pins of the **JTPM** header on **Supermicro MBD-X9SCL-F-0** to the **J10** header on **Poleg EVB** with the LPC cable:
+
+      Connect **pin 1-3, 5, 7-8, 10-12, 15-17** of JTPM with corresponding pins of J10, **one on one**.
+
+    * Execute BIOS POST Code test program by command in Poleg  
+      ```
+      snooper  
+      ```
+      
+      This command will trigger snooper test program to record BIOS POST Code from port 0x80 of host and save to file with timestamp filename in Poleg for each host power on or reset.
+      > _Saved filename format example: 2019_4_30_11_52_35_ON_  
+
+    * Server Power on
+
+      Press `Power on` button from `Server control` ->`Server power operations` of WebUI.  
+      During server power on, snooper test program will print received BIOS POST Code on screen and record to file in Poleg at the same time.
+      > _Snooper test program print received BIOS POST Code example:_  
+        > _recv: 0x3  
+           recv: 0x2  
+           recv: 0x7_  
+
+      > _AMI BIOS POST Code for Supermicro MBD-X9SCL-F-0:  
+         0x3: North Bridge initialization before microcode loading  
+         0x2: AP initialization before microcode loading  
+         0x7: AP initialization after microcode loading_  
+
+**Maintainer**  
 * Tim Lee
 
 
