@@ -1,6 +1,6 @@
-commit 41452d511f3224a9607267f06292f8954d9a1918
+commit 73835fdbaffa67a3dc60453ed765b755fb4089d3
 Author: YSChu <yschu@nuvoton.com>
-Date:   Tue Feb 12 13:36:15 2019 +0800
+Date:   Fri May 3 13:37:16 2019 +0800
 
     phosphor-ipmi-host: support SendMessage/GetMessage commands
 
@@ -368,15 +368,15 @@ index 0000000..b25b6a6
 +} // namespace phosphor
 diff --git a/messagehandler.cpp b/messagehandler.cpp
 new file mode 100644
-index 0000000..63ff77f
+index 0000000..ed5ecd9
 --- /dev/null
 +++ b/messagehandler.cpp
-@@ -0,0 +1,190 @@
+@@ -0,0 +1,200 @@
 +#include <numeric>
 +#include <phosphor-logging/log.hpp>
 +#include <phosphor-logging/elog-errors.hpp>
-+#include <host-ipmid/ipmid-api.h>
-+#include <host-ipmid/ipmid-host-cmd.hpp>
++#include <ipmid/api.h>
++#include <ipmid-host/cmd.hpp>
 +#include "config.h"
 +#include "transporthandler.hpp"
 +#include "ipmb-msg-queue.hpp"
@@ -390,6 +390,8 @@ index 0000000..63ff77f
 +#define CHANNEL_IPMB 	2
 +#define IPMB_MIN_SIZE	7
 +
++const char *ipmbBus = "xyz.openbmc_project.Ipmi.Channel.Ipmb";
++const char *ipmbObj = "/xyz/openbmc_project/Ipmi/Channel/Ipmb";
 +const char *HOST_IPMI_OBJ = "/org/openbmc/HostIpmi";
 +const char *IPMB_INTF = "org.openbmc.Ipmb";
 +
@@ -414,7 +416,7 @@ index 0000000..63ff77f
 +    uint8_t *p = (uint8_t*) request;
 +    int channel = (*p) & CHANNEL_MASK;
 +    uint16_t req_len = *data_len;
-+    uint8_t ipmb_netfn, lun, ipmb_cmd, seq;
++    uint8_t ipmb_netfn, lun, ipmb_cmd, ipmbCh;
 +    IPMB_HEADER *ipmbBuffer = (IPMB_HEADER *)(p + 1);
 +    // Status code.
 +    ipmi_ret_t rc = IPMI_CC_OK;
@@ -458,15 +460,23 @@ index 0000000..63ff77f
 +
 +    ipmb_netfn = ipmbBuffer->Header.Req.rsNetFnLUN >> 2; //netfn
 +    lun = 0x2;  //rqLun = SMS lun (10b)
-+    seq = ipmbBuffer->Header.Req.rqSeqLUN >> 2;  //rqSeq
++    //seq = ipmbBuffer->Header.Req.rqSeqLUN >> 2;  //rqSeq
++	ipmbCh = 0;
 +    ipmb_cmd = ipmbBuffer->Header.Req.cmd;
 +    std::vector<uint8_t> ipmbdata(p+8, p+req_len);
 +
 +    sdbusplus::bus::bus bus(ipmid_get_sd_bus_connection());
++    //sdbusplus::message::message mesg =
++    //    bus.new_signal(HOST_IPMI_OBJ, IPMB_INTF, "sendRequest");
++    //mesg.signal_send();
 +    sdbusplus::message::message mesg =
-+        bus.new_signal(HOST_IPMI_OBJ, IPMB_INTF, "sendRequest");
-+    mesg.append(seq, ipmb_netfn, lun, ipmb_cmd, ipmbdata);
-+    mesg.signal_send();
++        bus.new_method_call(ipmbBus, ipmbObj, IPMB_INTF, "sendRequest");
++    mesg.append(ipmbCh, ipmb_netfn, lun, ipmb_cmd, ipmbdata);
++    auto reply = bus.call(mesg);
++    if (reply.is_method_error()) {
++        log<level::ERR>("method error: sendRequest");
++	    rc = IPMI_CC_INVALID;
++    }
 +
 +    return rc;
 +}
@@ -540,7 +550,7 @@ index 0000000..63ff77f
 +static const sdbusplus::vtable::vtable_t ipmbVtable[] = {
 +    sdbusplus::vtable::start(),
 +    sdbusplus::vtable::method("returnRawResponse", "ay", "x", ipmi_return_response),
-+    sdbusplus::vtable::signal("sendRequest", "yyyyay"),
++    //sdbusplus::vtable::signal("sendRequest", "yyyyay"),
 +    sdbusplus::vtable::end()};
 +
 +#include <unistd.h>
