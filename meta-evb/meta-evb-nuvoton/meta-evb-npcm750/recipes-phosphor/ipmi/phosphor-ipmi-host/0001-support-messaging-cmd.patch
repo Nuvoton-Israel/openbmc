@@ -1,11 +1,11 @@
-commit 41452d511f3224a9607267f06292f8954d9a1918
+commit 5ba6f36a6346e897270947be44ad624af77a8f65
 Author: YSChu <yschu@nuvoton.com>
-Date:   Tue Feb 12 13:36:15 2019 +0800
+Date:   Fri May 3 16:09:31 2019 +0800
 
-    phosphor-ipmi-host: support SendMessage/GetMessage commands
+    send/get message
 
 diff --git a/Makefile.am b/Makefile.am
-index ac8449e..abbe151 100644
+index ac8449e..8d83fe2 100644
 --- a/Makefile.am
 +++ b/Makefile.am
 @@ -14,7 +14,8 @@ ipmid_SOURCES = \
@@ -18,14 +18,16 @@ index ac8449e..abbe151 100644
  nodist_ipmid_SOURCES = ipmiwhitelist.cpp
  
  libipmi20_BUILT_LIST = \
-@@ -91,6 +92,7 @@ libipmi20_la_SOURCES = \
- 	ipmi_fru_info_area.cpp \
- 	read_fru_data.cpp \
- 	sensordatahandler.cpp \
-+	messagehandler.cpp \
- 	$(libipmi20_BUILT_LIST)
- 
- @CODE_COVERAGE_RULES@
+@@ -133,7 +134,8 @@ libsysintfcmds_la_LIBADD = \
+ 	libipmid-host/libipmid-host.la
+ libsysintfcmds_la_SOURCES = \
+ 	systemintfcmds.cpp \
+-	host-interface.cpp
++	host-interface.cpp \
++	messagehandler.cpp
+ libsysintfcmds_la_LDFLAGS = \
+ 	$(SYSTEMD_LIBS) \
+ 	$(libmapper_LIBS) \
 diff --git a/ipmb-msg-queue.cpp b/ipmb-msg-queue.cpp
 new file mode 100644
 index 0000000..3a674a8
@@ -368,15 +370,15 @@ index 0000000..b25b6a6
 +} // namespace phosphor
 diff --git a/messagehandler.cpp b/messagehandler.cpp
 new file mode 100644
-index 0000000..63ff77f
+index 0000000..ed5ecd9
 --- /dev/null
 +++ b/messagehandler.cpp
-@@ -0,0 +1,190 @@
+@@ -0,0 +1,200 @@
 +#include <numeric>
 +#include <phosphor-logging/log.hpp>
 +#include <phosphor-logging/elog-errors.hpp>
-+#include <host-ipmid/ipmid-api.h>
-+#include <host-ipmid/ipmid-host-cmd.hpp>
++#include <ipmid/api.h>
++#include <ipmid-host/cmd.hpp>
 +#include "config.h"
 +#include "transporthandler.hpp"
 +#include "ipmb-msg-queue.hpp"
@@ -390,6 +392,8 @@ index 0000000..63ff77f
 +#define CHANNEL_IPMB 	2
 +#define IPMB_MIN_SIZE	7
 +
++const char *ipmbBus = "xyz.openbmc_project.Ipmi.Channel.Ipmb";
++const char *ipmbObj = "/xyz/openbmc_project/Ipmi/Channel/Ipmb";
 +const char *HOST_IPMI_OBJ = "/org/openbmc/HostIpmi";
 +const char *IPMB_INTF = "org.openbmc.Ipmb";
 +
@@ -414,7 +418,7 @@ index 0000000..63ff77f
 +    uint8_t *p = (uint8_t*) request;
 +    int channel = (*p) & CHANNEL_MASK;
 +    uint16_t req_len = *data_len;
-+    uint8_t ipmb_netfn, lun, ipmb_cmd, seq;
++    uint8_t ipmb_netfn, lun, ipmb_cmd, ipmbCh;
 +    IPMB_HEADER *ipmbBuffer = (IPMB_HEADER *)(p + 1);
 +    // Status code.
 +    ipmi_ret_t rc = IPMI_CC_OK;
@@ -458,15 +462,23 @@ index 0000000..63ff77f
 +
 +    ipmb_netfn = ipmbBuffer->Header.Req.rsNetFnLUN >> 2; //netfn
 +    lun = 0x2;  //rqLun = SMS lun (10b)
-+    seq = ipmbBuffer->Header.Req.rqSeqLUN >> 2;  //rqSeq
++    //seq = ipmbBuffer->Header.Req.rqSeqLUN >> 2;  //rqSeq
++	ipmbCh = 0;
 +    ipmb_cmd = ipmbBuffer->Header.Req.cmd;
 +    std::vector<uint8_t> ipmbdata(p+8, p+req_len);
 +
 +    sdbusplus::bus::bus bus(ipmid_get_sd_bus_connection());
++    //sdbusplus::message::message mesg =
++    //    bus.new_signal(HOST_IPMI_OBJ, IPMB_INTF, "sendRequest");
++    //mesg.signal_send();
 +    sdbusplus::message::message mesg =
-+        bus.new_signal(HOST_IPMI_OBJ, IPMB_INTF, "sendRequest");
-+    mesg.append(seq, ipmb_netfn, lun, ipmb_cmd, ipmbdata);
-+    mesg.signal_send();
++        bus.new_method_call(ipmbBus, ipmbObj, IPMB_INTF, "sendRequest");
++    mesg.append(ipmbCh, ipmb_netfn, lun, ipmb_cmd, ipmbdata);
++    auto reply = bus.call(mesg);
++    if (reply.is_method_error()) {
++        log<level::ERR>("method error: sendRequest");
++	    rc = IPMI_CC_INVALID;
++    }
 +
 +    return rc;
 +}
@@ -540,7 +552,7 @@ index 0000000..63ff77f
 +static const sdbusplus::vtable::vtable_t ipmbVtable[] = {
 +    sdbusplus::vtable::start(),
 +    sdbusplus::vtable::method("returnRawResponse", "ay", "x", ipmi_return_response),
-+    sdbusplus::vtable::signal("sendRequest", "yyyyay"),
++    //sdbusplus::vtable::signal("sendRequest", "yyyyay"),
 +    sdbusplus::vtable::end()};
 +
 +#include <unistd.h>
