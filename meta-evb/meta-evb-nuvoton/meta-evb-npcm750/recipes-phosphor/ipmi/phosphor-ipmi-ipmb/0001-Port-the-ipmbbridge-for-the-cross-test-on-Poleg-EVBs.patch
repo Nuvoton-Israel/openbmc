@@ -1,0 +1,267 @@
+From 0f18ca1e67eb7f6d053182791008e1c5c4f0e815 Mon Sep 17 00:00:00 2001
+From: kfting <kfting@nuvoton.com>
+Date: Tue, 7 May 2019 14:24:06 +0800
+Subject: [PATCH] Port the ipmbbridge for the cross test on Poleg EVBs.
+
+1. It takes two Poleg EVBs to test the ipmbbridge functionality.
+
+Signed-off-by: kfting <kfting@nuvoton.com>
+---
+ ipmbbridged.cpp | 121 ++++++++++++++++++++++++++++++++++++++++++------
+ ipmbbridged.hpp |   8 +++-
+ 2 files changed, 115 insertions(+), 14 deletions(-)
+
+diff --git a/ipmbbridged.cpp b/ipmbbridged.cpp
+index 2f78cd0..b0bb080 100644
+--- a/ipmbbridged.cpp
++++ b/ipmbbridged.cpp
+@@ -18,11 +18,14 @@
+ #include "ipmbdefines.hpp"
+ #include "ipmbutils.hpp"
+ 
+-#include <linux/i2c-dev-user.h>
+-
+ #include <phosphor-logging/log.hpp>
+ #include <tuple>
+ 
++extern "C" {
++#include <i2c/smbus.h>
++#include <linux/i2c-dev.h>
++}
++
+ /**
+  * @brief Dbus
+  */
+@@ -30,6 +33,8 @@ static constexpr const char *ipmbBus = "xyz.openbmc_project.Ipmi.Channel.Ipmb";
+ static constexpr const char *ipmbObj = "/xyz/openbmc_project/Ipmi/Channel/Ipmb";
+ static constexpr const char *hostIpmiIntf = "org.openbmc.HostIpmi";
+ static constexpr const char *ipmbDbusIntf = "org.openbmc.Ipmb";
++static constexpr const char *HOST_IPMI_OBJ = "/org/openbmc/HostIpmi";
++static constexpr const char *ipmiBus = "xyz.openbmc_project.Ipmi.Host";
+ 
+ boost::asio::io_service io;
+ auto conn = std::make_shared<sdbusplus::asio::connection>(io);
+@@ -40,11 +45,12 @@ auto conn = std::make_shared<sdbusplus::asio::connection>(io);
+  */
+ static const std::vector<IpmbChannelConfig> ipmbChannelsConfig = {
+     // ME channel
+-    {ipmbChannelType::me, "/sys/bus/i2c/devices/5-1010/slave-mqueue",
+-     "/dev/i2c-5", 0x20, 0x2C}, // 8 bit addresses
++    {ipmbChannelType::ipmb, "/sys/bus/i2c/devices/4-1010/slave-mqueue",
++     "/dev/i2c-4", 0x20, 0x58}//, // 7 bit addresses
+     // IPMB header channel
+-    {ipmbChannelType::ipmb, "/sys/bus/i2c/devices/0-1010/slave-mqueue",
+-     "/dev/i2c-0", 0x20, 0x58}}; // 8 bit addresses
++    //{ipmbChannelType::ipmb, "/sys/bus/i2c/devices/0-1010/slave-mqueue",
++     //"/dev/i2c-0", 0x20, 0x58}}; // 8 bit addresses
++ };
+ 
+ static std::list<IpmbChannel> ipmbChannels;
+ 
+@@ -198,6 +204,7 @@ void IpmbResponse::i2cToIpmbConstruct(IPMB_HEADER *ipmbBuffer,
+     cmd = ipmbBuffer->Header.Resp.cmd;
+     completionCode = ipmbBuffer->Header.Resp.completionCode;
+ 
++
+     size_t dataLength =
+         bufferLength - (ipmbConnectionHeaderLength +
+                         ipmbResponseDataHeaderLength + ipmbChecksumSize);
+@@ -244,6 +251,34 @@ int IpmbResponse::ipmbToi2cConstruct(std::vector<uint8_t> &buffer)
+     return 0;
+ }
+ 
++size_t IpmbResponse::ipmbToRMQConstruct(
++    std::array<uint8_t, ipmbMaxFrameLength> &buffer, size_t bufferLength)
++{
++    
++    auto ipmbBuffer = reinterpret_cast<IPMB_HEADER *>(buffer.data());
++    //@@: According to IPMI spec. 7-3 & 7-4, the rqSA would be the BMC addr 0x20.
++    //@@: Also, the rsSA address would be the slave dev addr.
++    ipmbBuffer->Header.Resp.address = BMC_ADR;
++    //ipmbBuffer->Header.Resp.rqNetFnLUN = ipmbNetFnLunSet(netFn, rqLun);
++    //ipmbBuffer->Header.Resp.rsSA = rsSA;
++    //ipmbBuffer->Header.Resp.rsSeqLUN = ipmbSeqLunSet(seq, rsLun);
++    //ipmbBuffer->Header.Resp.cmd = cmd;
++    //ipmbBuffer->Header.Resp.completionCode = completionCode;
++
++    ipmbBuffer->Header.Resp.checksum1 = ipmbChecksumCompute(
++        &buffer[0], ipmbConnectionHeaderLength - ipmbChecksumSize);
++    
++    size_t dataLength =
++        bufferLength - (ipmbConnectionHeaderLength +
++                        ipmbResponseDataHeaderLength + ipmbChecksumSize);
++
++    buffer[bufferLength - ipmbChecksumSize] =
++        ipmbChecksumCompute(&buffer[ipmbChecksum2StartOffset],
++                            (ipmbResponseDataHeaderLength + dataLength ));
++
++    return bufferLength;
++}
++
+ bool IpmbCommandFilter::isBlocked(const uint8_t reqNetFn, const uint8_t cmd)
+ {
+     auto blockedCmd = unhandledCommands.find({reqNetFn, cmd});
+@@ -348,9 +383,17 @@ void IpmbChannel::responseMatch(std::unique_ptr<IpmbResponse> &response)
+         {
+             // match, response is corresponding to previously sent request
+             request->state = ipmbRequestState::matched;
+-            request->timer->cancel();
++            if(SMS_LUN != (request->rqLun))
++            {
++                //phosphor::logging::log<phosphor::logging::level::ERR>("timer cancel!");
++                request->timer->cancel();
++            }
+             request->matchedResponse = std::move(response);
+         }
++
++        if(SMS_LUN == (request->rqLun) ){
++            makeRequestInvalid(*request);
++        }
+     }
+ }
+ 
+@@ -379,9 +422,33 @@ void IpmbChannel::processI2cEvent()
+             std::make_unique<IpmbResponse>();
+ 
+         ipmbMessageReceived->i2cToIpmbConstruct(ipmbFrame, r);
+-
++       
+         // try to match response with outstanding request
+         responseMatch(ipmbMessageReceived);
++        //phosphor::logging::log<phosphor::logging::level::ERR>("resp recv!");
++        if(SMS_LUN == ipmbLunFromNetFnLunGet(ipmbFrame->Header.Resp.rqNetFnLUN) )
++        {
++            auto mesg = conn->new_method_call(
++                      ipmiBus, HOST_IPMI_OBJ, ipmbDbusIntf, 
++                      "returnRawResponse");
++            //std::array<uint8_t, ipmbMaxFrameLength> buffer2{};
++            std::vector<uint8_t> dataReceived;
++            dataReceived.reserve(ipmbMaxFrameLength);
++
++            ipmbFrame->Header.Resp.rsSA = getRqSlaveAddress();
++
++            ipmbMessageReceived->ipmbToRMQConstruct(buffer, r);
++            dataReceived.insert(dataReceived.end(), &buffer[0],
++                        &buffer[r]);
++
++            mesg.append(dataReceived);
++            sdbusplus::message::message resp = conn->call(mesg);
++
++            if (resp.is_method_error())
++            {
++                phosphor::logging::log<phosphor::logging::level::ERR>("method error: sending response to the client app");
++            }
++        }
+     }
+     else
+     {
+@@ -402,7 +469,8 @@ void IpmbChannel::processI2cEvent()
+                 // prepare generic response
+                 auto ipmbResponse =
+                     IpmbResponse(ipmbRqSlaveAddress, ipmbRespNetFn(netFn), lun,
+-                                 ipmbBmcSlaveAddress, seq, ipmbRsLun, cmd,
++                                 //ipmbBmcSlaveAddress, seq, ipmbRsLun, cmd,
++                                 ipmbBmcSlaveAddress, seq, (SMS_LUN == lun)? lun : ipmbRsLun, cmd,
+                                  ipmbIpmiInvalidCommand, data);
+ 
+                 std::shared_ptr<std::vector<uint8_t>> buffer =
+@@ -562,6 +630,15 @@ std::tuple<int, uint8_t, uint8_t, uint8_t, uint8_t, std::vector<uint8_t>>
+             break;
+         }
+ 
++        if(SMS_LUN == request->rqLun)
++        {
++            // When the request's LUN is 0x2, just return to ipmid directly
++            // without waiting.
++            //phosphor::logging::log<phosphor::logging::level::ERR>(
++            //        "requestAdd: msg rec!");
++            return returnStatus(ipmbResponseStatus::success);
++        }
++
+         request->timer->expires_after(
+             std::chrono::milliseconds(ipmbRequestRetryTimeout));
+         request->timer->async_wait(yield[ec]);
+@@ -577,10 +654,21 @@ std::tuple<int, uint8_t, uint8_t, uint8_t, uint8_t, std::vector<uint8_t>>
+ 
+         if (request->state == ipmbRequestState::matched)
+         {
+-            // matched response, send it to client application
+-            makeRequestInvalid(*request);
+-            return request->returnMatchedResponse();
++            //phosphor::logging::log<phosphor::logging::level::ERR>(
++            //        "request matched!!!");
++            //if(SMS_LUN != request->rqLun)
++            //{
++                // matched response, send it to client application
++                makeRequestInvalid(*request);
++                return request->returnMatchedResponse();
++            //}
++            //else
++            //{
++            //    makeRequestInvalid(*request);
++            //    return returnStatus(ipmbResponseStatus::success);
++            //}
+         }
++
+     }
+ 
+     makeRequestInvalid(*request);
+@@ -661,6 +749,12 @@ auto ipmbSendMessage = [](uint8_t seq, uint8_t netfn, uint8_t lun, uint8_t cmd,
+ 
+         // response received
+         // dataReceived is empty after constructor invocation
++        /*
++        std::unique_ptr<IpmbResponse> ipmbMessageReceived =
++            std::make_unique<IpmbResponse>(rqSlaveAddress, netfn, lun,
++                                           bmcSlaveAddress, seq, lun, cmd, cc,
++                                           dataReceived);
++        */
+         std::unique_ptr<IpmbResponse> ipmbMessageReceived =
+             std::make_unique<IpmbResponse>(rqSlaveAddress, netfn, lun,
+                                            bmcSlaveAddress, seq, lun, cmd, cc,
+@@ -708,7 +802,8 @@ auto ipmbHandleRequest = [](boost::asio::yield_context yield,
+ 
+     // construct the request to add it to outstanding request list
+     std::shared_ptr<IpmbRequest> request = std::make_shared<IpmbRequest>(
+-        rqSlaveAddress, netfn, ipmbRsLun, bmcSlaveAddress, seqNum, lun, cmd,
++        //rqSlaveAddress, netfn, ipmbRsLun, bmcSlaveAddress, seqNum, lun, cmd,
++        rqSlaveAddress, netfn, (SMS_LUN == lun)? lun : ipmbRsLun, bmcSlaveAddress, seqNum, lun, cmd,
+         dataReceived);
+ 
+     if (!request->timer)
+diff --git a/ipmbbridged.hpp b/ipmbbridged.hpp
+index c139391..5a54d81 100644
+--- a/ipmbbridged.hpp
++++ b/ipmbbridged.hpp
+@@ -71,6 +71,9 @@ constexpr uint8_t ipmbLunMask = 0x03;
+ constexpr uint8_t ipmbSeqMask = 0x3F;
+ constexpr uint8_t ipmbRsLun = 0x0;
+ 
++constexpr uint8_t SMS_LUN = 0x2;
++constexpr uint8_t BMC_ADR = 0x20;
++
+ /**
+  * @brief Ipmb setters
+  */
+@@ -86,7 +89,8 @@ constexpr uint8_t ipmbSeqLunSet(uint8_t seq, uint8_t lun)
+ 
+ constexpr uint8_t ipmbAddressTo7BitSet(uint8_t address)
+ {
+-    return address >> 1;
++    //return address >> 1;
++    return address;
+ }
+ 
+ constexpr uint8_t ipmbRespNetFn(uint8_t netFn)
+@@ -188,6 +192,8 @@ struct IpmbResponse
+     void i2cToIpmbConstruct(IPMB_HEADER *ipmbBuffer, size_t bufferLength);
+ 
+     int ipmbToi2cConstruct(std::vector<uint8_t> &buffer);
++
++    size_t ipmbToRMQConstruct(std::array<uint8_t, ipmbMaxFrameLength> &buffer, size_t bufferLength);
+ };
+ 
+ /**
+-- 
+2.17.1
+

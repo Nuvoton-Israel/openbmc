@@ -47,4 +47,5 @@ RDEPENDS_${PN}-system = " \
 		openssl-bin \
 		bmcweb \
 		phosphor-host-postd \
+		phosphor-ipmi-ipmb \
         "
