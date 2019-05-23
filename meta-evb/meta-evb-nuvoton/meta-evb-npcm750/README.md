@@ -48,6 +48,7 @@ Please submit any patches against the NPCM750 evaluation board layer to the main
     + [LED](#led)
     + [FAN](#fan)
     + [BIOS POST Code](#bios-post-code)
+	+ [FRU](#fru)
   * [IPMI / DCMI](#ipmi--dcmi)
     + [SOL IPMI](#sol-ipmi)
     + [Message Bridging](#message-bridging)
@@ -876,6 +877,81 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
          0x3: North Bridge initialization before microcode loading  
          0x2: AP initialization before microcode loading  
          0x7: AP initialization after microcode loading_  
+
+**Maintainer**  
+* Tim Lee
+
+### FRU
+<img align="right" width="30%" src="https://cdn.rawgit.com/NTC-CCBG/snapshots/d95b6d0/openbmc/fru.png">
+
+Field Replaceable Unit. The FRU Information is used to primarily to provide “inventory” information about the boards that the FRU Information Device is located on. In Poleg, we connect EEPROM component as FRU Information Device to support this feature. Typically, this feature is used by the BMC to "monitor" host server health about H/W copmonents status.
+
+**Source URL**
+
+This is a patch for enabling FRU feature in [phosphor-impi-fru](https://github.com/openbmc/ipmi-fru-parser) on Nuvoton's NPCM750.
+It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) with Atmel 24c04 EEPROM copmonent.
+
+* [https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/ipmi](https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/ipmi)
+  
+    **How to use**  
+    * Prepare a Poleg EVB with up-to-date boot block, Uboot and OpenBMC versions with this FRU patch applied.  Check with Nuvoton support for the most recent versions.
+
+    * Prepare a Atmel 24c04 EEPROM component, then connect **SCL pin** with pull up resistor 3.3V to **pin 1** and **SDA pin** with pull up resistor 3.3V to **pin 2** of **J4** SMBus header on **Poleg EVB**. The other **pins WP/A1/A2** connect to GND and **pin A0** no connect.
+      > _Here, we connect Atmel 24c04 eeprom i2c device to i2c bus 3 in Poleg for verify FRU. Thus, if you connect to the other i2c bus then you need to remeber modify related DTS for this i2c device_  
+
+      For example about DTS **nuvoton-npcm750-evb.dts**:
+      ```
+      i2c3: i2c@83000 {
+      #address-cells = <1>;
+      #size-cells = <0>;
+      bus-frequency = <100000>;
+      status = "okay";
+
+      eeprom@50 {
+            compatible = "atmel,24c04";
+            pagesize = <16>;
+            reg = <0x50>;
+        };  
+        ```
+
+       According DTS modification, you also need to remember modify your EEPROM file description content about **SYSFS_PATH** and **FRUID**. Below is example for our EEPROM file description **motherboard**:
+       ```
+       SYSFS_PATH=/sys/bus/i2c/devices/3-0050/eeprom
+       FRUID=1  
+       ```
+       **SYSFS_PATH** is the path according your DTS setting and **FRUID** is arbitrary number but need to match **Fruid** in **config.yaml** file. Below is example for when **Fruid** set as 1:  
+       ```
+       1: #Fruid
+         /system/chassis/motherboard:
+           entityID: 7
+           entityInstance: 1
+           interfaces:
+             xyz.openbmc_project.Inventory.Decorator.Asset:
+               BuildDate:
+                 IPMIFruProperty: Mfg Date
+                 IPMIFruSection: Board
+               PartNumber:
+                 IPMIFruProperty: Part Number
+                 IPMIFruSection: Board
+               Manufacturer:
+                 IPMIFruProperty: Manufacturer
+                 IPMIFruSection: Board
+               SerialNumber:
+                 IPMIFruProperty: Serial Number
+                 IPMIFruSection: Board
+             xyz.openbmc_project.Inventory.Item:
+               PrettyName:
+                 IPMIFruProperty: Name
+                 IPMIFruSection: Board
+             xyz.openbmc_project.Inventory.Decorator.Revision:
+               Version:
+                 IPMIFruProperty: FRU File ID
+                 IPMIFruSection: Board  
+       ```
+
+    * Server health
+
+      Select `Server health` -> `Hardware status` on **Web-UI** will show FRU Board Info/Chassis Info/Product Info area.  
 
 **Maintainer**  
 * Tim Lee
@@ -1739,3 +1815,4 @@ image-rwfs    |  0 MB  | middle layer of the overlayfs, rw files in this partiti
 * 2019.03.13 Modify Server power operation of Server control about How to use
 * 2019.03.19 Update IPMI Comamnds Verified Table
 * 2019.04.08 Update Kernel version to 4.19.16
+* 2019.05.23 Add FRU for Server health
