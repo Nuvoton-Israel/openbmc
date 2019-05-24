@@ -46,6 +46,7 @@ Please submit any patches against the NPCM750 evaluation board layer to the main
     + [Time](#time)
     + [Sensor](#sensor)
     + [LED](#led)
+    + [ADC](#adc)
     + [FAN](#fan)
     + [BIOS POST Code](#bios-post-code)
 	+ [FRU](#fru)
@@ -803,6 +804,42 @@ Turning on ServerLED will make **hearbeat** and **identify** leds on EVB start b
 
 * Oshri Alkoby
 * Stanley Chu
+
+### ADC
+<img align="right" width="30%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/7710feb/openbmc/adc.png">  
+The NPCM750 contains an Analog-to-Digital Converter (ADC) interface that supports eight-channel inputs.  
+The ADC output value can be showed in Sensors page.  
+
+**Source URL**
+* [https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/sensors/phosphor-hwmon/obmc/hwmon/ahb/apb/adc%40c000.conf](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/sensors/phosphor-hwmon/obmc/hwmon/ahb/apb/adc%40c000.conf)  
+
+**How to use**  
+ * Add ADC configuration file(adc@c000.conf)  
+   ```
+   LABEL_in1 = "adc1"
+   LABEL_in2 = "adc2"
+   LABEL_in3 = "adc3"
+   LABEL_in4 = "adc4"
+   LABEL_in5 = "adc5"
+   LABEL_in6 = "adc6"
+   LABEL_in7 = "adc7"
+   LABEL_in8 = "adc8"
+   ```  
+   NOTE: For the LABEL assignment like LABEL_$(key) = $(value), the $(key) must have corresponding hwmon sysfs file in /sys/class/hwmon/hwmonN/$(key)_input
+
+ * Add configuration file to rootfs, modify phosphor-hwmon_%.bbappend
+   ```
+   FENVS = "obmc/hwmon/ahb/apb/{0}"
+   ADC_ITEMS = "adc@c000.conf"
+   SYSTEMD_ENVIRONMENT_FILE_${PN} += "${@compose_list(d, 'FENVS', 'ADC_ITEMS')}"
+   ```
+ * output 1.15v to ADC channel3 input in Poleg EVB(pin 1 of J25) 
+ * check ADC3 Voltage value in Web Sensors page  
+   This value should be closed to 1.15   
+   
+**Maintainer**
+
+* Stanley Chu  
 
 
 ### FAN
