@@ -1,0 +1,29 @@
+From 3a68081fed32d7fe93b04942cf6fda7aa2632214 Mon Sep 17 00:00:00 2001
+From: CH Li <chli30@nuvoton.com>
+Date: Fri, 24 May 2019 13:12:53 +0800
+Subject: [PATCH] fru-modify-dts-for-eeprom
+
+---
+ arch/arm/boot/dts/nuvoton-npcm750-evb.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm/boot/dts/nuvoton-npcm750-evb.dts b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
+index e4a46b871c7c..90815a6c39a5 100644
+--- a/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
++++ b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
+@@ -392,6 +392,12 @@
+ 				#size-cells = <0>;
+ 				bus-frequency = <100000>;
+ 				status = "okay";
++
++				eeprom@50 {
++					compatible = "atmel,24c04";
++					pagesize = <16>;
++					reg = <0x50>;
++				};
+ 			};
+ 
+ 			i2c4: i2c@84000 {
+-- 
+2.17.1
+
