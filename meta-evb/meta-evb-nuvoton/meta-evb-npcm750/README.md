@@ -1028,7 +1028,7 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
     * Launch a command window and navigate to that folder.  
     * Input the following command in the command window.  
       ```
-      ipmiutil sol -N 192.168.0.2 -U admin -P 0penBmc -J 3 -V 4 -a  
+      ipmiutil sol -N 192.168.0.2 -U root -P 0penBmc -J 3 -V 4 -a
       ```
     * (Optional) If the area doesn't display the UEFI setting clearly, the user could press the **Esc** key once.  
 
@@ -1044,7 +1044,7 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
     * Press the "`" key (using the shift key) and "." key at the same time in the command window.  
     * Input the following command in the command window.  
       ```
-      ipmiutil sol -N 192.168.0.2 -U admin -P 0penBmc -J 3 -V 4 -d  
+      ipmiutil sol -N 192.168.0.2 -U root -P 0penBmc -J 3 -V 4 -d
       ```
 
 **Maintainer**
@@ -1104,9 +1104,13 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
 
 6. In the build machine, download [Nuvoton-Israel/openbmc](https://github.com/Nuvoton-Israel/openbmc) git repository.  
 
-    * Download [linux-nuvoton_%.bbappend](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-patches/recipes-kernel/linux/linux-nuvoton_%25.bbappend) and overwrite the same original file located under **meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-kernel/linux** folder in the downloaded openbmc directory of the build machine.  
-    * Download [enable-i2cslave.cfg](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-patches/recipes-kernel/linux/enable-i2cslave.cfg) under **meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-kernel/linux/linux-nuvoton** folder in the downloaded openbmc directory of the build machine.  
-    * Download [0001-meta-evb-npcm750-enable-i2c-slave-function.patch](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-patches/recipes-kernel/linux/0x10/0001-meta-evb-npcm750-enable-i2c-slave-function.patch) under **meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-kernel/linux/linux-nuvoton** folder in the downloaded openbmc directory of the build machine to configure Poleg EVB A's own slave address as **0x10**.  
+    * The patches for Poleg EVB A has already applied to OpenBmc v2.6
+        - [linux-nuvoton_%.bbappend](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-kernel/linux/linux-nuvoton_%25.bbappend)
+        - [0001-Port-the-i2c-mqueue-driver-by-Intel-and-Nuvoton-i2c-.patch](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-kernel/linux/linux-nuvoton/0001-Enable-the-i2c-slave-mqueue-driver-by-Intel.patch)
+        - [phosphor-ipmi-ipmb](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/ipmi/phosphor-ipmi-ipmb)
+        - [phosphor-ipmi-ipmb_%.bbappend](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/ipmi/phosphor-ipmi-ipmb_%25.bbappend)
+        - [enable-slave-mqueue.cfg](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-kernel/linux/linux-nuvoton/enable-slave-mqueue.cfg)
+
     * In the build machine, rebuild the linux kernel for OpenBMC. As an example, enter the following command in a terminal window (build environment is configured in advance):  
       ```
       bitbake -C fetch virtual/kernel
@@ -1118,19 +1122,17 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
 
     * Follow the section **Programming the images** of [Nuvoton-Israel/openbmc](https://github.com/Nuvoton-Israel/openbmc) to program the updated image into Poleg EVB A.
 
-7. Download patches to meet the requirement of step-5 for Poleg EVB B.
+7. Download patch to meet the requirement of step-5 for Poleg EVB B.
 
-    * Download [0001-meta-evb-npcm750-enable-i2c-slave-function.patch](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-patches/recipes-kernel/linux/0x58/0001-meta-evb-npcm750-enable-i2c-slave-function.patch) and overwrite the same original file located under **meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-kernel/linux/linux-nuvoton** folder in the downloaded openbmc directory of the build machine to configure Poleg EVB B's own slave address as **0x58**.  
+    * Download [0001-PATCH-change-i2c-addrees-for-Poleg-EVB-B.patch](https://github.com/Nuvoton-Israel/openbmc/tree/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-patches/0001-PATCH-change-i2c-addrees-for-Poleg-EVB-B.patch) and apply patch by git command to configure Poleg EVB B's own slave address as **0x58** as follow.
+
+      ```
+      git apply -v 0001-PATCH-change-i2c-addrees-for-Poleg-EVB-B.patch
+      ```
+
     * In the build machine, rebuild the linux kernel for OpenBMC. As an example, enter the following command in a terminal window (build environment is configured in advance):  
       ```
       bitbake -C fetch virtual/kernel
-      ```
-
-    * Download [kcs_to_ipmb_message_bridging.patch](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-patches/recipes-phosphor/ipmi/phosphor-ipmi-ipmb/kcs_to_ipmb_message_bridging.patch) under the **meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/ipmi/phosphor-ipmi-ipmb** folder in the downloaded openbmc directory of the build machine.  
-    * In the build machine, open a terminal window and navigate to the **meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/ipmi/phosphor-ipmi-ipmb** folder in the downloaded openbmc directory.  
-    * Enter the following command in the terminal window in the build machine.  
-      ```
-      patch -p1 < ./kcs_to_ipmb_message_bridging.patch
       ```
 
     * In the build machine, rebuild the ipmbbridge for OpenBMC. As an example, enter the following command in a terminal window (build environment is configured in advance):  
