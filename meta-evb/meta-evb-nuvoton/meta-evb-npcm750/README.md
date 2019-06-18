@@ -1106,7 +1106,7 @@ It's verified with Nuvoton's NPCM750 solution (which is referred as Poleg here) 
 
     * The patches for Poleg EVB A has already applied to OpenBmc v2.6
         - [linux-nuvoton_%.bbappend](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-kernel/linux/linux-nuvoton_%25.bbappend)
-        - [0001-Port-the-i2c-mqueue-driver-by-Intel-and-Nuvoton-i2c-.patch](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-kernel/linux/linux-nuvoton/0001-Enable-the-i2c-slave-mqueue-driver-by-Intel.patch)
+        - [0001-Enable-the-i2c-slave-mqueue-driver-by-Intel.patch](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-kernel/linux/linux-nuvoton/0001-Enable-the-i2c-slave-mqueue-driver-by-Intel.patch)
         - [phosphor-ipmi-ipmb](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/ipmi/phosphor-ipmi-ipmb)
         - [phosphor-ipmi-ipmb_%.bbappend](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/ipmi/phosphor-ipmi-ipmb_%25.bbappend)
         - [enable-slave-mqueue.cfg](https://github.com/Nuvoton-Israel/openbmc/blob/master/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-kernel/linux/linux-nuvoton/enable-slave-mqueue.cfg)
@@ -1576,8 +1576,8 @@ Administrator can operate his own machine (guest) to debug CPU on remote server.
 1. Prepare a Poleg EVB and a target board (in our test, we use NUC950).
 2. Connect pins of Jtag on NUC950 to Poleg EVB:
     * Connect Jtag TCK pin to pin2 of J11 on Poleg EVB.
-    * Connect Jtag TDI pin to pin8 of J11 on Poleg EVB.
-    * Connect Jtag TDO pin to pin7 of J11 on Poleg EVB.
+    * Connect Jtag TDI pin to pin7 of J11 on Poleg EVB.
+    * Connect Jtag TDO pin to pin8 of J11 on Poleg EVB.
     * Connect Jtag TMS pin to pin10 of J11 on Poleg EVB.
 3. Prepare Jtag driver module and Jtag socket svc deamon:
     * Jtag driver
@@ -1634,7 +1634,7 @@ The motherboard on server might have CPLD or FPGA components that require downlo
    ```
    bitbake loadsvf
    ```
-3. Copy loadsvf executable binary from build/tmp/work/armv7a-openbmc-linux-gnueabi/loadsvf/<version>/image/usr/bin/ to Poleg EVB.  
+3. Copy loadsvf executable binary from build/tmp/work/armv7a-openbmc-linux-gnueabi/loadsvf/\<version\>/image/usr/bin/ to Poleg EVB.
 4. Put CPLD/FPGA image in USB disk and mount the USB disk on Poleg EVB
 5. run loadsvf on Poleg to program CPLD/FPGA
    ```
