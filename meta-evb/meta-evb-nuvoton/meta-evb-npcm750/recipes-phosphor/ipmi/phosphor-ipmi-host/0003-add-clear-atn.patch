@@ -1,0 +1,117 @@
+diff --git a/ipmb-msg-queue.cpp b/ipmb-msg-queue.cpp
+index 3a674a8..a1cf4dc 100644
+--- a/ipmb-msg-queue.cpp
++++ b/ipmb-msg-queue.cpp
+@@ -22,6 +22,8 @@ constexpr auto MAPPER_INTERFACE = "xyz.openbmc_project.ObjectMapper";
+ constexpr auto HOST_STATE_PATH = "/xyz/openbmc_project/state/host0";
+ constexpr auto HOST_STATE_INTERFACE = "xyz.openbmc_project.State.Host";
+ constexpr auto HOST_TRANS_PROP = "RequestedHostTransition";
++constexpr auto SMS_SET_ATTENTION = "setAttention";
++constexpr auto SMS_CLEAR_ATTENTION = "clearAttention";
+ 
+ // For throwing exceptions
+ using namespace phosphor::logging;
+@@ -56,6 +58,8 @@ IpmbMsg IpmbMessageQueue::GetMessage()
+     {
+ 		std::vector<uint8_t> empty {};
+         log<level::INFO>("Queue is empty!");
++        // clear SMS ATN when queue is empty
++        this->sendAttention(Attention::Clear);
+ 
+         return std::make_pair(0, empty);
+     }
+@@ -97,6 +101,7 @@ void IpmbMessageQueue::clearQueue()
+         this->workQueue.pop();
+ 
+     }
++    this->sendAttention(Attention::Clear);
+ }
+ 
+ // Called for alerting the host
+@@ -104,13 +109,6 @@ void IpmbMessageQueue::checkQueueAndAlertHost()
+ {
+     if (this->workQueue.size() >= 1)
+     {
+-        log<level::DEBUG>("Asserting SMS Attention");
+-
+-        std::string IPMI_PATH("/org/openbmc/HostIpmi/1");
+-        std::string IPMI_INTERFACE("org.openbmc.HostIpmi");
+-
+-        auto host = ::ipmi::getService(this->bus, IPMI_INTERFACE, IPMI_PATH);
+-
+         // Start the timer for this transaction
+         auto time = std::chrono::duration_cast<std::chrono::microseconds>(
+             std::chrono::seconds(IPMI_SMS_ATN_ACK_TIMEOUT_SECS));
+@@ -121,19 +119,10 @@ void IpmbMessageQueue::checkQueueAndAlertHost()
+             log<level::ERR>("Error starting timer for control host");
+             return;
+         }
+-
+-        auto method =
+-            this->bus.new_method_call(host.c_str(), IPMI_PATH.c_str(),
+-                                      IPMI_INTERFACE.c_str(), "setAttention");
+-        auto reply = this->bus.call(method);
+-
+-        if (reply.is_method_error())
+-        {
+-            log<level::ERR>("Error in setting SMS attention");
+-            elog<InternalFailure>();
+-        }
+-        log<level::DEBUG>("SMS Attention asserted");
++        this->sendAttention(Attention::Set);
+     }
++    else
++        this->sendAttention(Attention::Clear);
+ }
+ 
+ void IpmbMessageQueue::AddMessage(IpmbMsg msg)
+@@ -181,6 +170,28 @@ bool IpmbMessageQueue::empty()
+     return false;
+ }
+ 
++void IpmbMessageQueue::sendAttention(Attention attention)
++{
++    log<level::DEBUG>("Asserting SMS Attention:", entry("%u", attention));
++
++    std::string IPMI_PATH("/org/openbmc/HostIpmi/1");
++    std::string IPMI_INTERFACE("org.openbmc.HostIpmi");
++
++    auto host = ::ipmi::getService(this->bus, IPMI_INTERFACE, IPMI_PATH);
++    auto atn = attention==Attention::Set ?
++        SMS_SET_ATTENTION : SMS_CLEAR_ATTENTION;
++    auto method =
++            this->bus.new_method_call(host.c_str(), IPMI_PATH.c_str(),
++                                      IPMI_INTERFACE.c_str(), atn);
++    auto reply = this->bus.call(method);
++
++    if (reply.is_method_error())
++    {
++        log<level::ERR>("Error in setting SMS attention, ", entry("%s", atn));
++        elog<InternalFailure>();
++    }
++}
++
+ } // namespace command
+ } // namespace host
+ } // namespace phosphor
+diff --git a/ipmb-msg-queue.hpp b/ipmb-msg-queue.hpp
+index b25b6a6..ecf3278 100644
+--- a/ipmb-msg-queue.hpp
++++ b/ipmb-msg-queue.hpp
+@@ -57,6 +57,7 @@ using ChannelNum = uint8_t;
+ using IpmbData = std::vector<uint8_t>;
+ using IpmbMsg = std::pair<ChannelNum, IpmbData>;
+ 
++enum class Attention:unsigned int {Set, Clear};
+ /** @class
+  *  @brief Manages Messages that are to be sent to Host
+  */
+@@ -124,6 +125,8 @@ class IpmbMessageQueue
+          */
+         void clearQueueOnPowerOn(sdbusplus::message::message& msg);
+ 
++        void sendAttention(Attention);
++
+         /** @brief Reference to the dbus handler */
+         sdbusplus::bus::bus& bus;
+ 
