@@ -1,0 +1,31 @@
+From f9b5a3bb9f3314b7c2f0cb2ffd0cbd53c4757f41 Mon Sep 17 00:00:00 2001
+From: kfting <kfting@nuvoton.com>
+Date: Wed, 10 Jul 2019 10:28:30 +0800
+Subject: [PATCH] meta-quanta: meta-runbmc-nuvoton: add support for runbmc IPMB
+
+Signed-off-by: kfting <kfting@nuvoton.com>
+---
+ ipmb-channels.json | 7 -------
+ 1 file changed, 7 deletions(-)
+
+diff --git a/ipmb-channels.json b/ipmb-channels.json
+index ee4a373..45100bd 100644
+--- a/ipmb-channels.json
++++ b/ipmb-channels.json
+@@ -6,13 +6,6 @@
+       "slave-path": "/sys/bus/i2c/devices/5-1010/slave-mqueue",
+       "bmc-addr": 32,
+       "remote-addr": 44
+-    },
+-    {
+-      "type": "ipmb",
+-      "master-path": "/dev/i2c-0",
+-      "slave-path": "/sys/bus/i2c/devices/0-1010/slave-mqueue",
+-      "bmc-addr": 32,
+-      "remote-addr": 88
+     }
+   ]
+ }
+-- 
+2.17.1
+

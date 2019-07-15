@@ -48,4 +48,5 @@ RDEPENDS_${PN}-system = " \
         dhcpcd \
         phosphor-ipmi-fru \
         phosphor-host-postd \
+        phosphor-ipmi-ipmb \
         "
