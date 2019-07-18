@@ -51,4 +51,5 @@ RDEPENDS_${PN}-system = " \
         phosphor-ipmi-ipmb \
         phosphor-ipmi-flash \
         phosphor-ipmi-blobs \
+        runbmc-powerctrl \
         "

@@ -4,10 +4,8 @@
         "power_config": {
             "power_good_in": "PGOOD",
             "power_up_outs": [
-                {"name": "POWER_UP_PIN", "polarity": false}
-            ],
-            "reset_outs": [
-                {"name": "RESET_UP_PIN", "polarity": false}
+                {"name": "POWER_UP_PIN", "polarity": false},
+                {"name": "POWER_UP_PIN", "polarity": true}
             ]
         }
     },
