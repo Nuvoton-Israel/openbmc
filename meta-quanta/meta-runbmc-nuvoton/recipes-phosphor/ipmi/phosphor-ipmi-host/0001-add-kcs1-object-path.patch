@@ -1,0 +1,27 @@
+From 0af796fd6b1454239779b86d786434dc7eff2cd9 Mon Sep 17 00:00:00 2001
+From: CH Li <chli30@nuvoton.com>
+Date: Wed, 7 Aug 2019 10:15:59 +0800
+Subject: [PATCH] add kcs1 object path
+
+---
+ host-cmd-manager.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/host-cmd-manager.cpp b/host-cmd-manager.cpp
+index f3aba7f..8e30a3b 100644
+--- a/host-cmd-manager.cpp
++++ b/host-cmd-manager.cpp
+@@ -115,8 +115,8 @@ void Manager::checkQueueAndAlertHost()
+     {
+         log<level::DEBUG>("Asserting SMS Attention");
+ 
+-        std::string IPMI_PATH("/org/openbmc/HostIpmi/1");
+-        std::string IPMI_INTERFACE("org.openbmc.HostIpmi");
++        std::string IPMI_PATH("/xyz/openbmc_project/Ipmi/Channel/kcs1");
++        std::string IPMI_INTERFACE("xyz.openbmc_project.Ipmi.Channel.SMS");
+ 
+         auto host = ::ipmi::getService(this->bus, IPMI_INTERFACE, IPMI_PATH);
+ 
+-- 
+2.17.1
+
