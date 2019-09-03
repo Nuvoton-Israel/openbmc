@@ -52,4 +52,6 @@ RDEPENDS_${PN}-system = " \
         first-boot-set-mac \
         dbus-sensors \
         phosphor-node-manager-proxy \
+        phosphor-image-signing \
+        openssl-bin \
         "
