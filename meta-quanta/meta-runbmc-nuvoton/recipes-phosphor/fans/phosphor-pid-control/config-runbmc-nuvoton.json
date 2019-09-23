@@ -9,72 +9,108 @@
             "max": 255
         },
         {
-            "name": "p0_dimm_vr0_temp",
+            "name": "Core_0_CPU0",
             "type": "temp",
-            "readPath": "/xyz/openbmc_project/sensors/temperature/p0_dimm_vr0_temp",
+            "readPath": "/xyz/openbmc_project/sensors/temperature/Core_0_CPU0",
             "writePath": "",
             "min": 0,
             "max": 0,
             "timeout": 0
         },
         {
-            "name": "p0_dimm_vr1_temp",
+            "name": "Core_0_CPU1",
             "type": "temp",
-            "readPath": "/xyz/openbmc_project/sensors/temperature/p0_dimm_vr1_temp",
+            "readPath": "/xyz/openbmc_project/sensors/temperature/Core_0_CPU1",
             "writePath": "",
             "min": 0,
             "max": 0,
             "timeout": 0
         },
         {
-            "name": "p0_vccin_vr_temp",
+            "name": "Core_1_CPU0",
             "type": "temp",
-            "readPath": "/xyz/openbmc_project/sensors/temperature/p0_vccin_vr_temp",
+            "readPath": "/xyz/openbmc_project/sensors/temperature/Core_1_CPU0",
             "writePath": "",
             "min": 0,
             "max": 0,
             "timeout": 0
         },
         {
-            "name": "p0_vccio_vr_temp",
+            "name": "Core_1_CPU1",
             "type": "temp",
-            "readPath": "/xyz/openbmc_project/sensors/temperature/p0_vccio_vr_temp",
+            "readPath": "/xyz/openbmc_project/sensors/temperature/Core_1_CPU1",
             "writePath": "",
             "min": 0,
             "max": 0,
             "timeout": 0
         },
         {
-            "name": "p1_dimm_vr0_temp",
+            "name": "Core_2_CPU0",
             "type": "temp",
-            "readPath": "/xyz/openbmc_project/sensors/temperature/p1_dimm_vr0_temp",
+            "readPath": "/xyz/openbmc_project/sensors/temperature/Core_2_CPU0",
             "writePath": "",
             "min": 0,
             "max": 0,
             "timeout": 0
         },
         {
-            "name": "p1_dimm_vr1_temp",
+            "name": "Core_2_CPU1",
             "type": "temp",
-            "readPath": "/xyz/openbmc_project/sensors/temperature/p1_dimm_vr1_temp",
+            "readPath": "/xyz/openbmc_project/sensors/temperature/Core_2_CPU1",
             "writePath": "",
             "min": 0,
             "max": 0,
             "timeout": 0
         },
         {
-            "name": "p1_vccin_vr_temp",
+            "name": "Core_3_CPU0",
             "type": "temp",
-            "readPath": "/xyz/openbmc_project/sensors/temperature/p1_vccin_vr_temp",
+            "readPath": "/xyz/openbmc_project/sensors/temperature/Core_3_CPU0",
             "writePath": "",
             "min": 0,
             "max": 0,
             "timeout": 0
         },
         {
-            "name": "p1_vccio_vr_temp",
+            "name": "Core_3_CPU1",
             "type": "temp",
-            "readPath": "/xyz/openbmc_project/sensors/temperature/p1_vccio_vr_temp",
+            "readPath": "/xyz/openbmc_project/sensors/temperature/Core_3_CPU1",
+            "writePath": "",
+            "min": 0,
+            "max": 0,
+            "timeout": 0
+        },
+        {
+            "name": "Core_4_CPU0",
+            "type": "temp",
+            "readPath": "/xyz/openbmc_project/sensors/temperature/Core_4_CPU0",
+            "writePath": "",
+            "min": 0,
+            "max": 0,
+            "timeout": 0
+        },
+        {
+            "name": "Core_4_CPU1",
+            "type": "temp",
+            "readPath": "/xyz/openbmc_project/sensors/temperature/Core_4_CPU1",
+            "writePath": "",
+            "min": 0,
+            "max": 0,
+            "timeout": 0
+        },
+        {
+            "name": "Core_5_CPU0",
+            "type": "temp",
+            "readPath": "/xyz/openbmc_project/sensors/temperature/Core_5_CPU0",
+            "writePath": "",
+            "min": 0,
+            "max": 0,
+            "timeout": 0
+        },
+        {
+            "name": "Core_5_CPU1",
+            "type": "temp",
+            "readPath": "/xyz/openbmc_project/sensors/temperature/Core_5_CPU1",
             "writePath": "",
             "min": 0,
             "max": 0,
@@ -107,10 +143,10 @@
                     }
                 },
                 {
-                    "name": "p0_dimm_vr0_temp",
+                    "name": "Core_0_CPU0",
                     "type": "temp",
-                    "inputs": ["p0_dimm_vr0_temp"],
-                    "setpoint": 40.0,
+                    "inputs": ["Core_0_CPU0"],
+                    "setpoint": 30.0,
                     "pid": {
                         "samplePeriod": 1.0,
                         "proportionalCoeff": -20.0,
@@ -128,10 +164,10 @@
                     }
                 },
                 {
-                    "name": "p0_dimm_vr1_temp",
+                    "name": "Core_0_CPU1",
                     "type": "temp",
-                    "inputs": ["p0_dimm_vr1_temp"],
-                    "setpoint": 40.0,
+                    "inputs": ["Core_0_CPU1"],
+                    "setpoint": 30.0,
                     "pid": {
                         "samplePeriod": 1.0,
                         "proportionalCoeff": -20.0,
@@ -149,10 +185,10 @@
                     }
                 },
                 {
-                    "name": "p0_vccin_vr_temp",
+                    "name": "Core_1_CPU0",
                     "type": "temp",
-                    "inputs": ["p0_vccin_vr_temp"],
-                    "setpoint": 40.0,
+                    "inputs": ["Core_1_CPU0"],
+                    "setpoint": 30.0,
                     "pid": {
                         "samplePeriod": 1.0,
                         "proportionalCoeff": -20.0,
@@ -170,10 +206,10 @@
                     }
                 },
                 {
-                    "name": "p0_vccio_vr_temp",
+                    "name": "Core_1_CPU1",
                     "type": "temp",
-                    "inputs": ["p0_vccio_vr_temp"],
-                    "setpoint": 40.0,
+                    "inputs": ["Core_1_CPU1"],
+                    "setpoint": 30.0,
                     "pid": {
                         "samplePeriod": 1.0,
                         "proportionalCoeff": -20.0,
@@ -191,10 +227,10 @@
                     }
                 },
                 {
-                    "name": "p1_dimm_vr0_temp",
+                    "name": "Core_2_CPU0",
                     "type": "temp",
-                    "inputs": ["p1_dimm_vr0_temp"],
-                    "setpoint": 40.0,
+                    "inputs": ["Core_2_CPU0"],
+                    "setpoint": 30.0,
                     "pid": {
                         "samplePeriod": 1.0,
                         "proportionalCoeff": -20.0,
@@ -212,10 +248,10 @@
                     }
                 },
                 {
-                    "name": "p1_dimm_vr1_temp",
+                    "name": "Core_2_CPU1",
                     "type": "temp",
-                    "inputs": ["p1_dimm_vr1_temp"],
-                    "setpoint": 40.0,
+                    "inputs": ["Core_2_CPU1"],
+                    "setpoint": 30.0,
                     "pid": {
                         "samplePeriod": 1.0,
                         "proportionalCoeff": -20.0,
@@ -233,10 +269,10 @@
                     }
                 },
                 {
-                    "name": "p1_vccin_vr_temp",
+                    "name": "Core_3_CPU0",
                     "type": "temp",
-                    "inputs": ["p1_vccin_vr_temp"],
-                    "setpoint": 40.0,
+                    "inputs": ["Core_3_CPU0"],
+                    "setpoint": 30.0,
                     "pid": {
                         "samplePeriod": 1.0,
                         "proportionalCoeff": -20.0,
@@ -254,10 +290,94 @@
                     }
                 },
                 {
-                    "name": "p1_vccio_vr_temp",
+                    "name": "Core_3_CPU1",
                     "type": "temp",
-                    "inputs": ["p1_vccio_vr_temp"],
-                    "setpoint": 40.0,
+                    "inputs": ["Core_3_CPU1"],
+                    "setpoint": 30.0,
+                    "pid": {
+                        "samplePeriod": 1.0,
+                        "proportionalCoeff": -20.0,
+                        "integralCoeff": -0.1,
+                        "feedFwdOffsetCoeff": 0.0,
+                        "feedFwdGainCoeff": 0.0,
+                        "integralLimit_min": 0.0,
+                        "integralLimit_max": 0.0,
+                        "outLim_min": 0.0,
+                        "outLim_max": 16000.0,
+                        "slewNeg": 0.0,
+                        "slewPos": 0.0,
+                        "positiveHysteresis": 1.0,
+                        "negativeHysteresis": 1.0
+                    }
+                },
+                {
+                    "name": "Core_4_CPU0",
+                    "type": "temp",
+                    "inputs": ["Core_4_CPU0"],
+                    "setpoint": 30.0,
+                    "pid": {
+                        "samplePeriod": 1.0,
+                        "proportionalCoeff": -20.0,
+                        "integralCoeff": -0.1,
+                        "feedFwdOffsetCoeff": 0.0,
+                        "feedFwdGainCoeff": 0.0,
+                        "integralLimit_min": 0.0,
+                        "integralLimit_max": 0.0,
+                        "outLim_min": 0.0,
+                        "outLim_max": 16000.0,
+                        "slewNeg": 0.0,
+                        "slewPos": 0.0,
+                        "positiveHysteresis": 1.0,
+                        "negativeHysteresis": 1.0
+                    }
+                },
+                {
+                    "name": "Core_4_CPU1",
+                    "type": "temp",
+                    "inputs": ["Core_4_CPU1"],
+                    "setpoint": 30.0,
+                    "pid": {
+                        "samplePeriod": 1.0,
+                        "proportionalCoeff": -20.0,
+                        "integralCoeff": -0.1,
+                        "feedFwdOffsetCoeff": 0.0,
+                        "feedFwdGainCoeff": 0.0,
+                        "integralLimit_min": 0.0,
+                        "integralLimit_max": 0.0,
+                        "outLim_min": 0.0,
+                        "outLim_max": 16000.0,
+                        "slewNeg": 0.0,
+                        "slewPos": 0.0,
+                        "positiveHysteresis": 1.0,
+                        "negativeHysteresis": 1.0
+                    }
+                },
+                {
+                    "name": "Core_5_CPU0",
+                    "type": "temp",
+                    "inputs": ["Core_5_CPU0"],
+                    "setpoint": 30.0,
+                    "pid": {
+                        "samplePeriod": 1.0,
+                        "proportionalCoeff": -20.0,
+                        "integralCoeff": -0.1,
+                        "feedFwdOffsetCoeff": 0.0,
+                        "feedFwdGainCoeff": 0.0,
+                        "integralLimit_min": 0.0,
+                        "integralLimit_max": 0.0,
+                        "outLim_min": 0.0,
+                        "outLim_max": 16000.0,
+                        "slewNeg": 0.0,
+                        "slewPos": 0.0,
+                        "positiveHysteresis": 1.0,
+                        "negativeHysteresis": 1.0
+                    }
+                },
+                {
+                    "name": "Core_5_CPU1",
+                    "type": "temp",
+                    "inputs": ["Core_5_CPU1"],
+                    "setpoint": 30.0,
                     "pid": {
                         "samplePeriod": 1.0,
                         "proportionalCoeff": -20.0,
