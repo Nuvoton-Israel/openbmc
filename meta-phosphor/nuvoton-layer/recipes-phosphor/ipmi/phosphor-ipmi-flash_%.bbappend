@@ -4,21 +4,20 @@ SRC_URI_append = " git://github.com/Nuvoton-Israel/phosphor-ipmi-flash"
 SRCREV = "${AUTOREV}"
 
 FILESEXTRAPATHS_prepend := "${THISDIR}/${PN}:"
-EXTRA_OECONF_append = " --enable-static-layout"
-EXTRA_OECONF_append = " --enable-reboot-update"
-EXTRA_OECONF_append = " STATIC_HANDLER_STAGED_NAME=/run/initramfs/image-bmc"
 
-EXTRA_OECONF_append = " --enable-lpc-bridge"
-EXTRA_OECONF_append = " --enable-nuvoton-lpc"
-EXTRA_OECONF_append = " MAPPED_ADDRESS=0xc0008000"
+PACKAGECONFIG_nuvoton += " static-bmc reboot-update"
 
-#EXTRA_OECONF_append = " --enable-pci-bridge"
+NUVOTON_FLASH_PCIVGA  = "0x7F400000"
+NUVOTON_FLASH_PCIMBOX = "0xF0848000"
+NUVOTON_FLASH_LPC     = "0xc0008000"
 
+#EXTRA_OECONF_append = " --enable-nuvoton-lpc"
 #EXTRA_OECONF_append = " --enable-nuvoton-p2a-mbox"
-#EXTRA_OECONF_append = " MAPPED_ADDRESS=0xF0848000"
+EXTRA_OECONF_append = " --enable-nuvoton-p2a-vga"
 
-#EXTRA_OECONF_append = " --enable-nuvoton-p2a-vga"
-#EXTRA_OECONF_append = " MAPPED_ADDRESS=0x7F400000"
+IPMI_FLASH_BMC_ADDRESS_nuvoton = "${NUVOTON_FLASH_PCIVGA}"
+
+EXTRA_OECMAKE_append = " -DCMAKE_BUILD_TYPE:type=Debug"
 
 SRC_URI += "file://bmc-verify.sh"
 SRC_URI += "file://phosphor-ipmi-flash-bmc-verify.service"
