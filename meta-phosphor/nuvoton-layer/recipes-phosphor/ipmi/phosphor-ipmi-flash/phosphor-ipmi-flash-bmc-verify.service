@@ -1,5 +1,5 @@
 [Unit]
-Description=CS20 Phosphor-ipmi-flash verify service
+Description=Phosphor-ipmi-flash bmc verify service
 
 [Service]
 ExecStart=/usr/sbin/bmc-verify.sh

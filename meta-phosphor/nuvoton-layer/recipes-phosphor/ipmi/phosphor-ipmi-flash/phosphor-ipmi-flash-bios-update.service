@@ -1,0 +1,9 @@
+[Unit]
+Description=Phosphor-ipmi-flash update BISO service
+
+[Service]
+ExecStart=/usr/sbin/bios-update.sh
+SyslogIdentifier=bios-update.sh
+
+[Install]
+WantedBy=phosphor-ipmi-flash-bios-update.target
