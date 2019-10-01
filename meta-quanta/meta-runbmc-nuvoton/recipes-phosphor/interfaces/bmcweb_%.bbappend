@@ -1,5 +1,7 @@
 FILESEXTRAPATHS_prepend := "${THISDIR}/${PN}:"
 
+SRC_URI_append_runbmc-nuvoton = " file://0001-bmcweb-add-clear-event-logs-function.patch"
+
 # Enable CPU Log and Raw PECI support
 EXTRA_OECMAKE += "-DBMCWEB_ENABLE_REDFISH_CPU_LOG=ON"
 EXTRA_OECMAKE += "-DBMCWEB_ENABLE_REDFISH_RAW_PECI=ON"
