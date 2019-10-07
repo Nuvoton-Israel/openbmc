@@ -1,0 +1,278 @@
+From 1e5026099986862e2af21eace3d1b7c80272c940 Mon Sep 17 00:00:00 2001
+From: kfting <kfting@nuvoton.com>
+Date: Thu, 3 Oct 2019 10:29:02 +0800
+Subject: [PATCH] support ipmi session login via ldap
+
+1. "set user name" and "set user password" commands are not supported.
+
+Signed-off-by: kfting <kfting@nuvoton.com>
+---
+ command/rakp12.cpp | 210 +++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 191 insertions(+), 19 deletions(-)
+
+diff --git a/command/rakp12.cpp b/command/rakp12.cpp
+index 2ab9fcd..dec20b0 100644
+--- a/command/rakp12.cpp
++++ b/command/rakp12.cpp
+@@ -12,8 +12,147 @@
+ #include <iomanip>
+ #include <phosphor-logging/log.hpp>
+ 
++#include <ipmid/api.h>
++
+ using namespace phosphor::logging;
+ 
++//reference: phosphor-ipmi-host
++static constexpr size_t privNoAccess = 0xF;
++static std::array<std::string, (PRIVILEGE_OEM + 1)> ipmiPrivIndex = {
++    "priv-reserved", // PRIVILEGE_RESERVED - 0
++    "priv-callback", // PRIVILEGE_CALLBACK - 1
++    "priv-user",     // PRIVILEGE_USER - 2
++    "priv-operator", // PRIVILEGE_OPERATOR - 3
++    "priv-admin",    // PRIVILEGE_ADMIN - 4
++    "priv-custom"    // PRIVILEGE_OEM - 5
++};
++
++struct ldap_user_param {
++    std::string passtmp;
++    bool userEnabled;
++    uint8_t userPriv : 4;
++    uint8_t ipmiEnabled : 1;
++    uint8_t linkAuth : 1;
++    uint8_t callBack : 1;
++};
++
++CommandPrivilege convertToIPMIPrivilege(const std::string& value)
++{
++    auto iter = std::find(ipmiPrivIndex.begin(), ipmiPrivIndex.end(), value);
++    if (iter == ipmiPrivIndex.end())
++    {
++        if (value == "")
++        {
++            return static_cast<CommandPrivilege>(privNoAccess);
++        }
++    }
++
++    return static_cast<CommandPrivilege>(std::distance(ipmiPrivIndex.begin(), iter));
++}
++
++bool isUserFromLDAP(std::string userName, struct ldap_user_param &ldap_ret)
++{
++#define LDAP_BUF_LENGTH 64
++
++    FILE *fp=0;
++    //ipmi user password maximum length is 20 bytes.
++    char cmd_get[LDAP_BUF_LENGTH];
++    char read[LDAP_BUF_LENGTH];
++    const char *tty = "ipmi";
++    bool is_ldap_user = false;
++    //struct ldap_user_param ldap_ret;
++    memset(read, '\0', sizeof(read));
++    sprintf(cmd_get,"getent.ldap nuvopasswd %s %s", userName.c_str(), tty);
++    fp = popen(cmd_get, "r");
++    if( fp && (fgets(read, sizeof(read), fp) != NULL) )
++    {
++        const char *emp ="\n";
++        if(0 == strcmp(read, emp))
++        {
++            is_ldap_user = false;
++        }
++        else
++        {
++            //it means that the user exists in the ldap server.
++            //the user passes the Nuvoton's authentication method
++            //the user's is allowed to login via ipmi
++            //since fgets adds an extra '\n' character, remove it from the read
++            //string.
++            read[strcspn(read, "\n")] = 0;
++            is_ldap_user = true;
++            std::string delim = " ";
++            std::string temp(read);
++            auto start = 0U;
++            auto end = temp.find(delim);
++            if (std::string::npos != end)
++            {
++                ldap_ret.passtmp.assign(temp.substr(start, end-start).c_str());
++            }
++
++            start = end + delim.length();
++            end = temp.find(delim, start);
++            if (std::string::npos != end)
++            {
++                ldap_ret.userEnabled = std::atoi(temp.substr(start, end-start).c_str());
++                if (ERANGE == errno)
++                {
++                    ldap_ret.userEnabled = 0;
++                }
++            }
++
++            start = end + delim.length();
++            end = temp.find(delim, start);
++            if (std::string::npos != end)
++            {
++                ldap_ret.userPriv = convertToIPMIPrivilege(temp.substr(start, end-start).c_str());
++            }
++
++            start = end + delim.length();
++            end = temp.find(delim, start);
++            if (std::string::npos != end)
++            {
++               ldap_ret.ipmiEnabled = std::atoi(temp.substr(start, end-start).c_str());
++               if (ERANGE == errno)
++               {
++                   ldap_ret.ipmiEnabled = 0;
++               }
++            }
++
++            start = end + delim.length();
++            end = temp.find(delim, start);
++            if (std::string::npos != end)
++            {
++               ldap_ret.linkAuth = std::atoi(temp.substr(start, end-start).c_str());
++               if (ERANGE == errno)
++               {
++                   ldap_ret.linkAuth = 0;
++               }
++            }
++
++            start = end + delim.length();
++            end = temp.find(delim, start);
++            if (std::string::npos != end)
++            {
++               ldap_ret.callBack = std::atoi(temp.substr(start, end-start).c_str());
++               if (ERANGE == errno)
++               {
++                   ldap_ret.callBack = 0;
++               }
++            }
++        }
++    }
++    else
++    {
++        is_ldap_user = false;
++    }
++    if(fp)
++    {
++        pclose(fp);
++    }
++
++    return is_ldap_user;
++}
++
+ namespace command
+ {
+ 
+@@ -150,16 +289,27 @@ std::vector<uint8_t> RAKP12(const std::vector<uint8_t>& inPayload,
+     // Perform user name based lookup
+     std::string userName(request->user_name, request->user_name_len);
+     std::string passwd;
++
++    struct ldap_user_param ldap_ret;
++    bool is_ldap_user = isUserFromLDAP(userName,ldap_ret);
++
+     uint8_t userId = ipmi::ipmiUserGetUserId(userName);
+-    if (userId == ipmi::invalidUserId)
++    if(!is_ldap_user)
+     {
+-        response->rmcpStatusCode =
+-            static_cast<uint8_t>(RAKP_ReturnCode::UNAUTH_NAME);
+-        return outPayload;
++        if (userId == ipmi::invalidUserId)
++        {
++            response->rmcpStatusCode =
++                static_cast<uint8_t>(RAKP_ReturnCode::UNAUTH_NAME);
++            return outPayload;
++        }
+     }
+     // check user is enabled before proceeding.
+     bool userEnabled = false;
+     ipmi::ipmiUserCheckEnabled(userId, userEnabled);
++    if(is_ldap_user)
++    {
++        userEnabled = ldap_ret.userEnabled;
++    }
+     if (!userEnabled)
+     {
+         response->rmcpStatusCode =
+@@ -168,6 +318,10 @@ std::vector<uint8_t> RAKP12(const std::vector<uint8_t>& inPayload,
+     }
+     // Get the user password for RAKP message authenticate
+     passwd = ipmi::ipmiUserGetPassword(userName);
++    if(is_ldap_user)
++    {
++        passwd = ldap_ret.passtmp;
++    }
+     if (passwd.empty())
+     {
+         response->rmcpStatusCode =
+@@ -175,26 +329,45 @@ std::vector<uint8_t> RAKP12(const std::vector<uint8_t>& inPayload,
+         return outPayload;
+     }
+     // Check whether user is already locked for failed attempts
+-    if (!ipmi::ipmiUserPamAuthenticate(userName, passwd))
++    if(!is_ldap_user)
+     {
+-        log<level::ERR>("Authentication failed - user already locked out",
+-                        entry("USER-ID=%d", static_cast<uint8_t>(userId)));
+-
+-        response->rmcpStatusCode =
+-            static_cast<uint8_t>(RAKP_ReturnCode::UNAUTH_NAME);
+-        return outPayload;
++        if (!ipmi::ipmiUserPamAuthenticate(userName, passwd))
++        {
++            log<level::ERR>("Authentication failed - user already locked out",
++                            entry("USER-ID=%d", static_cast<uint8_t>(userId)));
++
++            response->rmcpStatusCode =
++                static_cast<uint8_t>(RAKP_ReturnCode::UNAUTH_NAME);
++            return outPayload;
++        }
+     }
+ 
+     uint8_t chNum = static_cast<uint8_t>(getInterfaceIndex());
+     // Get channel based access information
+-    if ((ipmi::ipmiUserGetPrivilegeAccess(
+-             userId, chNum, session->sessionUserPrivAccess) != IPMI_CC_OK) ||
+-        (ipmi::getChannelAccessData(chNum, session->sessionChannelAccess) !=
+-         IPMI_CC_OK))
++    if(!is_ldap_user)
+     {
+-        response->rmcpStatusCode =
+-            static_cast<uint8_t>(RAKP_ReturnCode::INACTIVE_ROLE);
+-        return outPayload;
++        if ((ipmi::ipmiUserGetPrivilegeAccess(
++                 userId, chNum, session->sessionUserPrivAccess) != IPMI_CC_OK) ||
++            (ipmi::getChannelAccessData(chNum, session->sessionChannelAccess) !=
++             IPMI_CC_OK))
++        {
++            response->rmcpStatusCode =
++                static_cast<uint8_t>(RAKP_ReturnCode::INACTIVE_ROLE);
++            return outPayload;
++        }
++    }
++    else
++    {
++        if(IPMI_CC_OK != ipmi::getChannelAccessData(chNum, session->sessionChannelAccess) )
++        {
++            response->rmcpStatusCode =
++                static_cast<uint8_t>(RAKP_ReturnCode::INACTIVE_ROLE);
++            return outPayload;
++        }
++        session->sessionUserPrivAccess.privilege = ldap_ret.userPriv;
++        session->sessionUserPrivAccess.ipmiEnabled = ldap_ret.ipmiEnabled;
++        session->sessionUserPrivAccess.linkAuthEnabled = ldap_ret.linkAuth;
++        session->sessionUserPrivAccess.accessCallback = ldap_ret.callBack;
+     }
+     if (session->sessionUserPrivAccess.privilege >
+         static_cast<uint8_t>(session::Privilege::OEM))
+@@ -234,7 +407,6 @@ std::vector<uint8_t> RAKP12(const std::vector<uint8_t>& inPayload,
+             static_cast<uint8_t>(RAKP_ReturnCode::UNAUTH_NAME);
+         return outPayload;
+     }
+-
+     std::fill(authAlgo->userKey.data(),
+               authAlgo->userKey.data() + authAlgo->userKey.size(), 0);
+     std::copy_n(passwd.c_str(), passwd.size(), authAlgo->userKey.data());
+-- 
+2.17.1
+

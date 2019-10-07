@@ -1,0 +1,326 @@
+Index: nss-pam-ldapd-0.9.8/nslcd.h
+===================================================================
+--- nss-pam-ldapd-0.9.8.orig/nslcd.h
++++ nss-pam-ldapd-0.9.8/nslcd.h
+@@ -157,6 +157,11 @@
+ #define NSLCD_ACTION_PASSWD_BYUID      0x00080002
+ #define NSLCD_ACTION_PASSWD_ALL        0x00080008
+ 
++/* Nuvoton User account (/etc/passwd) NSS requests. Result values are:
++     STRING       user ipmi password */
++#define NSLCD_ACTION_NUVO_PASSWD_BYNAME 0x00080011
++
++
+ /* Protocol information requests. Result values are:
+      STRING      protocol name
+      STRINGLIST  protocol aliases
+Index: nss-pam-ldapd-0.9.8/nslcd/common.h
+===================================================================
+--- nss-pam-ldapd-0.9.8.orig/nslcd/common.h
++++ nss-pam-ldapd-0.9.8/nslcd/common.h
+@@ -261,6 +261,8 @@ int nslcd_pam_sess_c(TFILE *fp, MYLDAP_S
+ int nslcd_pam_pwmod(TFILE *fp, MYLDAP_SESSION *session, uid_t calleruid);
+ int nslcd_usermod(TFILE *fp, MYLDAP_SESSION *session, uid_t calleruid);
+ 
++int nslcd_nuvo_passwd_byname(TFILE *fp, MYLDAP_SESSION *session, uid_t calleruid);
++
+ /* macros for generating service handling code */
+ #define NSLCD_HANDLE(db, fn, action, readfn, mkfilter, writefn)             \
+   int nslcd_##db##_##fn(TFILE *fp, MYLDAP_SESSION *session)                 \
+Index: nss-pam-ldapd-0.9.8/nslcd/nslcd.c
+===================================================================
+--- nss-pam-ldapd-0.9.8.orig/nslcd/nslcd.c
++++ nss-pam-ldapd-0.9.8/nslcd/nslcd.c
+@@ -406,6 +406,7 @@ static void handleconnection(int sock, M
+     case NSLCD_ACTION_PASSWD_ALL:
+       if (!nslcd_cfg->nss_disable_enumeration) (void)nslcd_passwd_all(fp, session, uid);
+       break;
++    case NSLCD_ACTION_NUVO_PASSWD_BYNAME:(void)nslcd_nuvo_passwd_byname(fp, session, uid); break;
+     case NSLCD_ACTION_PROTOCOL_BYNAME:  (void)nslcd_protocol_byname(fp, session); break;
+     case NSLCD_ACTION_PROTOCOL_BYNUMBER:(void)nslcd_protocol_bynumber(fp, session); break;
+     case NSLCD_ACTION_PROTOCOL_ALL:     (void)nslcd_protocol_all(fp, session); break;
+Index: nss-pam-ldapd-0.9.8/nslcd/passwd.c
+===================================================================
+--- nss-pam-ldapd-0.9.8.orig/nslcd/passwd.c
++++ nss-pam-ldapd-0.9.8/nslcd/passwd.c
+@@ -102,12 +102,22 @@ const char *nuvo_a_userlogst = "user-log
+ const char *nuvo_v_userlogst_ok = "0";
+ const char *nuvo_a_userlogintf = "user-login-interface";
+ const char *nuvo_v_wildcard = "*";
++const char *nuvo_a_userpasswdipmi = "user-passwd-ipmi";
++const char *nuvo_a_userenable = "UserEnabled";
++const char *nuvo_a_useripmipriv = "user-priv-ipmi-ch";
++const char *nuvo_a_useripmienable = "user-ipmi-en";
++const char *nuvo_a_userlinkauth = "user-link-auth-en";
++const char *nuvo_a_useraccecb = "user-acc-callback";
++const char *nuvo_a_userlock = "UserLockedForFailAttempt";
++const char *nuvo_a_userpriv = "UserPrivilege";
+ const char *nuvo_o_usergrpobj = "(objectClass=user-group-info-obj)";
+ const char *nuvo_b_ouppl = "ou=people,dc=ldap,dc=example,dc=com";
+ 
+ const char *nuvo_tty = "/dev/tty";
+ const char *nuvo_pts = "/dev/pts";
+ 
++/* the basic search filter for searches */
++const char *nuvo_f_useripmiobj = "objectClass=user-priv-ipmi-obj";
+ 
+ /* default values for attributes */
+ static const char *default_passwd_userPassword = "*"; /* unmatchable */
+@@ -809,6 +819,178 @@ static int write_passwd(TFILE *fp, MYLDA
+   return 0;
+ }
+ 
++int nslcd_nuvo_passwd_byname(TFILE *fp, MYLDAP_SESSION *session, uid_t calleruid)
++{
++#define NUVO_QUERY_PASSWD_NUM 9U
++    /* define common variables */
++    int32_t tmpint32;
++    MYLDAP_SEARCH *search;
++    MYLDAP_ENTRY *entry;
++    const char *attrs[NUVO_QUERY_PASSWD_NUM];
++    int rc, *rcp;
++    /* read request parameters */
++    char name[BUFLEN_NAME];
++    char filter[BUFLEN_FILTER];
++    char nuvo_base[BUFLEN_FILTER];
++    char nuvo_safename[NUVO_BUFLEN_SAFENAME];
++    char nuvo_safeprivname[NUVO_BUFLEN_SAFENAME];
++    char nuvo_safeuserprivname[NUVO_BUFLEN_SAFENAME];
++    const char **values;
++    char tty[BUFLEN_NAME];
++    uint8_t loop;
++    long ret_num[5];
++
++    rcp = &rc;
++    READ_STRING(fp, name);
++    READ_STRING(fp, tty);
++    log_setrequest("nuvo_passwd=\"%s\"", name);
++
++    /* write the response header */
++    WRITE_INT32(fp, NSLCD_VERSION);
++    WRITE_INT32(fp, NSLCD_ACTION_NUVO_PASSWD_BYNAME);
++
++    if (!isvalidname(name))
++    {
++      log_log(LOG_WARNING, "request denied by validnames option");
++		  *rcp = LDAP_INVALID_CREDENTIALS;
++      goto fail;
++    } 
++
++    nsswitch_check_reload();
++    /* do the LDAP search */
++    nuvo_uid_group_authc(session, name, tty, &rc);
++
++    if(LDAP_SUCCESS != rc)
++    {
++        goto fail;
++    }
++
++    //initialize the query paramters
++    //log_log(LOG_ERR, "group auth ok");
++    attrs[0] = nuvo_a_userpasswdipmi;
++    attrs[1] = nuvo_a_userenable;
++    attrs[2] = nuvo_a_useripmipriv;
++    attrs[3] = nuvo_a_useripmienable;
++    attrs[4] = nuvo_a_userlinkauth;
++    attrs[5] = nuvo_a_useraccecb;
++    attrs[6] = nuvo_a_userlock;
++    attrs[7] = nuvo_a_userpriv;
++    attrs[8] = NULL;
++    mysnprintf(filter, BUFLEN_FILTER, "(%s)",
++               nuvo_f_useripmiobj);
++    //log_log(LOG_ERR, "filter:%s", filter);
++    mysnprintf(nuvo_base, BUFLEN_FILTER, "%s=%s,%s",
++                        nuvo_a_uid,name,nuvo_b_ouppl);
++    //log_log(LOG_ERR, "nuvo_base:%s", nuvo_base);
++    search = myldap_search(session, nuvo_base, LDAP_SCOPE_SUBTREE, filter, attrs, rcp);
++    if(NULL == search)
++	  {
++		    //goto the fail step
++		    *rcp = LDAP_INVALID_CREDENTIALS;
++		    goto fail;
++	  }
++
++	  //get the user-passwd-ipmi and other attributes' value for the uid
++    entry = myldap_get_entry(search, rcp);
++
++	  if(NULL == entry)
++    {
++ 		    *rcp = LDAP_INVALID_CREDENTIALS;
++		    goto fail;
++    }
++
++		values = myldap_get_values_len(entry, nuvo_a_userpasswdipmi);
++		if(NULL == values)
++		{
++	 		  *rcp = LDAP_INVALID_CREDENTIALS;
++		    goto fail;
++    }
++	  if (myldap_escape(values[0], nuvo_safename, sizeof(nuvo_safename)))
++    {
++        log_log(LOG_ERR, "safename buffer too small");
++        *rcp = LDAP_INVALID_CREDENTIALS;
++        goto fail;
++    }
++
++		values = myldap_get_values_len(entry, nuvo_a_userenable);
++    ret_num[0] = strtol(values[0], NULL, 10);
++    if (ERANGE == errno)
++        goto fail;
++
++		values = myldap_get_values_len(entry, nuvo_a_useripmipriv);
++		if(NULL == values)
++		{
++	 		  *rcp = LDAP_INVALID_CREDENTIALS;
++		    goto fail;
++    }
++	  if (myldap_escape(values[0], nuvo_safeprivname, sizeof(nuvo_safeprivname)))
++    {
++        log_log(LOG_ERR, "safeprivname buffer too small");
++        *rcp = LDAP_INVALID_CREDENTIALS;
++        goto fail;
++    }
++ 
++		values = myldap_get_values_len(entry, nuvo_a_useripmienable);
++    ret_num[1] = strtol(values[0], NULL, 10);
++    if (ERANGE == errno)
++        goto fail;
++
++		values = myldap_get_values_len(entry, nuvo_a_userlinkauth);
++    ret_num[2] = strtol(values[0], NULL, 10);
++    if (ERANGE == errno)
++        goto fail;
++
++		values = myldap_get_values_len(entry, nuvo_a_useraccecb);
++    ret_num[3] = strtol(values[0], NULL, 10);
++    if (ERANGE == errno)
++        goto fail;
++
++		values = myldap_get_values_len(entry, nuvo_a_userlock);
++    ret_num[4] = strtol(values[0], NULL, 10);
++    if (ERANGE == errno)
++        goto fail;
++
++		values = myldap_get_values_len(entry, nuvo_a_userpriv);
++		if(NULL == values)
++		{
++	 		  *rcp = LDAP_INVALID_CREDENTIALS;
++		    goto fail;
++    }
++	  if (myldap_escape(values[0], nuvo_safeuserprivname, sizeof(nuvo_safeuserprivname)))
++    {
++        log_log(LOG_ERR, "safeuserpivname buffer too small");
++        *rcp = LDAP_INVALID_CREDENTIALS;
++        goto fail;
++    }
++
++fail:
++    WRITE_INT32(fp, NSLCD_RESULT_BEGIN);
++    if( LDAP_SUCCESS == rc )
++    {
++        WRITE_STRING(fp, nuvo_safename);
++        WRITE_INT32(fp, ret_num[0]);
++        WRITE_STRING(fp, nuvo_safeprivname);
++        WRITE_INT32(fp, ret_num[1]);
++        WRITE_INT32(fp, ret_num[2]);
++        WRITE_INT32(fp, ret_num[3]);
++        WRITE_INT32(fp, ret_num[4]);
++        WRITE_STRING(fp, nuvo_safeuserprivname);
++    }
++    else
++    {
++        WRITE_STRING(fp, "\n");
++        WRITE_INT32(fp, 0);
++        WRITE_STRING(fp, "\n");
++        WRITE_INT32(fp, 0);
++        WRITE_INT32(fp, 0);
++        WRITE_INT32(fp, 0);
++        WRITE_INT32(fp, 0);
++        WRITE_STRING(fp, "\n");
++    }
++    WRITE_INT32(fp, NSLCD_RESULT_END);
++    return 0;
++}
++
+ NSLCD_HANDLE_UID(
+   passwd, byname, NSLCD_ACTION_PASSWD_BYNAME,
+   char name[BUFLEN_NAME];
+Index: nss-pam-ldapd-0.9.8/utils/getent.py
+===================================================================
+--- nss-pam-ldapd-0.9.8.orig/utils/getent.py
++++ nss-pam-ldapd-0.9.8/utils/getent.py
+@@ -31,6 +31,9 @@ from nslcd import NslcdClient
+ import constants
+ 
+ 
++NSLCD_ACTION_NUVO_PASSWD_BYNAME = 0x00080011
++
++
+ epilog = '''
+ supported databases:
+   aliases, ethers, group, group.bymember, hosts, hostsv4, hostsv6,
+@@ -49,9 +52,10 @@ parser = argparse.ArgumentParser(
+ parser.add_argument('-V', '--version', action=VersionAction)
+ parser.add_argument('database', metavar='DATABASE',
+                     help='any database supported by nslcd')
+-parser.add_argument('keys', metavar='KEY', nargs='*',
++parser.add_argument('keys', metavar='KEY', nargs=1,
+                     help='filter returned database values by key')
+-
++parser.add_argument('intfs', metavar='INTFACE', nargs=1,
++                    help='login interface')
+ 
+ def write_aliases(con):
+     while con.get_response() == constants.NSLCD_RESULT_BEGIN:
+@@ -270,6 +274,18 @@ def write_passwd(con):
+                 con.read_string(),
+             ))
+ 
++def write_nuvo_passwd(con):
++    while con.get_response() == constants.NSLCD_RESULT_BEGIN:
++        print('%s' ' ' '%d' ' ' '%s' ' ' '%d' ' ' '%d' ' ' '%d' ' ' '%d' ' ' '%s' ' ' % (
++                con.read_string(),
++                con.read_int32(),
++                con.read_string(),
++                con.read_int32(),
++                con.read_int32(),
++                con.read_int32(),
++                con.read_int32(),
++                con.read_string(),
++            ))
+ 
+ def getent_passwd(database, keys=None):
+     if not keys:
+@@ -285,6 +301,23 @@ def getent_passwd(database, keys=None):
+         write_passwd(con)
+ 
+ 
++def getent_nuvo_passwd(database, keys=None, intfs=None):
++    if not keys:
++        return
++    for key in keys:
++        if re.match('^\d+$', key):
++            return
++        else:
++            con = NslcdClient(NSLCD_ACTION_NUVO_PASSWD_BYNAME)
++            con.write_string(key)
++    for intf in intfs:
++        if re.match('^\d+$', intf):
++            return
++        else:
++            con.write_string(intf)
++        write_nuvo_passwd(con)
++
++
+ def write_protocols(con):
+     while con.get_response() == constants.NSLCD_RESULT_BEGIN:
+         name = con.read_string()
+@@ -412,6 +445,8 @@ if __name__ == '__main__':
+             getent_services(args.database, args.keys)
+         elif args.database == 'shadow':
+             getent_shadow(args.database, args.keys)
++        elif args.database == 'nuvopasswd':
++            getent_nuvo_passwd('passwd', args.keys, args.intfs)
+         else:
+             parser.error('Unknown database: %s' % args.database)
+     except struct.error:

@@ -1,0 +1,332 @@
+Index: nss-pam-ldapd-0.9.8/nslcd/common.h
+===================================================================
+--- nss-pam-ldapd-0.9.8.orig/nslcd/common.h
++++ nss-pam-ldapd-0.9.8/nslcd/common.h
+@@ -150,6 +150,11 @@ int invalidator_start(void);
+ /* signal invalidator to invalidate the selected external cache */
+ void invalidator_do(enum ldap_map_selector map);
+ 
++/* Nuvoton's user management function via ldap */
++void nuvo_uid_group_authc(MYLDAP_SESSION *session, const char *uid, char *tty, int *rcp);
++
++#define NUVO_SRV_CHECKLIST_NUM 4
++
+ /* fallback definition of HOST_NAME_MAX */
+ #ifndef HOST_NAME_MAX
+ #ifdef _POSIX_HOST_NAME_MAX
+Index: nss-pam-ldapd-0.9.8/nslcd/pam.c
+===================================================================
+--- nss-pam-ldapd-0.9.8.orig/nslcd/pam.c
++++ nss-pam-ldapd-0.9.8/nslcd/pam.c
+@@ -419,6 +419,8 @@ int nslcd_pam_authc(TFILE *fp, MYLDAP_SE
+   int authzrc = NSLCD_PAM_SUCCESS;
+   char authzmsg[BUFLEN_MESSAGE];
+   authzmsg[0] = '\0';
++  /*64 is as long as tty array length definition above*/
++  char nuvo_service_checklist[NUVO_SRV_CHECKLIST_NUM][64] = {"dropbear", "login", "su", "webserver"};
+   /* read request parameters */
+   READ_STRING(fp, username);
+   READ_STRING(fp, service);
+@@ -428,8 +430,8 @@ int nslcd_pam_authc(TFILE *fp, MYLDAP_SE
+   READ_STRING(fp, password);
+   /* log call */
+   log_setrequest("authc=\"%s\"", username);
+-  log_log(LOG_DEBUG, "nslcd_pam_authc(\"%s\",\"%s\",\"%s\")",
+-          username, service, *password ? "***" : "");
++  //log_log(LOG_ERR, "nslcd_pam_authc(\"%s\",\"%s\",\"%s\",\"%s\")",
++  //        username, service, tty, *password ? "***" : "");
+   /* write the response header */
+   WRITE_INT32(fp, NSLCD_VERSION);
+   WRITE_INT32(fp, NSLCD_ACTION_PAM_AUTHC);
+@@ -489,6 +491,30 @@ int nslcd_pam_authc(TFILE *fp, MYLDAP_SE
+   /* perform shadow attribute checks */
+   if ((*username != '\0') && (authzrc == NSLCD_PAM_SUCCESS))
+     authzrc = check_shadow(session, username, authzmsg, sizeof(authzmsg), 1, 0);
++
++  /*check the services which really neeed further authentication after try_bind is okay*/
++  //log_log(LOG_ERR, "service: %s", service);
++  if( (NSLCD_PAM_SUCCESS == rc) && ('\0' != *service) )
++  {
++    unsigned char loop;
++    for(loop = 0; loop < NUVO_SRV_CHECKLIST_NUM; loop++)
++    {
++
++      if(0 == strcmp(service,nuvo_service_checklist[loop]))
++      {
++        nuvo_uid_group_authc(session, username, tty, &rc);
++        switch (rc)
++        {
++          case LDAP_SUCCESS:             rc = NSLCD_PAM_SUCCESS;  break;
++          case LDAP_INVALID_CREDENTIALS: rc = NSLCD_PAM_AUTH_ERR; break;
++          default:                       rc = NSLCD_PAM_AUTH_ERR;
++        }
++        break;
++      }
++
++    }
++  }
++
+   /* write response */
+   WRITE_INT32(fp, NSLCD_RESULT_BEGIN);
+   WRITE_INT32(fp, rc);
+Index: nss-pam-ldapd-0.9.8/nslcd/passwd.c
+===================================================================
+--- nss-pam-ldapd-0.9.8.orig/nslcd/passwd.c
++++ nss-pam-ldapd-0.9.8/nslcd/passwd.c
+@@ -32,6 +32,9 @@
+ #include <string.h>
+ #include <pthread.h>
+ 
++#include <ifaddrs.h>
++#include <netpacket/packet.h>
++
+ #include "common.h"
+ #include "log.h"
+ #include "myldap.h"
+@@ -69,6 +72,43 @@ const char *attmap_passwd_loginShell
+ static char *uidSid = NULL;
+ static char *gidSid = NULL;
+ 
++
++/* Nuvoton's user management function via ldap */
++/*
++  nuvo: a prefix that stands for Nuvoton
++  nuvo_a: attribute
++  nuvo_f: filter target
++  nuvo_o: object class in the filter
++  nuvo_b: base
++  nuvo_v: value
++*/
++#define MAC_LEN               18
++#define GROUP_MAX             20
++#define NUVO_BUFLEN_SAFENAME  200
++
++const char *lo_name = "lo";
++const char *nuvo_a_bmcuid = "bmc-uid";
++const char *nuvo_f_mac = "macAddress";
++const char *nuvo_o_bmcinfo = "(objectClass=bmc-info-obj)";
++const char *nuvo_b_oubmc = "ou=bmc,dc=ldap,dc=example,dc=com";
++
++const char *nuvo_a_cn = "cn";
++const char *nuvo_a_gid = "gidNumber";
++const char *nuvo_o_grpobj = "(objectClass=group-obj)";
++const char *nuvo_b_ouap = "ou=ap_group,dc=ldap,dc=example,dc=com";
++
++const char *nuvo_a_uid = "uid";
++const char *nuvo_a_userlogst = "user-login-disabled";
++const char *nuvo_v_userlogst_ok = "0";
++const char *nuvo_a_userlogintf = "user-login-interface";
++const char *nuvo_v_wildcard = "*";
++const char *nuvo_o_usergrpobj = "(objectClass=user-group-info-obj)";
++const char *nuvo_b_ouppl = "ou=people,dc=ldap,dc=example,dc=com";
++
++const char *nuvo_tty = "/dev/tty";
++const char *nuvo_pts = "/dev/pts";
++
++
+ /* default values for attributes */
+ static const char *default_passwd_userPassword = "*"; /* unmatchable */
+ 
+@@ -354,6 +394,202 @@ char *dn2uid(MYLDAP_SESSION *session, co
+   return uid;
+ }
+ 
++/* Nuvoton's user management function via ldap */
++/* Authenticate the user credentials from ldap */
++void nuvo_uid_group_authc(MYLDAP_SESSION *session, const char *uid, char *tty, int *rcp)
++{
++  MYLDAP_SEARCH *search = NULL;
++  MYLDAP_ENTRY *entry = NULL;
++  static const char *attrs[3];
++  char filter[BUFLEN_FILTER];
++  const char **values;
++  struct ifaddrs *ifaddr=NULL;
++  struct ifaddrs *ifa = NULL;
++  int loop = 0;
++  int j = 0;
++  char mac[MAC_LEN];
++  char nuvo_base[BUFLEN_FILTER];
++  char nuvo_safename[GROUP_MAX][NUVO_BUFLEN_SAFENAME];
++  //extra 6 bytes for "(cn=)\0"
++  char tmp_buf[NUVO_BUFLEN_SAFENAME+6];
++  char bmc_found = 0;
++ 
++  /* if it isn't a valid username, just bail out now */
++  if (!isvalidname(uid))
++  {
++    if (rcp != NULL)
++      *rcp = LDAP_INVALID_SYNTAX;
++    return;
++  }
++ 
++    //Get the macaddress address of current BMC
++  if (getifaddrs(&ifaddr) == -1)
++  {
++     log_log(LOG_WARNING, "getifaddrs failed");
++	   *rcp = LDAP_LOCAL_ERROR;
++	   goto fail;
++  }
++  else
++  {
++       *rcp = LDAP_SUCCESS;
++	   //The filters are "the userid" && "user-login-status is 0 (0 is allowed to login in)"
++	   //&& "user-login-interface's value matches the "tty" parameter"
++     //if the tty is "/dev/pts/*", then just use "/dev/pts" as the filter value.
++     //if the tty is "/dev/ttyS*", then just use "/dev/tty" as the filter value.
++	   //The target is to get cn@ap_group for the current user
++	   attrs[0] = nuvo_a_cn;
++	   attrs[1] = NULL;
++
++     if( (NULL != tty) && (0 == (strncmp(nuvo_pts, tty, strlen(nuvo_pts)))) )
++     {
++      //update the tty's value from e.g. /dev/pts/0 to /dev/pts
++      mysnprintf(tty, (strlen(nuvo_pts)+1), "%s", nuvo_pts);
++      //log_log(LOG_WARNING, "tty:%s", tty);
++     }
++     else if( (NULL != tty) && (0 == (strncmp(nuvo_tty, tty, strlen(nuvo_tty)))) )
++     {
++      //update the tty's value from e.g. /dev/ttyS0 to /dev/tty
++      mysnprintf(tty, (strlen(nuvo_tty)+1), "%s", nuvo_tty);
++     }
++
++	   mysnprintf(filter, BUFLEN_FILTER, "(&%s(%s=%s)(%s=%s))",
++                            nuvo_o_usergrpobj,nuvo_a_userlogst,nuvo_v_userlogst_ok,nuvo_a_userlogintf,tty);
++       mysnprintf(nuvo_base, BUFLEN_FILTER, "%s=%s,%s",
++                            nuvo_a_uid,uid,nuvo_b_ouppl);
++       search = myldap_search(session, nuvo_base, LDAP_SCOPE_SUBTREE, filter, attrs, rcp);
++	   if(NULL == search)
++	   {
++		   //goto the fail step
++		   *rcp = LDAP_INVALID_CREDENTIALS;
++		   goto fail;
++	   }
++	   //assumption: the group nubmer is not more than GROUP_MAX
++       for(loop = 0; (entry = myldap_get_entry(search, rcp)) != NULL; loop++)
++	   {
++		   values = myldap_get_values_len(entry, nuvo_a_cn);
++		   if( GROUP_MAX <= loop)
++		   {
++			   log_log(LOG_ERR, "no space for more than %d groups", GROUP_MAX);
++			   *rcp = LDAP_INVALID_CREDENTIALS;
++               goto fail;
++		   }
++
++		   if(NULL != values)
++		   {
++		       if (myldap_escape(values[0], nuvo_safename[loop], sizeof(nuvo_safename[loop])))
++               {
++                   log_log(LOG_ERR, "safename buffer too small");
++                   *rcp = LDAP_INVALID_CREDENTIALS;
++                   goto fail;
++               }
++		   }
++		   else
++		   {
++			   *rcp = LDAP_INVALID_CREDENTIALS;
++			   goto fail;
++		   }
++	   }
++       //There is no any matched entry with the defined filter above.
++	   if(0 == loop)
++	   {
++		   //goto the fail step
++		   *rcp = LDAP_INVALID_CREDENTIALS;
++		   goto fail;
++	   }
++
++	   //Find out that if there is a match between "filtered ap_group" for the current user && ap_group for the current bmc
++	   //if so, then the user is allowed to login onto the current bmc.
++	   for ( ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
++       {
++           if ( (ifa->ifa_addr) && (AF_PACKET == ifa->ifa_addr->sa_family) )
++           {
++                struct sockaddr_ll *sa = (struct sockaddr_ll*)ifa->ifa_addr;
++				//skip the lo interface
++				if(0 == strcmp(ifa->ifa_name, lo_name))
++				{
++					continue;
++				}
++				//format the macaddress to xx:xx:xx:xx:xx:xx
++				mysnprintf(mac, MAC_LEN ,"%02x:%02x:%02x:%02x:%02x:%02x" , sa->sll_addr[0], \
++				           sa->sll_addr[1], sa->sll_addr[2], sa->sll_addr[3], sa->sll_addr[4], \
++						   sa->sll_addr[5]);
++
++				mysnprintf(filter, BUFLEN_FILTER, "(&%s(%s=%s))",
++                      nuvo_o_bmcinfo,nuvo_f_mac,mac);
++				attrs[0] = nuvo_a_bmcuid;
++                attrs[1] = NULL;
++                search = myldap_search(session, nuvo_b_oubmc, LDAP_SCOPE_SUBTREE, filter, attrs, rcp);
++				if (NULL == search)
++                {   //skip to next valid ethernet device and obtain its macaddress
++                    continue;
++                }
++				else
++				{
++                    entry = myldap_get_entry(search, rcp);
++					if (NULL != entry)
++					{
++						values = myldap_get_values_len(entry, nuvo_a_bmcuid);
++						if(NULL != values)
++				        {
++							//the bmc requested is registered in the LDAP server
++							//the filter is used to get the bmc-uid from the macaddress
++							//notice the filter lacks one ")"
++							mysnprintf(filter, BUFLEN_FILTER, "(&%s(%s=%s)",
++                            nuvo_o_grpobj,nuvo_a_bmcuid,values[0]);
++							bmc_found = 1;
++							break;
++				        }
++					}
++				}
++
++           }
++       }
++       freeifaddrs(ifaddr);
++
++	   if(0 == bmc_found)
++	   {
++		   *rcp = LDAP_INVALID_CREDENTIALS;
++		   goto fail;
++	   }
++
++	   strcat(filter, "(|");
++	   //Get the strings concatenated and the concatenated string length is expected to be lower than BUFLEN_FILTER
++	   //assumption: the group name length is not longer than NUVO_BUFLEN_SAFENAME bytes
++	   //loop here indicates that how many qualified ap_group the user joins
++	   for(j = 0; j < loop; j++)
++	   {
++		   snprintf(tmp_buf, sizeof(tmp_buf), "(cn=%s)", nuvo_safename[j]);
++		   strcat(filter, tmp_buf);
++	   }
++
++	   strcat(filter, "))");
++
++       attrs[0] = nuvo_a_cn;
++       attrs[1] = NULL;
++	   search = myldap_search(session, nuvo_b_ouap, LDAP_SCOPE_SUBTREE, filter, attrs, rcp);
++	   if(NULL == search)
++	   {
++		   //goto the fail step
++		   *rcp = LDAP_INVALID_CREDENTIALS;
++		   goto fail;
++	   }
++
++	   entry = myldap_get_entry(search, rcp);
++	   if(NULL == entry)
++	   {
++		   //goto the fail step
++		   *rcp = LDAP_INVALID_CREDENTIALS;
++		   //goto fail;
++	   }
++
++  }
++
++fail:
++
++  return;
++ 
++}
++
+ MYLDAP_ENTRY *uid2entry(MYLDAP_SESSION *session, const char *uid, int *rcp)
+ {
+   MYLDAP_SEARCH *search = NULL;
