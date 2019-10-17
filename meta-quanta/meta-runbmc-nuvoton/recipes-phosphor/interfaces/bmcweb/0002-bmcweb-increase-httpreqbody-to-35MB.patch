@@ -1,0 +1,13 @@
+diff --git a/crow/include/crow/http_connection.h b/crow/include/crow/http_connection.h
+index 6f441869..1e124b96 100644
+--- a/crow/include/crow/http_connection.h
++++ b/crow/include/crow/http_connection.h
+@@ -242,7 +242,7 @@ static std::atomic<int> connectionCount;
+ #endif
+ 
+ // request body limit size: 30M
+-constexpr unsigned int httpReqBodyLimit = 1024 * 1024 * 30;
++constexpr unsigned int httpReqBodyLimit = 1024 * 1024 * 35;
+ 
+ template <typename Adaptor, typename Handler, typename... Middlewares>
+ class Connection
