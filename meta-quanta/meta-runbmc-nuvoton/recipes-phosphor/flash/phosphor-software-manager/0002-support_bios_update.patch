@@ -1,0 +1,145 @@
+commit cd3849009c7b903f82fbef998c5eee451c528073
+Author: Medad CChien <ctcchien@nuvoton.com>
+Date:   Wed Oct 16 11:46:04 2019 +0800
+
+    Support BIOS update
+
+diff --git a/image_verify.cpp b/image_verify.cpp
+index 7f0bca7..fdf2d5e 100644
+--- a/image_verify.cpp
++++ b/image_verify.cpp
+@@ -110,13 +110,17 @@ bool Signature::verify()
+             fs::path sigFile(file);
+             sigFile.replace_extension(SIGNATURE_FILE_EXT);
+ 
+-            // Verify the signature.
+-            auto valid = verifyFile(file, sigFile, publicKeyFile, hashType);
+-            if (valid == false)
++            // Make sure the existence of the image file and sig file in the system.
++            if ( fs::exists(file) && fs::exists(sigFile) )
+             {
+-                log<level::ERR>("Image file Signature Validation failed",
+-                                entry("IMAGE=%s", bmcImage.c_str()));
+-                return false;
++                // Verify the signature.
++                auto valid = verifyFile(file, sigFile, publicKeyFile, hashType);
++                if (valid == false)
++                {
++                    log<level::ERR>("Image file Signature Validation failed",
++                                    entry("IMAGE=%s", bmcImage.c_str()));
++                    return false;
++                }
+             }
+         }
+ 
+diff --git a/images.hpp b/images.hpp
+index 97b8f7f..46b3fa0 100644
+--- a/images.hpp
++++ b/images.hpp
+@@ -12,7 +12,9 @@ namespace image
+ 
+ // BMC flash image file name list.
+ const std::vector<std::string> bmcImages = {"image-kernel", "image-rofs",
+-                                            "image-rwfs", "image-u-boot"};
++                                            "image-rwfs", "image-u-boot",
++                                            "image-bios"};
++
+ 
+ } // namespace image
+ } // namespace software
+diff --git a/item_updater.cpp b/item_updater.cpp
+index 21fb6e0..92b0d60 100644
+--- a/item_updater.cpp
++++ b/item_updater.cpp
+@@ -64,7 +64,7 @@ void ItemUpdater::createActivation(sdbusplus::message::message& msg)
+                     auto value = SVersion::convertVersionPurposeFromString(
+                         variant_ns::get<std::string>(property.second));
+                     if (value == VersionPurpose::BMC ||
+-                        value == VersionPurpose::System)
++                        value == VersionPurpose::Host)
+                     {
+                         purpose = value;
+                     }
+@@ -288,7 +288,7 @@ void ItemUpdater::erase(std::string entryId)
+     auto it = versions.find(entryId);
+     if (it != versions.end())
+     {
+-        if (it->second->isFunctional() && ACTIVE_BMC_MAX_ALLOWED > 1)
++        if (it->second->isFunctional() && ACTIVE_BMC_MAX_ALLOWED >= 1)
+         {
+             log<level::ERR>("Error: Version is currently running on the BMC. "
+                             "Unable to remove.",
+@@ -356,18 +356,16 @@ void ItemUpdater::deleteAll()
+ ItemUpdater::ActivationStatus
+     ItemUpdater::validateSquashFSImage(const std::string& filePath)
+ {
+-    bool invalid = false;
++    bool invalid = true;
+ 
+     for (auto& bmcImage : bmcImages)
+     {
+         fs::path file(filePath);
+         file /= bmcImage;
+         std::ifstream efile(file.c_str());
+-        if (efile.good() != 1)
++        if (efile.good())
+         {
+-            log<level::ERR>("Failed to find the BMC image.",
+-                            entry("IMAGE=%s", bmcImage.c_str()));
+-            invalid = true;
++            invalid = false;
+         }
+     }
+ 
+diff --git a/static/flash.cpp b/static/flash.cpp
+index 82c2393..0de3afe 100644
+--- a/static/flash.cpp
++++ b/static/flash.cpp
+@@ -28,10 +28,26 @@ void Activation::flashWrite()
+     // the image to flash during reboot.
+     fs::path uploadDir(IMG_UPLOAD_DIR);
+     fs::path toPath(PATH_INITRAMFS);
++
+     for (auto& bmcImage : phosphor::software::image::bmcImages)
+     {
+-        fs::copy_file(uploadDir / versionId / bmcImage, toPath / bmcImage,
+-                      fs::copy_options::overwrite_existing);
++        if ( fs::exists(uploadDir / versionId / bmcImage))
++        {
++            if(bmcImage.compare("image-bios")==0)
++            {
++                fs::copy_file(uploadDir / versionId / bmcImage, "/tmp/bios-image",
++                              fs::copy_options::overwrite_existing);
++
++                std::string serviceFile = "phosphor-ipmi-flash-bios-update.service";
++                auto method = bus.new_method_call(SYSTEMD_BUSNAME, SYSTEMD_PATH,
++                                      SYSTEMD_INTERFACE, "StartUnit");
++                method.append(serviceFile, "replace");
++                auto rerply = bus.call(method);
++            }
++            else
++                fs::copy_file(uploadDir / versionId / bmcImage, toPath / bmcImage,
++                              fs::copy_options::overwrite_existing);
++        }
+     }
+ }
+ 
+diff --git a/version.cpp b/version.cpp
+index ca7e29c..8e7a5a3 100644
+--- a/version.cpp
++++ b/version.cpp
+@@ -124,7 +124,13 @@ std::string Version::getBMCVersion(const std::string& releaseFilePath)
+ 
+ bool Version::isFunctional()
+ {
+-    return versionStr == getBMCVersion(OS_RELEASE_FILE);
++    std::fprintf (stderr, "[CS20]versionStr:%s\n",versionStr.c_str());
++    if(versionStr == getBMCVersion(OS_RELEASE_FILE))
++        return true;
++    else if(versionStr == getBMCVersion(BIOS_FW_FILE))
++        return true;
++    else
++        return false;
+ }
+ 
+ void Delete::delete_()
