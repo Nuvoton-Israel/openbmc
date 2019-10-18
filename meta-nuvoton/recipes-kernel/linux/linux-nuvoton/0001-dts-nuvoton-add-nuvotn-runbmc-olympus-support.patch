@@ -769,8 +769,8 @@ index 000000000000..6eb04ba24145
 +					#address-cells = <1>;
 +					#size-cells = <1>;
 +					system1@0 {
-+						label = "spi3-system1";
-+						reg = <0x0 0x800000>;
++						label = "bios";
++						reg = <0x0 0x0>;
 +					};
 +					system2@800000 {
 +						label = "spi3-system2";
