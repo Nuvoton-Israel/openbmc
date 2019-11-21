@@ -32,3 +32,5 @@ SRC_URI += "file://0001-driver-net-emc-driver-update.patch"
 SRC_URI += "file://0001-driver-mtd-npcm-update-driver.patch"
 SRC_URI += "file://0001-driver-hwrng-add-NPCM-RNG.patch"
 SRC_URI += "file://0001-driver-misc-add-jtag-master-driver-for-npcm7xx.patch"
+
+SRC_URI += "file://0001-driver-ncsi-replace-del-timer-sync.patch"
