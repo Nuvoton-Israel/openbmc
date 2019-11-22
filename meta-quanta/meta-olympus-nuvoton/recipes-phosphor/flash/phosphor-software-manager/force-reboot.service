@@ -1,7 +1,0 @@
-[Unit]
-Description=Force reboot of the BMC
-
-[Service]
-Type=oneshot
-RemainAfterExit=no
-ExecStart=/sbin/reboot
