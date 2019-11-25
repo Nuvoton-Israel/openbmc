@@ -1,0 +1,44 @@
+From 57c94b1be566f159d642c0771899aa39f708007c Mon Sep 17 00:00:00 2001
+From: Tim Lee <timlee660101@gmail.com>
+Date: Mon, 25 Nov 2019 14:32:37 +0800
+Subject: [PATCH] main: Fix BMC system stuck when doing enumerate state after
+ host shutdown
+
+Root cause:
+According original postd design, the postFd open without any file descriptor flag option.
+This cause I/O operation on the postFd will waiting process on wait_event_interruptible() in LPC BPC driver.
+To avoid this stuck symptom when Host shutdown, postd daemon need to use nonblocking read.
+
+Solution:
+Change open fd flag to O_NONBLOCK  avoid this kind of system stuck symptom.
+
+Tested:
+Using RunBMC-Olympus platform to verify it. BTW, this issue is 100% repo.
+1. Power ON Host by WebUI.
+2. Shutdown Host by WebUI.
+3. Execute enumerate curl or busctl command as below to query state.
+   curl -b cjar -k https://${POLEG_IP}/xyz/openbmc_project/state/enumerate
+   busctl get-property xyz.openbmc_project.State.Boot.Raw /xyz/openbmc_project/state/boot/raw xyz.openbmc_project.State.Boot.Raw Value
+4. BMC system get enumerate state normally without stuck symptom when Host shutdown.
+
+Signed-off-by: Tim Lee <timlee660101@gmail.com>
+---
+ main.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/main.cpp b/main.cpp
+index 8928a5b..e31a178 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -161,7 +161,7 @@ int main(int argc, char* argv[])
+         }
+     }
+ 
+-    postFd = open(snoopFilename, 0);
++    postFd = open(snoopFilename, O_NONBLOCK);
+     if (postFd < 0)
+     {
+         fprintf(stderr, "Unable to open: %s\n", snoopFilename);
+-- 
+2.17.1
+
