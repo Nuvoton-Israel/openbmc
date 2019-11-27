@@ -1,0 +1,240 @@
+From e96732b28e431afca35f18749f863e10b6634d13 Mon Sep 17 00:00:00 2001
+From: Tim Lee <timlee660101@gmail.com>
+Date: Wed, 27 Nov 2019 09:56:22 +0800
+Subject: [PATCH] main: add feature for updating BootProgress and
+ OperatingSystemState properties when host power on
+
+Due to BootProgress and OperatingSystemState of Host state didn't be updated correctly.
+Thus, we implement an method to update those states according BIOS POST CODE in phosphor-host-postd.
+
+And we also design a JSON file for customer to specific their BIOS POST CODE according their host motherboard.
+Then customer can know the boot progress state when host power on.
+
+Tested: Using RunBMC-Olympus platform to verify it.
+Query host state continually when host power on by below curl command:
+curl -b cjar -k https://${POLEG_IP}/xyz/openbmc_project/state/enumerate
+
+Result:
+"/xyz/openbmc_project/state/host0": {
+"BootProgress": "xyz.openbmc_project.State.Boot.Progress.ProgressStages.OSStart",
+"OperatingSystemState": "xyz.openbmc_project.State.OperatingSystem.Status.OSStatus.Standby" }
+
+Signed-off-by: Tim Lee <timlee660101@gmail.com>
+---
+ lpcsnoop/snoop.hpp |  26 +++++++++
+ main.cpp           | 131 ++++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 155 insertions(+), 2 deletions(-)
+
+diff --git a/lpcsnoop/snoop.hpp b/lpcsnoop/snoop.hpp
+index acaeca7..89e9f56 100644
+--- a/lpcsnoop/snoop.hpp
++++ b/lpcsnoop/snoop.hpp
+@@ -8,6 +8,32 @@
+ #define SNOOP_OBJECTPATH "/xyz/openbmc_project/state/boot/raw"
+ /* The LPC snoop on port 80h is mapped to this dbus service. */
+ #define SNOOP_BUSNAME "xyz.openbmc_project.State.Boot.Raw"
++#include <xyz/openbmc_project/State/Boot/Progress/server.hpp>
++#include <xyz/openbmc_project/State/OperatingSystem/Status/server.hpp>
++
++static constexpr const char* POST_CODE_MEM_INIT = "POST_CODE_MEM_INIT";
++static constexpr const char* POST_CODE_PCI_INIT = "POST_CODE_PCI_INIT";
++static constexpr const char* POST_CODE_OS_START = "POST_CODE_OS_START";
++static constexpr const char* POST_CODE_BOARD_INIT = "POST_CODE_BOARD_INIT";
++
++static constexpr const char* HostStateIntfServiceName =
++    "xyz.openbmc_project.State.Host";
++static constexpr const char* HostStateIntfObjectPath =
++    "/xyz/openbmc_project/state/host0";
++static constexpr const char* BootProgressConfigIntfName =
++    "xyz.openbmc_project.State.Boot.Progress";
++static constexpr const char* BootProgressPropertyString =
++    "BootProgress";
++static constexpr const char* OSStatusConfigIntfName =
++    "xyz.openbmc_project.State.OperatingSystem.Status";
++static constexpr const char* OSStatusPropertyString =
++    "OperatingSystemState";
++
++std::variant<std::string> osstart = "xyz.openbmc_project.State.Boot.Progress.ProgressStages.OSStart";
++std::variant<std::string> meminit = "xyz.openbmc_project.State.Boot.Progress.ProgressStages.MemoryInit";
++std::variant<std::string> pciinit = "xyz.openbmc_project.State.Boot.Progress.ProgressStages.PCIInit";
++std::variant<std::string> boardinit = "xyz.openbmc_project.State.Boot.Progress.ProgressStages.MotherboardInit";
++std::variant<std::string> standby = "xyz.openbmc_project.State.OperatingSystem.Status.OSStatus.Standby";
+ 
+ template <typename... T>
+ using ServerObject = typename sdbusplus::server::object::object<T...>;
+diff --git a/main.cpp b/main.cpp
+index 8928a5b..1e8252a 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -32,9 +32,15 @@
+ #include <sdeventplus/source/io.hpp>
+ #include <thread>
+ 
++#include <fstream>
++#include <nlohmann/json.hpp>
++
+ static const char* snoopFilename = "/dev/aspeed-lpc-snoop0";
+ static size_t codeSize = 1; /* Size of each POST code in bytes */
+ 
++static constexpr auto biosDefs = "/etc/default/obmc/bios/bios_defs.json";
++uint64_t OS_START, MEM_INIT, PCI_INIT, BOARD_INIT = 0;
++
+ /*
+  * 256 bytes is a nice amount.  It's improbable we'd need this many, but its
+  * gives us leg room in the event the driver poll doesn't return in a timely
+@@ -42,6 +48,80 @@ static size_t codeSize = 1; /* Size of each POST code in bytes */
+  */
+ static constexpr size_t BUFFER_SIZE = 256;
+ 
++int getDbusProperty(const std::string& service,
++                    const std::string& objPath,
++                    const std::string& interface,
++                    const std::string& property,
++                    std::variant<std::string>& value)
++{
++    try
++    {
++        auto bus = sdbusplus::bus::new_default();
++        auto method = bus.new_method_call(service.c_str(), objPath.c_str(),
++                      "org.freedesktop.DBus.Properties", "Get");
++
++        method.append(interface, property);
++        auto reply = bus.call(method);
++        reply.read(value);
++    }
++    catch (const sdbusplus::exception::SdBusError& e)
++    {
++        return -EIO;
++    }
++    return 0;
++}
++
++int setDbusProperty(const std::string& service,
++                    const std::string& objPath,
++                    const std::string& interface,
++                    const std::string& property,
++                    std::variant<std::string>& value)
++{
++    try
++    {
++        auto bus = sdbusplus::bus::new_default();
++        auto method = bus.new_method_call(service.c_str(), objPath.c_str(),
++                      "org.freedesktop.DBus.Properties", "Set");
++
++        method.append(interface, property, value);
++        auto reply = bus.call(method);
++    }
++    catch (const sdbusplus::exception::SdBusError& e)
++    {
++        return -EIO;
++    }
++    return 0;
++}
++
++uint32_t getPostCodeNum(const std::string& biosName)
++{
++    uint32_t num = 0;
++
++    try
++    {
++        std::ifstream biosd{biosDefs};
++        auto json = nlohmann::json::parse(biosd, nullptr, true);
++        auto defs = json["bios_definitions"];
++
++        auto bios =
++            std::find_if(defs.begin(), defs.end(), [&biosName](const auto g) {
++                return biosName == g["name"];
++            });
++
++        if (bios != defs.end())
++        {
++            num = (*bios)["num"];
++            return num;
++        }
++    }
++    catch (std::exception& e)
++    {
++        fprintf(stderr, "%s\n", e.what());
++    }
++
++    return 0;
++}
++
+ static void usage(const char* name)
+ {
+     fprintf(stderr,
+@@ -76,6 +156,8 @@ void PostCodeEventHandler(sdeventplus::source::IO& s, int postFd,
+     std::array<uint8_t, BUFFER_SIZE> buffer;
+     int readb;
+ 
++    uint64_t postcode = 0;
++
+     readb = read(postFd, buffer.data(), buffer.size());
+     if (readb < 0)
+     {
+@@ -97,7 +179,46 @@ void PostCodeEventHandler(sdeventplus::source::IO& s, int postFd,
+     /* Broadcast the values read. */
+     for (int i = 0; i < readb; i += codeSize)
+     {
+-        reporter->value(assembleBytes(buffer, i, codeSize));
++        postcode = reporter->value(assembleBytes(buffer, i, codeSize));
++
++        if (postcode == OS_START)
++        {
++            // Set BootProgress property value to OSStart
++            if (0 != setDbusProperty(HostStateIntfServiceName, HostStateIntfObjectPath,
++                                     BootProgressConfigIntfName,
++                                     BootProgressPropertyString, osstart))
++                return;
++
++            // Set OperatingSystemState property value to Standby
++            if (0 != setDbusProperty(HostStateIntfServiceName, HostStateIntfObjectPath,
++                                     OSStatusConfigIntfName,
++                                     OSStatusPropertyString, standby))
++                return;
++        }
++        else if (postcode == MEM_INIT)
++        {
++            // Set BootProgress property value to MemoryInit
++            if (0 != setDbusProperty(HostStateIntfServiceName, HostStateIntfObjectPath,
++                                     BootProgressConfigIntfName,
++                                     BootProgressPropertyString, meminit))
++                return;
++        }
++        else if (postcode == PCI_INIT)
++        {
++            // Set BootProgress property value to PCIInit
++            if (0 != setDbusProperty(HostStateIntfServiceName, HostStateIntfObjectPath,
++                                     BootProgressConfigIntfName,
++                                     BootProgressPropertyString, pciinit))
++                return;
++        }
++        else if (postcode == BOARD_INIT)
++        {
++            // Set BootProgress property value to MotherboardInit
++            if (0 != setDbusProperty(HostStateIntfServiceName, HostStateIntfObjectPath,
++                                     BootProgressConfigIntfName,
++                                     BootProgressPropertyString, boardinit))
++                return;
++        }
+     }
+ }
+ 
+@@ -161,7 +282,13 @@ int main(int argc, char* argv[])
+         }
+     }
+ 
+-    postFd = open(snoopFilename, 0);
++    // Get POST CODE from JSON configure file.
++    OS_START = getPostCodeNum(POST_CODE_OS_START);
++    MEM_INIT = getPostCodeNum(POST_CODE_MEM_INIT);
++    PCI_INIT = getPostCodeNum(POST_CODE_PCI_INIT);
++    BOARD_INIT = getPostCodeNum(POST_CODE_BOARD_INIT);
++
++    postFd = open(snoopFilename, O_NONBLOCK);
+     if (postFd < 0)
+     {
+         fprintf(stderr, "Unable to open: %s\n", snoopFilename);
+-- 
+2.17.1
+
