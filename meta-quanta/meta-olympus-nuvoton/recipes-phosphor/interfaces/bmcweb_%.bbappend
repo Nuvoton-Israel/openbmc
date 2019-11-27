@@ -1,11 +1,13 @@
 FILESEXTRAPATHS_prepend_olympus-nuvoton := "${THISDIR}/${PN}:"
 
-SRC_URI_append_olympus-nuvoton = " file://0002-bmcweb-increase-httpreqbody-to-35MB.patch"
-SRC_URI_append_olympus-nuvoton = " file://0003-Redfish-Add-power-metrics-support.patch"
-SRC_URI_append_olympus-nuvoton = " file://0004-bmcweb-sensors-get-sensor-list-also-form-path-with-s.patch"
-SRC_URI_append_olympus-nuvoton = " file://0005-bmcweb-chassis-add-indicatorLED-support.patch"
-SRC_URI_append_olympus-nuvoton = " file://0006-bmcweb-get-cpu-and-dimm-info-from-prettyname.patch"
-SRC_URI_append_olympus-nuvoton = " file://0007-Add-Redfish-property-PowerSupply-EfficiencyPercent.patch"
+SRC_URI_append_olympus-nuvoton = " file://0002-bmcweb-increase-httpreqbody-to-35MB.patch \
+    file://0003-Redfish-Add-power-metrics-support.patch \
+    file://0004-bmcweb-sensors-get-sensor-list-also-form-path-with-s.patch \
+    file://0005-bmcweb-chassis-add-indicatorLED-support.patch \
+    file://0006-bmcweb-get-cpu-and-dimm-info-from-prettyname.patch \
+    file://0007-Add-Redfish-property-PowerSupply-EfficiencyPercent.patch \
+    file://Return-http-status-OK-after-ClearLog.patch \
+"
 
 # Enable CPU Log and Raw PECI support
 EXTRA_OECMAKE += "-DBMCWEB_ENABLE_REDFISH_CPU_LOG=ON"
