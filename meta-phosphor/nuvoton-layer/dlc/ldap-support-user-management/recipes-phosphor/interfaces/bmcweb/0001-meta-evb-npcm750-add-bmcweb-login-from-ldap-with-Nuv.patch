@@ -1,21 +1,21 @@
-From 363df500b4b946235d132335ffaf2d46d0ac17df Mon Sep 17 00:00:00 2001
+From 1d267d15f49171c8995741434c5a584433c9a85e Mon Sep 17 00:00:00 2001
 From: kfting <kfting@nuvoton.com>
-Date: Mon, 11 Nov 2019 17:09:39 +0800
+Date: Wed, 4 Dec 2019 13:50:12 +0800
 Subject: [PATCH] meta-evb-npcm750: add bmcweb login from ldap with Nuvoton's
  supplement
 
 Signed-off-by: kfting <kfting@nuvoton.com>
 ---
  http/routing.h                         |   6 +-
- include/pam_authenticate.hpp           |   9 +-
+ include/pam_authenticate.hpp           |   8 +
  include/sessions.hpp                   |   1 +
- redfish-core/include/nuvoton-addon.hpp | 162 +++++++++++++++++++
- redfish-core/lib/account_service.hpp   | 211 ++++++++++++++++++-------
- 5 files changed, 330 insertions(+), 59 deletions(-)
+ redfish-core/include/nuvoton-addon.hpp | 162 ++++++++++++++++++
+ redfish-core/lib/account_service.hpp   | 221 ++++++++++++++++++-------
+ 5 files changed, 340 insertions(+), 58 deletions(-)
  create mode 100644 redfish-core/include/nuvoton-addon.hpp
 
 diff --git a/http/routing.h b/http/routing.h
-index 758f8dd4..a7bb3498 100644
+index 200cfa09..87b03d6a 100644
 --- a/http/routing.h
 +++ b/http/routing.h
 @@ -2,6 +2,7 @@
@@ -26,7 +26,7 @@ index 758f8dd4..a7bb3498 100644
  
  #include <boost/container/flat_map.hpp>
  #include <boost/container/small_vector.hpp>
-@@ -1255,8 +1256,11 @@ class Router
+@@ -1251,8 +1252,11 @@ class Router
          if (req.session != nullptr)
          {
              // Get the user role from the session.
@@ -40,14 +40,13 @@ index 758f8dd4..a7bb3498 100644
  
              BMCWEB_LOG_DEBUG << "USER ROLE=" << userRole;
 diff --git a/include/pam_authenticate.hpp b/include/pam_authenticate.hpp
-index 1469aef7..ccbd99fa 100644
+index 5d78efcf..01cade90 100644
 --- a/include/pam_authenticate.hpp
 +++ b/include/pam_authenticate.hpp
-@@ -55,12 +55,19 @@ inline bool pamAuthenticateUser(const std::string_view username,
-     const struct pam_conv localConversation = {
+@@ -56,11 +56,19 @@ inline bool pamAuthenticateUser(const std::string_view username,
          pamFunctionConversation, const_cast<char*>(passStr.c_str())};
-     pam_handle_t* localAuthHandle = NULL; // this gets set by pam_start
--
+     pam_handle_t* localAuthHandle = nullptr; // this gets set by pam_start
+ 
 +    std::string nuvo_login_intf("web");
      if (pam_start("webserver", userStr.c_str(), &localConversation,
                    &localAuthHandle) != PAM_SUCCESS)
@@ -65,13 +64,13 @@ index 1469aef7..ccbd99fa 100644
                                    PAM_SILENT | PAM_DISALLOW_NULL_AUTHTOK);
  
 diff --git a/include/sessions.hpp b/include/sessions.hpp
-index df65d615..c6a2b8d7 100644
+index 6e74f259..618b8323 100644
 --- a/include/sessions.hpp
 +++ b/include/sessions.hpp
-@@ -11,6 +11,7 @@
- #include <sdbusplus/bus/match.hpp>
+@@ -12,6 +12,7 @@
  
  #include "logging.h"
+ #include "utility.h"
 +#include "nuvoton-addon.hpp"
  
  namespace crow
@@ -245,7 +244,7 @@ index 00000000..2e05746e
 +
 +} // namespace redfish
 diff --git a/redfish-core/lib/account_service.hpp b/redfish-core/lib/account_service.hpp
-index 7f34949f..f4ffdd43 100644
+index 637be86c..0e5c2893 100644
 --- a/redfish-core/lib/account_service.hpp
 +++ b/redfish-core/lib/account_service.hpp
 @@ -15,12 +15,14 @@
@@ -302,7 +301,7 @@ index 7f34949f..f4ffdd43 100644
  inline std::string getRoleIdFromPrivilege(std::string_view role)
  {
      if (role == "priv-admin")
-@@ -1214,6 +1248,8 @@ class AccountsCollection : public Node
+@@ -1363,6 +1397,8 @@ class AccountsCollection : public Node
                      messages::internalError(asyncResp->res);
                      return;
                  }
@@ -311,7 +310,7 @@ index 7f34949f..f4ffdd43 100644
  
                  nlohmann::json& memberArray =
                      asyncResp->res.jsonValue["Members"];
-@@ -1233,10 +1269,32 @@ class AccountsCollection : public Node
+@@ -1382,10 +1418,32 @@ class AccountsCollection : public Node
                      {
                          lastIndex += 1;
                      }
@@ -344,7 +343,7 @@ index 7f34949f..f4ffdd43 100644
              },
              "xyz.openbmc_project.User.Manager", "/xyz/openbmc_project/user",
              "org.freedesktop.DBus.ObjectManager", "GetManagedObjects");
-@@ -1377,6 +1435,9 @@ class ManagerAccount : public Node
+@@ -1527,6 +1585,9 @@ class ManagerAccount : public Node
                      messages::internalError(asyncResp->res);
                      return;
                  }
@@ -354,7 +353,7 @@ index 7f34949f..f4ffdd43 100644
                  auto userIt = users.begin();
  
                  for (; userIt != users.end(); userIt++)
-@@ -1386,7 +1447,9 @@ class ManagerAccount : public Node
+@@ -1536,7 +1597,9 @@ class ManagerAccount : public Node
                          break;
                      }
                  }
@@ -365,7 +364,7 @@ index 7f34949f..f4ffdd43 100644
                  {
                      messages::resourceNotFound(asyncResp->res, "ManagerAccount",
                                                 accountName);
-@@ -1401,75 +1464,102 @@ class ManagerAccount : public Node
+@@ -1551,75 +1614,102 @@ class ManagerAccount : public Node
                      {"Description", "User Account"},
                      {"Password", nullptr}};
  
@@ -404,13 +403,11 @@ index 7f34949f..f4ffdd43 100644
 +                            "xyz.openbmc_project.User.Attributes")
                          {
 -                            if (property.first == "UserEnabled")
-+                            for (const auto& property : interface.second)
-                             {
+-                            {
 -                                const bool* userEnabled =
 -                                    std::get_if<bool>(&property.second);
 -                                if (userEnabled == nullptr)
-+                                if (property.first == "UserEnabled")
-                                 {
+-                                {
 -                                    BMCWEB_LOG_ERROR
 -                                        << "UserEnabled wasn't a bool";
 -                                    messages::internalError(asyncResp->res);
@@ -421,11 +418,13 @@ index 7f34949f..f4ffdd43 100644
 -                            }
 -                            else if (property.first ==
 -                                     "UserLockedForFailedAttempt")
--                            {
++                            for (const auto& property : interface.second)
+                             {
 -                                const bool* userLocked =
 -                                    std::get_if<bool>(&property.second);
 -                                if (userLocked == nullptr)
--                                {
++                                if (property.first == "UserEnabled")
+                                 {
 -                                    BMCWEB_LOG_ERROR << "UserLockedForF"
 -                                                        "ailedAttempt "
 -                                                        "wasn't a bool";
@@ -524,20 +523,30 @@ index 7f34949f..f4ffdd43 100644
                  }
  
                  asyncResp->res.jsonValue["@odata.id"] =
-@@ -1554,6 +1644,13 @@ class ManagerAccount : public Node
-                 return;
-             }
-         }
+@@ -1699,6 +1789,23 @@ class ManagerAccount : public Node
+         std::string dbusObjectPath = "/xyz/openbmc_project/user/" + username;
+         dbus::utility::escapePathForDbus(dbusObjectPath);
+ 
 +        struct ldap_user_param ldap_ret;
 +        bool is_ldap_user = isUserFromLDAP(username, ldap_ret);
 +        if(is_ldap_user)
 +        {
++            if (password)
++            {
++                if (pamUpdatePassword(username, *password))
++                {
++                    BMCWEB_LOG_ERROR << "pamUpdatePassword Failed";
++                    messages::internalError(asyncResp->res);
++                    return;
++                }
++            }
 +            messages::success(asyncResp->res);
 +            return;
 +        }
- 
-         std::string dbusObjectPath = "/xyz/openbmc_project/user/" + username;
-         dbus::utility::escapePathForDbus(dbusObjectPath);
++
+         dbus::utility::checkDbusPathExists(
+             dbusObjectPath,
+             [dbusObjectPath(std::move(dbusObjectPath)), username,
 -- 
 2.17.1
 
