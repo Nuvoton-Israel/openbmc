@@ -1,0 +1,12 @@
+diff --git a/xyz/openbmc_project/Control/Boot.errors.yaml b/xyz/openbmc_project/Control/Boot.errors.yaml
+new file mode 100644
+index 0000000..3b47f64
+--- /dev/null
++++ b/xyz/openbmc_project/Control/Boot.errors.yaml
+@@ -0,0 +1,6 @@
++# xyz.openbmc_project.Control.Boot.Error.Checkstop
++ - name: Checkstop
++   description: Host boot hang.
++# xyz.openbmc_project.Control.Boot.Error.WatchdogTimedOut
++ - name: WatchdogTimedOut
++   description: Watchdog time out triggered while Host booting.
