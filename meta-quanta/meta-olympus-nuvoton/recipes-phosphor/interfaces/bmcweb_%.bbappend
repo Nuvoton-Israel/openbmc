@@ -7,6 +7,7 @@ SRC_URI_append_olympus-nuvoton = " file://0002-bmcweb-increase-httpreqbody-to-35
     file://0006-bmcweb-get-cpu-and-dimm-info-from-prettyname.patch \
     file://0007-Add-Redfish-property-PowerSupply-EfficiencyPercent.patch \
     file://Return-http-status-OK-after-ClearLog.patch \
+    file://add_message_registry_watchdog_timeout \
 "
 
 # Enable CPU Log and Raw PECI support
