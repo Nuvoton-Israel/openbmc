@@ -330,7 +330,7 @@ windows/linux
 ### BMC Firmware Update
 <img align="right" width="30%" src="https://cdn.rawgit.com/NTC-CCBG/snapshots/0f22742/openbmc/firmware-update.png">
 
-Virtual Media (VM) is to emulate an USB drive on remote host PC via Network Block Device(NBD) and Mass Storage(MSTG).
+This is a secure flash update mechanism to update BMC firmware via WebUI.
 
 **Source URL**
 
