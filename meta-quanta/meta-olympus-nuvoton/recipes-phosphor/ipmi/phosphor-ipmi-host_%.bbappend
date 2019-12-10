@@ -15,6 +15,7 @@ EXTRA_OECONF_olympus-nuvoton = " \
 
 SRC_URI_append_olympus-nuvoton = " file://phosphor-ipmi-host.service"
 SRC_URI_append_olympus-nuvoton = " file://xyz.openbmc_project.Ipmi.Internal.SoftPowerOff.service"
+SRC_URI_append_olympus-nuvoton = " file://0001-fix-get-property-failed-when-executing-channel-acces.patch"
 
 SYSTEMD_SERVICE_${PN}_append_olympus-nuvoton = " phosphor-ipmi-host.service"
 SYSTEMD_SERVICE_${PN}_append_olympus-nuvoton = " xyz.openbmc_project.Ipmi.Internal.SoftPowerOff.service"
