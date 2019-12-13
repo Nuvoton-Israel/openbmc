@@ -1,0 +1,25 @@
+From 16dae182347ed4d021ab403b42e91fdfaf79560d Mon Sep 17 00:00:00 2001
+From: Tim Lee <timlee660101@gmail.com>
+Date: Fri, 13 Dec 2019 17:49:16 +0800
+Subject: [PATCH] add default state for ProgressStages and OSStatus
+
+---
+ host_state_manager.cpp | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/host_state_manager.cpp b/host_state_manager.cpp
+index e640cbb..f991636 100644
+--- a/host_state_manager.cpp
++++ b/host_state_manager.cpp
+@@ -272,6 +272,8 @@ void Host::sysStateChange(sdbusplus::message::message& msg)
+     {
+         log<level::INFO>("Received signal that host is running");
+         this->currentHostState(server::Host::HostState::Running);
++        this->bootProgress(bootprogress::Progress::ProgressStages::OSStart);
++        this->operatingSystemState(osstatus::Status::OSStatus::Standby);
+     }
+     else if ((newStateUnit == HOST_STATE_QUIESCE_TGT) &&
+              (newStateResult == "done") &&
+-- 
+2.17.1
+
