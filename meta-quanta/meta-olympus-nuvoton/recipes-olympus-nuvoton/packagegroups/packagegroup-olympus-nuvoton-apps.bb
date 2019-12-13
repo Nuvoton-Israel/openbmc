@@ -56,4 +56,5 @@ RDEPENDS_${PN}-system = " \
         openssl-bin \
         loadsvf \
         asd \
+        iptables \
         "
