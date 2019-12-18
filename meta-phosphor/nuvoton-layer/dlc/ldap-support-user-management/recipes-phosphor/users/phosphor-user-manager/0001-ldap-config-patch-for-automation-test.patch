@@ -1,0 +1,30 @@
+From 27dd3b14a85078dc1abcf22da76bbb6bddba6818 Mon Sep 17 00:00:00 2001
+From: kfting <kfting@nuvoton.com>
+Date: Tue, 17 Dec 2019 14:01:44 +0800
+Subject: [PATCH] ldap-config patch for automation test
+
+1. Used for Nuvoton's ldap support
+
+Signed-off-by: kfting <kfting@nuvoton.com>
+---
+ phosphor-ldap-config/ldap_config.cpp | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/phosphor-ldap-config/ldap_config.cpp b/phosphor-ldap-config/ldap_config.cpp
+index 913dae3..3785b33 100644
+--- a/phosphor-ldap-config/ldap_config.cpp
++++ b/phosphor-ldap-config/ldap_config.cpp
+@@ -293,6 +293,10 @@ void Config::writeConfig()
+                  << ConfigIface::userNameAttribute() << "\n";
+         confData << "map passwd gidNumber        "
+                  << ConfigIface::groupNameAttribute() << "\n";
++
++        confData << "rootpwmoddn uid=proxyuser,ou=people,dc=ldap,dc=example,dc=com\n";
++        confData << "rootpwmodpw 123\n";
++        confData << "base group ou=group,dc=ldap,dc=example,dc=com\n";
+     }
+     try
+     {
+-- 
+2.17.1
+

@@ -1,4 +1,4 @@
-From 1d267d15f49171c8995741434c5a584433c9a85e Mon Sep 17 00:00:00 2001
+From 265ee2d8f4661a62b860f2d892c6601cbedc4f33 Mon Sep 17 00:00:00 2001
 From: kfting <kfting@nuvoton.com>
 Date: Wed, 4 Dec 2019 13:50:12 +0800
 Subject: [PATCH] meta-evb-npcm750: add bmcweb login from ldap with Nuvoton's
@@ -6,16 +6,16 @@ Subject: [PATCH] meta-evb-npcm750: add bmcweb login from ldap with Nuvoton's
 
 Signed-off-by: kfting <kfting@nuvoton.com>
 ---
- http/routing.h                         |   6 +-
+ http/routing.h                         |  70 ++++++-
  include/pam_authenticate.hpp           |   8 +
  include/sessions.hpp                   |   1 +
- redfish-core/include/nuvoton-addon.hpp | 162 ++++++++++++++++++
- redfish-core/lib/account_service.hpp   | 221 ++++++++++++++++++-------
- 5 files changed, 340 insertions(+), 58 deletions(-)
+ redfish-core/include/nuvoton-addon.hpp | 218 ++++++++++++++++++++
+ redfish-core/lib/account_service.hpp   | 273 +++++++++++++++++++------
+ 5 files changed, 510 insertions(+), 60 deletions(-)
  create mode 100644 redfish-core/include/nuvoton-addon.hpp
 
 diff --git a/http/routing.h b/http/routing.h
-index 200cfa09..87b03d6a 100644
+index 200cfa09..e568ce64 100644
 --- a/http/routing.h
 +++ b/http/routing.h
 @@ -2,6 +2,7 @@
@@ -26,13 +26,84 @@ index 200cfa09..87b03d6a 100644
  
  #include <boost/container/flat_map.hpp>
  #include <boost/container/small_vector.hpp>
-@@ -1251,8 +1252,11 @@ class Router
+@@ -22,6 +23,9 @@
+ #include "utility.h"
+ #include "websocket.h"
+ 
++#include <grp.h>
++#include <pwd.h>
++
+ namespace crow
+ {
+ 
+@@ -1251,8 +1255,72 @@ class Router
          if (req.session != nullptr)
          {
              // Get the user role from the session.
 +            // Check if the user is from LDAP
 +            struct redfish::ldap_user_param ldap_ret;
 +            bool is_ldap_user = redfish::isUserFromLDAP(std::string(req.session->username), ldap_ret);
++            if(is_ldap_user)
++            {
++                struct passwd *pw = NULL;
++                std::string name = std::string(req.session->username);
++                pw = getpwnam(name.c_str());
++                if(pw)
++                {
++#define MAX_GROUP_NUM 1024U
++                    int ngroups, i, ret;
++                    gid_t grouplist[MAX_GROUP_NUM];
++                    //Get the groups which the ldap user belongs to
++                    ret = getgrouplist(name.c_str(), pw->pw_gid, grouplist, &ngroups);
++                    std::vector<redfish::LDAPRoleMap> rr =  redfish::getLDAPRR();
++                    if( (0 <= ret) && (!rr.empty()) )
++                    {
++                        bool is_mapping_found = false;
++                        struct group *gp;
++                        //get the group/privilege mappings stored in the ldap
++                        //mapper
++                        //retrieve each group name where the ldap user joins
++                        for (i = 0; i < ngroups; i++)
++                        {
++                            //compare if the group name for the user matches
++                            //the group name stored in the ldap mapper
++                            gp = getgrgid(grouplist[i]);
++                            if(NULL != gp)
++                            {
++                                std::string str;
++                                for(auto it=rr.begin(); it!=rr.end(); it++)
++                                {
++                                    str.assign(gp->gr_name);
++                                    if(it->groupName == str)
++                                    {
++                                        ldap_ret.userPriv = it->privilege;
++                                        //use the privilege stored in the ldap-mapper
++                                        //instead of that store in the ldap server
++                                        //it doesn't update the the privilege stored in the
++                                        //ldap server
++                                        is_mapping_found = true;
++                                        break;
++                                    }
++                                }
++                            }
++
++                            if(is_mapping_found)
++                            {
++                                break;
++                            }
++                        }
++
++                        if(!is_mapping_found)
++                        {
++                            //Here it means that there is no overlapping between the ldap
++                            //user's groups and the groups stored in the ldap-mapper
++                            //Hence, there is no defined privilege for the ldap
++                            //user.
++                            ldap_ret.userPriv = "";
++                        }
++                    }
++                }
++            }
              const std::string& userRole =
 -                persistent_data::UserRoleMap::getInstance().getUserRole(
 +               is_ldap_user? ldap_ret.userPriv : persistent_data::UserRoleMap::getInstance().getUserRole(
@@ -77,10 +148,10 @@ index 6e74f259..618b8323 100644
  {
 diff --git a/redfish-core/include/nuvoton-addon.hpp b/redfish-core/include/nuvoton-addon.hpp
 new file mode 100644
-index 00000000..2e05746e
+index 00000000..87b39ca4
 --- /dev/null
 +++ b/redfish-core/include/nuvoton-addon.hpp
-@@ -0,0 +1,162 @@
+@@ -0,0 +1,218 @@
 +/*
 +// Copyright (c) 2019 Nuvoton Technology
 +//
@@ -109,6 +180,12 @@ index 00000000..2e05746e
 +namespace redfish
 +{
 +
++struct LDAPRoleMap
++{
++    std::string groupName;
++    std::string privilege;
++};
++
 +struct ldap_user_param 
 +{
 +    std::string passtmp;
@@ -120,6 +197,8 @@ index 00000000..2e05746e
 +    int userLock;
 +    std::string userPriv;
 +};
++
++std::vector<struct LDAPRoleMap> getLDAPRR(void); 
 +
 +inline bool isUserFromLDAP(std::string userName, struct ldap_user_param &ldap_ret)
 +{
@@ -241,10 +320,58 @@ index 00000000..2e05746e
 +    return is_ldap_user;
 +}
 +
++inline bool updateLDAPUser(std::string userName, std::string attr, std::string value)
++{
++#define LDAP_BUF_LENGTH 256
++    FILE *fp=0;
++    //ipmi user password maximum length is 20 bytes.
++    char cmd_get[LDAP_BUF_LENGTH];
++    char read[LDAP_BUF_LENGTH];
++    const char *tty = "web";
++    auto result = 0;
++
++    memset(read, '\0', sizeof(read));
++    sprintf(cmd_get,"getent.ldap nuvopasswd %s %s -t %s -u %s", userName.c_str(), tty, attr.c_str(), value.c_str());
++    fp = popen(cmd_get, "r");
++
++    if( fp && (fgets(read, sizeof(read), fp) != NULL) )
++    {
++        //it means that the user exists in the ldap server.
++        //the user passes the Nuvoton's authentication method
++        //since fgets adds an extra '\n' character, remove it from the read
++        //string.
++        read[strcspn(read, "\n")] = 0;
++        std::string delim = " ";
++        std::string temp(read);
++        auto start = 0U;
++        auto end = temp.find(delim);
++
++        if (std::string::npos != end)
++        {
++            result = std::atoi(temp.substr(start, end-start).c_str());
++            if (ERANGE == errno)
++            {
++                result = 1;
++            }
++        }
++
++    }
++    else
++    {
++        result = 1;
++    }
++
++    if(fp)
++    {
++        pclose(fp);
++    }
++
++    return (0 == result) ? true : false;
++}
 +
 +} // namespace redfish
 diff --git a/redfish-core/lib/account_service.hpp b/redfish-core/lib/account_service.hpp
-index 637be86c..0e5c2893 100644
+index 637be86c..b424b8e5 100644
 --- a/redfish-core/lib/account_service.hpp
 +++ b/redfish-core/lib/account_service.hpp
 @@ -15,12 +15,14 @@
@@ -262,10 +389,17 @@ index 637be86c..0e5c2893 100644
  
  namespace redfish
  {
-@@ -72,6 +74,38 @@ using ManagedObjectType = std::vector<std::pair<
+@@ -72,6 +74,45 @@ using ManagedObjectType = std::vector<std::pair<
  using GetObjectType =
      std::vector<std::pair<std::string, std::vector<std::string>>>;
  
++static std::vector<struct LDAPRoleMap> privRoleMapObjData;
++
++std::vector<struct LDAPRoleMap> getLDAPRR(void)
++{
++    return privRoleMapObjData;
++}
++
 +int getUsersFromAllSession(boost::container::flat_map<std::string, std::string> &userMap)
 +{
 +    std::vector<const std::string*> sessionIds = crow::persistent_data::SessionStore::getInstance().\
@@ -301,7 +435,108 @@ index 637be86c..0e5c2893 100644
  inline std::string getRoleIdFromPrivilege(std::string_view role)
  {
      if (role == "priv-admin")
-@@ -1363,6 +1397,8 @@ class AccountsCollection : public Node
+@@ -217,6 +258,22 @@ static void handleRoleMapPatch(
+             // delete the existing object
+             if (index < roleMapObjData.size())
+             {
++                if(privRoleMapObjData.empty())
++                {
++                    //It's possible that the bmcserver might be restarted or bmc gets rebooted
++                    //but the ldap-mapper configuration still
++                    //remains(serialized) while the mapping data is gone.
++                    //Recover the mapping data under such a condition.
++                    struct LDAPRoleMap map;
++                    size_t size = roleMapObjData.size();
++                    for(size_t i=0; i < size; i++)
++                    {
++                        map.groupName = roleMapObjData[index].second.groupName;
++                        map.privilege = getPrivilegeFromRoleId(roleMapObjData[index].second.privilege);
++                        privRoleMapObjData.insert(privRoleMapObjData.begin()+static_cast<int>(i), map);
++                    }
++                }
++
+                 crow::connections::systemBus->async_method_call(
+                     [asyncResp, roleMapObjData, serverType,
+                      index](const boost::system::error_code ec) {
+@@ -229,6 +286,8 @@ static void handleRoleMapPatch(
+                         asyncResp->res
+                             .jsonValue[serverType]["RemoteRoleMapping"][index] =
+                             nullptr;
++
++                        privRoleMapObjData.erase(privRoleMapObjData.begin()+static_cast<int>(index));
+                     },
+                     ldapDbusService, roleMapObjData[index].first,
+                     "xyz.openbmc_project.Object.Delete", "Delete");
+@@ -252,7 +311,6 @@ static void handleRoleMapPatch(
+             // update/create the object
+             std::optional<std::string> remoteGroup;
+             std::optional<std::string> localRole;
+-
+             if (!json_util::readJson(thisJson, asyncResp->res, "RemoteGroup",
+                                      remoteGroup, "LocalRole", localRole))
+             {
+@@ -263,6 +321,21 @@ static void handleRoleMapPatch(
+             if (index < roleMapObjData.size())
+             {
+                 BMCWEB_LOG_DEBUG << "Update Role Map Object";
++                if(privRoleMapObjData.empty())
++                {
++                    //It's possible that the bmcserver might be restarted or bmc gets rebooted
++                    //but the ldap-mapper configuration still
++                    //remains(serialized) while the mapping data is gone.
++                    //Recover the mapping data under such a condition.
++                    struct LDAPRoleMap map;
++                    size_t size = roleMapObjData.size();
++                    for(size_t i=0; i < size; i++)
++                    {
++                        map.groupName = *remoteGroup;
++                        map.privilege = getPrivilegeFromRoleId(*localRole);
++                        privRoleMapObjData.insert(privRoleMapObjData.begin()+static_cast<int>(i), map);
++                    }
++                }
+                 // If "RemoteGroup" info is provided
+                 if (remoteGroup)
+                 {
+@@ -279,6 +352,8 @@ static void handleRoleMapPatch(
+                             asyncResp->res
+                                 .jsonValue[serverType]["RemoteRoleMapping"]
+                                           [index]["RemoteGroup"] = *remoteGroup;
++
++                            privRoleMapObjData.at(index).groupName = *remoteGroup;
+                         },
+                         ldapDbusService, roleMapObjData[index].first,
+                         propertyInterface, "Set",
+@@ -303,6 +378,8 @@ static void handleRoleMapPatch(
+                             asyncResp->res
+                                 .jsonValue[serverType]["RemoteRoleMapping"]
+                                           [index]["LocalRole"] = *localRole;
++
++                            privRoleMapObjData.at(index).privilege = getPrivilegeFromRoleId(*localRole);
+                         },
+                         ldapDbusService, roleMapObjData[index].first,
+                         propertyInterface, "Set",
+@@ -348,7 +425,7 @@ static void handleRoleMapPatch(
+ 
+                 crow::connections::systemBus->async_method_call(
+                     [asyncResp, serverType, localRole,
+-                     remoteGroup](const boost::system::error_code ec) {
++                     remoteGroup, index](const boost::system::error_code ec) {
+                         if (ec)
+                         {
+                             BMCWEB_LOG_ERROR << "DBUS response error: " << ec;
+@@ -361,6 +438,11 @@ static void handleRoleMapPatch(
+                         remoteRoleJson.push_back(
+                             {{"LocalRole", *localRole},
+                              {"RemoteGroup", *remoteGroup}});
++
++                        struct LDAPRoleMap map;
++                        map.groupName = *remoteGroup;
++                        map.privilege = getPrivilegeFromRoleId(*localRole);
++                        privRoleMapObjData.insert(privRoleMapObjData.begin()+static_cast<int>(index), map);
+                     },
+                     ldapDbusService, dbusObjectPath, ldapPrivMapperInterface,
+                     "Create", std::move(*remoteGroup),
+@@ -1363,6 +1445,8 @@ class AccountsCollection : public Node
                      messages::internalError(asyncResp->res);
                      return;
                  }
@@ -310,7 +545,7 @@ index 637be86c..0e5c2893 100644
  
                  nlohmann::json& memberArray =
                      asyncResp->res.jsonValue["Members"];
-@@ -1382,10 +1418,32 @@ class AccountsCollection : public Node
+@@ -1382,10 +1466,32 @@ class AccountsCollection : public Node
                      {
                          lastIndex += 1;
                      }
@@ -343,7 +578,7 @@ index 637be86c..0e5c2893 100644
              },
              "xyz.openbmc_project.User.Manager", "/xyz/openbmc_project/user",
              "org.freedesktop.DBus.ObjectManager", "GetManagedObjects");
-@@ -1527,6 +1585,9 @@ class ManagerAccount : public Node
+@@ -1527,6 +1633,9 @@ class ManagerAccount : public Node
                      messages::internalError(asyncResp->res);
                      return;
                  }
@@ -353,7 +588,7 @@ index 637be86c..0e5c2893 100644
                  auto userIt = users.begin();
  
                  for (; userIt != users.end(); userIt++)
-@@ -1536,7 +1597,9 @@ class ManagerAccount : public Node
+@@ -1536,7 +1645,9 @@ class ManagerAccount : public Node
                          break;
                      }
                  }
@@ -364,7 +599,7 @@ index 637be86c..0e5c2893 100644
                  {
                      messages::resourceNotFound(asyncResp->res, "ManagerAccount",
                                                 accountName);
-@@ -1551,75 +1614,102 @@ class ManagerAccount : public Node
+@@ -1551,75 +1662,102 @@ class ManagerAccount : public Node
                      {"Description", "User Account"},
                      {"Password", nullptr}};
  
@@ -372,11 +607,14 @@ index 637be86c..0e5c2893 100644
 +                struct ldap_user_param ldap_ret;
 +                bool is_ldap_user = isUserFromLDAP(accountName, ldap_ret);
 +                if(is_ldap_user)
-+                {
+                 {
+-                    if (interface.first ==
+-                        "xyz.openbmc_project.User.Attributes")
 +                    asyncResp->res.jsonValue["Enabled"] = ldap_ret.userEnabled;
 +                    std::string role = getRoleIdFromPrivilege(ldap_ret.userPriv);
 +                    if (role.empty())
-+                    {
+                     {
+-                        for (const auto& property : interface.second)
 +                        BMCWEB_LOG_ERROR << "Invalid user role";
 +                        messages::internalError(asyncResp->res);
 +                        return;
@@ -392,13 +630,10 @@ index 637be86c..0e5c2893 100644
 +
 +                }
 +                else
-                 {
--                    if (interface.first ==
--                        "xyz.openbmc_project.User.Attributes")
++                {
 +
 +                    for (const auto& interface : userIt->second)
-                     {
--                        for (const auto& property : interface.second)
++                    {
 +                        if (interface.first ==
 +                            "xyz.openbmc_project.User.Attributes")
                          {
@@ -523,7 +758,7 @@ index 637be86c..0e5c2893 100644
                  }
  
                  asyncResp->res.jsonValue["@odata.id"] =
-@@ -1699,6 +1789,23 @@ class ManagerAccount : public Node
+@@ -1699,6 +1837,23 @@ class ManagerAccount : public Node
          std::string dbusObjectPath = "/xyz/openbmc_project/user/" + username;
          dbus::utility::escapePathForDbus(dbusObjectPath);
  
