@@ -1,0 +1,32 @@
+From f53ee2b2ab37cf32dad4d707588d11fc3f79574d Mon Sep 17 00:00:00 2001
+From: Tim Lee <timlee660101@gmail.com>
+Date: Thu, 26 Dec 2019 10:33:27 +0800
+Subject: [PATCH] fix mac address missing left zeros
+
+---
+ util.cpp | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/util.cpp b/util.cpp
+index afbc229..b0dd526 100644
+--- a/util.cpp
++++ b/util.cpp
+@@ -612,7 +612,14 @@ ether_addr fromString(const char* str)
+ 
+ std::string toString(const ether_addr& mac)
+ {
+-    return ether_ntoa(&mac);
++    // 12 digits + 5 colons + null terminator
++    char buf[18] = {0};
++
++    snprintf(buf, 18, "%02x:%02x:%02x:%02x:%02x:%02x", mac.ether_addr_octet[0],
++             mac.ether_addr_octet[1], mac.ether_addr_octet[2],
++             mac.ether_addr_octet[3], mac.ether_addr_octet[4],
++             mac.ether_addr_octet[5]);
++    return buf;
+ }
+ 
+ bool isEmpty(const ether_addr& mac)
+-- 
+2.17.1
+
