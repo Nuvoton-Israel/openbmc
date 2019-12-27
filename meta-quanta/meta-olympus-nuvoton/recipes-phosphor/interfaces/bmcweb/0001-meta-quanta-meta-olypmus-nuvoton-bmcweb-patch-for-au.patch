@@ -1,0 +1,79 @@
+From 5f6ef64d69032db86f0c6062b22edc9a043da646 Mon Sep 17 00:00:00 2001
+From: kfting <kfting@nuvoton.com>
+Date: Fri, 27 Dec 2019 13:03:10 +0800
+Subject: [PATCH] meta-quanta:meta-olypmus-nuvoton:bmcweb patch for automation
+ test
+
+1. Reference from https://gerrit.openbmc-project.xyz/c/openbmc/bmcweb/+/23538
+2. test_ldap_configuration.robot
+
+Signed-off-by: kfting <kfting@nuvoton.com>
+---
+ include/sessions.hpp | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+
+diff --git a/include/sessions.hpp b/include/sessions.hpp
+index 6e74f259..d65dbdcf 100644
+--- a/include/sessions.hpp
++++ b/include/sessions.hpp
+@@ -59,6 +59,7 @@ struct UserRoleMap
+     std::string getUserRole(std::string_view name)
+     {
+         auto it = roleMap.find(std::string(name));
++#if 0
+         if (it == roleMap.end())
+         {
+             BMCWEB_LOG_ERROR << "User name " << name
+@@ -66,6 +67,49 @@ struct UserRoleMap
+             return "";
+         }
+         return it->second;
++#endif
++        if (it != roleMap.end())
++        {
++            return it->second;
++        }
++        auto method = crow::connections::systemBus->new_method_call(
++                userService, userObjPath, userService, "GetUserInfo");
++        // string_view is not support by this dbus call. Hence, need to create
++        // a temporary string object.
++        method.append(std::string(name));
++        std::map<std::string, sdbusplus::message::variant<
++              bool, std::string, std::vector<std::string>>>
++              userInfo;
++        try
++        {
++            auto reply = crow::connections::systemBus->call(method);
++            reply.read(userInfo);
++        }
++        catch (const sdbusplus::exception::SdBusError& ex)
++        {
++            return "";
++        }
++        const std::string* userRole = nullptr;
++        auto userInfoIter = userInfo.find("UserPrivilege");
++        if (userInfoIter != userInfo.end())
++        {
++            userRole = std::get_if<std::string>(&userInfoIter->second);
++        }
++
++        if (userRole != nullptr)
++        {
++            BMCWEB_LOG_DEBUG << "user name " << name << " role is "
++                << *userRole;
++            return *userRole;
++        }
++        else
++        {
++            BMCWEB_LOG_ERROR << "Unable to find the userRole for the user "
++                << name;
++        }
++
++        return "";
++
+     }
+ 
+     std::string
+-- 
+2.17.1
+
