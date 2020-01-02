@@ -9,10 +9,14 @@ inherit phosphor-dbus-yaml
 
 S = "${WORKDIR}"
 CONFIG_YAML_PATH="xyz/openbmc_project/Control"
-SRC_URI = "file://Boot.errors.yaml"
+SRC_URI = "file://Boot.errors.yaml \
+           file://Boot.metadata.yaml \
+"
 
 do_install_append() {
     DEST=${D}${yaml_dir}/${CONFIG_YAML_PATH}
+    SRC=${S}
     install -d ${DEST}
-    install Boot.errors.yaml ${DEST}
+    install ${SRC}/*.errors.yaml ${DEST}
+    install ${SRC}/*.metadata.yaml ${DEST}
 }
