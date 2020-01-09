@@ -1,0 +1,44 @@
+From 572be161f796c535774cc43762d85e33051fa287 Mon Sep 17 00:00:00 2001
+From: Brian Ma <chma0@nuvoton.com>
+Date: Thu, 2 Jan 2020 16:37:26 +0800
+Subject: [PATCH] add watchdog sensor type
+
+---
+ sdrutils.hpp      | 3 ++-
+ sensorhandler.hpp | 1 +
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/sdrutils.hpp b/sdrutils.hpp
+index 7297467..9773837 100644
+--- a/sdrutils.hpp
++++ b/sdrutils.hpp
+@@ -91,6 +91,7 @@ const static boost::container::flat_map<
+          {"fan_tach", std::make_pair(IPMI_SENSOR_FAN, THRESHOLD)},
+          {"fan_pwm", std::make_pair(IPMI_SENSOR_FAN, THRESHOLD)},
+          {"power", std::make_pair(IPMI_SENSOR_OTHER, THRESHOLD)},
++         {"watchdog", std::make_pair(IPMI_SENSOR_WATCHDOG, SENSOR_SPECIFIC)},
+          {"memory", std::make_pair(IPMI_SENSOR_MEMORY, SENSOR_SPECIFIC)}}};
+ 
+ inline static std::string getSensorTypeStringFromPath(const std::string& path)
+@@ -180,4 +181,4 @@ inline static std::string getPathFromSensorNumber(uint8_t sensorNum)
+ 
+     return path;
+ }
+-#endif // JOURNAL_SEL
+\ No newline at end of file
++#endif // JOURNAL_SEL
+diff --git a/sensorhandler.hpp b/sensorhandler.hpp
+index bb49195..27c16b5 100644
+--- a/sensorhandler.hpp
++++ b/sensorhandler.hpp
+@@ -39,6 +39,7 @@ enum ipmi_sensor_types
+     IPMI_SENSOR_OTHER = 0x0B,
+     IPMI_SENSOR_TPM = 0xCC,
+     IPMI_SENSOR_MEMORY = 0x0C,
++    IPMI_SENSOR_WATCHDOG = 0x23,
+ };
+ 
+ enum ipmi_event_types
+-- 
+2.17.1
+

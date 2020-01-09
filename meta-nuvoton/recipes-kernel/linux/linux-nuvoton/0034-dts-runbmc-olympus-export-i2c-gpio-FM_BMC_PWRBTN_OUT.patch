@@ -1,0 +1,45 @@
+From 56e35ae373dc7727e46611de991ee007c440dda9 Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Tue, 7 Jan 2020 17:47:55 +0800
+Subject: [PATCH] dts: runbmc-olympus: export i2c-gpio FM_BMC_PWRBTN_OUT_N and
+ RST_BMC_SYSRST_BTN_OUT_N
+
+---
+ .../boot/dts/nuvoton-npcm750-runbmc-olympus.dts    | 14 ++------------
+ 1 file changed, 2 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts b/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts
+index 50e0ce20ecaf..224fbe73cc12 100644
+--- a/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts
++++ b/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts
+@@ -764,6 +764,8 @@
+ 					gpio-controller;
+ 					#gpio-cells = <2>;
+ 					reset-gpios = <&gpio5 28 GPIO_ACTIVE_LOW>;
++					gpio-line-names="","","","POWER_OUT","RESET_OUT","","","",
++													"","","","","","","","";
+ 					G2A_P0_0 {
+ 						gpio-hog;
+ 						gpios = <0 0>;
+@@ -782,18 +784,6 @@
+ 						input;
+ 						line-name = "RST_BMC_RTCRST";
+ 					};
+-					G2A_P0_3 {
+-						gpio-hog;
+-						gpios = <3 0>;
+-						output-high;
+-						line-name = "FM_BMC_PWRBTN_OUT_N";
+-					};
+-					G2A_P0_4 {
+-						gpio-hog;
+-						gpios = <4 0>;
+-						output-high;
+-						line-name = "RST_BMC_SYSRST_BTN_OUT_N";
+-					};
+ 					G2A_P0_5 {
+ 						gpio-hog;
+ 						gpios = <5 0>;
+-- 
+2.17.1
+

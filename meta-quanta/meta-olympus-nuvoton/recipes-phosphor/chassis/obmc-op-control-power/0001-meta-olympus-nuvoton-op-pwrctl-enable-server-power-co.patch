@@ -8,7 +8,7 @@ Subject: [PATCH] meta-olympus-nuvoton: op-pwrctl: enable server power control
  power_control_obj.c | 26 ++++++++++++++++++++------
  1 file changed, 20 insertions(+), 6 deletions(-)
 
-diff --git a/opower_control_obj.c b/power_control_obj.c
+diff --git a/power_control_obj.c b/power_control_obj.c
 index dedcbe2..cde80a0 100644
 --- a/power_control_obj.c
 +++ b/power_control_obj.c

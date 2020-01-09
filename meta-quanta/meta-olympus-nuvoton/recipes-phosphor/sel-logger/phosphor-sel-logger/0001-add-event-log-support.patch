@@ -1,0 +1,310 @@
+From f6be59fab2afdb465942410671c96a151eddfcbf Mon Sep 17 00:00:00 2001
+From: Brian Ma <chma0@nuvoton.com>
+Date: Thu, 2 Jan 2020 14:40:52 +0800
+Subject: [PATCH] add event log support
+
+---
+ CMakeLists.txt                |  12 +++
+ include/event_log_monitor.hpp |  61 ++++++++++++++
+ include/sel_logger.hpp        |   3 +
+ include/watchdog_timeout.hpp  | 153 ++++++++++++++++++++++++++++++++++
+ src/sel_logger.cpp            |   6 ++
+ 5 files changed, 235 insertions(+)
+ create mode 100644 include/event_log_monitor.hpp
+ create mode 100644 include/watchdog_timeout.hpp
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 5fc1ae2..a4f84d8 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -19,10 +19,18 @@ option (
+     OFF
+ )
+ 
++option(
++    REDFISH_LOG_MONITOR_EVENTS_LOG
++    "Enable logger to monitor and automatically
++     log dbus event log as SEL records"
++)
++
+ target_compile_definitions (
+     sel-logger PRIVATE
+     $<$<BOOL:${SEL_LOGGER_MONITOR_THRESHOLD_EVENTS}>: -DSEL_LOGGER_MONITOR_THRESHOLD_EVENTS>
+     $<$<BOOL:${REDFISH_LOG_MONITOR_PULSE_EVENTS}>: -DREDFISH_LOG_MONITOR_PULSE_EVENTS>
++    $<$<BOOL:${REDFISH_LOG_MONITOR_EVENTS_LOG}>: -DREDFISH_LOG_MONITOR_EVENTS_LOG>
++#    _GLIBCXX_USE_CXX11_ABI=0
+ )
+ 
+ target_include_directories (sel-logger PRIVATE ${CMAKE_SOURCE_DIR})
+@@ -53,3 +61,7 @@ set (
+     ${PROJECT_SOURCE_DIR}/service_files/xyz.openbmc_project.Logging.IPMI.service
+ )
+ install (FILES ${SERVICE_FILES} DESTINATION /lib/systemd/system/)
++
++find_package (PkgConfig REQUIRED)
++pkg_check_modules (DBUSINTERFACE phosphor-dbus-interfaces REQUIRED)
++target_link_libraries (${PROJECT_NAME} phosphor_dbus)
+diff --git a/include/event_log_monitor.hpp b/include/event_log_monitor.hpp
+new file mode 100644
+index 0000000..1e9f65f
+--- /dev/null
++++ b/include/event_log_monitor.hpp
+@@ -0,0 +1,61 @@
++#pragma once
++#include <sdbusplus/asio/object_server.hpp>
++#include <watchdog_timeout.hpp>
++
++namespace mesg = sdbusplus::message;
++namespace variant_ns = mesg::variant_ns;
++namespace MatchRules = sdbusplus::bus::match::rules;
++
++static constexpr auto LOGGING_PATH = "/xyz/openbmc_project/logging";
++static constexpr auto EVENT_LOG_INTERFACE = "xyz.openbmc_project.Logging.Entry";
++static constexpr auto EVENT_WATCHDOG_TIMEOUT = "xyz.openbmc_project.Control.Boot.Error.WatchdogTimedOut";
++
++inline static sdbusplus::bus::match::match
++    startEventLogMonitor(std::shared_ptr<sdbusplus::asio::connection> conn)
++{
++    auto eventLogMatcherCallback = [](sdbusplus::message::message &msg) {
++        mesg::object_path objPath;
++        std::map<std::string, std::map<std::string,
++                mesg::variant<std::string, std::vector<std::string> >>>
++                interfaces;
++        // TODO move debug log to DEBUG or comment
++        log<level::DEBUG>("eventLogMatcherCallback start read message");
++        msg.read(objPath, interfaces);
++        std::string path(std::move(objPath));
++        log<level::INFO>(("eventLogMatcherCallback: "+ path).c_str());
++
++        if (interfaces.empty())
++        {
++            return;
++        }
++
++        // find the message in interface xyz.openbmc_project.Logging.Entry
++        auto intf = std::find_if(interfaces.begin(), interfaces.end(),
++                            [](const auto& i) {
++                                 return i.first == EVENT_LOG_INTERFACE;
++                             });
++        if (intf != interfaces.end())
++        {
++            log<level::DEBUG>("get interface logging entry");
++            auto entry = intf->second;
++            auto message = entry.find("Message");
++            if (message != entry.end())
++            {
++                auto value = variant_ns::get<std::string>(message->second);
++                if (value == EVENT_WATCHDOG_TIMEOUT)
++                {
++                    handleWatchdogInfo(entry);
++                }
++            }
++        }
++
++    };
++
++    sdbusplus::bus::match::match eventLogMatcher(
++        static_cast<sdbusplus::bus::bus &>(*conn),
++        MatchRules::interfacesAdded() +
++                         MatchRules::path(LOGGING_PATH),
++        std::move(eventLogMatcherCallback));
++
++    return eventLogMatcher;
++}
+diff --git a/include/sel_logger.hpp b/include/sel_logger.hpp
+index bd40dff..ca3c04c 100644
+--- a/include/sel_logger.hpp
++++ b/include/sel_logger.hpp
+@@ -41,3 +41,6 @@ static uint16_t
+     selAddSystemRecord(const std::string &message, const std::string &path,
+                        const std::vector<uint8_t> &selData, const bool &assert,
+                        const uint16_t &genId, T &&... metadata);
++
++static unsigned int getNewRecordId(void);
++static void toHexStr(const std::vector<uint8_t> &data, std::string &hexStr);
+diff --git a/include/watchdog_timeout.hpp b/include/watchdog_timeout.hpp
+new file mode 100644
+index 0000000..5c1e5a2
+--- /dev/null
++++ b/include/watchdog_timeout.hpp
+@@ -0,0 +1,153 @@
++#include <xyz/openbmc_project/State/Watchdog/server.hpp>
++//#include "phosphor-logging/elog-errors.hpp"
++
++#include <phosphor-logging/elog.hpp>
++#include <sdbusplus/bus.hpp>
++#include <iostream>     // std::cout, std::endl
++#include <iomanip>
++#include <map>
++
++#include <sel_logger.hpp>
++
++using DbusProperty = std::string;
++using Value = std::variant<bool, uint8_t, int16_t, uint16_t, int32_t,
++                           uint32_t, int64_t, uint64_t, double, std::string>;
++using PropertyMap = std::map<DbusProperty, Value>;
++using namespace phosphor::logging;
++using namespace sdbusplus;
++namespace mesg = sdbusplus::message;
++namespace variant_ns = mesg::variant_ns;
++using LogEntry = std::map<std::string,
++                mesg::variant<std::string, std::vector<std::string>>>;
++
++static constexpr auto WATCHDOG_ACTION = "WATCHDOG_ACTION";
++static constexpr auto WATCHDOG_INTERVAL = "WATCHDOG_INTERVAL";
++static constexpr auto WATCHDOG_TIMER_USE = "WATCHDOG_TIMER_USE";
++
++// reference SEL_TroubleshootingGuide.pdf Table 1
++static constexpr uint8_t selRecordTypeSystem = 0x02; 	// system event record
++static constexpr uint8_t selRecordTypeOEM = 0xC0;
++static constexpr char const *watchdogPath = "/xyz/openbmc_project/watchdog/host0";
++static constexpr uint8_t selIpmiWatchdogAssert = 1 << 7 | 0x6F;
++/* IPMI SEL format
++template(name="IPMISELTemplate" type="list") {
++    property(name="timereported" dateFormat="rfc3339")
++    constant(value=" ")
++    property(name="$!IPMI_SEL_RECORD_ID")   // %d
++    constant(value=",")
++    property(name="$!IPMI_SEL_RECORD_TYPE") // %x
++    constant(value=",")
++    property(name="$!IPMI_SEL_DATA")		// %s
++    constant(value=",")
++    property(name="$!IPMI_SEL_GENERATOR_ID")// %x
++    constant(value=",")
++    property(name="$!IPMI_SEL_SENSOR_PATH") // %s
++    constant(value=",")
++    property(name="$!IPMI_SEL_EVENT_DIR")   // %s
++    constant(value="\n")
++}*/
++namespace StateServer = sdbusplus::xyz::openbmc_project::State::server;
++// for event data 2 [3:0], [7:4] = 0xF unspecified
++static const std::map<StateServer::Watchdog::TimerUse, uint8_t> timerUseMap={
++    {StateServer::Watchdog::TimerUse::Reserved, 0x0},
++    {StateServer::Watchdog::TimerUse::BIOSFRB2, 0x1},
++    {StateServer::Watchdog::TimerUse::BIOSPOST, 0x2},
++    {StateServer::Watchdog::TimerUse::OSLoad,   0x3},
++    {StateServer::Watchdog::TimerUse::SMSOS,    0x4},
++    {StateServer::Watchdog::TimerUse::OEM,      0x5},
++};
++
++// for event data 1 [3:0], [7:4] = 1100b
++static const std::map<StateServer::Watchdog::Action, uint8_t> actionMap={
++    {StateServer::Watchdog::Action::None,       0x0},
++    {StateServer::Watchdog::Action::HardReset,  0x1},
++    {StateServer::Watchdog::Action::PowerOff,   0x2},
++    {StateServer::Watchdog::Action::PowerCycle, 0x3},
++};
++
++void handleWatchdogInfo(LogEntry logEntry)
++{
++    PropertyMap properties;
++    std::vector<uint8_t> eventData(selEvtDataMaxSize, 0xFF);
++    log<level::DEBUG>("handleWatchdogInfo");
++    auto bus = bus::new_default_system();
++    auto method = bus.new_method_call("xyz.openbmc_project.Watchdog",
++            "/xyz/openbmc_project/watchdog/host0",
++            "org.freedesktop.DBus.Properties", "GetAll");
++    method.append("xyz.openbmc_project.State.Watchdog");
++
++    std::string action = "xyz.openbmc_project.State.Watchdog.Action.None";
++    std::string timerUse = "xyz.openbmc_project.State.Watchdog.TimerUse.Reserved";
++    //uint64_t interval = 18000;
++
++    auto addition = logEntry.find("AdditionalData");
++    if (addition != logEntry.end())
++    {
++        auto data = variant_ns::get<std::vector<std::string>>(addition->second);
++        for (const auto& property : data)
++        {
++            if (property.find(WATCHDOG_ACTION) == 0)
++            {
++                action = property.substr(
++                    strlen(WATCHDOG_ACTION) + 1, std::string::npos);
++            }
++            else if (property.find(WATCHDOG_TIMER_USE) == 0)
++            {
++                timerUse = property.substr(
++                    strlen(WATCHDOG_TIMER_USE) + 1, std::string::npos);
++            }
++        }
++        auto msg = "action:" + action + ", timer:" + timerUse;
++        log<level::INFO>(msg.c_str());
++    }
++    else
++    {
++        log<level::ERR>("Failed to get watch dog property, "
++            "the additional of metadata must hava value");
++    }
++
++    try
++    {
++        // fill up the event data
++        auto _timerUse = StateServer::Watchdog::convertTimerUseFromString(timerUse);
++        auto _action = StateServer::Watchdog::convertActionFromString(action);
++        auto ita = actionMap.find(_action);
++        if (ita != actionMap.end())
++        {
++            eventData[0] = ita->second | 0xC0;
++        }
++        auto itt = timerUseMap.find(_timerUse);
++        if (itt != timerUseMap.end())
++        {
++            eventData[1] = itt->second | 0xF0;
++        }
++    }
++    catch(const sdbusplus::exception::InvalidEnumString& e)
++    {
++        std::cerr << e.what() << '\n';
++        log<level::ERR>("Failed to convert watchdog string",
++            entry("WHAT=%s", e.what()));
++    }
++    
++
++    //eventData[0] = 0x06;
++    // convert event data to string
++    std::string selDataStr;
++    toHexStr(eventData, selDataStr);
++    auto recordId = getNewRecordId();
++
++    // write log to redfish via rsyslog
++    // log format: (bmcweb)
++    //     redfish-core/include/registries/openbmc_message_registry.hpp
++    log<level::ERR>("Host power on watch dog time out.",
++            entry("MESSAGE_ID=%s", selMessageId),
++            entry("IPMI_SEL_RECORD_ID=%d", recordId),
++            entry("IPMI_SEL_GENERATOR_ID=%x", selBMCGenID),
++            entry("IPMI_SEL_RECORD_TYPE=%x", selRecordTypeSystem),
++            entry("IPMI_SEL_SENSOR_PATH=%s", watchdogPath),
++            entry("IPMI_SEL_EVENT_DIR=%x", selIpmiWatchdogAssert),
++            entry("IPMI_SEL_DATA=%s", selDataStr.c_str()),
++            entry("REDFISH_MESSAGE_ID=%s", "OpenBMC.0.1.IPMIWatchdog"),
++            entry("REDFISH_MESSAGE_ARGS=%s", action.c_str()));
++}
++
+diff --git a/src/sel_logger.cpp b/src/sel_logger.cpp
+index 7fe52fb..7a22a86 100644
+--- a/src/sel_logger.cpp
++++ b/src/sel_logger.cpp
+@@ -27,6 +27,7 @@
+ #include <sel_logger.hpp>
+ #include <sstream>
+ #include <threshold_event_monitor.hpp>
++#include <event_log_monitor.hpp>
+ 
+ struct DBusInternalError final : public sdbusplus::exception_t
+ {
+@@ -210,6 +211,11 @@ int main(int argc, char *argv[])
+         startPulseEventMonitor(conn);
+ #endif
+ 
++#ifdef REDFISH_LOG_MONITOR_EVENTS_LOG
++    sdbusplus::bus::match::match eventLogMonitor =
++        startEventLogMonitor(conn);
++#endif
++
+     io.run();
+ 
+     return 0;
+-- 
+2.17.1
+

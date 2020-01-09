@@ -5,3 +5,4 @@ SRC_URI_append_olympus-nuvoton = " file://0001-add-default-state-for-ProgressSta
 
 # remove the reset sensor service since we do not need it
 SYSTEMD_PACKAGES_remove  += "${PN}-reset-sensor-states"
+SYSTEMD_PACKAGES_remove  += "${PN}-host-check"

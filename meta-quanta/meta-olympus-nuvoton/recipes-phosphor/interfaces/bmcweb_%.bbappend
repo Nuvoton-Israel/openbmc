@@ -6,7 +6,6 @@ SRC_URI_append_olympus-nuvoton = " \
     file://0005-bmcweb-chassis-add-indicatorLED-support.patch \
     file://0006-bmcweb-get-cpu-and-dimm-info-from-prettyname.patch \
     file://0007-Add-Redfish-property-PowerSupply-EfficiencyPercent.patch \
-    file://Return-http-status-OK-after-ClearLog.patch \
 "
 
 # Enable CPU Log and Raw PECI support
@@ -14,7 +13,7 @@ EXTRA_OECMAKE += "-DBMCWEB_ENABLE_REDFISH_CPU_LOG=ON"
 EXTRA_OECMAKE += "-DBMCWEB_ENABLE_REDFISH_RAW_PECI=ON"
 
 # Enable Redfish BMC Journal support
-EXTRA_OECMAKE += "-DBMCWEB_ENABLE_REDFISH_BMC_JOURNAL=ON"
+# EXTRA_OECMAKE += "-DBMCWEB_ENABLE_REDFISH_BMC_JOURNAL=ON"
 
 # Enable DBUS log service
 # EXTRA_OECMAKE += "-DBMCWEB_ENABLE_REDFISH_DBUS_LOG_ENTRIES=ON"

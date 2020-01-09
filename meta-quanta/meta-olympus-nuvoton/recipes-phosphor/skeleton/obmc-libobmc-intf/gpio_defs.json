@@ -28,12 +28,12 @@
         },
         {
             "name": "POWER_UP_PIN",
-            "num": 505,
+            "num": 451,
             "direction": "out"
         },
         {
             "name": "RESET_UP_PIN",
-            "num": 504,
+            "num": 452,
             "direction": "out"
         }
     ]

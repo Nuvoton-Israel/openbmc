@@ -24,14 +24,14 @@ sudo apt-get install -y git build-essential libsdl1.2-dev texinfo gawk chrpath d
 - Fedora 28
 
 ```
-sudo dnf install -y git patch diffstat texinfo chrpath SDL-devel bitbake \
-    rpcgen perl-Thread-Queue perl-bignum perl-Crypt-OpenSSL-Bignum
+sudo dnf install -y git patch diffstat texinfo chrpath SDL-devel bitbake rpcgen
 sudo dnf groupinstall "C Development Tools and Libraries"
 ```
 ### 2) Download the source
 ```
-git clone git@github.com:openbmc/openbmc.git
+git clone https://github.com/Nuvoton-Israel/openbmc.git
 cd openbmc
+git checkout -b runbmc origin/runbmc
 ```
 
 ### 3) Target your hardware
@@ -44,15 +44,15 @@ then move to the next step. Additional examples can be found in the
 
 Machine | TEMPLATECONF
 --------|---------
+Olympus Nuvoton | ```meta-quanta/meta-olympus-nuvoton/conf```
 Palmetto | ```meta-ibm/meta-palmetto/conf```
 Zaius| ```meta-ingrasys/meta-zaius/conf```
 Witherspoon| ```meta-ibm/meta-witherspoon/conf```
 Romulus| ```meta-ibm/meta-romulus/conf```
 
-
-As an example target Romulus
+As an example target Olympus Nuvoton
 ```
-export TEMPLATECONF=meta-ibm/meta-romulus/conf
+export TEMPLATECONF=meta-quanta/meta-olympus-nuvoton/conf
 ```
 
 ### 4) Build
@@ -65,84 +65,55 @@ bitbake obmc-phosphor-image
 Additional details can be found in the [docs](https://github.com/openbmc/docs)
 repository.
 
-## OpenBMC Development
+### 5) build images
+After building finished the built Images will found at:
+<OpenBMC_folder>/build/tmp/deploy/images/olympus-nuvoton/
+The relevant images to use to upload the OpenBMC on the Olympus Nuvoton are:
 
-The OpenBMC community maintains a set of tutorials new users can go through
-to get up to speed on OpenBMC development out
-[here](https://github.com/openbmc/docs/blob/master/development/README.md)
+1. image-bmc - The entire 32MB image including BootBlock, u-boot, linux kernel
+               and file system, can be programmed into the beginning of flash
+2. image-u-boot - Includes only BootBlock and u-boot and their headers can be
+                  programmed into the beginning of flash
+3. image-kernel - FIT image that includes linux kernel, device tree and an
+                  initial file system, can be loaded to the linux area in flash
+4. image-rofs - Main (and large) OpenBMC file system, can be loaded to the
+                rofs area in flash
 
-## Build Validation and Testing
-Commits submitted by members of the OpenBMC GitHub community are compiled and
-tested via our [Jenkins](https://openpower.xyz/) server.  Commits are run
-through two levels of testing.  At the repository level the makefile `make
-check` directive is run.  At the system level, the commit is built into a
-firmware image and run with an arm-softmmu QEMU model against a barrage of
-[CI tests](https://openpower.xyz/job/openbmc-test-qemu-ci/).
+#### 6) Programming the images
+For programming the OpenBMC to the Olympus Nuvoton platform, there are two ways to update BMC firmware.
+First, update BMC firmware image via OpenBMC web interface or RESTful API.
+Second, flash image via UART.
+In normal case we suggest user use the first method to update BMC firmware. User can follow the [firmware update readme](https://github.com/Nuvoton-Israel/openbmc/tree/runbmc/meta-quanta/meta-olympus-nuvoton#bmc-firmware-update) to upgrade BMC firmware.
 
-Commits submitted by non-members do not automatically proceed through CI
-testing. After visual inspection of the commit, a CI run can be manually
-performed by the reviewer.
+Or program BMC firmware via UART by following instructions:
 
-Automated testing against the QEMU model along with supported systems are
-performed.  The OpenBMC project uses the
-[Robot Framework](http://robotframework.org/) for all automation.  Our
-complete test repository can be found
-[here](https://github.com/openbmc/openbmc-test-automation).
+  1. Enable BMC program mode, set jump JPC6 to (2-3), and JPC7 to (1-2)
+  2. Connect UART to connector JP35
+  3. Follow the [NPCM7xx_OpenBMC_Programming.pdf](https://github.com/Nuvoton-Israel/nuvoton-info/blob/master/npcm7xx-poleg/evaluation-board/sw_deliverables/NPCM7xx_OpenBMC_Programming.pdf) chapter 2.2.2 to program BMC firmware.
+  Additionally, the step _a_ should change to `python UpdateInputsBinaries_RunBMC.py`
 
-## Submitting Patches
-Support of additional hardware and software packages is always welcome.
-Please follow the [contributing guidelines](https://github.com/openbmc/docs/blob/master/CONTRIBUTING.md)
-when making a submission.  It is expected that contributions contain test
-cases.
+#### 7) OpenBMC user login
+After the OpenBMC boot please enter the following login and password:
 
-## Bug Reporting
-[Issues](https://github.com/openbmc/openbmc/issues) are managed on
-GitHub.  It is recommended you search through the issues before opening
-a new one.
+```
+Phosphor OpenBMC (Phosphor OpenBMC Project Reference Distro) 0.1.0 olympus-nuvoton ttyS0
 
-## Questions
+olympus-nuvoton login: root
+Password: 0penBmc (first letter zero and not capital o)
+```
 
-First, please do a search on the internet. There's a good chance your question
-has already been asked.
+#### 8) More information
+See the [readme.txt](https://github.com/Nuvoton-Israel/nuvoton-info/blob/master/npcm7xx-poleg/RunBMC/readme.txt),
+there are documents about RunBMC implementation, schematics, and BOM list.
 
-For general questions, please use the openbmc tag on
-[Stack Overflow](https://stackoverflow.com/questions/tagged/openbmc).
-Please review the [discussion](https://meta.stackexchange.com/questions/272956/a-new-code-license-the-mit-this-time-with-attribution-required?cb=1)
-on Stack Overflow licensing before posting any code.
+For more info follow the readme.txt in:
+[ftp://ftp.nuvoton.co.il/outgoing/Eval_Board](ftp://ftp.nuvoton.co.il/outgoing/Eval_Board) at the section:
+"Loading to Evaluation Board and running instructions".
+In order to get a password for the ftp please contact BMC_Marketing@Nuvoton.com
 
-For technical discussions, please see [contact info](#contact) below for IRC and
-mailing list information.
-
-## Features of OpenBMC
-
-**Feature List**
-* Host management: Power, Cooling, LEDs, Inventory, Events, Watchdog
-* Full IPMI 2.0 Compliance with DCMI
-* Code Update Support for multiple BMC/BIOS images
-* Web-based user interface
-* REST interfaces
-* D-Bus based interfaces
-* SSH based SOL
-* Remote KVM
-* Hardware Simulation
-* Automated Testing
-
-**Features In Progress**
-* OpenCompute Redfish Compliance
-* User management
-* Virtual media
-* Verified Boot
-
-**Features Requested but need help**
-* OpenBMC performance monitoring
-
-
-## Finding out more
-
-Dive deeper into OpenBMC by opening the
-[docs](https://github.com/openbmc/docs) repository.
+#### 9) Enabled features
+For more info of OpenBMC features we enabled in:
+[https://github.com/Nuvoton-Israel/openbmc/tree/runbmc/meta-quanta/meta-olympus-nuvoton](https://github.com/Nuvoton-Israel/openbmc/tree/runbmc/meta-quanta/meta-olympus-nuvoton)
 
 ## Contact
-- Mail: openbmc@lists.ozlabs.org [https://lists.ozlabs.org/listinfo/openbmc](https://lists.ozlabs.org/listinfo/openbmc)
-- IRC: #openbmc on freenode.net
-- Riot: [#openbmc:matrix.org](https://riot.im/app/#/room/#openbmc:matrix.org)
+- Mail: tomer.maimon@nuvoton.com,  avi.fishman@nuvoton.com or BMC_Marketing@Nuvoton.com

@@ -58,9 +58,9 @@ if [ "$r" == "0" ]; then
 
 	sleep 10
 
-	echo  0 > /sys/class/gpio/gpio505/value
+	echo  0 > /sys/class/gpio/gpio451/value
 	sleep 10
-	echo  1 > /sys/class/gpio/gpio505/value
+	echo  1 > /sys/class/gpio/gpio451/value
 	sleep 1
 
 	echo "Power on"
