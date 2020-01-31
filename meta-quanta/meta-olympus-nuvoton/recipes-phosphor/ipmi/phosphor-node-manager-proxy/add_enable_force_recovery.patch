@@ -1,0 +1,136 @@
+diff --git a/NodeManagerProxy.cpp b/NodeManagerProxy.cpp
+index f3cd41d..046b8ec 100644
+--- a/NodeManagerProxy.cpp
++++ b/NodeManagerProxy.cpp
+@@ -204,6 +204,8 @@ int main(int argc, char *argv[])
+         [&healthData](const std::string &type, const std::string &level) {
+             healthData.set(type, level);
+         });
++    healthInterface->register_method("EnableForceRecovery", RecoveryMode);
++
+     healthInterface->initialize();
+ 
+     sdbusplus::bus::match::match configurationMatch(
+@@ -237,3 +239,74 @@ int main(int argc, char *argv[])
+     io.run();
+     return 0;
+ }
++void printData(std::vector<uint8_t> data)
++{
++    std::string data_str="";
++    char hex[2];
++    for (int i = 0 ; i < data.size() ; i++)
++    {
++        if (i > 0) data_str += " ";
++        sprintf(hex, "%02X", data[i]);
++        data_str += hex;
++    }
++    std::string msg = "respond data: " + data_str +
++            ", size: " + std::to_string(data.size());
++    phosphor::logging::log<phosphor::logging::level::INFO>(msg.c_str());
++}
++
++int ColdReset()
++{
++    IpmbDbusRspType ipmbResponse;
++    std::vector<uint8_t> dataToSend;
++    int sendStatus = ipmbSendRequest(
++        *conn, ipmbResponse, dataToSend, ipmiColdResetNetFn,
++        ipmiColdResetLun, ipmiColdResetCmd);
++    return sendStatus;
++}
++
++int RecoveryMode(bool enable)
++{
++    std::string msg = enable?"True":"False";
++    msg = "EnableForceRecovery: " + msg;
++    phosphor::logging::log<phosphor::logging::level::INFO>(msg.c_str());
++    if (!enable)
++    {
++        return ColdReset();
++    }
++    // prepare data to be sent
++    std::vector<uint8_t> dataToSend;
++    dataToSend.resize(sizeof(nmIpmiForceMERecoveryReq));
++
++    auto nmIpmiForceMERecovery =
++        reinterpret_cast<nmIpmiForceMERecoveryReq *>(dataToSend.data());
++
++    uint8_t command = 0x1; // Restart using Recovery Firmware
++
++    ipmiSetIntelIanaNumber(nmIpmiForceMERecovery->iana);
++    nmIpmiForceMERecovery->command = command;
++
++    IpmbDbusRspType ipmbResponse;
++    int sendStatus = ipmbSendRequest(
++        *conn, ipmbResponse, dataToSend, ipmiForceMERecoveryNetFn,
++        ipmiForceMERecoveryLun, ipmiForceMERecoveryCmd);
++
++    if (sendStatus != 0)
++        return sendStatus;
++
++    const auto &[status, netfn, lun, cmd, cc, dataReceived] = ipmbResponse;
++
++    if (status)
++    {
++        phosphor::logging::log<phosphor::logging::level::ERR>(
++            "forceRecovery: non-zero response status ",
++            phosphor::logging::entry("%d", status));
++        return -1;
++    }
++    if (cc)
++    {
++        phosphor::logging::log<phosphor::logging::level::WARNING>(
++            "forceRecovery: unsupported command parameter.",
++            phosphor::logging::entry("%d", cc));
++    }
++    return cc;
++}
+diff --git a/NodeManagerProxy.hpp b/NodeManagerProxy.hpp
+index 1a93dbd..061c179 100644
+--- a/NodeManagerProxy.hpp
++++ b/NodeManagerProxy.hpp
+@@ -136,6 +136,14 @@ constexpr uint8_t ipmiGetDevIdNetFn = 0x6;
+ constexpr uint8_t ipmiGetDevIdLun = 0;
+ constexpr uint8_t ipmiGetDevIdCmd = 0x1;
+ 
++// Recovery mode
++constexpr uint8_t ipmiColdResetNetFn = 0x6;
++constexpr uint8_t ipmiColdResetLun = 0;
++constexpr uint8_t ipmiColdResetCmd = 0x2;
++constexpr uint8_t ipmiForceMERecoveryNetFn = 0x2E;
++constexpr uint8_t ipmiForceMERecoveryLun = 0;
++constexpr uint8_t ipmiForceMERecoveryCmd = 0xDF;
++
+ /**
+  * @brief Part of Get Device ID Command Response Payload
+  */
+@@ -238,6 +246,20 @@ typedef struct
+     uint16_t statsPeriod;
+ } __attribute__((packed)) nmIpmiSetNmPolicyReq;
+ 
++// recovery request format
++typedef struct
++{
++    ipmiIana iana;
++    uint8_t command;
++} __attribute__((packed)) nmIpmiForceMERecoveryReq;
++
++/*typedef struct
++{
++    //uint8_t code;
++    ipmiIana ianaId;
++} __attribute__((packed)) nmIpmiForceMERecoveryResp;*/
++
++
+ /**
+  * @brief Enable/Disable NM Policy Control request format
+  */
+@@ -773,4 +795,7 @@ struct HealthData
+     boost::container::flat_set<std::string> warning;
+ };
+ 
++int ColdReset();
++int RecoveryMode(bool enable);
++
+ #endif
