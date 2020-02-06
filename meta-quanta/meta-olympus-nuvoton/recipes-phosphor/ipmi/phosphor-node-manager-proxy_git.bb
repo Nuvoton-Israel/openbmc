@@ -8,9 +8,9 @@ PV = "0.1+git${SRCPV}"
 
 FILESEXTRAPATHS_prepend_olympus-nuvoton := "${THISDIR}/${PN}:"
 SRC_URI += "file://0001-add-scale-and-change-the-number-from-uint16-to-int64.patch \
-            file://0001-watch-for-propery-change-of-PowerCap.patch \
-            file://add_enable_force_recovery.patch \
-			file://0001-fixed-sensors-name.patch \
+            file://0003-watch-for-propery-change-of-PowerCap.patch \
+            file://0004-add-force-recovery-functions.patch \
+            file://0002-fixed-sensors-name.patch \
             "
 
 LICENSE = "Apache-2.0"
