@@ -59,4 +59,5 @@ RDEPENDS_${PN}-system = " \
         iptables \
         iptable-save \
         pch-time-sync \
+        phosphor-post-code-manager \
         "
