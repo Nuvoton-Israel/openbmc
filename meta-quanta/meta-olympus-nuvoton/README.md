@@ -1291,12 +1291,11 @@ A common use of LDAP is to provide a central place to store usernames and passwo
 
     * Store and specify locations of keys and certs.
       + Edit /usr/local/etc/openldap/slapd.conf in Ubuntu with root privilege to update fields as examples shown below.
-        > _TLSCACertificateFile /etc/ldap/ca_certs.pem_  
+        > _TLSCACertificateFile /etc/ldap/ca_server.pem_  
         > _TLSCertificateFile /etc/ssl/certs/ldap_server.pem_  
         > _TLSCertificateKeyFile /etc/ssl/private/ldap_server.key_  
-        > _TLSCACertificatePath /etc/ldap_
       
-      + Copy ca_certs.pem, ldap_server.pem and ldap_server.key into locations specified above with root privilege.
+      + Copy ca_server.pem, ldap_server.pem and ldap_server.key into locations specified above with root privilege.
 
     * Add LDAP schema and LDIF (LDAP Data Interchange Format).
       + Download [user_exp.schema](https://github.com/Nuvoton-Israel/openbmc-util/blob/master/ldap_server/schema/user_exp.schema) and save it at /usr/local/etc/openldap/schema with root privilege in Ubuntu.
@@ -1354,6 +1353,9 @@ A common use of LDAP is to provide a central place to store usernames and passwo
       bitbake -C fetch openldap
       bitbake obmc-phosphor-image
       ```
+
+      > _Without these patches provided by Nuvoton, the privilege mapping and authentication procedure applied are predefined by OpenBMC._
+
     * Program the updated image into BMC.
 
 5. Test LDAP server.
@@ -1412,10 +1414,12 @@ A common use of LDAP is to provide a central place to store usernames and passwo
 
       + Use user1/123 to log in WebUI.
         > _user1 is the login ID._
-        > _123 is the login password._
-        > _The **bmc-uid** for the BMC machine used for this test is bmc1. According to the LDIF provided, the BMC machine bmc1 is deployed under the **ap_group** email and the the BMC machine bmc2 is deployed under **ap_group** webserver. Also one can tell from the snapshots, user1 and user2 have different **user-login-interface** settings for the **ap_group** email and **ap_group** webserver respectively._
-        > _User1 is able to log on bmc1 via WebUI since the following conditions are met: the BMC machine bmc1 is deployed under **ap_group** email.; user1 is a member of the **ap_group** email.; user1 has an **user-login-interface** setting as **web** for that group and value of user1's **user-login-disabled** attribute is not set._
-        > _Although user2 is also a member of the **ap_group** email, it does not have an **user-login-interface** setting as **web** for that group. Under such conditions, user2 is not allowed to log on bmc1. User2 does have an **user-login-interface** setting as **web** for the **ap_group** webserver but bmc1 is not deployed under the **ap_group** webserver._
+        > _123 is the login password._  
+        > _The **bmc-uid** for the BMC machine used for this test is bmc1. According to the LDIF provided, the BMC machine bmc1 is deployed under the **ap_group** email and the the BMC machine bmc2 is deployed under **ap_group** webserver._  
+        > _Also one can tell from the snapshots, user1 and user2 have different **user-login-interface** settings for the **ap_group** email and **ap_group** webserver respectively._  
+        > _User1 is able to log on bmc1 via WebUI since the following conditions are met: the BMC machine bmc1 is deployed under **ap_group** email.; user1 is a member of the **ap_group** email.; user1 has an **user-login-interface** setting as **web** for that group and value of user1's **user-login-disabled** attribute is not set._  
+        > _Although user2 is also a member of the **ap_group** email, it does not have an **user-login-interface** setting as **web** for that group. Under such conditions, user2 is not allowed to log on bmc1._  
+        > _User2 does have an **user-login-interface** setting as **web** for the **ap_group** webserver but bmc1 is not deployed under the **ap_group** webserver._  
         > _The description above explains why user1 is used for this test._
 
     * Password modification is also available to LDAP accounts via WebUI.
@@ -1461,9 +1465,72 @@ A common use of LDAP is to provide a central place to store usernames and passwo
         > _Please replace **192.168.0.2** with your IP configuration for BMC._
         > _Only limited ipmi commands are supported._
 
+
+**LDAP user authentication and privilege mapping in OpenBMC**
+
+The **How to use** part above is to introduce the Nuvoton customized authentication mechanism in addition to the LDAP server setup procedure.
+
+In OpenBMC, PAM based authentication is implemented, so for both LDAP users and local users, the authentication flow is the same. For the LDAP user accounts, there is no LDAP attribute type that corresponds to the OpenBMC privilege roles. The preferred way is to group LDAP user accounts into LDAP groups. D-Bus API is provided for the user to assign privilege role to the LDAP group.
+
+This section is to brief some characteristics about the LDAP user authentication and privilege mapping which are currently implmented in OpenBMC. For more information, please refer to [user_management.md](https://github.com/openbmc/docs/blob/master/architecture/user_management.md#ldap).
+
+1. Openbmc's LDAP user authentication is fulfilled by [bmcweb](https://github.com/openbmc/bmcweb), [libpam](https://github.com/openbmc/openbmc/tree/master/meta-phosphor/recipes-extended/pam) and [nss-pam-ldapd](https://github.com/openbmc/meta-phosphor/tree/master/recipes-support/nss-pam-ldapd). 
+
+2. By calling the function **pamAuthenticateUser**, bmcweb is able to authenticate the user from the ldap server via the pam configuration file **webserver** , the libpam module and nss-pam-ldapd.
+
+3. The pam configuration file **webserver** requires the user to pass the predefined authentication criteria as described below.
+    > _auth     include  common-auth_.  
+    > _auth     required pam_succeed_if.so user ingroup redfish_.
+
+4. The pam_succeed_if pam modules requires the login user to be a member of the **redfish** group.
+    > _For more information, please refer to https://linux.die.net/man/8/pam_succeed_if_.  
+    > _The snapshot below shows how the users are added in the **redfish** group via the **memberUid** column_.
+    <img width="30%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/redfish_group_user.PNG">
+
+5. The patch [pam_succeed_if_support_ldap_user_login.patch](https://github.com/Nuvoton-Israel/openbmc/blob/runbmc/meta-quanta/meta-olympus-nuvoton/recipes-extended/pam/libpam/pam_succeed_if_support_ldap_user_login.patch) provided by Nuvoton is to deal with the group name/id conflict when there are same group name/id between the **/etc/group** and ldap server for passing the pam_succeed_if module check.
+
+6. The privilege role is a property of the user D-Bus object for the local users. For the LDAP user accounts, the privilege role will be based on the LDAP group. The LDAP group to privilege role mapping needs to be configured prior to authenticating with the LDAP user accounts. The following two example images show how to configure privilege role mapping and the result and the configuration steps are provided as well.
+
+    <img width="30%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/create_mapping.PNG">
+    <img width="30%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/mapping_example.PNG">
+
+    > _Log in WebUI using root/0penBmc and navigate to `Access` menu item on the left panel_.  
+    > _A sub menu item `LDAP` pops up and select it_.  
+    > _Enable the checkbox `Enable LDAP authentication` on the right panel and set up the LDAP configuration in OpenBMC according to your LDAP server setting_.  
+    > _Press `Save` button to enable the LDAP service_.  
+    > _The `Add role group` button is available then and select it_.  
+    > _A dialogue window `Add new role group` pops up, fill the group name and select the corresponding privilege according to your requirement_.  
+    > _Press `Save` button of the dialogue window to create the privilege role mapping for the LDAP group just filled_.  
+    > _Check if the privilege for a LDAP user is mapped properly by logging into WebUI with the account in the LDAP group just filled_.  
+    > _If the account doesn't act as a Administrator, some pages inside the WebUI are not available_.
+
+    > _To get privilege mapping via dbus, the user can input the following command in the debug console and get the output as shown by the following example image. The object path **/xyz/openbmc_project/user/ldap/openldap/role_map/1** is an example here_.  
+        ```
+        busctl introspect xyz.openbmc_project.Ldap.Config /xyz/openbmc_project/user/ldap/openldap/role_map/1
+        ```
+
+    <img width="50%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/dbus_mapping_example.PNG">
+
+7. An excerpt of [user_management.md](https://github.com/openbmc/docs/blob/master/architecture/user_management.md#authorization-flow) about the ldap user's privilege is provided here, explains how the privilege roles of the user accounts are consumed by the webserver interface and some description is added.
+
+    * Invoke PAM API for authenticating with user credentials. Proceed, if the authentication succeeds.
+    * Check if the user is a local user account. If the user account is local, fetch the privilege role from the D-Bus object and update the session information.
+    * If the user account is not local, read the group name for the user.
+    * Fetch the privilege role corresponding to the group name, update the session information with the privilege role.
+      + To deal with the group name/id conflict between **/etc/group** and the ldap server, a patch [0001-meta-quanta-meta-olympus-nuvoton-phosphor-user-manag.patch](https://github.com/Nuvoton-Israel/openbmc/blob/runbmc/meta-quanta/meta-olympus-nuvoton/recipes-phosphor/users/phosphor-user-manager/0001-meta-quanta-meta-olympus-nuvoton-phosphor-user-manag.patch) is provided by Nuvoton.
+    * If there is no mapping for group name to privilege role, default to user privilege role for the session.
+    * The following images display the LDAP settings for a LDAP user (e.g.: user1) to act as a role of Administrator.
+      + The **gidNumber** attribute for the account **user1** and the group **priv-admin** has to be identical.
+      + Along with the patch [0001-meta-quanta-meta-olympus-nuvoton-phosphor-user-manag.patch](https://github.com/Nuvoton-Israel/openbmc/blob/runbmc/meta-quanta/meta-olympus-nuvoton/recipes-phosphor/users/phosphor-user-manager/0001-meta-quanta-meta-olympus-nuvoton-phosphor-user-manag.patch), the user could avoid the conflict of the same group name like **priv-admin** between /etc/group and the ldap server.
+
+    <img width="30%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/priv_admin_group_user.PNG">
+    <img width="30%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/user_priv_mapping_example.PNG">
+    
+
 **Maintainer**
 
 * Tyrone Ting
+
 
 ## JTAG Master
 JTAG master is implemented on BMC to facilitate debugging host CPU or programming CPLD device.  
@@ -1922,3 +1989,4 @@ image-rwfs    |  0 MB  | middle layer of the overlayfs, rw files in this partiti
 * 2019.12.23 Fix some typo and text format
 * 2020.03.31 Add Open Test Automation and update Features In Progressing and Image Size
 * 2020.04.06 Add Certificate Management
+* 2020.04.20 Update LDAP for User Management
