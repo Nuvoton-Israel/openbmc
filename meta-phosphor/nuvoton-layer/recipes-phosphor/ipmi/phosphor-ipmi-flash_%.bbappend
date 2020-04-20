@@ -1,22 +1,18 @@
-SRC_URI_remove = "git://github.com/openbmc/phosphor-ipmi-flash"
-SRC_URI_append = " git://github.com/Nuvoton-Israel/phosphor-ipmi-flash"
-
 SRCREV = "${AUTOREV}"
 
 FILESEXTRAPATHS_prepend := "${THISDIR}/${PN}:"
 
 PACKAGECONFIG_append_nuvoton = " static-bmc reboot-update host-bios"
 
-NUVOTON_FLASH_PCIVGA  = "0x7F400000"
+NUVOTON_FLASH_PCIVGA  = "0x7FC00000"
 NUVOTON_FLASH_PCIMBOX = "0xF0848000"
 NUVOTON_FLASH_LPC     = "0xc0008000"
 
-#PACKAGECONFIG_append_nuvoton = " nuvoton-lpc"
+PACKAGECONFIG_append_nuvoton = " nuvoton-lpc"
+#XTRA_OECONF_append = " --enable-nuvoton-p2a-mbox"
+#EXTRA_OECONF_append = " --enable-nuvoton-p2a-vga"
 
-#EXTRA_OECONF_append = " --enable-nuvoton-p2a-mbox"
-EXTRA_OECONF_append = " --enable-nuvoton-p2a-vga"
-
-IPMI_FLASH_BMC_ADDRESS_nuvoton = "${NUVOTON_FLASH_PCIVGA}"
+IPMI_FLASH_BMC_ADDRESS_nuvoton = "${NUVOTON_FLASH_LPC}"
 
 SRC_URI_append_nuvoton = " file://bmc-verify.sh"
 SRC_URI_append_nuvoton = " file://phosphor-ipmi-flash-bmc-verify.service"
