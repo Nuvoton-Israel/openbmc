@@ -1,0 +1,87 @@
+From f63b6d811482ce74899e02514eeba90e6fdf62f4 Mon Sep 17 00:00:00 2001
+From: Tim Lee <timlee660101@gmail.com>
+Date: Mon, 27 Apr 2020 11:04:43 +0800
+Subject: [PATCH 8/8] log_services: fix Severity Empty string found issue when
+ running Redfish Service Validator
+
+Symptom:
+When running Redfish Service Validator, we found that Severity Empty string issue except first post code in PostCodesEntry.
+
+*** /redfish/v1/Systems/system/LogServices/PostCodes/Entries/B1-1
+Regetting resource from URI /redfish/v1/Systems/system/LogServices/PostCodes/Entries/B1-1
+	 Type (#LogEntry.v1_4_0.LogEntry), GET SUCCESS (time: 0)
+	 PASS
+
+*** /redfish/v1/Systems/system/LogServices/PostCodes/Entries/B1-2
+Regetting resource from URI /redfish/v1/Systems/system/LogServices/PostCodes/Entries/B1-2
+	 Type (#LogEntry.v1_4_0.LogEntry), GET SUCCESS (time: 0)
+Severity: Empty string found - Services should omit properties if not supported
+Severity: Invalid Enum value '' found, expected ['OK', 'Warning', 'Critical']
+	  FAIL...
+
+Root cause:
+In fillPostCodeEntry(), this statement "severity = message->severity" only be executed once.
+And another statement {"Severity", std::move(severity)} in the end of this function will clear severity string to null after calling std::move() standard function.
+Thus, only first post code Severity is 'OK', but the others are NULL.
+
+Solution:
+Move this statement "severity = message->severity" to for loop in fillPostCodeEntry() then all post codes will be recorded with correct severity string 'OK'.
+
+Tested:
+Passed the Redfish Service Validator and verified "Severity": "OK" in /redfish/v1/Systems/system/LogServices/PostCodes/Entries/B1-2
+{
+    "@odata.context": "/redfish/v1/$metadata#LogEntry.LogEntry",
+    "@odata.id": "/redfish/v1/Systems/system/LogServices/PostCodes/Entries/B1-2",
+    "@odata.type": "#LogEntry.v1_4_0.LogEntry",
+    "Created": "2020-04-27T01:48:10+00:00",
+    "EntryType": "Event",
+    "Id": "B1-2",
+    "Message": "Boot Count: 1: TS Offset: 0.0046; POST Code: 0x02",
+    "MessageArgs": [
+        "1",
+        "0.0046",
+        "0x02"
+    ],
+    "MessageId": "OpenBMC.0.1.BIOSPOSTCode",
+    "Name": "POST Code Log Entry",
+    "Severity": "OK"
+}
+
+Signed-off-by: Tim Lee <timlee660101@gmail.com>
+---
+ redfish-core/lib/log_services.hpp | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
+
+diff --git a/redfish-core/lib/log_services.hpp b/redfish-core/lib/log_services.hpp
+index f8640076..cceb562e 100644
+--- a/redfish-core/lib/log_services.hpp
++++ b/redfish-core/lib/log_services.hpp
+@@ -2170,11 +2170,6 @@ static void fillPostCodeEntry(
+     // Get the Message from the MessageRegistry
+     const message_registries::Message *message =
+         message_registries::getMessage("OpenBMC.0.1.BIOSPOSTCode");
+-    std::string severity;
+-    if (message != nullptr)
+-    {
+-        severity = message->severity;
+-    }
+ 
+     uint64_t currentCodeIndex = 0;
+     nlohmann::json &logEntryArray = aResp->res.jsonValue["Members"];
+@@ -2260,6 +2255,13 @@ static void fillPostCodeEntry(
+             }
+         }
+ 
++        // Get Severity template from message registry
++        std::string severity;
++        if (message != nullptr)
++        {
++            severity = message->severity;
++        }
++
+         // add to AsyncResp
+         logEntryArray.push_back({});
+         nlohmann::json &bmcLogEntry = logEntryArray.back();
+-- 
+2.17.1
+
