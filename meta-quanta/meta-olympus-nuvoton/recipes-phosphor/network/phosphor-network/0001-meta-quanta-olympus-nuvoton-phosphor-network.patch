@@ -1,0 +1,31 @@
+From 541f4e18dbd58c1a94958435000cfb9784f32cb3 Mon Sep 17 00:00:00 2001
+From: kfting <kfting@nuvoton.com>
+Date: Tue, 28 Apr 2020 13:08:13 +0800
+Subject: [PATCH] meta-quanta: olympus-nuvoton: phosphor-network
+
+1. Fix phosphor-network aborted issue when creating a VLAN link.
+
+Signed-off-by: kfting <kfting@nuvoton.com>
+---
+ ethernet_interface.cpp | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/ethernet_interface.cpp b/ethernet_interface.cpp
+index e8319cd..bce3d6f 100644
+--- a/ethernet_interface.cpp
++++ b/ethernet_interface.cpp
+@@ -89,7 +89,10 @@ EthernetInterface::EthernetInterface(sdbusplus::bus::bus& bus,
+         MacAddressIntf::mACAddress(getMACAddress(intfName));
+     }
+     EthernetInterfaceIntf::nTPServers(getNTPServersFromConf());
+-    EthernetInterfaceIntf::nameservers(getNameServerFromResolvd());
++    if( if_nametoindex(interfaceName().c_str()) )
++    {
++        EthernetInterfaceIntf::nameservers(getNameServerFromResolvd());
++    }
+     EthernetInterfaceIntf::staticNameServers(getstaticNameServerFromConf());
+ #if NIC_SUPPORTS_ETHTOOL
+     InterfaceInfo ifInfo = EthernetInterface::getInterfaceInfo();
+-- 
+2.17.1
+
