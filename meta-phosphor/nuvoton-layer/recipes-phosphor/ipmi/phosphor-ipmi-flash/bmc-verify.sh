@@ -11,9 +11,12 @@ if [ -f $publickey ];then
 	if [ "Verified OK" == "$r" ]; then
 		mv $bmcimage $imagebmc
 		echo "success" > /tmp/bmc.verify
+		exit 0
 	else
 		echo "failed" > /tmp/bmc.verify
+		exit 1
 	fi
 else
 	echo "No $publickey file" > /tmp/update-bmc.log
+	exit 1
 fi

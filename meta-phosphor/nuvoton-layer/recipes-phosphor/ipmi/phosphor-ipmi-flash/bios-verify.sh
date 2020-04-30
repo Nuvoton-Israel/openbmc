@@ -9,9 +9,12 @@ if [ -f $publickey ];then
 	echo "$r" > /tmp/update-bios.log
 	if [ "Verified OK" == "$r" ]; then
 		echo "success" > /tmp/bios.verify
+		exit 0
 	else
 		echo "failed" > /tmp/bios.verify
+		exit 1
 	fi
 else
 	echo "No $publickey file" > /tmp/update-bios.log
+	exit 1
 fi

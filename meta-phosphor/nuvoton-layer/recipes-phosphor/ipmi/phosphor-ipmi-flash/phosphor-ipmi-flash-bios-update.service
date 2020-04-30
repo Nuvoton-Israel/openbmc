@@ -7,4 +7,4 @@ SyslogIdentifier=bios-update.sh
 Type=oneshot
 
 [Install]
-WantedBy=phosphor-ipmi-flash-bios-update.target
+RequiredBy=phosphor-ipmi-flash-bios-update.target

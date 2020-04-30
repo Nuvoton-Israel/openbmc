@@ -4,6 +4,7 @@ Description=Phosphor-ipmi-flash verify BISO service
 [Service]
 ExecStart=/usr/sbin/bios-verify.sh
 SyslogIdentifier=bios-verify.sh
+Type=oneshot
 
 [Install]
-WantedBy=phosphor-ipmi-flash-bios-verify.target
+RequiredBy=phosphor-ipmi-flash-bios-verify.target

@@ -4,6 +4,7 @@ Description=Phosphor-ipmi-flash bmc verify service
 [Service]
 ExecStart=/usr/sbin/bmc-verify.sh
 SyslogIdentifier=bmc-verify.sh
+Type=oneshot
 
 [Install]
-WantedBy=phosphor-ipmi-flash-bmc-verify.target
+RequiredBy=phosphor-ipmi-flash-bmc-verify.target

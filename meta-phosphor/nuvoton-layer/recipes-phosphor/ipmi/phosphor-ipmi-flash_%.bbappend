@@ -4,13 +4,11 @@ FILESEXTRAPATHS_prepend := "${THISDIR}/${PN}:"
 
 PACKAGECONFIG_append_nuvoton = " static-bmc reboot-update host-bios"
 
-NUVOTON_FLASH_PCIVGA  = "0x7FC00000"
 NUVOTON_FLASH_PCIMBOX = "0xF0848000"
 NUVOTON_FLASH_LPC     = "0xc0008000"
 
 PACKAGECONFIG_append_nuvoton = " nuvoton-lpc"
-#XTRA_OECONF_append = " --enable-nuvoton-p2a-mbox"
-#EXTRA_OECONF_append = " --enable-nuvoton-p2a-vga"
+#EXTRA_OECONF_append = " --enable-nuvoton-p2a-mbox"
 
 IPMI_FLASH_BMC_ADDRESS_nuvoton = "${NUVOTON_FLASH_LPC}"
 
@@ -40,24 +38,24 @@ SYSTEMD_SERVICE_${PN}_append_nuvoton = " \
     "
 
 pkg_postinst_${PN}_nuvoton() {
-	LINK_BMC="$D$systemd_system_unitdir/phosphor-ipmi-flash-bmc-verify.wants/phosphor-ipmi-flash-bmc-verify.service"
-	LINK_BIOS_UPDATE="$D$systemd_system_unitdir/phosphor-ipmi-flash-bios-update.wants/phosphor-ipmi-flash-bios-update.service"
-	LINK_BIOS_VERIFY="$D$systemd_system_unitdir/phosphor-ipmi-flash-bios-verify.wants/phosphor-ipmi-flash-bios-verify.service"
+	LINK_BMC="$D$systemd_system_unitdir/phosphor-ipmi-flash-bmc-verify.requires/phosphor-ipmi-flash-bmc-verify.service"
+	LINK_BIOS_UPDATE="$D$systemd_system_unitdir/phosphor-ipmi-flash-bios-update.requires/phosphor-ipmi-flash-bios-update.service"
+	LINK_BIOS_VERIFY="$D$systemd_system_unitdir/phosphor-ipmi-flash-bios-verify.requires/phosphor-ipmi-flash-bios-verify.service"
 	TARGET_BMC="../phosphor-ipmi-flash-bmc-verify.service"
 	TARGET_BIOS_UPDATE="../phosphor-ipmi-flash-bios-update.service"
 	TARGET_BIOS_VERIFY="../phosphor-ipmi-flash-bios-verify.service"
-	mkdir -p $D$systemd_system_unitdir/phosphor-ipmi-flash-bmc-verify.wants
-	mkdir -p $D$systemd_system_unitdir/phosphor-ipmi-flash-bios-update.wants
-	mkdir -p $D$systemd_system_unitdir/phosphor-ipmi-flash-bios-verify.wants
+	mkdir -p $D$systemd_system_unitdir/phosphor-ipmi-flash-bmc-verify.requires
+	mkdir -p $D$systemd_system_unitdir/phosphor-ipmi-flash-bios-update.requires
+	mkdir -p $D$systemd_system_unitdir/phosphor-ipmi-flash-bios-verify.requires
 	ln -s $TARGET_BMC $LINK_BMC
 	ln -s $TARGET_BIOS_UPDATE $LINK_BIOS_UPDATE
 	ln -s $TARGET_BIOS_VERIFY $LINK_BIOS_VERIFY
 }
 
 pkg_prerm_${PN}_nuvoton() {
-	LINK_BMC="$D$systemd_system_unitdir/phosphor-ipmi-flash-bmc-verify.wants/phosphor-ipmi-flash-bmc-verify.service"
-	LINK_BIOS_UPDATE="$D$systemd_system_unitdir/phosphor-ipmi-flash-bios-update.wants/phosphor-ipmi-flash-bios-update.service"
-	LINK_BIOS_VERIFY="$D$systemd_system_unitdir/phosphor-ipmi-flash-bios-verify.wants/phosphor-ipmi-flash-bios-verify.service"
+	LINK_BMC="$D$systemd_system_unitdir/phosphor-ipmi-flash-bmc-verify.requires/phosphor-ipmi-flash-bmc-verify.service"
+	LINK_BIOS_UPDATE="$D$systemd_system_unitdir/phosphor-ipmi-flash-bios-update.requires/phosphor-ipmi-flash-bios-update.service"
+	LINK_BIOS_VERIFY="$D$systemd_system_unitdir/phosphor-ipmi-flash-bios-verify.requires/phosphor-ipmi-flash-bios-verify.service"
 	rm $LINK_BMC
 	rm $LINK_BIOS_UPDATE
 	rm $LINK_BIOS_VERIFY
