@@ -61,6 +61,7 @@ Please submit any patches against the meta-runbmc-nuvoton layer to the maintaine
   * [In-Band Firmware Update](#in-band-firmware-update)
     + [HOST Tool](#host-tool)
     + [IPMI Library](#ipmi-library)
+  * [VLAN](#vlan)
 - [OpenBMC Test Automation](#openbmc-test-automation)
 - [Features In Progressing](#features-in-progressing)
 - [Features Planned](#features-planned)
@@ -1748,6 +1749,69 @@ This is an OpenBMC IPMI Library (Handler) for In-Band Firmware Update.
 **Maintainer**
 * Medad CChien
 
+
+## VLAN
+
+VLAN (Virtual Local Area Networks) is any broadcast domain that is partitioned and isolated in a computer network at the data link layer (OSI layer 2). VLANs work by applying tags to network frames and handling these tags in networking systems – creating the appearance and functionality of network traffic that is physically on a single network but acts as if it is split between separate networks.
+
+VLANs allow network administrators to group hosts together even if the hosts are not directly connected to the same network switch. Because VLAN membership can be configured through software, this can greatly simplify network design and deployment.
+
+To subdivide a network into VLANs, one configures network equipment. Simpler equipment can partition only per physical port (if at all), in which case each VLAN is connected with a dedicated network cable. More sophisticated devices can mark frames through VLAN tagging, so that a single interconnect (trunk) may be used to transport data for multiple VLANs.
+
+For more information, please refer to [https://en.wikipedia.org/wiki/Virtual_LAN](https://en.wikipedia.org/wiki/Virtual_LAN).
+
+**Source URL**
+
+* [https://github.com/Nuvoton-Israel/openbmc/tree/runbmc/meta-quanta/meta-olympus-nuvoton/recipes-kernel/linux](https://github.com/Nuvoton-Israel/openbmc/tree/runbmc/meta-quanta/meta-olympus-nuvoton/recipes-kernel/linux)
+* [https://github.com/Nuvoton-Israel/openbmc/tree/runbmc/meta-quanta/meta-olympus-nuvoton/recipes-phosphor/network](https://github.com/Nuvoton-Israel/openbmc/tree/runbmc/meta-quanta/meta-olympus-nuvoton/recipes-phosphor/network)
+
+For users who prefer ipmi network utilization via VLAN, please refer to the following section **How to use**.
+
+**How to use**
+
+1. Configure VLAN setting of the Olympus platform by inputting the following commands on the Olympus debug console. Please replace the IP addresses mentioned below according to your configuration.
+    ```
+    ip link add link eth1 name eth1.1 type vlan id 1
+    ip addr add 192.168.1.4/24 dev eth1.1
+    ip link set up eth1.1
+    ```
+    If the user prefers the REST method via a remote PC, the commands are provided below as an example.
+    ```
+    export bmc=192.168.0.3
+    export token=`curl -k -H "Content-Type: application/json" -X POST https://${bmc}/login -d '{"username" :  "root", "password" :  "0penBmc"}' | grep token | awk '{print $2;}' | tr -d '"'`
+    curl -k -H "X-Auth-Token: $token" -H "Content-Type: application/json" -X POST -d '{"data":["eth1",1] }' https://${bmc}/xyz/openbmc_project/network/action/VLAN
+    curl -k -H "X-Auth-Token: $token" -H "Content-Type: application/json" -X POST -d '{"data": ["xyz.openbmc_project.Network.IP.Protocol.IPv4", "192.168.1.4",24,"192.168.1.1"] }' https://${bmc}/xyz/openbmc_project/network/eth1_1/action/IP
+    ```
+
+    The expected response is listed below as an example.
+    ```
+    {
+      "data": "/xyz/openbmc_project/network/eth1_1/ipv4/a3f185f1",
+      "message": "200 OK",
+      "status": "ok"
+    }
+    ```
+
+    For more information, please refer to [https://github.com/openbmc/phosphor-networkd/blob/master/docs/Network-Configuration.md](https://github.com/openbmc/phosphor-networkd/blob/master/docs/Network-Configuration.md).
+
+2. Prepare a PC which runs Ubuntu (for example) or any OS which supports VLAN. The Olympus device and the PC are connected to an unmanaged network switch.  
+
+   Please input the following commands in a opened terminal emulator with a privileged user account to configure the VLAN setting of the Ubuntu PC.  
+
+   Here the network interface enp24s0f3 of the Ubuntu PC is used as an example. 
+    ```
+    sudo modprobe 8021q
+    sudo ip link add link enp24s0f3 enp24s.1 type vlan id 1
+    sudo ip addr add 192.168.1.5/24 dev enp24s.1
+    sudo ip link set up enp24s.1
+    ```
+
+3. Ping either from Olympus or the PC to the other device.
+
+**Maintainer**
+* Tyrone Ting
+
+
 ## OpenBMC Test Automation
 
 **Source URL**
@@ -1990,3 +2054,4 @@ image-rwfs    |  0 MB  | middle layer of the overlayfs, rw files in this partiti
 * 2020.03.31 Add Open Test Automation and update Features In Progressing and Image Size
 * 2020.04.06 Add Certificate Management
 * 2020.04.20 Update LDAP for User Management
+* 2020.05.15 Add VLAN
