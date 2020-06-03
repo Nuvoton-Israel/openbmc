@@ -822,6 +822,38 @@ This is a patch for enabling BIOS POST Code feature in [phosphor-host-postd](htt
         recv: 0x2
         recv: 0x7_
 
+**phosphor-post-code-manager**
+
+* This daemon [phosphor-post-code-manager](https://github.com/openbmc/phosphor-post-code-manager) will monitors post code posted on dbus interface /xyz/openbmc_project/state/boot/raw by snoopd daemon [phosphor-host-postd](https://github.com/openbmc/phosphor-host-postd).
+
+* Every cycle post codes are saved as file in **/var/lib/phosphor-post-code-manager** on BMC.
+  ```
+  "1" file is saved all post codes for cycle 1
+  "2" file is saved all post codes for cycle 2
+  "CurrentBootCycleIndex" file is saved the current boot cycle number
+  "CurrentBootCycleCount" file is saved the current boot cycle count
+  ```
+
+* GetPostCodes
+
+  Method to get the cached post codes of the indicated boot cycle.
+  Return an array of post codes of one boot cycle.  
+  Get boot cycle 1 post codes by busctl:
+  > _busctl call xyz.openbmc_project.State.Boot.PostCode /xyz/openbmc_project/State/Boot/PostCode xyz.openbmc_project.State.Boot.PostCode GetPostCodes q 1_
+
+* GetPostCodesWithTimeStamp
+
+  Method to get the cached post codes of the indicated boot cycle with timestamp.
+  Return an array of post codes and timestamp in microseconds since epoch.  
+  Get boot cycle 1 post codes with timestamp by busctl:
+  > _busctl call xyz.openbmc_project.State.Boot.PostCode /xyz/openbmc_project/State/Boot/PostCode xyz.openbmc_project.State.Boot.PostCode GetPostCodesWithTimeStamp q 1_
+
+* Get POST codes through Redfish
+
+  BIOS Power-On Self-Test (POST) codes are exposed on DBUS but not currently over Redfish. This describes a method to expose the BIOS POST codes over the Redfish interface using the logging service.  
+  Get boot cycle 1 post codes by Redfish URL for example:
+  > _[https://{BMC_IP}/redfish/v1/Systems/system/LogServices/PostCodes/Entries](https://{BMC_IP}/redfish/v1/Systems/system/LogServices/PostCodes/Entries)_
+
 **Maintainer**
 * Tim Lee
 
@@ -2055,3 +2087,4 @@ image-rwfs    |  0 MB  | middle layer of the overlayfs, rw files in this partiti
 * 2020.04.06 Add Certificate Management
 * 2020.04.20 Update LDAP for User Management
 * 2020.05.15 Add VLAN
+* 2020.06.03 Update BIOS POST Code
