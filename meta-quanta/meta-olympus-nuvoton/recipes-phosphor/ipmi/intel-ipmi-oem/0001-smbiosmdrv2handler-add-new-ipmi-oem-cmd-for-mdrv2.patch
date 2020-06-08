@@ -1,0 +1,217 @@
+From 2ec5f9f05b06954659af447b26efa5c54d22f2af Mon Sep 17 00:00:00 2001
+From: Tim Lee <timlee660101@gmail.com>
+Date: Mon, 8 Jun 2020 10:52:40 +0800
+Subject: [PATCH] smbiosmdrv2handler: add new ipmi oem cmd for mdrv2
+
+Signed-off-by: Tim Lee <timlee660101@gmail.com>
+---
+ include/oemcommands.hpp        |  1 +
+ include/smbiosmdrv2handler.hpp | 15 ++++--
+ src/smbiosmdrv2handler.cpp     | 84 ++++++++++++++++++++++++++++++++--
+ 3 files changed, 92 insertions(+), 8 deletions(-)
+
+diff --git a/include/oemcommands.hpp b/include/oemcommands.hpp
+index 13586c5..3c1dd11 100644
+--- a/include/oemcommands.hpp
++++ b/include/oemcommands.hpp
+@@ -106,6 +106,7 @@ static constexpr Cmd cmdMdrIISendDataInfo = 0x3a;
+ static constexpr Cmd cmdMdrIIDataStart = 0x3b;
+ static constexpr Cmd cmdMdrIIDataDone = 0x3c;
+ static constexpr Cmd cmdMdrIISendDataBlock = 0x3d;
++static constexpr Cmd cmdMdrIIGetMboxSharedMem = 0x3e;
+ static constexpr Cmd cmdSlotIpmb = 0x51;
+ } // namespace app
+ 
+diff --git a/include/smbiosmdrv2handler.hpp b/include/smbiosmdrv2handler.hpp
+index d677376..cb16e01 100644
+--- a/include/smbiosmdrv2handler.hpp
++++ b/include/smbiosmdrv2handler.hpp
+@@ -21,6 +21,14 @@
+ #include <oemcommands.hpp>
+ #include <sdbusplus/timer.hpp>
+ 
++static constexpr const uint32_t MboxAddress = 0xF0848000;
++static constexpr const uint32_t MboxLength  = 0x4000;
++
++constexpr auto SYSTEMD_SERVICE = "org.freedesktop.systemd1";
++constexpr auto SYSTEMD_OBJ_PATH = "/org/freedesktop/systemd1";
++constexpr auto SYSTEMD_INTERFACE = "org.freedesktop.systemd1.Manager";
++constexpr auto SMBIOS_MDRV2_SERVICE = "smbios-mdrv2.service";
++
+ static constexpr const char *mdrType2File = "/var/lib/smbios/smbios2";
+ static constexpr const char *smbiosPath = "/var/lib/smbios";
+ static constexpr const size_t msgPayloadSize =
+@@ -54,9 +62,9 @@ static constexpr const uint32_t smbiosTableTimestamp =
+ static constexpr const size_t smbiosSMMemoryOffset =
+     0; // Offset of VGA share memory
+ static constexpr const size_t smbiosSMMemorySize =
+-    1024 * 1024; // Total size of VGA share memory
++    16 * 1024; // Total size of VGA share memory
+ static constexpr const size_t smbiosTableStorageSize =
+-    64 * 1024; // Total size of smbios table
++    16 * 1024; // Total size of smbios table
+ static constexpr const uint32_t defaultTimeout = 200;
+ static constexpr const uint8_t sysClock = 100;
+ static constexpr const int lastAgentIndex = -1;
+@@ -258,6 +266,7 @@ class MDRV2
+             std::make_unique<phosphor::Timer>([&](void) { timeoutHandler(); });
+     }
+ 
++    void RestartMDRV2();
+     int agentLookup(const uint16_t &agentId);
+     int findLockHandle(const uint16_t &lockHandle);
+     int syncDirCommonData(uint8_t idIndex, uint32_t size,
+@@ -298,7 +307,7 @@ class MDRV2
+                              53,
+                              54,
+                              0x42,
+-                             0,
++                             smbiosSMMemorySize,
+                              smbiosTableStorageSize,
+                              smbiosTableVersion,
+                              smbiosTableTimestamp,
+diff --git a/src/smbiosmdrv2handler.cpp b/src/smbiosmdrv2handler.cpp
+index 59390d1..b251324 100644
+--- a/src/smbiosmdrv2handler.cpp
++++ b/src/smbiosmdrv2handler.cpp
+@@ -41,6 +41,19 @@ static constexpr const uint8_t ccStorageLeak = 0xC4;
+ 
+ static void register_netfn_smbiosmdrv2_functions() __attribute__((constructor));
+ 
++void MDRV2::RestartMDRV2()
++{
++    std::shared_ptr<sdbusplus::asio::connection> bus = getSdBus();
++    sdbusplus::message::message method =
++        bus->new_method_call(SYSTEMD_SERVICE, SYSTEMD_OBJ_PATH, SYSTEMD_INTERFACE,
++                             "RestartUnit");
++
++    method.append(SMBIOS_MDRV2_SERVICE);
++    method.append("replace");
++
++    bus->call_noreply(method);
++}
++
+ int MDRV2::agentLookup(const uint16_t &agentId)
+ {
+     int agentIndex = -1;
+@@ -824,7 +837,7 @@ void SharedMemoryArea::Initialize(uint32_t addr, uint32_t areaSize)
+     int memDriver = 0;
+ 
+     // open mem driver for the system memory access
+-    memDriver = open("/dev/vgasharedmem", O_RDONLY);
++    memDriver = open("/dev/mem", O_RDONLY);
+     if (memDriver < 0)
+     {
+         phosphor::logging::log<phosphor::logging::level::ERR>(
+@@ -838,7 +851,7 @@ void SharedMemoryArea::Initialize(uint32_t addr, uint32_t areaSize)
+                 PROT_READ,                  // want to read and write
+                 MAP_SHARED,                 // no copy on write
+                 memDriver,                  // handle to /dev/mem
+-                (physicalAddr & pageMask)); // hopefully the Text-buffer :-)
++                physicalAddr);              // hopefully the Text-buffer :-)
+ 
+     close(memDriver);
+     if (vPtr == MAP_FAILED)
+@@ -1082,7 +1095,7 @@ ipmi::RspType<uint8_t, uint16_t>
+             "Requested data length is out of SMBIOS Table storage size.");
+         return ipmi::responseParmOutOfRange();
+     }
+-    if ((xferLength + xferAddress) > mdriiSMSize)
++    if ((xferLength + xferAddress) > (MboxAddress + MboxLength))
+     {
+         phosphor::logging::log<phosphor::logging::level::ERR>(
+             "Invalid data address and size");
+@@ -1191,6 +1204,9 @@ ipmi::RspType<> cmd_mdr2_data_done(uint16_t agentId, uint16_t lockHandle)
+         return ipmi::responseDestinationUnavailable();
+     }
+ 
++    std::vector<std::uint8_t> results(MboxLength);
++    std::memcpy(results.data(), mdrv2->area->vPtr, MboxLength);
++
+     mdrv2->area.reset(nullptr);
+     MDRSMBIOSHeader mdr2Smbios;
+     mdr2Smbios.mdrType = mdrTypeII;
+@@ -1207,8 +1223,7 @@ ipmi::RspType<> cmd_mdr2_data_done(uint16_t agentId, uint16_t lockHandle)
+                 "create folder failed for writting smbios file");
+         }
+     }
+-    if (!mdrv2->storeDatatoFlash(
+-            &mdr2Smbios, mdrv2->smbiosDir.dir[smbiosDirIndex].dataStorage))
++    if (!mdrv2->storeDatatoFlash(&mdr2Smbios, results.data()))
+     {
+         phosphor::logging::log<phosphor::logging::level::ERR>(
+             "MDR2 Store data to flash failed");
+@@ -1245,6 +1260,60 @@ ipmi::RspType<> cmd_mdr2_data_done(uint16_t agentId, uint16_t lockHandle)
+     return ipmi::responseSuccess();
+ }
+ 
++/** @brief implements mdr2 get mbox shared mem command
++ *
++ *  @returns IPMI completion code
++ */
++ipmi::RspType<> cmd_mdr2_get_mbox_shared_mem()
++{
++    std::shared_ptr<sdbusplus::asio::connection> bus = getSdBus();
++    std::string service = ipmi::getService(*bus, mdrv2Interface, mdrv2Path);
++
++    if (mdrv2 == nullptr)
++    {
++        mdrv2 = std::make_unique<MDRV2>();
++    }
++
++    try
++    {
++        mdrv2->area =
++            std::make_unique<SharedMemoryArea>(MboxAddress, MboxLength);
++    }
++    catch (const std::system_error &e)
++    {
++        return ipmi::responseUnspecifiedError();
++    }
++
++    std::vector<std::uint8_t> results(MboxLength);
++    std::memcpy(results.data(), mdrv2->area->vPtr, MboxLength);
++
++    mdrv2->area.reset(nullptr);
++    MDRSMBIOSHeader mdr2Smbios;
++    mdr2Smbios.mdrType = mdrTypeII;
++    mdr2Smbios.dirVer = mdrv2->smbiosDir.dir[0].common.dataVersion;
++    mdr2Smbios.timestamp = mdrv2->smbiosDir.dir[0].common.timestamp;
++    mdr2Smbios.dataSize = mdrv2->smbiosDir.dir[0].common.size;
++
++    if (access(smbiosPath, 0) == -1)
++    {
++        int flag = mkdir(smbiosPath, S_IRWXU);
++        if (flag != 0)
++        {
++            phosphor::logging::log<phosphor::logging::level::ERR>(
++                "create folder failed for writting smbios file");
++        }
++    }
++    if (!mdrv2->storeDatatoFlash(&mdr2Smbios, results.data()))
++    {
++        phosphor::logging::log<phosphor::logging::level::ERR>(
++            "MDR2 Store data to flash failed");
++        return ipmi::responseDestinationUnavailable();
++    }
++
++    mdrv2->RestartMDRV2();
++    return ipmi::responseSuccess();
++}
++
+ static void register_netfn_smbiosmdrv2_functions(void)
+ {
+     // MDR V2 Command
+@@ -1307,4 +1376,9 @@ static void register_netfn_smbiosmdrv2_functions(void)
+     ipmi::registerHandler(ipmi::prioOemBase, ipmi::intel::netFnApp,
+                           ipmi::intel::app::cmdMdrIIDataDone,
+                           ipmi::Privilege::Operator, cmd_mdr2_data_done);
++
++    // <Get Mailbox Shared Memory>
++    ipmi::registerHandler(ipmi::prioOemBase, ipmi::intel::netFnApp,
++                          ipmi::intel::app::cmdMdrIIGetMboxSharedMem,
++                          ipmi::Privilege::Operator, cmd_mdr2_get_mbox_shared_mem);
+ }
+-- 
+2.17.1
+

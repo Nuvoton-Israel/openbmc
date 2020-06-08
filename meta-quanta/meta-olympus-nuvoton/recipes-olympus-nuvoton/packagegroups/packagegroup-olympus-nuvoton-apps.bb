@@ -60,4 +60,7 @@ RDEPENDS_${PN}-system = " \
         iptable-save \
         pch-time-sync \
         phosphor-post-code-manager \
+        smbios-mdrv2 \
+        intel-dbus-interfaces \
+        intel-ipmi-oem \
         "
