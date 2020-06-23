@@ -51,7 +51,6 @@ RDEPENDS_${PN}-system = " \
         olympus-nuvoton-powerctrl \
         ipmitool \
         phosphor-sel-logger \
-        first-boot-set-mac \
         first-boot-set-psu \
         phosphor-node-manager-proxy \
         phosphor-image-signing \
@@ -66,4 +65,5 @@ RDEPENDS_${PN}-system = " \
         intel-dbus-interfaces \
         adm1278-hotswap-power-cycle \
         google-ipmi-sys \
+        mac-address \
         "
