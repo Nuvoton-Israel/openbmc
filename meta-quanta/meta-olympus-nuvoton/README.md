@@ -49,6 +49,7 @@ Please submit any patches against the meta-runbmc-nuvoton layer to the maintaine
     + [BIOS POST Code](#bios-post-code)
     + [FRU](#fru)
     + [Fan PID Control](#fan-pid-control)
+    + [Crash Dump](#crash-dump)
   * [IPMI / DCMI](#ipmi--dcmi)
     + [SOL IPMI](#sol-ipmi)
     + [Host Power Budget Control](#host-power-budget-control)
@@ -1088,10 +1089,85 @@ In order to automatically apply accurate and responsive correction to a fan cont
     ```
     + **ExecStopPost** that means an additional commands that are executed after the service is stopped.
 
-
 **Maintainer**
 * Tim Lee
 
+### Crash Dump
+<img align="right" width="30%" src="https://cdn.rawgit.com/NTC-CCBG/snapshots/5f39468/openbmc/crashdump.png">
+
+The Intel Crash Dump feature facilitates debug of an IERR triggered and leverages uncore hardware features accessible via the PECI interface to provide a scheme to dump the Caching agent (Cbo) Table of Requests (TOR) structure.
+
+**Source URL**
+
+This source code is implements CrashDump for the Whitley platform and supports the Ice Lake Server and Cooper Lake Server processors in private github [Intel-BMC/crashdump](https://github.com/Intel-BMC/crashdump/) that collects debug data from the processors over the PECI bus when executed.
+
+**How to use**
+
+* There are two ways to execute Crash Dump
+  ```
+  On-Demand (Trigger by Redfish)
+  ```
+
+  You can use below Redfish curl to trigger Crash Dump by On-Demand POST action.  
+  This action is used to trigger a new On-Demand Crash Dump is returned immediately.
+  > _/redfish/v1/Systems/system/LogServices/Crashdump/Actions/Oem/Crashdump.OnDemand_
+
+  Eventually, there is crashdump file will exist in /tmp/crashdumps folder on BMC.  
+  And **trigger_type** content in crashdump file is **On-Demand** that means the Crash Dump daemon be called by On-Demand.
+
+  You can use below busctl command to verify Crash Dump by On-Demand.
+  > _busctl call com.intel.crashdump /com/intel/crashdump/0 org.freedesktop.DBus.Properties Get ss "com.intel.crashdump" "Log"_
+
+  ```
+  Direct call upon detection of an Error Event (Trigger by Intel Host Error Monitor)
+  ```
+
+  The Intel Host Error Monitor [Intel-BMC/host-error-monitor](https://github.com/Intel-BMC/host-error-monitor) daemon is use to detect an host error event then trigger Crash Dump dameon be executed. And **trigger_type** content in crashdump file is **IERR** that means the Crash Dump daemon be called upon the BMC detecting an host error event.
+
+* There are two ways to get crashdump file
+  ```
+  Redish
+  ```
+
+  Redfish url to get crashdump entries.  
+  You can get crashdump file **crashdump_xxx.json** by clicking **Message** link directly.
+  > _https://{bmc_ip}/redfish/v1/Systems/system/LogServices/Crashdump/Entries_
+
+  ```
+  WebUI
+  ```
+
+  Select `Event log` and select `Oem` in `Select system log type` on **WebUI**.  
+  You can get crashdump file by clicking **Export** button.
+
+**CScripts Crash Dump**
+
+  CScripts (Customer Scripts) are a collection of scripts provided by Intel to assist customers with platform debug and validation. This is another method use CScripts function crashdump() to collect crash records manually. Use RunBMC Olympus as example:
+
+**How to use**
+
+* Configuring ASD on BMC and OpenIPC on Host (refer to [ASD](#asd))
+
+* Inject 3Strike Error
+
+  Injects a Three Strike Counter timeout, resulting in Machine Check Exception (MCE) and IERR.  
+  Execute ei.injectThreeStrike command in cscripts folder
+    > _>>> ei.injectThreeStrike_
+
+* Collect crash records
+
+  The crashdump feature allows the user to retrieve internal state of the cores after a 3Strike failure.  
+  Collected data will be stored in JSON format name as **crashdump.json**  
+  Execute crashdump() command in cscripts folder
+    > _>>> crashdump()_
+
+  The crashdump_decode_analyze feature allows the user to analyze any crashdump JSON file.  
+  Analysis data will be stored in JSON format name as **crasdump_decoded.json**  
+  Execute crashdump() command in cscripts folder
+    > _>>> crashdump_decode_analyze(crashdump.json)_
+
+**Maintainer**
+* Tim Lee
 
 ## IPMI / DCMI
 
@@ -2088,3 +2164,4 @@ image-rwfs    |  0 MB  | middle layer of the overlayfs, rw files in this partiti
 * 2020.04.20 Update LDAP for User Management
 * 2020.05.15 Add VLAN
 * 2020.06.03 Update BIOS POST Code
+* 2020.06.29 Add Crash Dump
