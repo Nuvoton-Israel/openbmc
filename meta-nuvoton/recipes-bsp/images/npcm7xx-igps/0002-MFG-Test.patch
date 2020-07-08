@@ -1,0 +1,363 @@
+commit 221246224b53f07018093880cb0180c03b9bc266
+Author: Medad CChien <ctcchien@nuvoton.com>
+Date:   Mon Jul 6 16:47:29 2020 +0800
+
+    MFG Test
+
+diff --git a/ImageGeneration/inputs/DDRSITest.xml b/ImageGeneration/inputs/DDRSITest.xml
+new file mode 100644
+index 0000000..3a3a2fb
+--- /dev/null
++++ b/ImageGeneration/inputs/DDRSITest.xml
+@@ -0,0 +1,75 @@
++<!-- SPDX-License-Identifier: GPL-2.0
++#
++# Nuvoton IGPS: Image Generation And Programming Scripts For Poleg BMC
++#
++# Copyright (C) 2019 Nuvoton Technologies, All Rights Reserved
++#--------------------------------------------------------------------------->
++
++<?xml version="1.0" encoding="UTF-8"?>
++
++<Bin_Ecc_Map>
++	<!-- BMC mandatory fields -->
++	<ImageProperties>
++		<BinSize>0</BinSize>         <!-- If 0 the binary size will be calculated by the tool -->
++		<PadValue>0xFF</PadValue>	<!-- Byte value to pad the empty areas, default is 0 -->
++	</ImageProperties>
++	
++	<BinField>
++		<name>TestBINTag</name>         <!-- name of field -->
++		<config>
++			<offset>0x0</offset>            <!-- offset in the header -->
++			<size>0x8</size>              <!-- size in the header -->
++		</config>
++		<content format='bytes'>0x53 0x54 0x44 0x41 0x4C 0x54 0x53 0x54</content>  <!-- content the user should fill -->
++	</BinField>
++	
++	<BinField>
++		<!-- BootBlock or u-boot Code size -->
++		<name>CodeSize</name>         
++		<config>
++			<offset>0x8</offset>       
++			<size>0x4</size> 
++		</config>
++		<content format='FileSize'>DDRSI.bin</content>	<!-- content the user should fill -->
++	</BinField>
++	
++	<BinField>
++		<!-- Code destination address, 32-bit aligned: for DDR should be 0xFFFD0000 -->
++		<name>DestAddr</name>
++		<config>
++			<offset>0xC</offset>
++			<size>0x4</size>
++		</config>
++		<content format='32bit'>0xFFFD0000</content>     <!-- content the user should fill -->
++	</BinField>
++	
++	<BinField>
++		<!-- Code destination address, 32-bit aligned: for DDR should be 0xFFFD0000 -->
++		<name>Description</name>
++		<config>
++			<offset>0x10</offset>
++			<size>0x40</size> 
++		</config>
++		<content format='bytes'>0x44 0x44 0x52 0x53 0x49 0x54 0x53 0x54</content>     <!-- content the user should fill -->
++	</BinField>
++	
++	<BinField>
++		<!-- Code destination address, 32-bit aligned: for DDR should be 0xFFFD0000 -->
++		<name>TestResult</name>
++		<config>
++			<offset>0x50</offset>
++			<size>0x4</size> 
++		</config>
++		<content format='bytes'>0xFF 0xFF 0xFF 0xFF</content>     <!-- content the user should fill -->
++	</BinField>
++	
++	<BinField>
++		<name>test-bin</name>             <!-- name of field -->
++		<config>
++			<offset>0x100</offset>        <!-- offset in the header -->
++			<size format='FileSize'>DDRSI.bin</size>                 <!-- size in the header calculated by tool-->
++		</config>
++		<content format='FileContent'>DDRSI.bin</content>  <!-- content the user should fill -->
++	</BinField>
++	
++</Bin_Ecc_Map>
+diff --git a/ImageGeneration/inputs/GFXTest.xml b/ImageGeneration/inputs/GFXTest.xml
+new file mode 100644
+index 0000000..b29f791
+--- /dev/null
++++ b/ImageGeneration/inputs/GFXTest.xml
+@@ -0,0 +1,75 @@
++<!-- SPDX-License-Identifier: GPL-2.0
++#
++# Nuvoton IGPS: Image Generation And Programming Scripts For Poleg BMC
++#
++# Copyright (C) 2019 Nuvoton Technologies, All Rights Reserved
++#--------------------------------------------------------------------------->
++
++<?xml version="1.0" encoding="UTF-8"?>
++
++<Bin_Ecc_Map>
++	<!-- BMC mandatory fields -->
++	<ImageProperties>
++		<BinSize>0</BinSize>         <!-- If 0 the binary size will be calculated by the tool -->
++		<PadValue>0xFF</PadValue>	<!-- Byte value to pad the empty areas, default is 0 -->
++	</ImageProperties>
++	
++	<BinField>
++		<name>TestBINTag</name>         <!-- name of field -->
++		<config>
++			<offset>0x0</offset>            <!-- offset in the header -->
++			<size>0x8</size>              <!-- size in the header -->
++		</config>
++		<content format='bytes'>0x53 0x54 0x44 0x41 0x4C 0x54 0x53 0x54</content>  <!-- content the user should fill -->
++	</BinField>
++	
++	<BinField>
++		<!-- BootBlock or u-boot Code size -->
++		<name>CodeSize</name>         
++		<config>
++			<offset>0x8</offset>       
++			<size>0x4</size> 
++		</config>
++		<content format='FileSize'>GFX.bin</content>	<!-- content the user should fill -->
++	</BinField>
++	
++	<BinField>
++		<!-- Code destination address, 32-bit aligned: for DDR should be 0xFFFD0000 -->
++		<name>DestAddr</name>         
++		<config>
++			<offset>0xC</offset>       
++			<size>0x4</size> 
++		</config>
++		<content format='32bit'>0xFFFD0000</content>     <!-- content the user should fill -->
++	</BinField>
++	
++	<BinField>
++		<!-- Code destination address, 32-bit aligned: for DDR should be 0xFFFD0000 -->
++		<name>Description</name>         
++		<config>
++			<offset>0x10</offset>       
++			<size>0x40</size> 
++		</config>
++		<content format='bytes'>0x47 0x46 0x58 0x53 0x41 0x54 0x53 0x54</content>     <!-- content the user should fill -->
++	</BinField>
++	
++	<BinField>
++		<!-- Code destination address, 32-bit aligned: for DDR should be 0xFFFD0000 -->
++		<name>TestResult</name>
++		<config>
++			<offset>0x50</offset>
++			<size>0x4</size> 
++		</config>
++		<content format='bytes'>0xFF 0xFF 0xFF 0xFF</content>     <!-- content the user should fill -->
++	</BinField>
++	
++	<BinField>
++		<name>test-bin</name>             <!-- name of field -->
++		<config>
++			<offset>0x100</offset>        <!-- offset in the header -->
++			<size format='FileSize'>GFX.bin</size>                 <!-- size in the header calculated by tool-->
++		</config>
++		<content format='FileContent'>GFX.bin</content>  <!-- content the user should fill -->
++	</BinField>
++	
++</Bin_Ecc_Map>
+diff --git a/ImageGeneration/inputs/MEMTest.xml b/ImageGeneration/inputs/MEMTest.xml
+new file mode 100644
+index 0000000..528d3c1
+--- /dev/null
++++ b/ImageGeneration/inputs/MEMTest.xml
+@@ -0,0 +1,66 @@
++<!-- SPDX-License-Identifier: GPL-2.0
++#
++# Nuvoton IGPS: Image Generation And Programming Scripts For Poleg BMC
++#
++# Copyright (C) 2019 Nuvoton Technologies, All Rights Reserved
++#--------------------------------------------------------------------------->
++
++<?xml version="1.0" encoding="UTF-8"?>
++
++<Bin_Ecc_Map>
++	<!-- BMC mandatory fields -->
++	<ImageProperties>
++		<BinSize>0</BinSize>         <!-- If 0 the binary size will be calculated by the tool -->
++		<PadValue>0xFF</PadValue>	<!-- Byte value to pad the empty areas, default is 0 -->
++	</ImageProperties>
++	
++	<BinField>
++		<name>TestBINTag</name>         <!-- name of field -->
++		<config>
++			<offset>0x0</offset>            <!-- offset in the header -->
++			<size>0x8</size>              <!-- size in the header -->
++		</config>
++		<content format='bytes'>0x53 0x54 0x44 0x41 0x4C 0x54 0x53 0x54</content>  <!-- content the user should fill -->
++	</BinField>
++	
++	<BinField>
++		<!-- BootBlock or u-boot Code size -->
++		<name>CodeSize</name>         
++		<config>
++			<offset>0x8</offset>       
++			<size>0x4</size> 
++		</config>
++		<content format='32bit'>0x0</content>	<!-- content the user should fill -->
++	</BinField>
++	
++	<BinField>
++		<!-- Code destination address, 32-bit aligned: for DDR should be 0xFFFD0000 -->
++		<name>DestAddr</name>
++		<config>
++			<offset>0xC</offset>
++			<size>0x4</size>
++		</config>
++		<content format='32bit'>0xFFFFFFFF</content>     <!-- content the user should fill -->
++	</BinField>
++	
++	<BinField>
++		<!-- Code destination address, 32-bit aligned: for DDR should be 0xFFFD0000 -->
++		<name>Description</name>
++		<config>
++			<offset>0x10</offset>
++			<size>0x40</size> 
++		</config>
++		<content format='bytes'>0x75 0x62 0x6F 0x6F 0x74 0x2D 0x63 0x6D 0x64 0x2D 0x6D 0x74 0x65 0x73 0x74 0x2D 0x72 0x65 0x73 0x75 0x6C 0x74 0x2D 0x6F 0x6E 0x6C 0x79</content>     <!-- content the user should fill -->
++	</BinField>
++	
++	<BinField>
++		<!-- Code destination address, 32-bit aligned: for DDR should be 0xFFFD0000 -->
++		<name>TestResult</name>
++		<config>
++			<offset>0x50</offset>
++			<size>0x4</size> 
++		</config>
++		<content format='bytes'>0xFF 0xFF 0xFF 0xFF</content>     <!-- content the user should fill -->
++	</BinField>
++	
++</Bin_Ecc_Map>
+diff --git a/ImageGeneration/inputs/mergedBootBlockAndUbootAndTests.xml b/ImageGeneration/inputs/mergedBootBlockAndUbootAndTests.xml
+new file mode 100644
+index 0000000..7647a63
+--- /dev/null
++++ b/ImageGeneration/inputs/mergedBootBlockAndUbootAndTests.xml
+@@ -0,0 +1,35 @@
++<!-- SPDX-License-Identifier: GPL-2.0
++#
++# Nuvoton IGPS: Image Generation And Programming Scripts For Poleg BMC
++#
++# Copyright (C) 2018 Nuvoton Technologies, All Rights Reserved
++#--------------------------------------------------------------------------->
++
++<?xml version="1.0" encoding="UTF-8"?>
++
++<Bin_Ecc_Map>
++	<!-- BMC mandatory fields -->
++	<ImageProperties>
++		<BinSize>0</BinSize>         <!-- If 0 the binary size will be calculated by the tool -->
++		<PadValue>0xFF</PadValue>	<!-- Byte value to pad the empty areas, default is 0 -->
++	</ImageProperties>
++		
++	<BinField>
++		<name>BootBlockAndUboot</name>         <!-- name of field -->
++		<config>
++			<offset>0</offset>            <!-- offset in the header -->
++			<size format='FileSize'>u-boot.bin.merged</size>              <!-- size in the header -->
++		</config>
++		<content format='FileContent'>u-boot.bin.merged</content>  <!-- content the user should fill -->
++	</BinField>
++		
++	<BinField>
++		<name>tests</name>         <!-- name of field -->
++		<config>
++			<offset format='FileSize' align='0x1000'>u-boot.bin.merged</offset>            <!-- offset in the header -->
++			<size format='FileSize'>mergedTests123.bin</size>              <!-- size in the header -->
++		</config>
++		<content format='FileContent'>mergedTests123.bin</content>  <!-- content the user should fill -->
++	</BinField>
++	
++</Bin_Ecc_Map>
+diff --git a/ImageGeneration/inputs/mergedTests12.xml b/ImageGeneration/inputs/mergedTests12.xml
+new file mode 100644
+index 0000000..58e81ae
+--- /dev/null
++++ b/ImageGeneration/inputs/mergedTests12.xml
+@@ -0,0 +1,35 @@
++<!-- SPDX-License-Identifier: GPL-2.0
++#
++# Nuvoton IGPS: Image Generation And Programming Scripts For Poleg BMC
++#
++# Copyright (C) 2018 Nuvoton Technologies, All Rights Reserved
++#--------------------------------------------------------------------------->
++
++<?xml version="1.0" encoding="UTF-8"?>
++
++<Bin_Ecc_Map>
++	<!-- BMC mandatory fields -->
++	<ImageProperties>
++		<BinSize>0</BinSize>         <!-- If 0 the binary size will be calculated by the tool -->
++		<PadValue>0xFF</PadValue>	<!-- Byte value to pad the empty areas, default is 0 -->
++	</ImageProperties>
++		
++	<BinField>
++		<name>Test1</name>         <!-- name of field -->
++		<config>
++			<offset>0x0</offset>            <!-- offset in the header -->
++			<size format='FileSize'>MEMTest.bin</size>              <!-- size in the header -->
++		</config>
++		<content format='FileContent'>MEMTest.bin</content>  <!-- content the user should fill -->
++	</BinField>
++		
++	<BinField>
++		<name>Test2</name>         <!-- name of field -->
++		<config>
++			<offset format='FileSize' align='0x1000'>MEMTest.bin</offset>            <!-- offset in the header -->
++			<size format='FileSize'>DDRSITest.bin</size>              <!-- size in the header -->
++		</config>
++		<content format='FileContent'>DDRSITest.bin</content>  <!-- content the user should fill -->
++	</BinField>
++	
++</Bin_Ecc_Map>
+diff --git a/ImageGeneration/inputs/mergedTests123.xml b/ImageGeneration/inputs/mergedTests123.xml
+new file mode 100644
+index 0000000..c62b3d2
+--- /dev/null
++++ b/ImageGeneration/inputs/mergedTests123.xml
+@@ -0,0 +1,35 @@
++<!-- SPDX-License-Identifier: GPL-2.0
++#
++# Nuvoton IGPS: Image Generation And Programming Scripts For Poleg BMC
++#
++# Copyright (C) 2018 Nuvoton Technologies, All Rights Reserved
++#--------------------------------------------------------------------------->
++
++<?xml version="1.0" encoding="UTF-8"?>
++
++<Bin_Ecc_Map>
++	<!-- BMC mandatory fields -->
++	<ImageProperties>
++		<BinSize>0</BinSize>         <!-- If 0 the binary size will be calculated by the tool -->
++		<PadValue>0xFF</PadValue>	<!-- Byte value to pad the empty areas, default is 0 -->
++	</ImageProperties>
++		
++	<BinField>
++		<name>Test12</name>         <!-- name of field -->
++		<config>
++			<offset>0</offset>            <!-- offset in the header -->
++			<size format='FileSize'>mergedTests12.bin</size>              <!-- size in the header -->
++		</config>
++		<content format='FileContent'>mergedTests12.bin</content>  <!-- content the user should fill -->
++	</BinField>
++		
++	<BinField>
++		<name>Test3</name>         <!-- name of field -->
++		<config>
++			<offset format='FileSize' align='0x1000'>mergedTests12.bin</offset>            <!-- offset in the header -->
++			<size format='FileSize'>GFXTest.bin</size>              <!-- size in the header -->
++		</config>
++		<content format='FileContent'>GFXTest.bin</content>  <!-- content the user should fill -->
++	</BinField>
++	
++</Bin_Ecc_Map>

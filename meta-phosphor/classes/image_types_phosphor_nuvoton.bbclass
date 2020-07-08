@@ -4,6 +4,13 @@ FULL_SUFFIX = "full"
 MERGED_SUFFIX = "merged"
 UBOOT_SUFFIX_append = ".${MERGED_SUFFIX}"
 
+TEST1_BINARY = "MEMTest.bin"
+TEST2_BINARY = "DDRSITest.bin"
+TEST3_BINARY = "GFXTest.bin"
+TEST12_BINARY = "mergedTests12.bin"
+TEST123_BINARY = "mergedTests123.bin"
+MERGED_BB_UBOOT_TEST_BINARY = "mergedBootBlockAndUbootAndTests.bin"
+
 IGPS_DIR = "${STAGING_DIR_NATIVE}/${datadir}/npcm7xx-igps"
 
 # Prepare the Bootblock and U-Boot images using npcm7xx-bingo
@@ -18,6 +25,25 @@ do_prepare_bootloaders() {
 
     bingo ${IGPS_DIR}/mergedBootBlockAndUboot.xml \
             -o ${DEPLOY_DIR_IMAGE}/${UBOOT_BINARY}.${MERGED_SUFFIX}
+
+    bingo ${IGPS_DIR}/MEMTest.xml \
+            -o ${DEPLOY_DIR_IMAGE}/${TEST1_BINARY}
+
+    bingo ${IGPS_DIR}/DDRSITest.xml \
+            -o ${DEPLOY_DIR_IMAGE}/${TEST2_BINARY}
+
+    bingo ${IGPS_DIR}/GFXTest.xml \
+            -o ${DEPLOY_DIR_IMAGE}/${TEST3_BINARY}
+
+    bingo ${IGPS_DIR}/mergedTests12.xml \
+            -o ${DEPLOY_DIR_IMAGE}/${TEST12_BINARY}
+
+    bingo ${IGPS_DIR}/mergedTests123.xml \
+            -o ${DEPLOY_DIR_IMAGE}/${TEST123_BINARY}
+
+    bingo ${IGPS_DIR}/mergedBootBlockAndUbootAndTests.xml \
+            -o ${DEPLOY_DIR_IMAGE}/${MERGED_BB_UBOOT_TEST_BINARY}
+
     cd "$olddir"
 }
 
@@ -25,6 +51,8 @@ do_prepare_bootloaders[depends] += " \
     npcm7xx-bootblock:do_deploy \
     npcm7xx-bingo-native:do_populate_sysroot \
     npcm7xx-igps-native:do_populate_sysroot \
+    npcm7xx-ddr4si-test:do_deploy \
+    npcm7xx-gfx-test:do_deploy \
     "
 
 addtask do_prepare_bootloaders before do_generate_static after do_generate_rwfs_static
