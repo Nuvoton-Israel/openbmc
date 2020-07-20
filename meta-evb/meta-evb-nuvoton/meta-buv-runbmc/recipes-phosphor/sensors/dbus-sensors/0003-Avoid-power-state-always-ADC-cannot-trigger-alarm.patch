@@ -1,4 +1,4 @@
-From 6b97f40ec27b802e0c32a451eb216e2a1bcdbe5c Mon Sep 17 00:00:00 2001
+From 1e9cba9338054a875a2af685eb9179d0246a0ed6 Mon Sep 17 00:00:00 2001
 From: Brian Ma <chma0@nuvoton.com>
 Date: Fri, 29 May 2020 10:51:11 +0800
 Subject: [PATCH 3/4] Avoid power state always ADC cannot trigger alarm
@@ -27,5 +27,5 @@ index 81383b0..394c5a7 100644
 -    thresholds::checkThresholdsPowerDelay(this, thresholdTimer);
  }
 -- 
-2.25.1
+2.17.1
 

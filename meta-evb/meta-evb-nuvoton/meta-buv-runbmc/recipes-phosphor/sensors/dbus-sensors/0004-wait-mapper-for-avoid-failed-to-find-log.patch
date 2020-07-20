@@ -1,4 +1,4 @@
-From 6f05f2574b6d7d488c91e2f10e71ef6f07617ffb Mon Sep 17 00:00:00 2001
+From 9bf1531b09249fd4a9e8684bafcf997ce3c0f15a Mon Sep 17 00:00:00 2001
 From: Brian Ma <chma0@nuvoton.com>
 Date: Thu, 4 Jun 2020 14:48:50 +0800
 Subject: [PATCH 4/4] wait mapper for avoid failed to find log
@@ -77,5 +77,5 @@ index 4b22e8c..8dacae6 100644
  [Service]
  Restart=always
 -- 
-2.25.1
+2.17.1
 

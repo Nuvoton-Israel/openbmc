@@ -1,8 +1,9 @@
-From 953827dc1af3ade1255b43713abfa4da7db1f1eb Mon Sep 17 00:00:00 2001
-From: Joseph <kwliu@nuvoton.com>
-Date: Thu, 4 Jun 2020 16:05:41 +0800
+From 579569eedeb4f04482ca659297619096ac02922c Mon Sep 17 00:00:00 2001
+From: YSChu <yschu@nuvoton.com>
+Date: Wed, 14 Aug 2019 15:16:12 +0800
 Subject: [PATCH 2/4] add "Scale" d-bus interface property
 
+Signed-off-by: YSChu <yschu@nuvoton.com>
 ---
  include/CPUSensor.hpp   | 1 +
  src/ADCSensor.cpp       | 2 ++
@@ -44,17 +45,17 @@ index 454944a..81383b0 100644
      {
          thresholdInterfaceWarning = objectServer.add_interface(
 diff --git a/src/CPUSensor.cpp b/src/CPUSensor.cpp
-index ed8d244..1154f4e 100644
+index 6a0fa7a..9c87282 100644
 --- a/src/CPUSensor.cpp
 +++ b/src/CPUSensor.cpp
-@@ -58,6 +58,7 @@ CPUSensor::CPUSensor(const std::string& path, const std::string& objectType,
-             "xyz.openbmc_project.Sensor.Value");
-         sensorInterface->register_property("Unit",
-             std::string("xyz.openbmc_project.Sensor.Value.Unit.DegreesC"));
-+	sensorInterface->register_property("Scale", Scale);
- 
-         if (auto fileParts = splitFileName(path))
-         {
+@@ -71,6 +71,7 @@ CPUSensor::CPUSensor(const std::string& path, const std::string& objectType,
+                 interfacePath, "xyz.openbmc_project.Sensor.Value");
+             sensorInterface->register_property("Unit",
+                 std::string("xyz.openbmc_project.Sensor.Value.Unit.DegreesC"));
++            sensorInterface->register_property("Scale", Scale);
+             if (thresholds::hasWarningInterface(thresholds))
+             {
+                 thresholdInterfaceWarning = objectServer.add_interface(
 diff --git a/src/HwmonTempSensor.cpp b/src/HwmonTempSensor.cpp
 index 6a7d0a4..c55056a 100644
 --- a/src/HwmonTempSensor.cpp
@@ -106,5 +107,5 @@ index 0f49157..6dc944b 100644
      if (thresholds::hasWarningInterface(thresholds))
      {
 -- 
-2.25.1
+2.17.1
 

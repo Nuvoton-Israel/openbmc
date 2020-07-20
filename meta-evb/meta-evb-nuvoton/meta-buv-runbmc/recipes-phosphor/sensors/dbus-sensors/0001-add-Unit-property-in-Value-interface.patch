@@ -1,4 +1,4 @@
-From 9dc3d320dc93bd8236be5ab626d90284acbdb2e3 Mon Sep 17 00:00:00 2001
+From aa4809d5b1bda72acc42f8ea338c5d0e0d1eb200 Mon Sep 17 00:00:00 2001
 From: YSChu <yschu@nuvoton.com>
 Date: Mon, 12 Aug 2019 16:59:06 +0800
 Subject: [PATCH 1/4] add "Unit" property in Value interface
@@ -6,12 +6,12 @@ Subject: [PATCH 1/4] add "Unit" property in Value interface
 Signed-off-by: YSChu <yschu@nuvoton.com>
 ---
  src/ADCSensor.cpp       |  2 ++
- src/CPUSensor.cpp       |  6 ++++++
+ src/CPUSensor.cpp       |  2 ++
  src/HwmonTempSensor.cpp |  2 ++
  src/MCUTempSensor.cpp   |  2 ++
  src/PSUSensor.cpp       | 20 ++++++++++++++++++++
  src/TachSensor.cpp      |  2 ++
- 6 files changed, 34 insertions(+)
+ 6 files changed, 30 insertions(+)
 
 diff --git a/src/ADCSensor.cpp b/src/ADCSensor.cpp
 index bfe17ac..454944a 100644
@@ -27,22 +27,18 @@ index bfe17ac..454944a 100644
      {
          thresholdInterfaceWarning = objectServer.add_interface(
 diff --git a/src/CPUSensor.cpp b/src/CPUSensor.cpp
-index afc4706..ed8d244 100644
+index afc4706..6a0fa7a 100644
 --- a/src/CPUSensor.cpp
 +++ b/src/CPUSensor.cpp
-@@ -53,6 +53,12 @@ CPUSensor::CPUSensor(const std::string& path, const std::string& objectType,
-     nameTcontrol += " CPU" + std::to_string(cpuId);
-     if (show)
-     {
-+ 	sensorInterface = objectServer.add_interface(
-+            "/xyz/openbmc_project/sensors/temperature/" + name,
-+            "xyz.openbmc_project.Sensor.Value");
-+        sensorInterface->register_property("Unit",
-+            std::string("xyz.openbmc_project.Sensor.Value.Unit.DegreesC"));
-+
-         if (auto fileParts = splitFileName(path))
-         {
-             auto [type, nr, item] = *fileParts;
+@@ -69,6 +69,8 @@ CPUSensor::CPUSensor(const std::string& path, const std::string& objectType,
+ 
+             sensorInterface = objectServer.add_interface(
+                 interfacePath, "xyz.openbmc_project.Sensor.Value");
++            sensorInterface->register_property("Unit",
++                std::string("xyz.openbmc_project.Sensor.Value.Unit.DegreesC"));
+             if (thresholds::hasWarningInterface(thresholds))
+             {
+                 thresholdInterfaceWarning = objectServer.add_interface(
 diff --git a/src/HwmonTempSensor.cpp b/src/HwmonTempSensor.cpp
 index 71ff4ed..6a7d0a4 100644
 --- a/src/HwmonTempSensor.cpp
@@ -114,5 +110,5 @@ index c45fcb0..a4bfddd 100644
      if (thresholds::hasWarningInterface(thresholds))
      {
 -- 
-2.25.1
+2.17.1
 
