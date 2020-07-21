@@ -50,6 +50,7 @@ Please submit any patches against the meta-runbmc-nuvoton layer to the maintaine
     + [FRU](#fru)
     + [Fan PID Control](#fan-pid-control)
     + [Crash Dump](#crash-dump)
+    + [SMBIOS](#smbios)
   * [IPMI / DCMI](#ipmi--dcmi)
     + [SOL IPMI](#sol-ipmi)
     + [Host Power Budget Control](#host-power-budget-control)
@@ -1169,6 +1170,30 @@ This source code is implements CrashDump for the Whitley platform and supports t
 **Maintainer**
 * Tim Lee
 
+### SMBIOS
+<img align="right" width="30%" src="https://cdn.rawgit.com/NTC-CCBG/snapshots/c240503/openbmc/smbios.png">
+
+SMBIOS stands for System Management BIOS while DMI stands for Desktop Management Interface. Both standards are tightly related and developed by the DMTF. The BIOS should provide support according to SMBIOS Reference Specification.
+
+In Nuvoton RunBMC Olympus, the raw DMI table are presented as binary attributes at `/sys/firmware/dmi/tables/DMI`. The format of DMI structures can be read in SMBIOS specification.
+
+**Source URL**
+
+This source code is implements SMBIOS MDR version 2 service [Intel-BMC/mdrv2](https://github.com/Intel-BMC/mdrv2) for Intel based platform  that get SMBIOS binary file `/var/lib/smbios/smbios2` in Nuvoton RunBMC then parse this table to update BIOS/CPU/DIMM informations through xyz.openbmc_project.Smbios.MDR_V2 this dbus interface and show on `WebUI`->`Health`->`Hardware status` page.
+
+**How to use**
+
+* Execute `xfer_mbox_mem host` tool in Nuvoton RunBMC Olympus side
+
+  This is a host tool [Nuvoton-BMC/xfer_mbox_mem](https://github.com/Nuvoton-Israel/openbmc-util/tree/master/xfer_mbox_mem) use to get smbios table from host then copy to mailbox shared memory for BMC to parse smbios binary file. The tool usage can refer to [xfer_mbox_mem](https://github.com/Nuvoton-Israel/openbmc-util/blob/master/xfer_mbox_mem/README.md).
+
+* Refresh `WebUI`
+
+  You will see the new items `BIOS`, `CPU` and `DIMM` are show on `Health`->`Hardware status` page.
+
+**Maintainer**
+* Tim Lee
+
 ## IPMI / DCMI
 
 ### SOL IPMI
@@ -2165,3 +2190,4 @@ image-rwfs    |  0 MB  | middle layer of the overlayfs, rw files in this partiti
 * 2020.05.15 Add VLAN
 * 2020.06.03 Update BIOS POST Code
 * 2020.06.29 Add Crash Dump
+* 2020.07.21 Add SMBIOS
