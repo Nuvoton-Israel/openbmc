@@ -231,6 +231,12 @@ Virtual Media (VM) is to emulate an USB drive on remote host PC via Network Bloc
         + After `Mount USB`, click `UnMount USB` to emulate unplugging the USB disk from host platform
         + After `UnMount USB`, click `Stop VM` to stop VM network service, or click `Mount USB` to hook USB disk to host platform.
 
+3. Performance
+
+|Client |MountType |Encryption |Speed KB/s
+:---------------------|:----------------------------------------------|:---|:---------|
+Client WebUI(HTML5)  | CentOS-8.2.2004-x86_64-dvd1.iso (8GB Size)    |Yes| ~7800KB/s |
+
 **Maintainer**
 * Medad CChien
 
