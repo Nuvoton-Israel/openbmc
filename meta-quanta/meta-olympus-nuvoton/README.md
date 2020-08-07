@@ -2092,3 +2092,4 @@ image-rwfs    |  0 MB  | middle layer of the overlayfs, rw files in this partiti
 * 2020.07.27 Update Time Synce and Table of Contents
 * 2020.08.03 Add Power Supply Unit Inventory
 * 2020.08.03 Add ipmi.md, dcmi.md and redfish.md
+* 2020.08.07 Add Virtual Media Performance
