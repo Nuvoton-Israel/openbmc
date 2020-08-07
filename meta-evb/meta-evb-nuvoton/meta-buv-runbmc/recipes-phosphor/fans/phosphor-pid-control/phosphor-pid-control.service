@@ -5,7 +5,7 @@ Requires=xyz.openbmc_project.Hwmon@.service
 
 [Service]
 Type=simple
-ExecStartPre=/usr/bin/env mapper wait /xyz/openbmc_project/sensors/temperature/BMC_Card
+ExecStartPre=/usr/bin/env mapper wait /xyz/openbmc_project/sensors/temperature/bmc_card_tmp75
 ExecStart=/usr/bin/swampd
 Restart=always
 RestartSec=5

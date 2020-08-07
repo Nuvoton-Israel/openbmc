@@ -3,7 +3,7 @@
         {
             "name": "fan1",
             "type": "fan",
-            "readPath": "/xyz/openbmc_project/sensors/fan_tach/FAN_1",
+            "readPath": "/xyz/openbmc_project/sensors/fan_tach/fan1",
             "writePath": "/sys/devices/platform/ahb/ahb:apb/f0103000.pwm-fan-controller/hwmon/**/pwm1",
             "min": 0,
             "max": 255
@@ -11,7 +11,7 @@
         {
             "name": "fan2",
             "type": "fan",
-            "readPath": "/xyz/openbmc_project/sensors/fan_tach/FAN_2",
+            "readPath": "/xyz/openbmc_project/sensors/fan_tach/fan2",
             "writePath": "/sys/devices/platform/ahb/ahb:apb/f0103000.pwm-fan-controller/hwmon/**/pwm2",
             "min": 0,
             "max": 255
@@ -19,7 +19,7 @@
         {
             "name": "fan3",
             "type": "fan",
-            "readPath": "/xyz/openbmc_project/sensors/fan_tach/FAN_3",
+            "readPath": "/xyz/openbmc_project/sensors/fan_tach/fan3",
             "writePath": "/sys/devices/platform/ahb/ahb:apb/f0103000.pwm-fan-controller/hwmon/**/pwm3",
             "min": 0,
             "max": 255
@@ -27,24 +27,24 @@
         {
             "name": "fan4",
             "type": "fan",
-            "readPath": "/xyz/openbmc_project/sensors/fan_tach/FAN_4",
+            "readPath": "/xyz/openbmc_project/sensors/fan_tach/fan4",
             "writePath": "/sys/devices/platform/ahb/ahb:apb/f0103000.pwm-fan-controller/hwmon/**/pwm4",
             "min": 0,
             "max": 255
         },
         {
-            "name": "BMC_Card",
+            "name": "bmc_card_tmp75",
             "type": "temp",
-            "readPath": "/xyz/openbmc_project/sensors/temperature/BMC_Card",
+            "readPath": "/xyz/openbmc_project/sensors/temperature/bmc_card_tmp75",
             "writePath": "",
             "min": 0,
             "max": 0,
             "timeout": 0
         },
         {
-            "name": "BUV_Board",
+            "name": "lm75",
             "type": "temp",
-            "readPath": "/xyz/openbmc_project/sensors/temperature/BUV_Board",
+            "readPath": "/xyz/openbmc_project/sensors/temperature/lm75",
             "writePath": "",
             "min": 0,
             "max": 0,
@@ -77,9 +77,9 @@
                     }
                 },
                 {
-                    "name": "BMC_Card",
+                    "name": "bmc_card_tmp75",
                     "type": "stepwise",
-                    "inputs": ["BMC_Card"],
+                    "inputs": ["bmc_card_tmp75"],
                     "setpoint": 30.0,
                     "pid": {
                         "samplePeriod": 1.0,
@@ -151,9 +151,9 @@
                     }
                 },
                  {
-                    "name": "BUV_Board",
+                    "name": "lm75",
                     "type": "stepwise",
-                    "inputs": ["BUV_Board"],
+                    "inputs": ["lm75"],
                     "setpoint": 30.0,
                     "pid": {
                         "samplePeriod": 1.0,

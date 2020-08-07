@@ -1,4 +1,4 @@
-From 13b093943c3faff7966d731f2305eea9dff2c986 Mon Sep 17 00:00:00 2001
+From e8076aea41e59ddd6c82d46b29bc277946251244 Mon Sep 17 00:00:00 2001
 From: Joseph Liu <kwliu@nuvoton.com>
 Date: Mon, 13 Jan 2020 16:58:41 +0800
 Subject: [PATCH] dts: nuvoton: add buv runbmc support
@@ -106,7 +106,7 @@ index 000000000000..57cfad2d497d
 +};
 diff --git a/arch/arm/boot/dts/nuvoton-npcm750-buv-runbmc.dts b/arch/arm/boot/dts/nuvoton-npcm750-buv-runbmc.dts
 new file mode 100644
-index 000000000000..604d9c41d169
+index 000000000000..dbf31562e3e7
 --- /dev/null
 +++ b/arch/arm/boot/dts/nuvoton-npcm750-buv-runbmc.dts
 @@ -0,0 +1,563 @@
@@ -178,7 +178,9 @@ index 000000000000..604d9c41d169
 +		#address-cells = <1>;
 +		#size-cells = <1>;
 +
-+		dev-num = <0>;
++		dev-num = <0>; /* /dev/jtag0 */
++		mode = "pspi"; /* pspi or gpio */
++
 +		pspi-controller = <2>; /* pspi2 */
 +		reg = <0xf0201000 0x1000>;
 +		interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
@@ -188,8 +190,6 @@ index 000000000000..604d9c41d169
 +				<&gpio0 18 GPIO_ACTIVE_HIGH>, /* TDI */
 +				<&gpio0 17 GPIO_ACTIVE_HIGH>, /* TDO */
 +				<&gpio0 16 GPIO_ACTIVE_HIGH>; /* TMS */
-+		jtag-gpios-reg = <0xf0010000 0xf0010000
-+						  0xf0010000 0xf0010000>;
 +		status = "okay";
 +	};
 +
@@ -281,7 +281,7 @@ index 000000000000..604d9c41d169
 +					};
 +					u-boot@0 {
 +						label = "u-boot";
-+						reg = <0x0000000 0x80000>;
++						reg = <0x0000000 0xC0000>;
 +						read-only;
 +					};
 +					u-boot-env@100000{
@@ -294,11 +294,11 @@ index 000000000000..604d9c41d169
 +					};
 +					rofs@800000 {
 +						label = "rofs";
-+						reg = <0x800000 0x1500000>;
++						reg = <0x800000 0x3500000>;
 +					};
 +					rwfs@1d00000 {
 +						label = "rwfs";
-+						reg = <0x1d00000 0x300000>;
++						reg = <0x3d00000 0x300000>;
 +					};
 +				};
 +			};
