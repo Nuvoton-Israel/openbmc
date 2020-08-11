@@ -1,0 +1,72 @@
+diff --git a/arch/arm/boot/dts/nuvoton-npcm750-buv-runbmc.dts b/arch/arm/boot/dts/nuvoton-npcm750-buv-runbmc.dts
+index 9f2b0efc1c5d..8aaf5aa4044b 100644
+--- a/arch/arm/boot/dts/nuvoton-npcm750-buv-runbmc.dts
++++ b/arch/arm/boot/dts/nuvoton-npcm750-buv-runbmc.dts
+@@ -80,7 +80,26 @@
+ 						  0xf0010000 0xf0010000>;
+ 		status = "okay";
+ 	};
+-
++	seven-seg-gpio {
++                  compatible = "seven-seg-gpio-dev";
++                  refresh-interval-ms = <500>;
++		  seven-gpios = <&gpio4 14 0>,
++				<&gpio4 12 0>,
++				<&gpio7 7 0>,
++				<&gpio0 9 0>,
++				<&gpio4 15 0>,
++				<&gpio2 25 0>,
++				<&gpio4 11 0>,
++				<&gpio4 10 0>,
++				<&gpio0 25 0>,
++				<&gpio4 9 0>,
++				<&gpio0 24 0>,
++				<&gpio0 11 0>,
++				<&gpio2 23 0>,
++				<&gpio4 13 0>,
++				<&gpio2 24 0>,
++				<&gpio2 26 0>;
++        };
+ 	ahb {
+ 		gmac0: eth@f0802000 {
+ 			phy-mode = "rgmii-id";
+diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+index 4ebf4679a6a4..c77b04b2d19a 100644
+--- a/drivers/misc/Kconfig
++++ b/drivers/misc/Kconfig
+@@ -433,6 +433,22 @@ config VEXPRESS_SYSCFG
+ 	  bus. System Configuration interface is one of the possible means
+ 	  of generating transactions on this bus.
+ 
++config SEVEN_SEGMENT_DISPLAY
++        tristate "Character driver for seven segment display support"
++        help
++          Character device driver which implements the user-space
++          API for letting a user write to two 7-segment displays including
++          any conversion methods necessary to map the user input
++          to two 7-segment displays.
++
++config SEVEN_SEGMENT_GPIO
++        tristate "Platform driver to update seven segment display"
++        depends on SEVEN_SEGMENT_DISPLAY
++        help
++          Platform device driver which provides an API for displaying on two
++          7-segment displays, and implements the required bit-banging.
++          The hardware assumed is 74HC164 wired to two 7-segment displays.
++
+ config PCI_ENDPOINT_TEST
+ 	depends on PCI
+ 	select CRC32
+diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
+index a04e40a33eff..a9d416440362 100644
+--- a/drivers/misc/Makefile
++++ b/drivers/misc/Makefile
+@@ -57,6 +57,8 @@ obj-y				+= cardreader/
+ obj-$(CONFIG_PVPANIC)   	+= pvpanic.o
+ obj-$(CONFIG_HABANA_AI)		+= habanalabs/
+ obj-$(CONFIG_XILINX_SDFEC)	+= xilinx_sdfec.o
++obj-$(CONFIG_SEVEN_SEGMENT_DISPLAY)    += seven_seg_disp.o
++obj-$(CONFIG_SEVEN_SEGMENT_GPIO) += seven_seg_gpio.o
+ obj-$(CONFIG_NPCM7XX_LPC_BPC)	+= npcm7xx-lpc-bpc.o
+ obj-$(CONFIG_NPCM7XX_PCI_MBOX)	+= npcm7xx-pci-mbox.o
+ obj-$(CONFIG_NPCM7XX_JTAG_MASTER)	+= npcm7xx-jtag-master.o
