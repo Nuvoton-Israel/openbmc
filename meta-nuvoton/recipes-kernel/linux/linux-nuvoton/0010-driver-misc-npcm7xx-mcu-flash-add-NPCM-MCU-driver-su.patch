@@ -1,0 +1,790 @@
+From ab90b5c30a57a17c825f45a85d513770506a269e Mon Sep 17 00:00:00 2001
+From: Tim Lee <timlee660101@gmail.com>
+Date: Tue, 25 Aug 2020 11:31:57 +0800
+Subject: [PATCH 10/10] driver: misc: npcm7xx-mcu-flash: add NPCM MCU driver
+ support
+
+Signed-off-by: Tim Lee <timlee660101@gmail.com>
+---
+ .../dts/nuvoton-npcm750-runbmc-olympus.dts    |  14 +
+ drivers/misc/Kconfig                          |   6 +
+ drivers/misc/Makefile                         |   1 +
+ drivers/misc/npcm7xx-mcu-flash.c              | 714 ++++++++++++++++++
+ 4 files changed, 735 insertions(+)
+ create mode 100644 drivers/misc/npcm7xx-mcu-flash.c
+
+diff --git a/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts b/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts
+index 92270c9d2985..62904b609c95 100644
+--- a/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts
++++ b/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts
+@@ -83,6 +83,20 @@
+ 		status = "okay";
+ 	};
+ 
++	mcu_flash {
++		compatible = "nuvoton,npcm750-mcu-flash";
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		dev-num = <0>; /* /dev/mcu0 */
++
++		mcu-gpios = <&gpio6 30 GPIO_ACTIVE_HIGH>,     /* GPIO222/PROG_CLK, Output */
++					<&gpio6 31 GPIO_ACTIVE_HIGH>,     /* GPIO223/PROG_MOSI Output*/
++					<&gpio1 6 GPIO_ACTIVE_HIGH>,      /* GPIO38/PROG_MISO, Input */
++					<&gpio1 5 GPIO_ACTIVE_LOW>;       /* GPIO37/RESET#, Output */
++		status = "okay";
++	};
++
+ 	ahb {
+ 		gmac0: eth@f0802000 {
+ 			phy-mode = "rgmii-id";
+diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+index 86edba22cd43..a7f7d6bd7ed5 100644
+--- a/drivers/misc/Kconfig
++++ b/drivers/misc/Kconfig
+@@ -487,6 +487,12 @@ config NPCM7XX_JTAG_MASTER
+ 	help
+ 	  Control PSPI/GPIO to transmit jtag signals to support jtag master function.
+ 
++config NPCM7XX_MCU_FLASH
++	tristate "NPCM7xx MCU Flash driver"
++	depends on (ARCH_NPCM7XX || COMPILE_TEST)
++	help
++	  Control GPIO to transmit SPI signals to support MCU firmware flash function.
++
+ source "drivers/misc/c2port/Kconfig"
+ source "drivers/misc/eeprom/Kconfig"
+ source "drivers/misc/cb710/Kconfig"
+diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
+index 05d09c9d0997..c5bba1c11df8 100644
+--- a/drivers/misc/Makefile
++++ b/drivers/misc/Makefile
+@@ -61,3 +61,4 @@ obj-$(CONFIG_NPCM7XX_LPC_BPC)	+= npcm7xx-lpc-bpc.o
+ obj-$(CONFIG_NPCM7XX_PCI_MBOX)	+= npcm7xx-pci-mbox.o
+ obj-$(CONFIG_NPCM_VDM)		+= npcm-vdm/
+ obj-$(CONFIG_NPCM7XX_JTAG_MASTER)	+= npcm7xx-jtag-master.o
++obj-$(CONFIG_NPCM7XX_MCU_FLASH)		+= npcm7xx-mcu-flash.o
+diff --git a/drivers/misc/npcm7xx-mcu-flash.c b/drivers/misc/npcm7xx-mcu-flash.c
+new file mode 100644
+index 000000000000..58fc1fbe17cb
+--- /dev/null
++++ b/drivers/misc/npcm7xx-mcu-flash.c
+@@ -0,0 +1,714 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Description   : NPCM7xx MCU Flash Driver
++ *
++ * Copyright (C) 2020 Nuvoton Corporation
++ *
++ */
++
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/gpio.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/clk.h>
++#include <linux/uaccess.h>
++#include <linux/regmap.h>
++#include <linux/mfd/syscon.h>
++#include <linux/cdev.h>
++#include <linux/miscdevice.h>
++#include <linux/interrupt.h>
++#include <linux/fs.h>
++#include <linux/file.h>
++
++/* GPIO Port Registers */
++#define GPnDIN	0x04	/* Data In */
++#define GPnDOUT	0x0C	/* Data Out */
++#define GPnDOS	0x68	/* Data Out Set */
++#define GPnDOC	0x6C	/* Data Out Clear */
++
++#define GPnDBNC	0x24	/* Debounce */
++#define GPIO38_NODBNC	0
++#define GPIO38_DBNC		1
++#define GPIO38_MASK		1
++#define GPIO38_OFFSET	6
++
++#define GPnOTYP	0x14	/* Output Type */
++#define GPIO222_PU		0
++#define GPIO222_OD		1
++#define GPIO222_MASK	1
++#define GPIO222_OFFSET	30
++#define GPIO223_PU		0
++#define GPIO223_OD		1
++#define GPIO223_MASK	1
++#define GPIO223_OFFSET	31
++
++/* Multiple Function Pin Selection */
++#define MFSEL3_OFFSET 0x064
++#define SMB13SEL_OFFSET	6
++#define SMB13SEL_MASK	1
++#define SMB13SEL_GPIO	0
++#define SMB13SEL_SMB	1
++
++// Lock and Fuse Bits  
++#define Fuse_Low_Byte         0
++#define Fuse_High_Byte        1
++#define Fuse_Extended_Byte    2
++#define Lock_Byte             3
++
++u8 Flash_Data_0 [16*1024];   __attribute__ ((aligned (4)));
++u8 Flash_Data_1 [16*1024];   __attribute__ ((aligned (4)));
++
++u8 EEPROM_Data_0 [256];      __attribute__ ((aligned (4)));
++u8 EEPROM_Data_1 [256];      __attribute__ ((aligned (4)));
++
++enum MCU_PIN {
++	pin_CLK,
++	pin_MOSI,
++	pin_MISO,
++	pin_RESET,
++	pin_TOTAL,
++};
++
++#define DELAY                20
++#define MCUIOC_BASE          'M'
++#define MCU_RUNTEST          _IOW(MCUIOC_BASE, 9, unsigned int)
++
++static DEFINE_SPINLOCK(mcu_file_lock);
++
++struct mcu_pins {
++	struct gpio_desc *gpiod;
++	unsigned int gpio;
++	int bit_offset;
++};
++
++struct mcu_info {
++	struct device *dev;
++	struct miscdevice miscdev;
++	struct mcu_pins pins[pin_TOTAL];
++	struct regmap		*gcr_regmap;
++	bool is_open;
++	u32 dev_num;
++};
++
++//-----------------------------------------------------------------------------------------
++u8 SPI_SendReceiveByte (struct mcu_info *mcu, u8 DataToSend)
++{
++	int l_BitCount, delay;
++	u8 l_MOSI, l_MISO;
++	u8 DataReceived = 0;
++
++	for (l_BitCount=0; l_BitCount<8; l_BitCount++)
++	{
++		// new SPI_MOSI
++		l_MOSI = (DataToSend >> (7-l_BitCount)) & 0x01;
++		if (l_MOSI == 0)
++			gpiod_set_value(mcu->pins[pin_MOSI].gpiod, 0);			// SET_SPI_MOSI_LOW;
++		else
++			gpiod_set_value(mcu->pins[pin_MOSI].gpiod, 1);			// SET_SPI_MOSI_HIGH;
++
++		// read SPI_MISO
++		l_MISO = gpiod_get_value(mcu->pins[pin_MISO].gpiod);		// l_MISO = READ_SPI_MISO;
++		DataReceived |= l_MISO << (7-l_BitCount);
++
++		for (delay=0; delay<DELAY; delay++)
++			l_MISO = gpiod_get_value(mcu->pins[pin_MISO].gpiod);	// l_MISO = READ_SPI_MISO;
++
++		gpiod_set_value(mcu->pins[pin_CLK].gpiod, 1);				// SET_SPI_CLK_HIGH;
++
++		// NOTE:
++		// The same signals are use for I2C Channel 13 therefore SDA/MOSI must not be change when SCL/CLK signal is high to avoid I2C start/stop condition.
++
++		for (delay=0; delay<DELAY; delay++)
++			l_MISO = gpiod_get_value(mcu->pins[pin_MISO].gpiod);	// l_MISO = READ_SPI_MISO;
++
++		gpiod_set_value(mcu->pins[pin_CLK].gpiod, 0);				// SET_SPI_CLK_LOW;
++	}
++
++	return (DataReceived);
++}
++//-----------------------------------------------------------------------------------------
++
++//-----------------------------------------------------------------------------------------
++bool Is_Sync (struct mcu_info *mcu)
++{
++	SPI_SendReceiveByte (mcu, 0xAC);
++	SPI_SendReceiveByte (mcu, 0x53);
++	u8 Sync = SPI_SendReceiveByte (mcu, 0x00);
++	SPI_SendReceiveByte (mcu, 0x00);
++
++	if (Sync == 0x53)
++		return true;
++	else
++		return false;
++}
++//-----------------------------------------------------------------------------------------
++
++//-----------------------------------------------------------------------------------------
++bool Is_Ready (struct mcu_info *mcu)
++{
++	SPI_SendReceiveByte (mcu,0xF0);
++	SPI_SendReceiveByte (mcu,0x00);
++	SPI_SendReceiveByte (mcu,0x00);
++	u8 Data = SPI_SendReceiveByte (mcu,0x00);
++
++	if ((Data&0x01) == 0x01){
++		return false;	// Device is busy programming
++	}
++	else{
++		return true;	// Device is ready for new command
++	}
++}
++//-----------------------------------------------------------------------------------------
++
++//-----------------------------------------------------------------------------------------
++void Chip_Erase (struct mcu_info *mcu)
++{
++	SPI_SendReceiveByte (mcu, 0xAC);
++	SPI_SendReceiveByte (mcu, 0x80);
++	SPI_SendReceiveByte (mcu, 0x00);
++	SPI_SendReceiveByte (mcu, 0x00);
++	// Need to wait for RDY !!
++}
++//-----------------------------------------------------------------------------------------
++
++//-----------------------------------------------------------------------------------------
++u8 Read_Flash_Memory_Byte (struct mcu_info *mcu, u16 Addr)
++{
++	u8 Data;
++
++	if ((Addr&0x01) == 0x00)
++	{
++		// Read Program Memory, Low byte
++		SPI_SendReceiveByte (mcu, 0x20);
++	}
++	else
++	{
++		// Read Program Memory, High byte
++		SPI_SendReceiveByte (mcu, 0x28);
++	}
++
++	SPI_SendReceiveByte (mcu, Addr>>9);
++	SPI_SendReceiveByte (mcu, Addr>>1);
++	Data = SPI_SendReceiveByte (mcu, 0x00);
++	return (Data);
++}	
++//-----------------------------------------------------------------------------------------
++
++//-----------------------------------------------------------------------------------------
++void Read_Flash_Memory_Block (struct mcu_info *mcu, u16 Addr, u16 LengthInByte, u8 *pData)
++{
++	while (LengthInByte != 0)
++	{
++		*pData = Read_Flash_Memory_Byte (mcu, Addr);;
++		Addr++;
++		pData++;
++		LengthInByte--;
++	}
++}
++//-----------------------------------------------------------------------------------------
++
++//-----------------------------------------------------------------------------------------
++void Write_Flash_Memory_Page (struct mcu_info *mcu, u16 Addr, u8 *pData)
++{
++	// address must be aline to word
++	if ((Addr & 0x01) != 0)
++		return -1; //exit (-1);
++
++	Addr &= 0xFFFE;
++
++	// Load Flash Memory Page
++	int index;
++	for (index=0; index<16; index++)
++	{
++		// Load Program Memory Page, Low byte of word
++		SPI_SendReceiveByte (mcu, 0x40);
++		SPI_SendReceiveByte (mcu, 0x00);
++		SPI_SendReceiveByte (mcu, index);
++		SPI_SendReceiveByte (mcu, *pData);
++		pData++;
++
++		// Load Program Memory Page, High byte of word
++		SPI_SendReceiveByte (mcu, 0x48);
++		SPI_SendReceiveByte (mcu, 0x00);
++		SPI_SendReceiveByte (mcu, index);
++		SPI_SendReceiveByte (mcu, *pData);
++		pData++;
++	}
++
++	// Write Program Memory Page
++	SPI_SendReceiveByte (mcu, 0x4C);
++	SPI_SendReceiveByte (mcu, Addr>>9);
++	SPI_SendReceiveByte (mcu, Addr>>1);
++	SPI_SendReceiveByte (mcu, 0x00);
++	while (Is_Ready(mcu) == false); // TBD: add Time-Out
++}
++//-----------------------------------------------------------------------------------------
++
++//-----------------------------------------------------------------------------------------
++void Write_Flash_Memory_Block (struct mcu_info *mcu, u16 Addr, u16 LengthInByte, u8 *pData)
++{
++	// address must be aline to word
++	if ((Addr & 0x01) != 0)
++		return -1; //exit (-1);
++
++	// LengthInByte must be aline to Page size 16 words / 32 bytes
++	if ((LengthInByte & 0x1F) != 0)
++		return -1; //exit (-1);
++
++	Addr &= 0xFFFE;
++	LengthInByte &= 0xFFE0;
++
++	while (LengthInByte != 0)
++	{
++		Write_Flash_Memory_Page (mcu, Addr, pData);
++		Addr += 32;
++		pData += 32;
++		LengthInByte -= 32;
++	}
++}
++//-----------------------------------------------------------------------------------------
++
++//-----------------------------------------------------------------------------------------
++void MemoryDumpB_Compare (u32 Address_Reference, u32 Address, u32 DisplayAddress, u16 NumOfLines)
++{	
++	u16 line;
++	u8 *pData8 = (u8*)Address;
++	u8 *pData8_Reference = (u8*)Address_Reference;
++	u8 index;
++	u8 Data8,Data8_Reference;
++	
++	for (line=0;line<NumOfLines;line++)
++	{
++		pr_cont("0x%08X: ", DisplayAddress);
++		DisplayAddress+=16;
++		for (index=0;index<16;index++)
++		{
++			Data8 = *pData8++;
++			Data8_Reference = *pData8_Reference++;
++			if (Data8!=Data8_Reference)
++				pr_cont("0x%02X ",Data8);
++			else
++				pr_cont("0x%02X  ",Data8);
++		}
++		pr_cont("\n");
++	}	
++}
++//-----------------------------------------------------------------------------------------
++
++//-----------------------------------------------------------------------------------------
++int MemCmp (const void *ptr1, const void *ptr2, u32 SizeInByte)
++{
++	u32 Offset;
++
++	Offset = 0;
++	while (SizeInByte!=0)
++	{
++		if (*((u8*)ptr1) != *((u8*)ptr2))
++			return (Offset);	
++
++		ptr1 = (u8*)ptr1 + 1;
++		ptr2 = (u8*)ptr2 + 1;
++		Offset++;
++		SizeInByte--;	
++	}
++	return (-1); // pass
++}
++//-----------------------------------------------------------------------------------------
++
++//-----------------------------------------------------------------------------------------
++void MemoryDumpB (u32 Address, u32 DisplayAddress, u16 NumOfLines)
++{	
++	u16 line;
++	u8 *pData8 = (u8*)Address;
++	u8 index;
++	u8 Data8;
++
++	for (line=0;line<NumOfLines;line++)
++	{
++		//pr_cont("0x%08X: ", DisplayAddress);
++		DisplayAddress+=16;
++		for (index=0;index<16;index++)
++		{
++			Data8 = *pData8++;
++			//pr_cont("0x%02X  ",Data8);
++		}
++		//pr_cont("\n");
++	}
++}
++//-----------------------------------------------------------------------------------------
++
++//-----------------------------------------------------------------------------------------
++// rand values are from 0 to 32768
++static unsigned long int next = 1;
++//-----------------------------------------------------------------------------------------
++int rand(void)
++{
++	next = next * 1103515245 + 12345;
++	return ((unsigned int)(next>>16)) & 0x7FFF ;
++}
++//-----------------------------------------------------------------------------------------
++
++//-----------------------------------------------------------------------------------------
++u8 Read_ROM_Table (struct mcu_info *mcu, u8 Addr)
++{
++	u8 Data;
++
++	if ((Addr&0x01) == 0x00)
++	{
++		// Read Signature Byte a.k.a. ROM Table, Low byte.
++		SPI_SendReceiveByte (mcu, 0x30);
++	}
++	else
++	{
++		// Read Calibration Byte a.k.a. ROM Table, High byte.
++		SPI_SendReceiveByte (mcu, 0x38);
++	}
++
++	SPI_SendReceiveByte (mcu, 0x00);
++	SPI_SendReceiveByte (mcu, Addr>>1);
++	Data = SPI_SendReceiveByte (mcu, 0x00);
++	return (Data);
++}	
++//-----------------------------------------------------------------------------------------
++
++//-----------------------------------------------------------------------------------------
++bool Check_Device_Signature (struct mcu_info *mcu)
++{
++	u32 Device_Signature = 0;
++	Device_Signature |= (u32)Read_ROM_Table(mcu, 0)<<0;
++	Device_Signature |= (u32)Read_ROM_Table(mcu, 2)<<8;
++	Device_Signature |= (u32)Read_ROM_Table(mcu, 4)<<16;
++	if (Device_Signature == 0x0012941E) // Check ATtiny1634 DS section 22.3.1
++		return true;
++	else
++		return false;
++}
++//-----------------------------------------------------------------------------------------
++
++//-----------------------------------------------------------------------------------------
++u8 Read_Configuration (struct mcu_info *mcu, int CfgMode)
++{
++	u8 Data;
++
++	switch (CfgMode)
++	{
++	case (Fuse_Low_Byte):
++		// Read Fuse low bits
++		SPI_SendReceiveByte (mcu, 0x50);
++		SPI_SendReceiveByte (mcu, 0x00);
++		break;
++
++	case (Fuse_High_Byte):
++		// Read Fuse High bits
++		SPI_SendReceiveByte (mcu, 0x58);
++		SPI_SendReceiveByte (mcu, 0x08);
++		break;
++
++	case (Fuse_Extended_Byte):
++		// Read Fuse Extended Bits
++		SPI_SendReceiveByte (mcu, 0x50);
++		SPI_SendReceiveByte (mcu, 0x08);
++		break;
++
++	case (Lock_Byte):
++		// Read Lock bits
++		SPI_SendReceiveByte (mcu, 0x58);
++		SPI_SendReceiveByte (mcu, 0x00);
++		break;
++
++	default:
++		return -1; //exit (-1);
++	}
++	SPI_SendReceiveByte (mcu, 0x00);
++	Data = SPI_SendReceiveByte (mcu, 0x00);
++
++	return (Data);
++}
++//-----------------------------------------------------------------------------------------
++
++/* configure mcu pins function */
++static inline void npcm_mcu_config_gpio(struct mcu_info *mcu)
++{
++	int val;
++
++	// Set GPIO222/SMB13SCL and GPIO223/SMB13SDA to GPIOs.
++	// In NPCM750R there is no MUX on GPIO37 and GPIO38.
++	val = SMB13SEL_GPIO;
++	regmap_update_bits(mcu->gcr_regmap, MFSEL3_OFFSET,
++		(SMB13SEL_MASK << SMB13SEL_OFFSET),
++		(val << SMB13SEL_OFFSET));
++}
++
++/* configure mcu pins function */
++static inline void npcm_mcu_config_smb(struct mcu_info *mcu)
++{
++	int val;
++
++	val = SMB13SEL_SMB;
++	regmap_update_bits(mcu->gcr_regmap, MFSEL3_OFFSET,
++		(SMB13SEL_MASK << SMB13SEL_OFFSET),
++		(val << SMB13SEL_OFFSET));
++}
++
++static void npcm_mcu_init(struct mcu_info *priv)
++{
++	int index=0;
++
++	/* Initialize pins to gpio function */
++	npcm_mcu_config_gpio(priv);
++
++	// Keep SCL and SDA low
++	gpiod_direction_output(priv->pins[pin_CLK].gpiod, 0);
++	udelay(1);
++	gpiod_direction_output(priv->pins[pin_MOSI].gpiod, 0);
++
++	gpiod_direction_output(priv->pins[pin_CLK].gpiod, 0);
++
++	// Set SPI_CLK high
++	gpiod_direction_output(priv->pins[pin_RESET].gpiod, 0);
++	mdelay(5);
++	
++	// Set SPI_CLK low
++	gpiod_direction_output(priv->pins[pin_RESET].gpiod, 1);
++	mdelay(20);
++
++	if (Is_Sync(priv))
++		pr_cont("MCU F/W Check Sync ............... DONE\n");
++	else
++		pr_cont("MCU F/W Check Sync ... FAIL\n");
++
++	for (index=0; index<128; index++)
++		EEPROM_Data_0 [index] = Read_ROM_Table (priv, index);
++	//MemoryDumpB ((u32)EEPROM_Data_0, 0, 128/16);
++
++	if (Check_Device_Signature(priv) == true)
++		pr_cont("MCU F/W Check Device Signature ... DONE\n");
++	else
++	{
++		pr_cont("MCU F/W Check Device Signature ... FAIL\n");
++		return;
++	}
++
++	pr_cont("MCU F/W Chip Erase ..");
++	Chip_Erase(priv);
++	while (Is_Ready(priv) == false)
++		pr_cont(".");
++	pr_cont(" DONE\n");
++}
++
++static ssize_t mcu_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
++{
++	int index=0;
++	u16 FlashOffset = 0;
++
++	struct mcu_info *priv = file->private_data;
++	void __user *argp = (void __user *)buf;
++
++	if (copy_from_user(Flash_Data_1, argp, count)) {
++		pr_cont("mcu_write: copy_from_user FAIL\n");
++		return -EFAULT;
++	}
++
++	npcm_mcu_init(priv);
++
++	pr_cont("MCU F/W Program Flash Memory ..... ");
++	Write_Flash_Memory_Block (priv, FlashOffset, count, Flash_Data_1);
++	pr_cont("DONE\n");
++
++	pr_cont("MCU F/W Read Flash Memory ........ ");
++	Read_Flash_Memory_Block (priv, FlashOffset, count, Flash_Data_0);
++	pr_cont("DONE\n");
++	//MemoryDumpB ((u32)Flash_Data_0, FlashOffset, count/16);
++
++	pr_cont("MCU F/W Compare Flash Memory ..... ");
++	if (MemCmp(Flash_Data_1, Flash_Data_0, count) != -1)
++		pr_cont("FAIL\n");
++	else
++		pr_cont("DONE\n");
++
++	npcm_mcu_config_smb(priv);
++
++	// Set SPI_CLK high
++	gpiod_direction_output(priv->pins[pin_RESET].gpiod, 0);
++
++	return count;
++}
++
++static long mcu_ioctl(struct file *file,
++		unsigned int cmd, unsigned long arg)
++{
++	struct mcu_info *priv = file->private_data;
++	int ret = 0;
++
++	switch (cmd) {
++	case MCU_RUNTEST:
++		pr_cont("mcu_ioctl: MCU_RUNTEST\n");
++		npcm_mcu_config_smb(priv);
++		break;
++	default:
++		return -ENOTTY;
++	}
++
++	return ret;
++}
++
++static int mcu_open(struct inode *inode, struct file *file)
++{
++	struct mcu_info *mcu;
++
++	mcu = container_of(file->private_data, struct mcu_info, miscdev);
++
++	spin_lock(&mcu_file_lock);
++	if (mcu->is_open) {
++		spin_unlock(&mcu_file_lock);
++		pr_cont("mcu_open: EBUSY\n");
++		return -EBUSY;
++	}
++
++	mcu->is_open = true;
++	file->private_data = mcu;
++
++	spin_unlock(&mcu_file_lock);
++	return 0;
++}
++
++const struct file_operations npcm_mcu_fops = {
++	.open              = mcu_open,
++	.unlocked_ioctl    = mcu_ioctl,
++	.write             = mcu_write,
++};
++
++static int mcu_register_device(struct mcu_info *mcu)
++{
++	struct device *dev = mcu->dev;
++	int err;
++
++	if (!dev)
++		return -ENODEV;
++
++	/* register miscdev */
++	mcu->miscdev.parent = dev;
++	mcu->miscdev.fops =  &npcm_mcu_fops;
++	mcu->miscdev.minor = MISC_DYNAMIC_MINOR;
++	mcu->miscdev.name = kasprintf(GFP_KERNEL, "mcu%d", mcu->dev_num);
++	if (!mcu->miscdev.name)
++		return -ENOMEM;
++
++	err = misc_register(&mcu->miscdev);
++	if (err) {
++		dev_err(mcu->miscdev.parent,
++			"Unable to register device, err %d\n", err);
++		kfree(mcu->miscdev.name);
++		return err;
++	}
++
++	return 0;
++}
++
++static int npcm_mcu_probe(struct platform_device *pdev)
++{
++	struct mcu_info *npcm_mcu;
++	struct gpio_desc *gpiod;
++	struct gpio_chip *chip;
++	u32 value;
++	int i, ret;
++	u16 FlashOffset = 0;
++
++	enum gpiod_flags pin_flags[pin_TOTAL] = {
++		GPIOD_OUT_LOW, GPIOD_OUT_LOW, GPIOD_IN, GPIOD_OUT_HIGH,
++		};
++
++	dev_info(&pdev->dev, "%s", __func__);
++
++	npcm_mcu = kzalloc(sizeof(struct mcu_info), GFP_KERNEL);
++	if (!npcm_mcu)
++		return -ENOMEM;
++	npcm_mcu->dev = &pdev->dev;
++
++	npcm_mcu->gcr_regmap =
++		syscon_regmap_lookup_by_compatible("nuvoton,npcm750-gcr");
++	if (IS_ERR(npcm_mcu->gcr_regmap)) {
++		dev_err(&pdev->dev, "Can't find npcm750-gcr\n");
++		ret = PTR_ERR(npcm_mcu->gcr_regmap);
++		goto err;
++	}
++
++	/* mcu pins */
++	for (i = 0; i < pin_TOTAL; i++) {
++		gpiod = gpiod_get_index(&pdev->dev, "mcu",
++			i, pin_flags[i]);
++		if (IS_ERR(gpiod)) {
++			dev_err(&pdev->dev, "No mcu pin: %d", i);
++			return PTR_ERR(gpiod);
++		}
++		chip = gpiod_to_chip(gpiod);
++		npcm_mcu->pins[i].gpiod = gpiod;
++
++		npcm_mcu->pins[i].bit_offset = desc_to_gpio(gpiod)
++			- chip->base;
++	}
++
++	ret = of_property_read_u32(pdev->dev.of_node,
++			"dev-num", &value);
++	if (ret < 0) {
++		dev_err(&pdev->dev,
++				"Could not read dev_num\n");
++		value = 0;
++	}
++	npcm_mcu->dev_num = value;
++
++	ret = mcu_register_device(npcm_mcu);
++	if (ret) {
++		dev_err(&pdev->dev, "Failed to create device\n");
++		goto err;
++	}
++	platform_set_drvdata(pdev, npcm_mcu);
++
++	return 0;
++
++err:
++	kfree(npcm_mcu);
++	return ret;
++}
++
++static int npcm_mcu_remove(struct platform_device *pdev)
++{
++	struct mcu_info *mcu = platform_get_drvdata(pdev);
++	int i;
++
++	if (!mcu)
++		return 0;
++
++	misc_deregister(&mcu->miscdev);
++	kfree(mcu->miscdev.name);
++	for (i = 0; i < pin_TOTAL; i++) {
++		gpiod_direction_input(mcu->pins[i].gpiod);
++		gpiod_put(mcu->pins[i].gpiod);
++	}
++	kfree(mcu);
++
++	return 0;
++}
++
++static const struct of_device_id npcm_mcu_id[] = {
++	{ .compatible = "nuvoton,npcm750-mcu-flash", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, npcm_mcu_id);
++
++static struct platform_driver npcm_mcu_driver = {
++	.probe          = npcm_mcu_probe,
++	.remove			= npcm_mcu_remove,
++	.driver         = {
++		.name   = "mcu-flash",
++		.owner	= THIS_MODULE,
++		.of_match_table = npcm_mcu_id,
++	},
++};
++
++module_platform_driver(npcm_mcu_driver);
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Tim Lee <chli30@nuvoton.com>");
++MODULE_DESCRIPTION("NPCM7xx MCU Flash Driver");
+\ No newline at end of file
+-- 
+2.17.1
+

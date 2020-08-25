@@ -66,4 +66,5 @@ RDEPENDS_${PN}-system = " \
         google-ipmi-sys \
         mac-address \
         smbios-mdrv2 \
+        loadmcu \
         "

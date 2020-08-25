@@ -1,0 +1,6 @@
+[Unit]
+Description=NPCM7xx MCU F/W update service
+
+[Service]
+ExecStart=/usr/bin/mcu-update.sh
+Type=oneshot
