@@ -68,4 +68,7 @@ RDEPENDS_${PN}-system = " \
         smbios-mdrv2 \
         loadmcu \
         usb-network \
+        pldm \
+        mctp \
+        dbus-sensors \
         "
