@@ -1,0 +1,100 @@
+From 6eb7f20c6ad215e8bbbcc03f9f708932200fd79c Mon Sep 17 00:00:00 2001
+From: Tim Lee <timlee660101@gmail.com>
+Date: Fri, 11 Sep 2020 14:16:57 +0800
+Subject: [PATCH 11/11] driver: misc: npcm7xx-mcu-flash: fix mcu reset signal
+ always keep low when system boot up
+
+Signed-off-by: Tim Lee <timlee660101@gmail.com>
+---
+ .../dts/nuvoton-npcm750-runbmc-olympus.dts     |  2 +-
+ drivers/misc/npcm7xx-mcu-flash.c               | 18 +++++++++++-------
+ 2 files changed, 12 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts b/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts
+index 68449d1d0623..f1a058a95f90 100644
+--- a/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts
++++ b/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts
+@@ -94,7 +94,7 @@
+ 		mcu-gpios = <&gpio6 30 GPIO_ACTIVE_HIGH>,     /* GPIO222/PROG_CLK, Output */
+ 					<&gpio6 31 GPIO_ACTIVE_HIGH>,     /* GPIO223/PROG_MOSI Output */
+ 					<&gpio1 6 GPIO_ACTIVE_HIGH>,      /* GPIO38/PROG_MISO, Input  */
+-					<&gpio1 5 GPIO_ACTIVE_LOW>;       /* GPIO37/RESET#, Output    */
++					<&gpio1 5 GPIO_ACTIVE_HIGH>;       /* GPIO37/RESET#, Output    */
+ 		status = "okay";
+ 	};
+ 
+diff --git a/drivers/misc/npcm7xx-mcu-flash.c b/drivers/misc/npcm7xx-mcu-flash.c
+index aa7ea625c038..2a8746f1a68a 100644
+--- a/drivers/misc/npcm7xx-mcu-flash.c
++++ b/drivers/misc/npcm7xx-mcu-flash.c
+@@ -303,7 +303,7 @@ static inline void npcm7xx_mcu_config_smb (struct npcm7xx_mcu *mcu)
+ 		(val << mcu->smb_offset));
+ }
+ 
+-static void npcm7xx_mcu_init (struct npcm7xx_mcu *mcu)
++static int npcm7xx_mcu_init (struct npcm7xx_mcu *mcu)
+ {
+ 	int i = 0;
+ 
+@@ -318,17 +318,19 @@ static void npcm7xx_mcu_init (struct npcm7xx_mcu *mcu)
+ 	gpiod_direction_output(mcu->pins[PIN_CLK].gpiod, 0);
+ 
+ 	/* Set RESET high */
+-	gpiod_direction_output(mcu->pins[PIN_RESET].gpiod, 0);
++	gpiod_direction_output(mcu->pins[PIN_RESET].gpiod, 1);
+ 	mdelay(5);
+ 
+ 	/* Set RESET low */
+-	gpiod_direction_output(mcu->pins[PIN_RESET].gpiod, 1);
++	gpiod_direction_output(mcu->pins[PIN_RESET].gpiod, 0);
+ 	mdelay(20);
+ 
+ 	if (npcm7xx_mcu_sync(mcu))
+ 		pr_cont("MCU F/W Check Sync ............... DONE\n");
+-	else
++	else {
+ 		pr_cont("MCU F/W Check Sync ............... FAIL\n");
++		return -1;
++	}
+ 
+ 	for (i = 0; i < 128; i++)
+ 		eeprom_data[i] = read_rom_table(mcu, i);
+@@ -338,7 +340,7 @@ static void npcm7xx_mcu_init (struct npcm7xx_mcu *mcu)
+ 		pr_cont("MCU F/W Check Device Signature ... DONE\n");
+ 	else {
+ 		pr_cont("MCU F/W Check Device Signature ... FAIL\n");
+-		return;
++		return -1;
+ 	}
+ 
+ 	pr_cont("MCU F/W Chip Erase ..");
+@@ -346,6 +348,7 @@ static void npcm7xx_mcu_init (struct npcm7xx_mcu *mcu)
+ 	while (npcm7xx_mcu_ready(mcu) == false)
+ 		pr_cont(".");
+ 	pr_cont(" DONE\n");
++	return 0;
+ }
+ 
+ static ssize_t npcm7xx_mcu_write (struct file *file, const char __user *buf, size_t count, loff_t *ppos)
+@@ -361,7 +364,8 @@ static ssize_t npcm7xx_mcu_write (struct file *file, const char __user *buf, siz
+ 		return -EFAULT;
+ 	}
+ 
+-	npcm7xx_mcu_init(mcu);
++	if (npcm7xx_mcu_init(mcu) != 0)
++		return -EFAULT;;
+ 
+ 	pr_cont("MCU F/W Program Flash Memory ..... ");
+ 	write_flash_memory_block(mcu, offset, count, flash_data_1);
+@@ -381,7 +385,7 @@ static ssize_t npcm7xx_mcu_write (struct file *file, const char __user *buf, siz
+ 	npcm7xx_mcu_config_smb(mcu);
+ 
+ 	// Set RESET high
+-	gpiod_direction_output(mcu->pins[PIN_RESET].gpiod, 0);
++	gpiod_direction_output(mcu->pins[PIN_RESET].gpiod, 1);
+ 
+ 	return count;
+ }
+-- 
+2.17.1
+
