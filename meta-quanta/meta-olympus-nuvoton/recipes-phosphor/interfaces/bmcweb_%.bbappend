@@ -6,6 +6,7 @@ SRC_URI_append_olympus-nuvoton = " file://0005-bmcweb-chassis-add-indicatorLED-s
 #SRC_URI_append_olympus-nuvoton = " file://0006-bmcweb-get-cpu-and-dimm-info-from-prettyname.patch"
 
 SRC_URI_append_olympus-nuvoton = " file://0001-redfish-cpudimm-fix-cannot-prsent-totalcores.patch"
+SRC_URI_append_olympus-nuvoton = " file://0010-bmcweb-fix-segmentation-fault-in-update-service.patch"
 
 # Enable CPU Log and Raw PECI support
 EXTRA_OECMAKE += "-DBMCWEB_ENABLE_REDFISH_CPU_LOG=ON"
