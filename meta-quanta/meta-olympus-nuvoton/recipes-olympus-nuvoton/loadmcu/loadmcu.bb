@@ -11,12 +11,19 @@ inherit autotools pkgconfig
 
 DEPENDS += "systemd"
 DEPENDS += "autoconf-archive-native"
+RDEPENDS_${PN} += "bash"
 
 SRC_URI += " git://github.com/Nuvoton-Israel/loadmcu.git \
              file://mcu-update.service \
+             file://mcu-version.sh \
            "
 SRCREV = "${AUTOREV}"
 S = "${WORKDIR}/git/"
 
 SYSTEMD_PACKAGES = "${PN}"
 SYSTEMD_SERVICE_${PN} = "mcu-update.service"
+
+do_install_append() {
+    install -d ${D}${bindir}
+    install -m 0755 ${WORKDIR}/mcu-version.sh ${D}${bindir}/
+}
