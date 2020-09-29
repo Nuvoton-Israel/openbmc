@@ -1,0 +1,40 @@
+From a0da45bf133023f7337dee42d12ff84edf53dcd7 Mon Sep 17 00:00:00 2001
+From: Tim Lee <timlee660101@gmail.com>
+Date: Mon, 28 Sep 2020 09:48:54 +0800
+Subject: [PATCH 12/12] driver: misc: npcm7xx-mcu-flash: add
+ npcm7xx_mcu_release funciton for close operation
+
+Signed-off-by: Tim Lee <timlee660101@gmail.com>
+---
+ drivers/misc/npcm7xx-mcu-flash.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/drivers/misc/npcm7xx-mcu-flash.c b/drivers/misc/npcm7xx-mcu-flash.c
+index 2a8746f1a68a..14a78422a716 100644
+--- a/drivers/misc/npcm7xx-mcu-flash.c
++++ b/drivers/misc/npcm7xx-mcu-flash.c
+@@ -410,9 +410,21 @@ static int npcm7xx_mcu_open (struct inode *inode, struct file *file)
+ 	return 0;
+ }
+ 
++static int npcm7xx_mcu_release (struct inode *inode, struct file *file)
++{
++	struct npcm7xx_mcu *mcu = file->private_data;
++
++	spin_lock(&mcu_file_lock);
++	mcu->is_open = false;
++	spin_unlock(&mcu_file_lock);
++
++	return 0;
++}
++
+ const struct file_operations npcm7xx_mcu_fops = {
+ 	.open              = npcm7xx_mcu_open,
+ 	.write             = npcm7xx_mcu_write,
++	.release           = npcm7xx_mcu_release,
+ };
+ 
+ static int npcm7xx_mcu_register_device (struct npcm7xx_mcu *mcu)
+-- 
+2.17.1
+
