@@ -2,8 +2,10 @@
 
 sleep 1
 
+i2c_bus=$(echo $1)
+
 # get mcu firmware version
-version=$(i2ctransfer -f -y 13 w2@0x70 0x01 0x30 r2)
+version=$(i2ctransfer -f -y $i2c_bus w2@0x70 0x01 0x30 r2)
 
 # parse mcu firmware major revision
 major=`echo $version | awk '{print$2}'`
@@ -12,5 +14,9 @@ major=`echo $version | awk '{print$2}'`
 minor=`echo $version | awk '{print$1}'`
 
 version="V`echo $((major))`.`echo $((minor))`"
-echo $version
-echo "VERSION_ID=$version" > /usr/share/phosphor-bmc-code-mgmt/mcu-release
+
+if [ $version != "V0.0" ]; then
+   echo "VERSION_ID=$version" > /usr/share/phosphor-bmc-code-mgmt/mcu-release
+else
+   echo "VERSION_ID=N/A" > /usr/share/phosphor-bmc-code-mgmt/mcu-release
+fi

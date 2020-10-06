@@ -16,12 +16,14 @@ RDEPENDS_${PN} += "bash"
 SRC_URI += " git://github.com/Nuvoton-Israel/loadmcu.git \
              file://mcu-update.service \
              file://mcu-version.sh \
+             file://mcu-version@.service \
            "
 SRCREV = "${AUTOREV}"
 S = "${WORKDIR}/git/"
 
 SYSTEMD_PACKAGES = "${PN}"
-SYSTEMD_SERVICE_${PN} = "mcu-update.service"
+SYSTEMD_SERVICE_${PN} = "mcu-update.service mcu-version@.service"
+SYSTEMD_SERVICE_${PN} += "mcu-version@13.service"
 
 do_install_append() {
     install -d ${D}${bindir}
