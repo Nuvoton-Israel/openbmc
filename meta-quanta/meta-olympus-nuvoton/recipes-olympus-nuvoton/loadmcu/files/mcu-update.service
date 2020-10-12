@@ -4,4 +4,4 @@ Description=NPCM7xx MCU F/W update service
 [Service]
 ExecStart=/usr/bin/loadmcu -d /dev/mcu0 -s /tmp/image-mcu
 Type=oneshot
-ExecStopPost=/bin/systemctl start mcu-version@13.service
+ExecStopPost=/bin/systemctl start mcu-version@* --all
