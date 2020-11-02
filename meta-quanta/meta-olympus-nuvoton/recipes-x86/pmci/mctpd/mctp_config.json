@@ -1,4 +1,15 @@
 {
+  "smbus": {
+      "role": "endpoint",
+      "default-eid":8,
+      "eid-pool":[8,9,10,11,12,13,14,15,16,17,18,19,20],
+      "bus":"/dev/i2c-2",
+      "PhysicalMediumID":"Smbus3OrI2c400khzCompatible",
+      "ARPMasterSupport": false,
+      "BMCSlaveAddress":20,
+      "ReqToRespTimeMs":100,
+      "ReqRetryCount":2
+  },
   "pcie": {
       "role": "endpoint",
       "default-eid":0,
