@@ -1,2 +1,2 @@
 SRC_URI_olympus-nuvoton := "git://github.com/Nuvoton-Israel/pmci.git;protocol=ssh"
-SRCREV_olympus-nuvoton := "448498b926276521e2f82050e55790b6fd842c19"
+SRCREV_olympus-nuvoton := "c4742806ded35936dc26a7e4164cedb79ab72ee1"

@@ -3,7 +3,7 @@ DESCRIPTION = "PLDM Sensor Services Configured from D-Bus"
 
 SRC_URI = "git://github.com/Nuvoton-Israel/pldmsensors.git;protocol=ssh;branch=main;"
 
-SRCREV = "50c0bb53238b7a329d3ae6c12697cc8e4b573d4e"
+SRCREV = "82cf2aa47408f90829dce01d203ba08788275de2"
 
 PV = "0.1+git${SRCPV}"
 
@@ -15,7 +15,7 @@ SYSTEMD_SERVICE_${PN} = " xyz.openbmc_project.pldmsensor.service"
 DEPENDS = "boost nlohmann-json sdbusplus i2c-tools libgpiod libpldm-intel "
 inherit cmake systemd
 
-S = "${WORKDIR}/git/"
+S = "${WORKDIR}/git"
 
 EXTRA_OECMAKE = "-DYOCTO=1"
 

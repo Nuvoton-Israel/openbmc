@@ -15,7 +15,8 @@
       "upperThresholdFatal":"220",
       "lowerThresholdWarning":"190",
       "lowerThresholdCritical":"180",
-      "lowerThresholdFatal":"170"
+      "lowerThresholdFatal":"170",
+      "hysteresis":5
    },
    {
       "sensorID":4,
@@ -33,6 +34,7 @@
       "upperThresholdFatal":"80",
       "lowerThresholdWarning":"15",
       "lowerThresholdCritical":"10",
-      "lowerThresholdFatal":"5"
+      "lowerThresholdFatal":"5",
+      "hysteresis":3
    }
 ]
