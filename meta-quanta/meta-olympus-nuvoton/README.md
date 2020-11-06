@@ -44,6 +44,7 @@ Please submit any patches against the meta-runbmc-nuvoton layer to the maintaine
     + [Certificate Management](#Certificate-Management)
   * [System](#system)
     + [Sensors](#sensors)
+    + [PLDM Sensors](#sensors)
     + [LED Manager](#led-manager)
     + [Fan PID Control](#fan-pid-control)
     + [Event Policy](#event-policy)
@@ -637,6 +638,89 @@ Management operations:
 **Maintainer**
 
 * Stanley Chu
+
+### PLDM Sensors
+[pldmsensors](https://github.com/Nuvoton-Israel/pldmsensors) daemon will periodically check the sensor reading and update on corresponding dbus property. This daemon will send PLDM request via dbus method registed by [mctpd](https://github.com/Nuvoton-Israel/pmci/tree/master/mctpd) daemon, and mctpd will pack the PLDM request into a MCTP message and pass the request to PLDM device via I2C or PCI according to SMBUS_BINDING in [mctpd.bbappend](https://github.com/Nuvoton-Israel/openbmc/blob/runbmc/meta-quanta/meta-olympus-nuvoton/recipes-x86/pmci/mctpd.bbappend). There is also a config file [mctp_config.json](https://github.com/Nuvoton-Israel/openbmc/blob/runbmc/meta-quanta/meta-olympus-nuvoton/recipes-x86/pmci/mctpd/mctp_config.json) for mctpd you should modify according to your configuration.
+
+**Source URL**
+* [https://github.com/Nuvoton-Israel/pldmsensors](https://github.com/Nuvoton-Israel/pldmsensors)
+* [https://github.com/Nuvoton-Israel/pmci](https://github.com/Nuvoton-Israel/pmci)
+* [https://github.com/Nuvoton-Israel/libmctp](https://github.com/Nuvoton-Israel/libmctp)
+
+**How to use**
+
+* **Configure sensors**
+    
+  * Add Sensor Configuration File
+  
+    All the sensors **temperature**, **adc**, **fan**, **voltage** and **power** use the same [pldmsensors.json](https://github.com/Nuvoton-Israel/openbmc/blob/runbmc/meta-quanta/meta-olympus-nuvoton/recipes-phosphor/sensors/pldmsensors/pldmsensors.json) that defines the sensor name and its warning or critical thresholds ,etc. This file is located under **meta-quanta/meta-olympus-nuvoton/recipes-phosphor/sensors/pldmsensors/** .  
+
+    Below is sensor config for a temperature sensor on PLDM device. The sensor ID is **4** and its name is **PLDM_Temp0**. It has warning and critical thresholds and fatal for **upper** and **lower** bound and sensorUnit, sensorDataSize, sensorScale, rearmEventState, powerState, hysteresis, factor, etc.
+      ```
+      "sensorID":4,
+      "sensorTypeName":"temperature",
+      "objectType":"xyz.openbmc_project.Configuration.PLDMtemperature",
+      "sensorName":"PLDM_Temp0",
+      "sensorUnit":"DegreesC",
+      "sensorDataSize":"SINT8",
+      "sensorScale":0,
+      "factor":"1",
+      "rearmEventState":"false",
+      "powerState":"Standby",
+      "upperThresholdWarning":"60",
+      "upperThresholdCritical":"70",
+      "upperThresholdFatal":"80",
+      "lowerThresholdWarning":"15",
+      "lowerThresholdCritical":"10",
+      "lowerThresholdFatal":"5",
+      "hysteresis":3
+      ```
+    Below is sensor config for a voltage on PLDM device.
+      ```
+      "sensorID":31,
+      "sensorTypeName":"voltage",
+      "objectType":"xyz.openbmc_project.Configuration.PLDMvoltage",
+      "sensorName":"PLDM_3_3STDBY",
+      "sensorUnit":"Volts",
+      "sensorDataSize":"UINT16",
+      "sensorScale":0,
+      "factor":"0.016",
+      "rearmEventState":"false",
+      "powerState":"Standby",
+      "upperThresholdWarning":"210",
+      "upperThresholdCritical":"215",
+      "upperThresholdFatal":"220",
+      "lowerThresholdWarning":"190",
+      "lowerThresholdCritical":"180",
+      "lowerThresholdFatal":"170",
+      "hysteresis":5
+      ```
+
+* **Monitor sensor and events**
+
+  * Using WebUI  
+
+    In `Sensors` page of **WebUI**, the sensors reading will show as below.
+
+    <img align="bottomleft" width="30%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/pldmsensor_reading.png">  
+
+  * Using Dbus
+
+    Use **busctl** to send command for getting PLDM_Temp0 info.  
+    ```
+    $ busctl  introspect  xyz.openbmc_project.PLDMSensor /xyz/openbmc_project/sensors/temperature/PLDM_Temp0
+    ```
+    <img align="bottomleft" width="30%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/PLDM_Temp0.png">
+    
+    Use **busctl** to send command for getting PLDM_3_3STDBY info. 
+    ```
+    $ busctl  introspect  xyz.openbmc_project.PLDMSensor /xyz/openbmc_project/sensors/voltage/PLDM_3_3STDBY
+    ```
+     <img align="bottomleft" width="30%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/PLDM_3_3STDBY.png">
+
+**Maintainer**
+
+* Medad CChien
 
 ### LED Manager
 <img align="right" width="30%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/ServerLed.PNG">  
@@ -2092,3 +2176,4 @@ image-rwfs    |  0 MB  | middle layer of the overlayfs, rw files in this partiti
 * 2020.08.03 Add Power Supply Unit Inventory
 * 2020.08.03 Add ipmi.md, dcmi.md and redfish.md
 * 2020.08.07 Add Virtual Media Performance
+* 2020.11.06 Add PLDM sensors
