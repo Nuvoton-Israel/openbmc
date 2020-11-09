@@ -44,7 +44,7 @@ Please submit any patches against the meta-runbmc-nuvoton layer to the maintaine
     + [Certificate Management](#Certificate-Management)
   * [System](#system)
     + [Sensors](#sensors)
-    + [PLDM Sensors](#sensors)
+    + [PLDM Sensors](#pldm-sensors)
     + [LED Manager](#led-manager)
     + [Fan PID Control](#fan-pid-control)
     + [Event Policy](#event-policy)
