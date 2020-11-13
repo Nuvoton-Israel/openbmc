@@ -40,6 +40,7 @@ Please submit any patches against the meta-runbmc-nuvoton layer to the maintaine
     + [Virtual Media](#virtual-media)
     + [BMC Firmware Update Over Lan](#bmc-firmware-update-over-lan)
     + [BIOS Firmware Update Over Lan](#bios-firmware-update-over-lan)
+    + [MCU Firmware Update Over Lan](#mcu-firmware-update-over-lan)
     + [Server Power Operations](#server-power-operations)
     + [Certificate Management](#Certificate-Management)
   * [System](#system)
@@ -369,6 +370,89 @@ This is a secure flash update mechanism to update BMC firmware via WebUI.
 **Maintainer**
 
 * Brian Ma
+
+### MCU Firmware Update Over Lan
+<img align="right" width="40%" src="https://cdn.rawgit.com/NTC-CCBG/snapshots/50a8c7e/openbmc/mcu.png">
+  This MCU update function is implemented according to Openbmc firmware update mechanism. Users can update MCU just like they update BMC firmware via web UI.
+
+
+**Source URL**
+
+* [https://github.com/Nuvoton-Israel/phosphor-bmc-code-mgmt](https://github.com/Nuvoton-Israel/phosphor-bmc-code-mgmt)
+* [https://github.com/Nuvoton-Israel/loadmcu](https://github.com/Nuvoton-Israel/loadmcu)
+
+**How to use**
+
+* Prepare the MCU image for update
+
+  1. MANIFEST
+
+      The manifest for MCU must set *purpose=xyz.openbmc_project.Software.Version.VersionPurpose.MCU*, and provide version information.
+      Others information just set as BMC manifest.
+      ```
+      purpose=xyz.openbmc_project.Software.Version.VersionPurpose.MCU
+      version=V0.4
+      KeyType=OpenBMC
+      HashType=RSA-SHA256
+      MachineName=olympus-nuvoton
+      ```
+
+  2. MCU firmware
+
+      rename MCU image to image-mcu
+      ```
+      mv ATtiny1634_FW.bin image-mcu
+      ```
+
+  3. public key
+
+      Prepare your own key pair for sign MCU firmware, and put the public key in image. Then sign the image-mcu as following command:
+      ```
+      openssl dgst -sha256 -sign userkey.priv -out image-mcu.sig image-mcu
+      ```
+  4. Sign MANIFEST and public key
+
+      Follow the BMC update signature verify flow, we also need sign MANIFEST and user public key by BMC system key.
+      ```
+      openssl dgst -sha256 -sign OpenBMC.priv -out MANIFEST.sig MANIFEST
+      openssl dgst -sha256 -sign OpenBMC.priv -out publickey.sig publickey
+      ```
+
+  5. Collect data and tar image
+
+      Now we have six files, and we just need tar them to a file.
+      ```
+      tar -cf image-mcu.tar image-mcu image-mcu.sig MANIFEST MANIFEST.sig publickey publickey.sig
+      ```
+
+* Update MCU
+
+  There are two way updating MCU image just like BMC firmware update.
+
+  1. WebUI
+
+      Upload tar image, and active it.
+      ```
+      Server configuration
+       -> Firmware
+         -> Choose file (select image-mcu.tar)
+         -> Click "Upload firmware" button
+         -> Click "Active" link
+             -> Select "ACTIVATE FIRMWARE FILE AND AUTOMATICALLY REBOOT SERVER"
+             -> Click Continue
+      ```
+
+  2. Redfish
+
+      We can update MCU image via REST API just like BMC firmware. And the image will apply immediately after uploaded by default.
+      ```
+      curl -k -H "X-Auth-Token: $token" -H "Content-Type: application/octet-stream" -X POST -T image-mcu.tar https://${BMC_IP}/redfish/v1/UpdateService
+      ```
+      >_${token} is the token value come from login API, read more information from [REST README](https://github.com/openbmc/docs/blob/master/REST-cheatsheet.md)_
+
+**Maintainer**
+
+* Tim Lee
 
 ### Server Power Operations
 <img align="right" width="30%" src="https://cdn.rawgit.com/NTC-CCBG/snapshots/8fc19a1/openbmc/power_ops.png">
@@ -2177,3 +2261,4 @@ image-rwfs    |  0 MB  | middle layer of the overlayfs, rw files in this partiti
 * 2020.08.03 Add ipmi.md, dcmi.md and redfish.md
 * 2020.08.07 Add Virtual Media Performance
 * 2020.11.06 Add PLDM sensors
+* 2020.11.13 Add MCU Firmware Update
