@@ -1,0 +1,26 @@
+From 332b07c0776c25f475058bbcf700570cc875ea16 Mon Sep 17 00:00:00 2001
+From: Tim Lee <timlee660101@gmail.com>
+Date: Thu, 19 Nov 2020 14:08:35 +0800
+Subject: [PATCH 13/13] systems: fix Members@odata.count is incorrect even
+ Members have contents
+
+Signed-off-by: Tim Lee <timlee660101@gmail.com>
+---
+ redfish-core/lib/systems.hpp | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/redfish-core/lib/systems.hpp b/redfish-core/lib/systems.hpp
+index 944f730f..5103736a 100644
+--- a/redfish-core/lib/systems.hpp
++++ b/redfish-core/lib/systems.hpp
+@@ -1695,6 +1695,7 @@ class SystemsCollection : public Node
+                 count = 0;
+                 ifaceArray.push_back(
+                     {{"@odata.id", "/redfish/v1/Systems/system"}});
++                    count = ifaceArray.size();
+                 if (!ec)
+                 {
+                     BMCWEB_LOG_DEBUG << "Hypervisor is available";
+-- 
+2.17.1
+
