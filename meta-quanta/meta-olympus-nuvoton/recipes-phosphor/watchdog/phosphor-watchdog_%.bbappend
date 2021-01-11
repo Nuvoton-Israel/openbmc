@@ -1,9 +1,8 @@
 FILESEXTRAPATHS_prepend_olympus-nuvoton := "${THISDIR}/${PN}:"
 
-SRC_URI_append_olympus-nuvoton = " file://obmc-enable-host-watchdog@.service"
+SRC_URI_append_olympus-nuvoton = " file://0001-Customize-phosphor-watchdog-for-Intel-platforms.patch"
 
-do_install_append_olympus-nuvoton() {
-    install -d ${D}${systemd_unitdir}/system/
-    install -m 0644 ${WORKDIR}/obmc-enable-host-watchdog@.service \
-        ${D}${systemd_unitdir}/system
-}
+# Remove the override to keep service running after DC cycle
+SYSTEMD_OVERRIDE_${PN}_remove_olympus-nuvoton = "poweron.conf:phosphor-watchdog@poweron.service.d/poweron.conf"
+SYSTEMD_SERVICE_${PN}_olympus-nuvoton = "phosphor-watchdog.service"
+
