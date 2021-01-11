@@ -1,0 +1,87 @@
+From 079db75d91abd1907f75b31d88092d3d6b4382c5 Mon Sep 17 00:00:00 2001
+From: Tim Lee <timlee660101@gmail.com>
+Date: Mon, 11 Jan 2021 10:12:22 +0800
+Subject: [PATCH 18/18] dts: runbmc-olympus: add power/reset button and post
+ complete for x86-power-control
+
+Signed-off-by: Tim Lee <timlee660101@gmail.com>
+---
+ .../dts/nuvoton-npcm750-runbmc-olympus.dts    | 31 +++++++++++++------
+ 1 file changed, 21 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts b/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts
+index 94e34b3bce7f..9183b1996571 100644
+--- a/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts
++++ b/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts
+@@ -769,8 +769,10 @@
+ 					gpio-controller;
+ 					#gpio-cells = <2>;
+ 					reset-gpios = <&gpio5 28 GPIO_ACTIVE_LOW>;
++					interrupt-parent = <&gpio5>;
++					interrupts = <29 IRQ_TYPE_LEVEL_LOW>;
+ 					gpio-line-names="","","","POWER_OUT","RESET_OUT","","","",
+-									"","","","","","","","";
++									"","","","","","","POST_COMPLETE","";
+ 					G2A_P0_0 {
+ 						gpio-hog;
+ 						gpios = <0 0>;
+@@ -843,12 +845,6 @@
+ 						input;
+ 						line-name = "FM_SOL_UART_CH_SEL";
+ 					};
+-					G2A_P1_6 {
+-						gpio-hog;
+-						gpios = <14 0>;
+-						input;
+-						line-name = "FM_BIOS_POST_CMPLT_N";
+-					};
+ 				};
+ 
+ 				pca9539_g2b: pca9539-g2b@75 {
+@@ -856,6 +852,12 @@
+ 					reg = <0x75>;
+ 					gpio-controller;
+ 					#gpio-cells = <2>;
++					interrupt-parent = <&gpio5>;
++					interrupts = <29 IRQ_TYPE_LEVEL_LOW>;
++					#interrupt-cells = <2>;
++					interrupt-controller;
++					gpio-line-names="","","","","","","","",
++									"","","","","","","","";
+ 					G2B_P0_0 {
+ 						gpio-hog;
+ 						gpios = <0 0>;
+@@ -1188,7 +1190,7 @@
+ 			/*64-95*/
+ 			"","","","","","","","",
+ 			"","","","","","","PREQ_N","PRDY_N",
+-			"","","","","","","","",
++			"","","","POWER_BUTTON","","","","",
+ 			"","","","","","","","PLTRST_N";
+ 		};
+ 		gpio4: gpio@f0014000 {
+@@ -1196,10 +1198,19 @@
+ 			gpio-line-names =
+ 			/*128-159*/
+ 			"","","","","","","","",
+-			"","","","","","","","",
+-			"","","","","","","","",
++			"","PS_PWROK","","","","","","",
++			"","RESET_BUTTON","","","","","","",
+ 			"","PWR_DEBUG_N","","RSMRST_N","","","","";
+ 		};
++		gpio5: gpio@f0015000 {
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			gpio-line-names =
++				"","","","","","","","",
++				"","","","","","","","",
++				"","","","","","","","",
++				"","","","","","","","";
++		};
+ 		gpio7: gpio@f0017000 {
+ 			/* SYSPWROK=gpio229, DEBUG_EN_N=gpio231 */
+ 			gpio-line-names =
+-- 
+2.17.1
+

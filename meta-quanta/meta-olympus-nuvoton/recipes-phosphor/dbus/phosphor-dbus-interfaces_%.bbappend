@@ -7,3 +7,5 @@ SRC_URI_append_olympus-nuvoton = " file://0005-Add-DBUS-interface-of-CPU-and-Mem
 SRC_URI_append_olympus-nuvoton = " file://0001-support-type-uint8-uint16-uint32-for-inventory-manag.patch"
 SRC_URI_append_olympus-nuvoton = " file://0001-Software-Add-MCU-VersionPurpose.patch"
 SRC_URI_append_olympus-nuvoton = " file://0028-MCTP-Daemon-D-Bus-interface-definition.patch"
+SRC_URI_append_olympus-nuvoton = " file://0024-Add-the-pre-timeout-interrupt-defined-in-IPMI-spec.patch"
+SRC_URI_append_olympus-nuvoton = " file://0025-Add-PreInterruptFlag-properity-in-DBUS.patch"
