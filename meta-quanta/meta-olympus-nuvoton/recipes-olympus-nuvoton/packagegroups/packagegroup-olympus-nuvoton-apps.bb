@@ -23,7 +23,7 @@ RPROVIDES_${PN}-system += "virtual-obmc-system-mgmt"
 
 SUMMARY_${PN}-chassis = "OLYMPUS NUVOTON Chassis"
 RDEPENDS_${PN}-chassis = " \
-        obmc-op-control-power \
+        x86-power-control \
         "
 
 SUMMARY_${PN}-fans = "OLYMPUS NUVOTON Fans"
@@ -47,7 +47,6 @@ RDEPENDS_${PN}-system = " \
         phosphor-host-postd \
         phosphor-ipmi-ipmb \
         phosphor-ipmi-blobs \
-        olympus-nuvoton-powerctrl \
         ipmitool \
         phosphor-sel-logger \
         first-boot-set-psu \
