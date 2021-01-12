@@ -7,7 +7,7 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=bcd9ada3a943f58551867d72893cc9ab"
 SRC_URI = "git://github.com/Intel-BMC/pmci.git;protocol=ssh"
 SRCREV = "a8e84b6f61639ab85b0e2368c9ec755e692aa14c"
 
-S = "${WORKDIR}/git/mctp_emulator/"
+S = "${WORKDIR}/git/mctp_emulator"
 
 PV = "1.0+git${SRCPV}"
 

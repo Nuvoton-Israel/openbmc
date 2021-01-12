@@ -7,7 +7,7 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=e3fc50a88d0a364313df4b21ef20c29e"
 SRC_URI = "git://github.com/Intel-BMC/pmci.git;protocol=ssh"
 SRCREV = "a8e84b6f61639ab85b0e2368c9ec755e692aa14c"
 
-S = "${WORKDIR}/git/mctpd/"
+S = "${WORKDIR}/git/mctpd"
 
 PV = "1.0+git${SRCPV}"
 
