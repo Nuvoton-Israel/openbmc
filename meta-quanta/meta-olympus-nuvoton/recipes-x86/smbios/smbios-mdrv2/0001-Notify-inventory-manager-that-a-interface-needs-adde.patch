@@ -1,24 +1,24 @@
-From 0ce133c1365886f54731a88ec86bdb8a76cd68dc Mon Sep 17 00:00:00 2001
-From: Joseph Liu <kwliu@nuvoton.com>
-Date: Mon, 17 Aug 2020 14:47:18 +0800
-Subject: [PATCH] Notify inventory manager
+From 970dab7443547b7c590fe6bdde19f148ed5425a3 Mon Sep 17 00:00:00 2001
+From: Tim Lee <timlee660101@gmail.com>
+Date: Tue, 19 Jan 2021 15:22:46 +0800
+Subject: [PATCH] Notify inventory manager that a interface needs added
 
+Signed-off-by: Tim Lee <timlee660101@gmail.com>
 ---
- include/cpu.hpp  |  64 +++++++++++++++++++---------
+ include/cpu.hpp  |  84 +++++++++++++++++++++++++------------
  include/dimm.hpp |  87 ++++++++++++++++++++++++++------------
- src/cpu.cpp      |  92 +++++++++-------------------------------
+ src/cpu.cpp      |  43 ++++++++++---------
  src/dimm.cpp     | 107 ++++++++++++-----------------------------------
- 4 files changed, 150 insertions(+), 200 deletions(-)
+ 4 files changed, 164 insertions(+), 157 deletions(-)
 
 diff --git a/include/cpu.hpp b/include/cpu.hpp
-index 6d562aa..bfe1a5b 100644
+index 5c8ca86..c5cd0da 100644
 --- a/include/cpu.hpp
 +++ b/include/cpu.hpp
-@@ -16,8 +16,11 @@
+@@ -19,7 +19,11 @@
  
- #pragma once
- #include "smbios_mdrv2.hpp"
--
+ #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
+ #include <xyz/openbmc_project/Inventory/Decorator/Revision/server.hpp>
 -#include <xyz/openbmc_project/Inventory/Item/Cpu/server.hpp>
 +#include <sdbusplus/asio/object_server.hpp>
 +#include <sdbusplus/server.hpp>
@@ -28,10 +28,15 @@ index 6d562aa..bfe1a5b 100644
  
  namespace phosphor
  {
-@@ -25,6 +28,22 @@ namespace phosphor
+@@ -27,11 +31,20 @@ namespace phosphor
  namespace smbios
  {
  
+-using rev =
+-    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Revision;
+-using asset =
+-    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Asset;
+-using processor = sdbusplus::xyz::openbmc_project::Inventory::Item::server::Cpu;
 +using Path = std::string;
 +
 +using Property = std::string;
@@ -46,36 +51,65 @@ index 6d562aa..bfe1a5b 100644
 +using Object = sdbusplus::message::object_path;
 +
 +using ObjectMap = std::map<Object, InterfaceMap>;
-+
-+
- // Definition follow smbios spec DSP0134 3.0.0
- static const std::map<uint8_t, const char*> processorTypeTable = {
-     {0x1, "Other"},          {0x2, "Unknown"},       {0x3, "Central Processor"},
-@@ -86,9 +105,7 @@ static const std::array<std::string, 16> characteristicsTable{
-     "Reserved",
-     "Reserved"};
  
--class Cpu :
--    sdbusplus::server::object::object<
--        sdbusplus::xyz::openbmc_project::Inventory::Item::server::Cpu>
+ // Definition follow smbios spec DSP0134 3.0.0
+ static const std::map<uint8_t, const char*> familyTable = {
+@@ -70,25 +83,25 @@ static const std::map<uint8_t, const char*> familyTable = {
+ };
+ 
+ // Definition follow smbios spec DSP0134 3.0.0
+-static const std::array<std::optional<processor::Capability>, 16>
+-    characteristicsTable{std::nullopt,
+-                         std::nullopt,
+-                         processor::Capability::Capable64bit,
+-                         processor::Capability::MultiCore,
+-                         processor::Capability::HardwareThread,
+-                         processor::Capability::ExecuteProtection,
+-                         processor::Capability::EnhancedVirtualization,
+-                         processor::Capability::PowerPerformanceControl,
+-                         std::nullopt,
+-                         std::nullopt,
+-                         std::nullopt,
+-                         std::nullopt,
+-                         std::nullopt,
+-                         std::nullopt,
+-                         std::nullopt,
+-                         std::nullopt};
+-
+-class Cpu : sdbusplus::server::object_t<processor, asset, rev>
++static const std::array<std::string, 16>
++    characteristicsTable{"Reserved",
++                         "Unknown",
++                         "64-bit Capable",
++                         "Multi-Core",
++                         "Hardware Thread",
++                         "Execute Protection",
++                         "Enhanced Virtualization",
++                         "Power/Performance Control",
++                         "Reserved",
++                         "Reserved",
++                         "Reserved",
++                         "Reserved",
++                         "Reserved",
++                         "Reserved",
++                         "Reserved",
++                         "Reserved"};
++
 +class Cpu
  {
    public:
      Cpu() = delete;
-@@ -100,27 +117,30 @@ class Cpu :
+@@ -100,11 +113,22 @@ class Cpu : sdbusplus::server::object_t<processor, asset, rev>
  
      Cpu(sdbusplus::bus::bus& bus, const std::string& objPath,
          const uint8_t& cpuId, uint8_t* smbiosTableStorage) :
--        sdbusplus::server::object::object<
--            sdbusplus::xyz::openbmc_project::Inventory::Item::server::Cpu>(
--            bus, objPath.c_str()),
+-        sdbusplus::server::object_t<processor, asset, rev>(bus,
+-                                                           objPath.c_str()),
          cpuNum(cpuId), storage(smbiosTableStorage)
      {
 +        auto pimMsg = bus.new_method_call("xyz.openbmc_project.Inventory.Manager", "/xyz/openbmc_project/inventory",
-+                                      "xyz.openbmc_project.Inventory.Manager", "Notify");
-+
-+
-         processorInfoUpdate();
++                                          "xyz.openbmc_project.Inventory.Manager", "Notify");
+         infoUpdate();
 +
 +        interfaces.emplace("xyz.openbmc_project.Inventory.Item.Cpu",property);
 +        interfaces.emplace("xyz.openbmc_project.Inventory.Decorator.Asset", assertprop);
@@ -87,30 +121,13 @@ index 6d562aa..bfe1a5b 100644
 +        objects.emplace(str, interfaces);
 +        pimMsg.append(std::move(objects));
 +        bus.call(pimMsg);
-+
-+
      }
  
-     void processorInfoUpdate(void);
- 
--    std::string processorSocket(std::string value) override;
--    std::string processorType(std::string value) override;
--    std::string processorFamily(std::string value) override;
--    std::string processorManufacturer(std::string value) override;
--    uint32_t processorId(uint32_t value) override;
--    std::string processorVersion(std::string value) override;
--    uint16_t processorMaxSpeed(uint16_t value) override;
--    std::string processorCharacteristics(std::string value) override;
--    uint16_t processorCoreCount(uint16_t value) override;
--    uint16_t processorThreadCount(uint16_t value) override;
--
-   private:
-     uint8_t cpuNum;
- 
-@@ -168,6 +188,12 @@ class Cpu :
-     void cpuVersion(const uint8_t positionNum, const uint8_t structLen,
-                     uint8_t* dataIn);
-     void cpuCharacteristics(const uint16_t value);
+     void infoUpdate(void);
+@@ -155,6 +179,12 @@ class Cpu : sdbusplus::server::object_t<processor, asset, rev>
+     void version(const uint8_t positionNum, const uint8_t structLen,
+                  uint8_t* dataIn);
+     void characteristics(const uint16_t value);
 +    ObjectMap objects;
 +    InterfaceMap interfaces;
 +    PropertyMap property;
@@ -248,173 +265,112 @@ index 7d69a29..2b13dfb 100644
  
  struct MemoryInfo
 diff --git a/src/cpu.cpp b/src/cpu.cpp
-index 913c9d8..837ef62 100644
+index 90c1191..5322602 100644
 --- a/src/cpu.cpp
 +++ b/src/cpu.cpp
-@@ -28,13 +28,7 @@ void Cpu::cpuSocket(const uint8_t positionNum, const uint8_t structLen,
+@@ -29,7 +29,7 @@ void Cpu::socket(const uint8_t positionNum, const uint8_t structLen,
  {
      std::string result = positionToString(positionNum, structLen, dataIn);
  
--    processorSocket(result);
--}
--
--std::string Cpu::processorSocket(std::string value)
--{
--    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Cpu::
--        processorSocket(value);
+-    processor::socket(result);
 +    property.emplace(std::move("ProcessorSocket"),std::move(result));
  }
  
- void Cpu::cpuType(const uint8_t value)
-@@ -43,57 +37,34 @@ void Cpu::cpuType(const uint8_t value)
-         processorTypeTable.find(value);
-     if (it == processorTypeTable.end())
-     {
--        processorType("Unknown Processor Type");
-+        property.emplace(std::move("ProcessorType"), std::move("Unknown Processor Type"));
-     }
-     else
-     {
--        processorType(it->second);
-+        property.emplace(std::move("ProcessorType"), std::move(it->second));
-     }
- }
- 
--std::string Cpu::processorType(std::string value)
--{
--    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Cpu::
--        processorType(value);
--}
--
- void Cpu::cpuFamily(const uint8_t value)
- {
+ void Cpu::family(const uint8_t value)
+@@ -37,11 +37,11 @@ void Cpu::family(const uint8_t value)
      std::map<uint8_t, const char*>::const_iterator it = familyTable.find(value);
      if (it == familyTable.end())
      {
--        processorFamily("Unknown Processor Family");
+-        processor::family("Unknown Processor Family");
 +        property.emplace(std::move("ProcessorFamily"), std::move("Unknown Processor Family"));
      }
      else
      {
--        processorFamily(it->second);
+-        processor::family(it->second);
 +        property.emplace(std::move("ProcessorFamily"), std::move(it->second));
      }
  }
  
--std::string Cpu::processorFamily(std::string value)
--{
--    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Cpu::
--        processorFamily(value);
--}
--
- void Cpu::cpuManufacturer(const uint8_t positionNum, const uint8_t structLen,
-                           uint8_t* dataIn)
+@@ -50,7 +50,8 @@ void Cpu::manufacturer(const uint8_t positionNum, const uint8_t structLen,
  {
      std::string result = positionToString(positionNum, structLen, dataIn);
  
--    processorManufacturer(result);
--}
--
--std::string Cpu::processorManufacturer(std::string value)
--{
--    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Cpu::
--        processorManufacturer(value);
--}
--
--uint32_t Cpu::processorId(uint32_t value)
--{
--    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Cpu::
--        processorId(value);
+-    asset::manufacturer(result);
 +    property.emplace(std::move("ProcessorManufacturer"), std::move(result));
 +    assertprop.emplace(std::move("Manufacturer"), std::move("Intel"));
  }
  
- void Cpu::cpuVersion(const uint8_t positionNum, const uint8_t structLen,
-@@ -103,20 +74,9 @@ void Cpu::cpuVersion(const uint8_t positionNum, const uint8_t structLen,
+ void Cpu::version(const uint8_t positionNum, const uint8_t structLen,
+@@ -60,27 +61,22 @@ void Cpu::version(const uint8_t positionNum, const uint8_t structLen,
  
      result = positionToString(positionNum, structLen, dataIn);
  
--    processorVersion(result);
+-    rev::version(result);
 +    property.emplace(std::move("ProcessorVersion"), std::move(result));
  }
  
--std::string Cpu::processorVersion(std::string value)
--{
--    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Cpu::
--        processorVersion(value);
--}
--
--uint16_t Cpu::processorMaxSpeed(uint16_t value)
--{
--    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Cpu::
--        processorMaxSpeed(value);
--}
- 
- void Cpu::cpuCharacteristics(uint16_t value)
+ void Cpu::characteristics(uint16_t value)
  {
-@@ -130,25 +90,7 @@ void Cpu::cpuCharacteristics(uint16_t value)
-         value >>= 1;
+-    std::vector<processor::Capability> result;
+-    std::optional<processor::Capability> cap;
+-
+-    std::bitset<16> charBits = value;
+-    for (uint8_t index = 0; index < charBits.size(); index++)
++    std::string result = "";
++    for (uint8_t index = 0; index < (8 * sizeof(value)); index++)
+     {
+-        if (charBits.test(index))
++        if (value & 0x01)
+         {
+-            if (cap = characteristicsTable[index])
+-            {
+-                result.emplace_back(*cap);
+-            }
++            result += characteristicsTable[index];
+         }
++        value >>= 1;
      }
  
--    processorCharacteristics(result);
--}
--
--std::string Cpu::processorCharacteristics(std::string value)
--{
--    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Cpu::
--        processorCharacteristics(value);
--}
--
--uint16_t Cpu::processorCoreCount(uint16_t value)
--{
--    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Cpu::
--        processorCoreCount(value);
--}
--
--uint16_t Cpu::processorThreadCount(uint16_t value)
--{
--    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Cpu::
--        processorThreadCount(value);
+-    processor::characteristics(result);
 +    property.emplace(std::move("ProcessorCharacteristics"), std::move(result));
  }
  
  static constexpr uint8_t maxOldVersionCount = 0xff;
-@@ -184,28 +126,32 @@ void Cpu::processorInfoUpdate(void)
-     cpuFamily(cpuInfo->family);      // offset 6h
-     cpuManufacturer(cpuInfo->manufacturer, cpuInfo->length,
-                     dataIn);                               // offset 7h
--    processorId(cpuInfo->id);                              // offset 8h
+@@ -116,28 +112,31 @@ void Cpu::infoUpdate(void)
+     family(cpuInfo->family); // offset 6h
+     manufacturer(cpuInfo->manufacturer, cpuInfo->length,
+                  dataIn);                               // offset 7h
+-    id(cpuInfo->id);                                    // offset 8h
 +    property.emplace(std::move("ProcessorId"), static_cast<uint32_t>((uint32_t)cpuInfo->id)); // offset 8h
-     cpuVersion(cpuInfo->version, cpuInfo->length, dataIn); // offset 10h
--    processorMaxSpeed(cpuInfo->maxSpeed);                  // offset 14h
+     version(cpuInfo->version, cpuInfo->length, dataIn); // offset 10h
+-    maxSpeedInMhz(cpuInfo->maxSpeed);                   // offset 14h
 +    property.emplace(std::move("ProcessorMaxSpeed"), static_cast<uint16_t>((uint16_t)cpuInfo->maxSpeed)); // offset 14h
-     if (cpuInfo->coreCount < maxOldVersionCount)           // offset 23h or 2Ah
+     if (cpuInfo->coreCount < maxOldVersionCount)        // offset 23h or 2Ah
      {
--        processorCoreCount(cpuInfo->coreCount);
+-        coreCount(cpuInfo->coreCount);
 +        property.emplace(std::move("ProcessorCoreCount"), static_cast<uint16_t>((uint16_t)cpuInfo->coreCount));
      }
      else
      {
--        processorCoreCount(cpuInfo->coreCount2);
+-        coreCount(cpuInfo->coreCount2);
 +        property.emplace(std::move("ProcessorCoreCount"), static_cast<uint16_t>((uint16_t)cpuInfo->coreCount2));
      }
  
      if (cpuInfo->threadCount < maxOldVersionCount) // offset 25h or 2Eh)
      {
--        processorThreadCount(cpuInfo->threadCount);
+-        threadCount(cpuInfo->threadCount);
 +        property.emplace(std::move("ProcessorThreadCount"), static_cast<uint16_t>((uint16_t)cpuInfo->threadCount));
      }
      else
      {
--        processorThreadCount(cpuInfo->threadCount2);
+-        threadCount(cpuInfo->threadCount2);
 +        property.emplace(std::move("ProcessorThreadCount"), static_cast<uint16_t>((uint16_t)cpuInfo->threadCount2));
      }
  
-     cpuCharacteristics(cpuInfo->characteristics); // offset 26h
+     characteristics(cpuInfo->characteristics); // offset 26h
 +
 +    itemprop.emplace(std::move("Present"), static_cast<bool>(true));
 +    opprop.emplace(std::move("Functional"), static_cast<bool>(true));
-+
  }
  
  } // namespace smbios
@@ -631,5 +587,5 @@ index 71123d2..05bf751 100644
  
  } // namespace smbios
 -- 
-2.25.1
+2.17.1
 
