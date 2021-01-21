@@ -1,42 +1,36 @@
-From 970dab7443547b7c590fe6bdde19f148ed5425a3 Mon Sep 17 00:00:00 2001
+From 77df2e87653c1cd1f81c9eb17fff16d31361f814 Mon Sep 17 00:00:00 2001
 From: Tim Lee <timlee660101@gmail.com>
-Date: Tue, 19 Jan 2021 15:22:46 +0800
+Date: Thu, 21 Jan 2021 14:42:20 +0800
 Subject: [PATCH] Notify inventory manager that a interface needs added
 
 Signed-off-by: Tim Lee <timlee660101@gmail.com>
 ---
- include/cpu.hpp  |  84 +++++++++++++++++++++++++------------
- include/dimm.hpp |  87 ++++++++++++++++++++++++++------------
- src/cpu.cpp      |  43 ++++++++++---------
- src/dimm.cpp     | 107 ++++++++++++-----------------------------------
- 4 files changed, 164 insertions(+), 157 deletions(-)
+ include/cpu.hpp  | 40 +++++++++++++++++++++++++++++++++
+ include/dimm.hpp | 58 ++++++++++++++++++++++++++++++++++++++++++++++++
+ src/cpu.cpp      | 18 +++++++++++++++
+ src/dimm.cpp     | 26 ++++++++++++++++++++++
+ 4 files changed, 142 insertions(+)
 
 diff --git a/include/cpu.hpp b/include/cpu.hpp
-index 5c8ca86..c5cd0da 100644
+index 5c8ca86..e53d9d4 100644
 --- a/include/cpu.hpp
 +++ b/include/cpu.hpp
-@@ -19,7 +19,11 @@
- 
- #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
+@@ -21,12 +21,33 @@
  #include <xyz/openbmc_project/Inventory/Decorator/Revision/server.hpp>
--#include <xyz/openbmc_project/Inventory/Item/Cpu/server.hpp>
+ #include <xyz/openbmc_project/Inventory/Item/Cpu/server.hpp>
+ 
 +#include <sdbusplus/asio/object_server.hpp>
 +#include <sdbusplus/server.hpp>
 +#include <sdbusplus/message.hpp>
 +#include <string>
 +#include <variant>
- 
++
  namespace phosphor
  {
-@@ -27,11 +31,20 @@ namespace phosphor
+ 
  namespace smbios
  {
  
--using rev =
--    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Revision;
--using asset =
--    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Asset;
--using processor = sdbusplus::xyz::openbmc_project::Inventory::Item::server::Cpu;
 +using Path = std::string;
 +
 +using Property = std::string;
@@ -51,66 +45,17 @@ index 5c8ca86..c5cd0da 100644
 +using Object = sdbusplus::message::object_path;
 +
 +using ObjectMap = std::map<Object, InterfaceMap>;
- 
- // Definition follow smbios spec DSP0134 3.0.0
- static const std::map<uint8_t, const char*> familyTable = {
-@@ -70,25 +83,25 @@ static const std::map<uint8_t, const char*> familyTable = {
- };
- 
- // Definition follow smbios spec DSP0134 3.0.0
--static const std::array<std::optional<processor::Capability>, 16>
--    characteristicsTable{std::nullopt,
--                         std::nullopt,
--                         processor::Capability::Capable64bit,
--                         processor::Capability::MultiCore,
--                         processor::Capability::HardwareThread,
--                         processor::Capability::ExecuteProtection,
--                         processor::Capability::EnhancedVirtualization,
--                         processor::Capability::PowerPerformanceControl,
--                         std::nullopt,
--                         std::nullopt,
--                         std::nullopt,
--                         std::nullopt,
--                         std::nullopt,
--                         std::nullopt,
--                         std::nullopt,
--                         std::nullopt};
--
--class Cpu : sdbusplus::server::object_t<processor, asset, rev>
-+static const std::array<std::string, 16>
-+    characteristicsTable{"Reserved",
-+                         "Unknown",
-+                         "64-bit Capable",
-+                         "Multi-Core",
-+                         "Hardware Thread",
-+                         "Execute Protection",
-+                         "Enhanced Virtualization",
-+                         "Power/Performance Control",
-+                         "Reserved",
-+                         "Reserved",
-+                         "Reserved",
-+                         "Reserved",
-+                         "Reserved",
-+                         "Reserved",
-+                         "Reserved",
-+                         "Reserved"};
 +
-+class Cpu
- {
-   public:
-     Cpu() = delete;
-@@ -100,11 +113,22 @@ class Cpu : sdbusplus::server::object_t<processor, asset, rev>
- 
-     Cpu(sdbusplus::bus::bus& bus, const std::string& objPath,
-         const uint8_t& cpuId, uint8_t* smbiosTableStorage) :
--        sdbusplus::server::object_t<processor, asset, rev>(bus,
--                                                           objPath.c_str()),
+ using rev =
+     sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Revision;
+ using asset =
+@@ -104,7 +125,19 @@ class Cpu : sdbusplus::server::object_t<processor, asset, rev>
+                                                            objPath.c_str()),
          cpuNum(cpuId), storage(smbiosTableStorage)
      {
-+        auto pimMsg = bus.new_method_call("xyz.openbmc_project.Inventory.Manager", "/xyz/openbmc_project/inventory",
-+                                          "xyz.openbmc_project.Inventory.Manager", "Notify");
-         infoUpdate();
++        auto pimMsg = bus.new_method_call("xyz.openbmc_project.Inventory.Manager", "/xyz/openbmc_project/inventory", "xyz.openbmc_project.Inventory.Manager", "Notify");
 +
+         infoUpdate();
 +        interfaces.emplace("xyz.openbmc_project.Inventory.Item.Cpu",property);
 +        interfaces.emplace("xyz.openbmc_project.Inventory.Decorator.Asset", assertprop);
 +        interfaces.emplace("xyz.openbmc_project.Inventory.Item", itemprop);
@@ -124,10 +69,11 @@ index 5c8ca86..c5cd0da 100644
      }
  
      void infoUpdate(void);
-@@ -155,6 +179,12 @@ class Cpu : sdbusplus::server::object_t<processor, asset, rev>
+@@ -155,6 +188,13 @@ class Cpu : sdbusplus::server::object_t<processor, asset, rev>
      void version(const uint8_t positionNum, const uint8_t structLen,
                   uint8_t* dataIn);
      void characteristics(const uint16_t value);
++
 +    ObjectMap objects;
 +    InterfaceMap interfaces;
 +    PropertyMap property;
@@ -138,15 +84,13 @@ index 5c8ca86..c5cd0da 100644
  
  } // namespace smbios
 diff --git a/include/dimm.hpp b/include/dimm.hpp
-index 7d69a29..2b13dfb 100644
+index 7d69a29..107b67e 100644
 --- a/include/dimm.hpp
 +++ b/include/dimm.hpp
-@@ -17,8 +17,17 @@
- #pragma once
- #include "smbios_mdrv2.hpp"
- 
--#include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
+@@ -20,15 +20,43 @@
+ #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
  #include <xyz/openbmc_project/Inventory/Item/Dimm/server.hpp>
+ 
 +#include <sdbusplus/asio/object_server.hpp>
 +#include <sdbusplus/server.hpp>
 +#include <sdbusplus/message.hpp>
@@ -157,10 +101,10 @@ index 7d69a29..2b13dfb 100644
 +    "xyz.openbmc_project.Inventory.Item.Dimm";
 +
 +sdbusplus::asio::object_server& getObjectServer(void);
- 
++
  namespace phosphor
  {
-@@ -26,14 +35,27 @@ namespace phosphor
+ 
  namespace smbios
  {
  
@@ -182,77 +126,44 @@ index 7d69a29..2b13dfb 100644
  using DeviceType =
      sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::DeviceType;
  
--class Dimm :
--    sdbusplus::server::object::object<
--        sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm>,
--    sdbusplus::server::object::object<
--        sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Asset>
 +using ConvertDim = sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm;
 +
-+class Dimm
- {
-   public:
-     Dimm() = delete;
-@@ -45,31 +67,34 @@ class Dimm :
- 
-     Dimm(sdbusplus::bus::bus& bus, const std::string& objPath,
-          const uint8_t& dimmId, uint8_t* smbiosTableStorage) :
--
--        sdbusplus::server::object::object<
--            sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm>(
--            bus, objPath.c_str()),
--        sdbusplus::server::object::object<
--            sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::
--                Asset>(bus, objPath.c_str()),
+ class Dimm :
+     sdbusplus::server::object::object<
+         sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm>,
+@@ -55,6 +83,27 @@ class Dimm :
          dimmNum(dimmId), storage(smbiosTableStorage)
      {
--        memoryInfoUpdate();
-+        if (!memoryInfoUpdate()) { 
-+            auto pimMsg = bus.new_method_call("xyz.openbmc_project.Inventory.Manager", "/xyz/openbmc_project/inventory",
-+                                      "xyz.openbmc_project.Inventory.Manager", "Notify");
+         memoryInfoUpdate();
 +
-+            interfaces.emplace("xyz.openbmc_project.Inventory.Item.Dimm", property);
-+            interfaces.emplace("xyz.openbmc_project.Inventory.Decorator.Asset", assertprop);
-+            interfaces.emplace("xyz.openbmc_project.Inventory.Item", itemprop);
-+            interfaces.emplace("xyz.openbmc_project.State.Decorator.OperationalStatus", opprop);
++        auto pimMsg = bus.new_method_call("xyz.openbmc_project.Inventory.Manager", "/xyz/openbmc_project/inventory",
++                                  "xyz.openbmc_project.Inventory.Manager", "Notify");
 +
-+            std::string str = objPath.c_str();
-+            str.erase (0,30);
-+            objects.emplace(str, interfaces);
-+            pimMsg.append(std::move(objects));
-+            bus.call(pimMsg);
++        interfaces.emplace("xyz.openbmc_project.Inventory.Item.Dimm", property);
++        interfaces.emplace("xyz.openbmc_project.Inventory.Decorator.Asset", assertprop);
++        interfaces.emplace("xyz.openbmc_project.Inventory.Item", itemprop);
++        interfaces.emplace("xyz.openbmc_project.State.Decorator.OperationalStatus", opprop);
 +
-+            pimMsg = bus.new_method_call("xyz.openbmc_project.Inventory.Manager", objPath.c_str(),
-+                                      "org.freedesktop.DBus.Properties", "Set");
-+            pimMsg.append(std::move("xyz.openbmc_project.Inventory.Item.Dimm"));
-+            pimMsg.append(std::move("MemoryType"));
-+            pimMsg.append(std::move(typeprop));
-+            bus.call(pimMsg);
++        std::string str = objPath.c_str();
++        str.erase (0,30);
++        objects.emplace(str, interfaces);
++        pimMsg.append(std::move(objects));
++        bus.call(pimMsg);
 +
-+        }
++        pimMsg = bus.new_method_call("xyz.openbmc_project.Inventory.Manager", objPath.c_str(),
++                                  "org.freedesktop.DBus.Properties", "Set");
++        pimMsg.append(std::move("xyz.openbmc_project.Inventory.Item.Dimm"));
++        pimMsg.append(std::move("MemoryType"));
++        pimMsg.append(std::move(typeprop));
++        bus.call(pimMsg);
      }
  
--    void memoryInfoUpdate(void);
--
--    uint16_t memoryDataWidth(uint16_t value) override;
--    uint32_t memorySizeInKB(uint32_t value) override;
--    std::string memoryDeviceLocator(std::string value) override;
--    DeviceType memoryType(DeviceType value) override;
--    std::string memoryTypeDetail(std::string value) override;
--    uint16_t maxMemorySpeedInMhz(uint16_t value) override;
--    std::string manufacturer(std::string value) override;
--    std::string serialNumber(std::string value) override;
--    std::string partNumber(std::string value) override;
--    uint8_t memoryAttributes(uint8_t value) override;
--    uint16_t memoryConfiguredSpeedInMhz(uint16_t value) override;
-+    int memoryInfoUpdate(void);
- 
-   private:
-     uint8_t dimmNum;
-@@ -88,6 +113,14 @@ class Dimm :
+     void memoryInfoUpdate(void);
+@@ -88,6 +137,15 @@ class Dimm :
                         uint8_t* dataIn);
      void dimmPartNum(const uint8_t positionNum, const uint8_t structLen,
                       uint8_t* dataIn);
++
 +    std::shared_ptr<sdbusplus::asio::dbus_interface> dimmInterface;
 +    ObjectMap objects;
 +    InterfaceMap interfaces;
@@ -265,105 +176,77 @@ index 7d69a29..2b13dfb 100644
  
  struct MemoryInfo
 diff --git a/src/cpu.cpp b/src/cpu.cpp
-index 90c1191..5322602 100644
+index 90c1191..4baa525 100644
 --- a/src/cpu.cpp
 +++ b/src/cpu.cpp
-@@ -29,7 +29,7 @@ void Cpu::socket(const uint8_t positionNum, const uint8_t structLen,
- {
+@@ -30,6 +30,8 @@ void Cpu::socket(const uint8_t positionNum, const uint8_t structLen,
      std::string result = positionToString(positionNum, structLen, dataIn);
  
--    processor::socket(result);
+     processor::socket(result);
++
 +    property.emplace(std::move("ProcessorSocket"),std::move(result));
  }
  
  void Cpu::family(const uint8_t value)
-@@ -37,11 +37,11 @@ void Cpu::family(const uint8_t value)
-     std::map<uint8_t, const char*>::const_iterator it = familyTable.find(value);
+@@ -38,10 +40,12 @@ void Cpu::family(const uint8_t value)
      if (it == familyTable.end())
      {
--        processor::family("Unknown Processor Family");
+         processor::family("Unknown Processor Family");
 +        property.emplace(std::move("ProcessorFamily"), std::move("Unknown Processor Family"));
      }
      else
      {
--        processor::family(it->second);
+         processor::family(it->second);
 +        property.emplace(std::move("ProcessorFamily"), std::move(it->second));
      }
  }
  
-@@ -50,7 +50,8 @@ void Cpu::manufacturer(const uint8_t positionNum, const uint8_t structLen,
- {
+@@ -51,6 +55,9 @@ void Cpu::manufacturer(const uint8_t positionNum, const uint8_t structLen,
      std::string result = positionToString(positionNum, structLen, dataIn);
  
--    asset::manufacturer(result);
+     asset::manufacturer(result);
++
 +    property.emplace(std::move("ProcessorManufacturer"), std::move(result));
 +    assertprop.emplace(std::move("Manufacturer"), std::move("Intel"));
  }
  
  void Cpu::version(const uint8_t positionNum, const uint8_t structLen,
-@@ -60,27 +61,22 @@ void Cpu::version(const uint8_t positionNum, const uint8_t structLen,
- 
+@@ -61,6 +68,8 @@ void Cpu::version(const uint8_t positionNum, const uint8_t structLen,
      result = positionToString(positionNum, structLen, dataIn);
  
--    rev::version(result);
+     rev::version(result);
++
 +    property.emplace(std::move("ProcessorVersion"), std::move(result));
  }
  
  void Cpu::characteristics(uint16_t value)
- {
--    std::vector<processor::Capability> result;
--    std::optional<processor::Capability> cap;
--
--    std::bitset<16> charBits = value;
--    for (uint8_t index = 0; index < charBits.size(); index++)
-+    std::string result = "";
-+    for (uint8_t index = 0; index < (8 * sizeof(value)); index++)
-     {
--        if (charBits.test(index))
-+        if (value & 0x01)
-         {
--            if (cap = characteristicsTable[index])
--            {
--                result.emplace_back(*cap);
--            }
-+            result += characteristicsTable[index];
-         }
-+        value >>= 1;
-     }
- 
--    processor::characteristics(result);
-+    property.emplace(std::move("ProcessorCharacteristics"), std::move(result));
- }
- 
- static constexpr uint8_t maxOldVersionCount = 0xff;
-@@ -116,28 +112,31 @@ void Cpu::infoUpdate(void)
-     family(cpuInfo->family); // offset 6h
+@@ -117,27 +126,36 @@ void Cpu::infoUpdate(void)
      manufacturer(cpuInfo->manufacturer, cpuInfo->length,
                   dataIn);                               // offset 7h
--    id(cpuInfo->id);                                    // offset 8h
+     id(cpuInfo->id);                                    // offset 8h
 +    property.emplace(std::move("ProcessorId"), static_cast<uint32_t>((uint32_t)cpuInfo->id)); // offset 8h
      version(cpuInfo->version, cpuInfo->length, dataIn); // offset 10h
--    maxSpeedInMhz(cpuInfo->maxSpeed);                   // offset 14h
+     maxSpeedInMhz(cpuInfo->maxSpeed);                   // offset 14h
 +    property.emplace(std::move("ProcessorMaxSpeed"), static_cast<uint16_t>((uint16_t)cpuInfo->maxSpeed)); // offset 14h
      if (cpuInfo->coreCount < maxOldVersionCount)        // offset 23h or 2Ah
      {
--        coreCount(cpuInfo->coreCount);
+         coreCount(cpuInfo->coreCount);
 +        property.emplace(std::move("ProcessorCoreCount"), static_cast<uint16_t>((uint16_t)cpuInfo->coreCount));
      }
      else
      {
--        coreCount(cpuInfo->coreCount2);
+         coreCount(cpuInfo->coreCount2);
 +        property.emplace(std::move("ProcessorCoreCount"), static_cast<uint16_t>((uint16_t)cpuInfo->coreCount2));
      }
  
      if (cpuInfo->threadCount < maxOldVersionCount) // offset 25h or 2Eh)
      {
--        threadCount(cpuInfo->threadCount);
+         threadCount(cpuInfo->threadCount);
 +        property.emplace(std::move("ProcessorThreadCount"), static_cast<uint16_t>((uint16_t)cpuInfo->threadCount));
      }
      else
      {
--        threadCount(cpuInfo->threadCount2);
+         threadCount(cpuInfo->threadCount2);
 +        property.emplace(std::move("ProcessorThreadCount"), static_cast<uint16_t>((uint16_t)cpuInfo->threadCount2));
      }
  
@@ -375,114 +258,62 @@ index 90c1191..5322602 100644
  
  } // namespace smbios
 diff --git a/src/dimm.cpp b/src/dimm.cpp
-index 71123d2..05bf751 100644
+index 71123d2..cc2c84f 100644
 --- a/src/dimm.cpp
 +++ b/src/dimm.cpp
-@@ -27,7 +27,7 @@ using DeviceType =
-     sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::DeviceType;
- 
- static constexpr uint16_t maxOldDimmSize = 0x7fff;
--void Dimm::memoryInfoUpdate(void)
-+int Dimm::memoryInfoUpdate(void)
- {
-     uint8_t* dataIn = storage;
- 
-@@ -35,25 +35,25 @@ void Dimm::memoryInfoUpdate(void)
- 
-     if (dataIn == nullptr)
-     {
--        return;
-+        return -1;
-     }
-     for (uint8_t index = 0; index < dimmNum; index++)
-     {
-         dataIn = smbiosNextPtr(dataIn);
-         if (dataIn == nullptr)
-         {
--            return;
-+            return -1;
-         }
-         dataIn = getSMBIOSTypePtr(dataIn, memoryDeviceType);
-         if (dataIn == nullptr)
-         {
--            return;
-+            return -1;
-         }
-     }
- 
+@@ -54,6 +54,7 @@ void Dimm::memoryInfoUpdate(void)
      auto memoryInfo = reinterpret_cast<struct MemoryInfo*>(dataIn);
  
--    memoryDataWidth(memoryInfo->dataWidth);
+     memoryDataWidth(memoryInfo->dataWidth);
 +    property.emplace(std::move("MemoryDataWidth"), static_cast<uint16_t>((uint16_t)memoryInfo->dataWidth));
  
      if (memoryInfo->size == maxOldDimmSize)
      {
-@@ -67,20 +67,20 @@ void Dimm::memoryInfoUpdate(void)
-     dimmDeviceLocator(memoryInfo->deviceLocator, memoryInfo->length, dataIn);
+@@ -68,12 +69,17 @@ void Dimm::memoryInfoUpdate(void)
      dimmType(memoryInfo->memoryType);
      dimmTypeDetail(memoryInfo->typeDetail);
--    maxMemorySpeedInMhz(memoryInfo->speed);
+     maxMemorySpeedInMhz(memoryInfo->speed);
 +    property.emplace(std::move("MaxMemorySpeedInMhz"), static_cast<uint16_t>((uint16_t)memoryInfo->speed));
-+
      dimmManufacturer(memoryInfo->manufacturer, memoryInfo->length, dataIn);
      dimmSerialNum(memoryInfo->serialNum, memoryInfo->length, dataIn);
      dimmPartNum(memoryInfo->partNum, memoryInfo->length, dataIn);
--    memoryAttributes(memoryInfo->attributes);
--    memoryConfiguredSpeedInMhz(memoryInfo->confClockSpeed);
+     memoryAttributes(memoryInfo->attributes);
+     memoryConfiguredSpeedInMhz(memoryInfo->confClockSpeed);
  
--    return;
--}
 +    property.emplace(std::move("MemoryAttributes"), static_cast<uint8_t>((uint8_t)memoryInfo->attributes));
 +    property.emplace(std::move("MemoryConfiguredSpeedInMhz"), static_cast<uint16_t>((uint16_t)memoryInfo->confClockSpeed));
 +    itemprop.emplace(std::move("Present"), static_cast<bool>(true));
 +    opprop.emplace(std::move("Functional"), static_cast<bool>(true));
-+    if (memoryInfo->confClockSpeed <= 0)
-+        return -1;
- 
--uint16_t Dimm::memoryDataWidth(uint16_t value)
--{
--    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::
--        memoryDataWidth(value);
-+    return 0;
+     return;
  }
  
- static constexpr uint16_t baseNewVersionDimmSize = 0x8000;
-@@ -92,19 +92,13 @@ void Dimm::dimmSize(const uint16_t size)
-     {
+@@ -93,12 +99,16 @@ void Dimm::dimmSize(const uint16_t size)
          result = result * dimmSizeUnit;
      }
--    memorySizeInKB(result);
+     memorySizeInKB(result);
++
 +    property.emplace(std::move("MemorySizeInKB"), static_cast<uint32_t>(result));
  }
  
  void Dimm::dimmSizeExt(uint32_t size)
  {
      size = size * dimmSizeUnit;
--    memorySizeInKB(size);
--}
--
--uint32_t Dimm::memorySizeInKB(uint32_t value)
--{
--    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::
--        memorySizeInKB(value);
+     memorySizeInKB(size);
++
 +    property.emplace(std::move("MemorySizeInKB"), static_cast<uint32_t>(size));
  }
  
- void Dimm::dimmDeviceLocator(const uint8_t positionNum, const uint8_t structLen,
-@@ -112,32 +106,23 @@ void Dimm::dimmDeviceLocator(const uint8_t positionNum, const uint8_t structLen,
- {
+ uint32_t Dimm::memorySizeInKB(uint32_t value)
+@@ -113,6 +123,8 @@ void Dimm::dimmDeviceLocator(const uint8_t positionNum, const uint8_t structLen,
      std::string result = positionToString(positionNum, structLen, dataIn);
  
--    memoryDeviceLocator(result);
--}
--
--std::string Dimm::memoryDeviceLocator(std::string value)
--{
--    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::
--        memoryDeviceLocator(value);
+     memoryDeviceLocator(result);
++
 +    property.emplace(std::move("MemoryDeviceLocator"), std::move(result));
  }
  
+ std::string Dimm::memoryDeviceLocator(std::string value)
+@@ -124,14 +136,20 @@ std::string Dimm::memoryDeviceLocator(std::string value)
  void Dimm::dimmType(const uint8_t type)
  {
      std::map<uint8_t, DeviceType>::const_iterator it = dimmTypeTable.find(type);
@@ -490,102 +321,55 @@ index 71123d2..05bf751 100644
 +
      if (it == dimmTypeTable.end())
      {
--        memoryType(DeviceType::Unknown);
+         memoryType(DeviceType::Unknown);
 +        value = ConvertDim::convertDeviceTypeToString(DeviceType::Unknown);
      }
      else
      {
--        memoryType(it->second);
+         memoryType(it->second);
 +        value = ConvertDim::convertDeviceTypeToString(it->second);
      }
--}
--
--DeviceType Dimm::memoryType(DeviceType value)
--{
--    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::
--        memoryType(value);
++
 +    typeprop = std::move(value);
  }
  
- void Dimm::dimmTypeDetail(uint16_t detail)
-@@ -151,19 +136,7 @@ void Dimm::dimmTypeDetail(uint16_t detail)
-         }
+ DeviceType Dimm::memoryType(DeviceType value)
+@@ -152,6 +170,8 @@ void Dimm::dimmTypeDetail(uint16_t detail)
          detail >>= 1;
      }
--    memoryTypeDetail(result);
--}
--
--std::string Dimm::memoryTypeDetail(std::string value)
--{
--    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::
--        memoryTypeDetail(value);
--}
--
--uint16_t Dimm::maxMemorySpeedInMhz(uint16_t value)
--{
--    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::
--        maxMemorySpeedInMhz(value);
+     memoryTypeDetail(result);
++
 +    property.emplace(std::move("MemoryTypeDetail"), std::move(result));
  }
  
- void Dimm::dimmManufacturer(const uint8_t positionNum, const uint8_t structLen,
-@@ -171,53 +144,25 @@ void Dimm::dimmManufacturer(const uint8_t positionNum, const uint8_t structLen,
- {
+ std::string Dimm::memoryTypeDetail(std::string value)
+@@ -172,6 +192,8 @@ void Dimm::dimmManufacturer(const uint8_t positionNum, const uint8_t structLen,
      std::string result = positionToString(positionNum, structLen, dataIn);
  
--    manufacturer(result);
+     manufacturer(result);
++
 +    assertprop.emplace(std::move("Manufacturer"), std::move(result));
  }
  
--std::string Dimm::manufacturer(std::string value)
--{
--    return sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::
--        Asset::manufacturer(value);
--}
- 
- void Dimm::dimmSerialNum(const uint8_t positionNum, const uint8_t structLen,
-                          uint8_t* dataIn)
- {
+ std::string Dimm::manufacturer(std::string value)
+@@ -186,6 +208,8 @@ void Dimm::dimmSerialNum(const uint8_t positionNum, const uint8_t structLen,
      std::string result = positionToString(positionNum, structLen, dataIn);
  
--    serialNumber(result);
+     serialNumber(result);
++
 +    assertprop.emplace(std::move("SerialNumber"), std::move(result));
  }
  
--std::string Dimm::serialNumber(std::string value)
--{
--    return sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::
--        Asset::serialNumber(value);
--}
- 
- void Dimm::dimmPartNum(const uint8_t positionNum, const uint8_t structLen,
-                        uint8_t* dataIn)
- {
+ std::string Dimm::serialNumber(std::string value)
+@@ -200,6 +224,8 @@ void Dimm::dimmPartNum(const uint8_t positionNum, const uint8_t structLen,
      std::string result = positionToString(positionNum, structLen, dataIn);
  
--    partNumber(result);
--}
--
--std::string Dimm::partNumber(std::string value)
--{
--    return sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::
--        Asset::partNumber(value);
--}
--
--uint8_t Dimm::memoryAttributes(uint8_t value)
--{
--    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::
--        memoryAttributes(value);
--}
--
--uint16_t Dimm::memoryConfiguredSpeedInMhz(uint16_t value)
--{
--    return sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::
--        memoryConfiguredSpeedInMhz(value);
+     partNumber(result);
++
 +    assertprop.emplace(std::move("PartNumber"), std::move(result));
  }
  
- } // namespace smbios
+ std::string Dimm::partNumber(std::string value)
 -- 
 2.17.1
 
