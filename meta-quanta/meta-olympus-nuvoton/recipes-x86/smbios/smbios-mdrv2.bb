@@ -7,6 +7,7 @@ SRCREV = "9c362668c24153066f746393f12f3869e095d523"
 SRC_URI += "file://0001-Notify-inventory-manager-that-a-interface-needs-adde.patch"
 SRC_URI += "file://0002-remove-fno-rtti-cxx-flags.patch"
 SRC_URI += "file://smbios2"
+SRC_URI += "file://smbios-mdrv2.service"
 
 S = "${WORKDIR}/git"
 
