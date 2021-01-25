@@ -2,10 +2,9 @@ SUMMARY = "SMBIOS MDR version 2 service for Intel based platform"
 DESCRIPTION = "SMBIOS MDR version 2 service for Intel based platfrom"
 
 SRC_URI = "git://github.com/openbmc/smbios-mdr"
-SRCREV = "9c362668c24153066f746393f12f3869e095d523"
+SRCREV = "26de0d73700eef983af4733d258314b7c39bd7ac"
 
 SRC_URI += "file://0001-Notify-inventory-manager-that-a-interface-needs-adde.patch"
-SRC_URI += "file://0002-remove-fno-rtti-cxx-flags.patch"
 SRC_URI += "file://smbios2"
 SRC_URI += "file://smbios-mdrv2.service"
 
@@ -36,6 +35,8 @@ DEPENDS += " \
 do_install_append() {
     install -d ${D}${localstatedir_nativesdk}/${base_libdir_nativesdk}/smbios
     install -m 0644 ${WORKDIR}/smbios2 ${D}${localstatedir_nativesdk}/${base_libdir_nativesdk}/smbios
+    install -d ${D}${systemd_system_unitdir}
+    install -m 0644 ${WORKDIR}/smbios-mdrv2.service ${D}${systemd_system_unitdir}
 }
 
 EXTRA_OECMAKE = "-DYOCTO=1"

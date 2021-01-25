@@ -7,8 +7,8 @@ After=mapper-wait@-xyz-openbmc_project-inventory.service
 Restart=always
 RestartSec=5
 StartLimitBurst=10
+ExecStartPre=/bin/mkdir -p /var/lib/smbios
 ExecStart=/usr/bin/env smbiosmdrv2app
-SyslogIdentifier=smbiosmdrv2app
 
 [Install]
 WantedBy={SYSTEMD_DEFAULT_TARGET}
