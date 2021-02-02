@@ -1,6 +1,5 @@
 FILESEXTRAPATHS_prepend_buv-runbmc := "${THISDIR}/${PN}:"
 
-SRC_URI_append_buv-runbmc = " file://0010-bmcweb-fix-segmentation-fault-in-update-service.patch"
 
 # Enable CPU Log and Raw PECI support
 #EXTRA_OEMESON_append = " -Dredfish-cpu-log=enabled"
