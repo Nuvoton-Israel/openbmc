@@ -4,7 +4,7 @@ SMBUS_BINDING = "smbus"
 
 SRC_URI_buv-runbmc = "git://github.com/Nuvoton-Israel/pmci.git;protocol=ssh"
 
-SRCREV_buv-runbmc = "ae3aac4a41512037746bd0588ab9eed7ca13563e"
+SRCREV_buv-runbmc = "bbbe833676c74b61fdc7bcc67d756eb8f557641a"
 
 SRC_URI_append_buv-runbmc = " file://mctp_config.json"
 

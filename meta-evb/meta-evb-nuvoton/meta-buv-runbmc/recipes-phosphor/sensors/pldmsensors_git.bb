@@ -3,7 +3,7 @@ DESCRIPTION = "PLDM Sensor Services Configured from D-Bus"
 
 SRC_URI = "git://github.com/Nuvoton-Israel/pldmsensors.git;protocol=ssh;branch=main;"
 
-SRCREV = "c904995efa2865e4091841a582d0c39fc4333769"
+SRCREV = "c0bac1546c0f4c5c38eaf0ab6b0cc473a6823ec2"
 
 PV = "0.1+git${SRCPV}"
 
@@ -21,9 +21,9 @@ EXTRA_OECMAKE = "-DYOCTO=1"
 
 FILESEXTRAPATHS_prepend_buv-runbmc := "${THISDIR}/${PN}:"
 
-SRC_URI += "file://pldmsensors.json "
+SRC_URI += "file://pldm.json "
 
 do_install_append() {
     install -d ${D}${sysconfdir}/default
-    install -m 0644 ${WORKDIR}/pldmsensors.json ${D}${sysconfdir}/default
+    install -m 0644 ${WORKDIR}/pldm.json ${D}${sysconfdir}/default
 }
