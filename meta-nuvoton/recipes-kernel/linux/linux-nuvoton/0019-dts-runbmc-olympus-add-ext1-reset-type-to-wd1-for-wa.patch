@@ -1,0 +1,26 @@
+From 389f716926bff6c8963b0354b8ab5a79c11b1512 Mon Sep 17 00:00:00 2001
+From: Tim Lee <timlee660101@gmail.com>
+Date: Tue, 23 Feb 2021 11:53:49 +0800
+Subject: [PATCH 19/19] dts: runbmc-olympus: add ext1-reset-type to wd1 for
+ watchdog1
+
+Signed-off-by: Tim Lee <timlee660101@gmail.com>
+---
+ arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts b/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts
+index 9183b1996571..e472aad87579 100644
+--- a/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts
++++ b/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts
+@@ -252,6 +252,7 @@
+ 		apb {
+ 
+ 			watchdog1: watchdog@901C {
++				nuvoton,ext1-reset-type = "wd1";
+ 				status = "okay";
+ 			};
+ 
+-- 
+2.17.1
+
