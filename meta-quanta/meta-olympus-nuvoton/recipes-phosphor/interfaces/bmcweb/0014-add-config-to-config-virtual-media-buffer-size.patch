@@ -1,0 +1,38 @@
+diff --git a/include/vm_websocket.hpp b/include/vm_websocket.hpp
+index a175f0a8..ab8121d7 100644
+--- a/include/vm_websocket.hpp
++++ b/include/vm_websocket.hpp
+@@ -17,7 +17,7 @@ static crow::websocket::Connection* session = nullptr;
+ // The max network block device buffer size is 128kb plus 16bytes
+ // for the message header:
+ // https://github.com/NetworkBlockDevice/nbd/blob/master/doc/proto.md#simple-reply-message
+-static constexpr auto nbdBufferSize = 131088;
++static constexpr auto nbdBufferSize = 131088 * BMCWEB_VM_BUFFER_SIZE;
+ 
+ class Handler : public std::enable_shared_from_this<Handler>
+ {
+ 
+diff --git a/meson.build b/meson.build
+index 529b9cbf..fc62c2e8 100644
+--- a/meson.build
++++ b/meson.build
+@@ -340,6 +340,7 @@ srcfiles_unittest = ['include/ut/dbus_utility_test.cpp',
+ 
+ conf_data = configuration_data()
+ conf_data.set('BMCWEB_HTTP_REQ_BODY_LIMIT_MB',get_option('http-body-limit'))
++conf_data.set('BMCWEB_VM_BUFFER_SIZE',get_option('vm-buffer-size'))
+ conf_data.set('MESON_INSTALL_PREFIX',get_option('prefix'))
+ configure_file(output: 'config.h',
+                configuration: conf_data)
+diff --git a/meson_options.txt b/meson_options.txt
+index 1298b968..ef8619aa 100644
+--- a/meson_options.txt
++++ b/meson_options.txt
+@@ -22,6 +22,7 @@ option('cookie-auth', type : 'feature', value : 'enabled', description : '''Enab
+ option('mutual-tls-auth', type : 'feature', value : 'enabled', description : '''Enables authenticating users through TLS client certificates. The insecure-disable-ssl must be disabled for this option to take effect.''')
+ option('ibm-management-console', type : 'feature', value : 'disabled', description : 'Enable the IBM management console specific functionality. Paths are under \'/ibm/v1/\'')
+ option('http-body-limit', type: 'integer', min : 0, max : 512, value : 30, description : 'Specifies the http request body length limit')
++option('vm-buffer-size', type: 'integer', min : 1, max : 10, value : 1, description : 'Specifies the buffer size for virtual media')
+ 
+ # Insecure options. Every option that starts with a `insecure` flag should
+ # not be enabled by default for any platform, unless the author fully comprehends
