@@ -387,6 +387,10 @@
 				#size-cells = <0>;
 				bus-frequency = <100000>;
 				status = "okay";
+				npcm7xx-ssif-bmc@40000010 {
+					compatible = "nuvoton,npcm7xx-ssif-bmc";
+					reg = <0x40000010>;
+				};
 			};
 
 			i2c9: i2c@89000 {
@@ -394,6 +398,10 @@
 				#size-cells = <0>;
 				bus-frequency = <100000>;
 				status = "okay";
+				ipmi_ssif@10 {
+					compatible = "ipmi_ssif";
+					reg = <0x10>;
+				};
 			};
 
 			i2c10: i2c@8a000 {

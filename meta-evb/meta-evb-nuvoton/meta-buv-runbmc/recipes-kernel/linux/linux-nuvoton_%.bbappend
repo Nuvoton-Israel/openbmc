@@ -7,6 +7,7 @@ SRC_URI_append_buv-runbmc = " \
   file://0005-misc-Character-device-driver.patch \
   file://0006-driver-SPI-add-w25q01jv-support.patch \
   file://arch \
+  file://0007-Ampere-Altra-MAX-SSIF-IPMI-driver.patch \
   "
 
 # Merge source tree by original project with our layer of additional files
