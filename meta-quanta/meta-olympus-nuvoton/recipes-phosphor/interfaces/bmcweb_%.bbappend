@@ -26,4 +26,4 @@ EXTRA_OEMESON_append = " -Dhttp-body-limit=35"
 EXTRA_OEMESON_append = " -Dredfish-dump-log=enabled"
 
 # Buffer size for virtual media
-EXTRA_OEMESON_append = " -Dvm-buffer-size=2"
+EXTRA_OEMESON_append = " -Dvm-buffer-size=3"
