@@ -1,10 +1,5 @@
 [Unit]
-Description=Chassis%i (Power Off)
-Wants=multi-user.target
-After=multi-user.target
-Wants=mapper-wait@-xyz-openbmc_project-Chassis-Control-Power%i.service
-After=mapper-wait@-xyz-openbmc_project-Chassis-Control-Power%i.service
-Conflicts=obmc-chassis-poweron@%i.target
-Conflicts=obmc-chassis-reset@%i.target
+Description=Chassis Power Off
+Conflicts=obmc-chassis-poweron.target
+RefuseManualStart=yes
 RefuseManualStop=yes
-

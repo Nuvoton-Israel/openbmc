@@ -1,10 +1,5 @@
 [Unit]
-Description=Chassis%i (Power On)
-Wants=multi-user.target
-After=multi-user.target
-Wants=mapper-wait@-xyz-openbmc_project-Chassis-Control-Power%i.service
-After=mapper-wait@-xyz-openbmc_project-Chassis-Control-Power%i.service
-Conflicts=obmc-chassis-poweroff@%i.target
+Description=Chassis Power On
+Conflicts=obmc-chassis-poweroff.target
+RefuseManualStart=yes
 RefuseManualStop=yes
-OnFailure=obmc-chassis-poweroff@%i.target
-OnFailureJobMode=flush
