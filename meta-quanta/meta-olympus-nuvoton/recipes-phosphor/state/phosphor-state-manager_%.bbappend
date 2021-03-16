@@ -1,6 +1,7 @@
 FILESEXTRAPATHS_prepend_olympus-nuvoton := "${THISDIR}/${PN}:"
 
 SRC_URI_append_olympus-nuvoton = " file://0001-Use-pgood-to-check-host-stat.patch"
+SRC_URI_append_olympus-nuvoton = " file://0002-add-support-to-record-last-bmc-reboot-cause.patch"
 SRC_URI_append_olympus-nuvoton = " file://phosphor-reset-host-check@.service"
 
 SYSTEMD_SERVICE_${PN}_append_olympus-nuvoton = " phosphor-reset-host-check@.service"
