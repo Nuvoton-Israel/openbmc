@@ -76,6 +76,8 @@ Please submit any patches against the meta-runbmc-nuvoton layer to the maintaine
     + [MCTP over SMBUS](#mctp-over-smbus)
   * [PLDM](#pldm)
     + [PLDM Sensors](#pldm-sensors)
+  * [BMC Reboot Cause](#bmc-reboot-cause)
+    + [Last BMC Reboot Cause](#last-bmc-reboot-cause)
 - [OpenBMC Test Automation](#openbmc-test-automation)
 - [Features In Progressing](#features-in-progressing)
 - [Features Planned](#features-planned)
@@ -465,7 +467,7 @@ Server Power Operations are using to Power on/Warm reboot/Cold reboot/Orderly sh
 
 **Source URL**
 
-* [https://github.com/Nuvoton-Israel/openbmc/tree/runbmc/meta-quanta/meta-olympus-nuvoton/recipes-phosphor/chassis](https://github.com/Nuvoton-Israel/openbmc/tree/runbmc/meta-quanta/meta-olympus-nuvoton/recipes-phosphor/chassis)
+* [https://github.com/Nuvoton-Israel/openbmc/tree/runbmc/meta-quanta/meta-olympus-nuvoton/recipes-x86/chassis](https://github.com/Nuvoton-Israel/openbmc/tree/runbmc/meta-quanta/meta-olympus-nuvoton/recipes-x86/chassis)
 
 **How to use**
 
@@ -480,60 +482,49 @@ Server Power Operations are using to Power on/Warm reboot/Cold reboot/Orderly sh
 
       There is a package **phosphor-watchdog** included in OpenBMC now. The watchdog daemon is started on host's power on, which is used to monitor if host is alive. In normal case, when host starts, it will send IPMI commands to kick watchdog and so everything would work fine. If host fails to start, the watchdog eventually timeout. However, the default watchdog timeout action is **HardReset** which is defined at [Watchdog.interface.yaml](https://github.com/openbmc/phosphor-dbus-interfaces/blob/master/xyz/openbmc_project/State/Watchdog.interface.yaml) in **phosphor-dbus-interfaces** that will cause host rebooted after power on.
 
-2. Configure GPIO pin definitions for **POWER_SW**, **RESET_SW** and **PGOOD** on BMC
+2. Configure GPIO pin definitions for **POWER_OUT**, **RESET_OUT**, **PS_PWROK**, **POWER_BUTTON**, **RESET_BUTTON** and **RESET_BUTTON** on BMC
 
-    * Pin **POWER_SW** (GPIO451) is use to do all server power operations, pin **RESET_SW** (GPIO452) is reserve for reset operations, and **PGOOD** (GPIO506) is use to monitor DC real status that indicate `Server power` in WebUI.
+    * Pin **POWER_OUT** is use to do all server power operations, pin **RESET_OUT** is reserve for reset operations, and **PS_PWROK** is use to monitor DC real status that indicate `Server power` in WebUI.
 
-    * If other GPIO pins are preferred, please modify the file [gpio_defs.json](https://github.com/Nuvoton-Israel/openbmc/blob/runbmc/meta-quanta/meta-olympus-nuvoton/recipes-phosphor/skeleton/obmc-libobmc-intf/gpio_defs.json).
+    * If other GPIO pins are preferred, please modify the file [power-config-host0.json](https://github.com/Nuvoton-Israel/openbmc/blob/runbmc/meta-quanta/meta-olympus-nuvoton/recipes-x86/chassis/x86-power-control/power-config-host0.json).
 
-    * Content below is a part of **gpio_defs.json** for this sample:
+    * Content below is a part of **power-config-host0.json** for this sample:
       ```
-      "power_config": {
-          "power_good_in": "PGOOD",
-          "power_up_outs": [
-              {"name": "POWER_UP_PIN", "polarity": false},
-              {"name": "POWER_UP_PIN", "polarity": true}
-          ]
+      {
+          "PostComplete": "POST_COMPLETE",
+          "PwrButton": "POWER_BUTTON",
+          "PwrOK": "PS_PWROK",
+          "PwrOut": "POWER_OUT",
+          "RstButton": "RESET_BUTTON",
+          "RstOut": "RESET_OUT"
       }
-
-      "name": "PGOOD",
-      "num": 506,
-      "direction": "in"
-
-      "name": "POWER_UP_PIN",
-      "num": 451,
-      "direction": "out"
-
-      "name": "RESET_UP_PIN",
-      "num": 452,
-      "direction": "out"
       ```
-      > _"name" here is referred in code and fixed, please don't modify it. "num"  means GPIO pin number and changeable here, "direction" should be set as "in" for **PGOOD**, "out" for **RESET_UP_PIN** and **POWER_UP_PIN**, and "polarity" should be set as "false" then set as "true" for **POWER_UP_PIN** accordind NPCM750 schematic._
+      > _**PostComplete**, **PwrButton**, **PwrOK**, **PwrOut**, **RstButton** and **RstOut** here are referred in code and fixed, please don't modify it. However, **POST_COMPLETE**, **POWER_BUTTON**, **PS_PWROK**, **POWER_OUT**, **RESET_BUTTON** and **RESET_OUT** all need to match **gpio-line-names** naming in your project **DTS** file._
 
 3. Server Power on
-    * Press `Power on` button from `Server control` ->`Server power operations` of WebUI.
+    * Press `Power on` button from `Control`->`Server power operations` of WebUI.
 
-      > _[obmc-host-start@.target](https://github.com/openbmc/phosphor-state-manager/blob/master/target_files/obmc-host-start%40.target) is the one driving the boot of the system._
+      > _curl -k -H "X-Auth-Token: $token" -X POST https://${bmc}/redfish/v1/Systems/system/Actions/ComputerSystem.Reset -d '{"ResetType": "ForceOn"}'_
 
 4. Server Power off (Soft)
-    * Press `Orderly shutdown` button from `Server control` ->`Server power operations` of WebUI.
+    * Select `Orderly` and press `Shut down` button from `Control`->`Server power operations` of WebUI.
 
-      > _The soft server power off function is encapsulated in the [obmc-host-shutdown@.target](https://github.com/openbmc/phosphor-state-manager/blob/master/target_files/obmc-host-shutdown%40.target) that is soft in that it notifies the host of the power off request and gives it a certain amount of time to shut itself down._
+      > _curl -k -H "X-Auth-Token: $token" -X POST https://${bmc}/redfish/v1/Systems/system/Actions/ComputerSystem.Reset -d '{"ResetType": "GracefulShutdown"}'_
 
 5. Server Power off (Hard)
-    * Press `Immediate shutdown` button from `Server control` ->`Server power operations` of WebUI.
+    * Select `Immediate` and press `Shut down` button from `Control`->`Server power operations` of WebUI.
 
-      > _The hard server power off is encapsulated in the [obmc-chassis-hard-poweroff@.target](https://github.com/openbmc/phosphor-state-manager/blob/master/target_files/obmc-chassis-hard-poweroff%40.target) that will force the stopping of the soft power off service if running, and immediately cut power to the system._
+      > _curl -k -H "X-Auth-Token: $token" -X POST https://${bmc}/redfish/v1/Systems/system/Actions/ComputerSystem.Reset -d '{"ResetType": "ForceOff"}'_
 
 6. Server Reboot (Warm)
-    * Press `Warm reboot` button from `Server control` ->`Server power operations` of WebUI.
+    * Select `Orderly` and press `Reboot` button from `Control`->`Server power operations` of WebUI.
 
-      > _The warm reboot of the server is encapsulated in the [obmc-host-reboot@.target](https://github.com/openbmc/phosphor-state-manager/blob/master/target_files/obmc-host-reboot%40.target) that will utilize the server power off (soft) target [obmc-host-shutdown@.target](https://github.com/openbmc/phosphor-state-manager/blob/master/target_files/obmc-host-shutdown%40.target) and then, once that completes, start the host power on target [obmc-host-start@.target](https://github.com/openbmc/phosphor-state-manager/blob/master/target_files/obmc-host-start%40.target)._
+      > _curl -k -H "X-Auth-Token: $token" -X POST https://${bmc}/redfish/v1/Systems/system/Actions/ComputerSystem.Reset -d '{"ResetType": "GracefulRestart"}'_
 
 7. Server Reboot (Cold)
-    * Press `Cold reboot` button from `Server control` ->`Server power operations` of WebUI.
+    * Select `Immediate` and press `Reboot` button from `Control`->`Server power operations` of WebUI.
 
-      > _The cold reboot of the server is shutdown server immediately, then restarts it. This target will utilize the Immediate shutdown target [obmc-chassis-hard-poweroff@.target](https://github.com/openbmc/phosphor-state-manager/blob/master/target_files/obmc-chassis-hard-poweroff%40.target) and then, start the host power on target [obmc-host-start@.target](https://github.com/openbmc/phosphor-state-manager/blob/master/target_files/obmc-host-start%40.target)._
+      > _curl -k -H "X-Auth-Token: $token" -X POST https://${bmc}/redfish/v1/Systems/system/Actions/ComputerSystem.Reset -d '{"ResetType": "PowerCycle"}'_
 
 **Maintainer**
 * Tim Lee
@@ -2331,6 +2322,51 @@ This is a PLDM over MCTP over SMBUS feature.
 
 * Medad CChien
 
+
+### BMC Reboot Cause
+
+#### Last BMC Reboot Cause
+<img align="right" width="30%" src="https://cdn.rawgit.com/NTC-CCBG/snapshots/8199e33/openbmc/bmc_reboot_cause.png">
+
+The BMC Reboot Cause feature facilitates customer to know the last reboot cause of BMC through OpenBMC WebUI.
+
+**Source URL**
+
+For this feature, we need to modify three recipes from OpenBMC github as below:  
+* [OpenBMC/phosphor-dbus-interfaces](https://github.com/openbmc/phosphor-dbus-interfaces)  
+* [OpenBMC/phosphor-state-manager](https://github.com/openbmc/phosphor-state-manager)  
+* [OpenBMC/phosphor-webui](https://github.com/openbmc/phosphor-webui)  
+
+**How to use**
+
+* Currently, we have support two kinds of bmc reboot cause
+
+  * **Power-On-Reset (Trigger by unplug/plug-in BMC power cable)**
+
+
+  You can use below busctl command to verify last bmc reboot cause when unplug/plug-in BMC power cable.  
+  The result will be **"xyz.openbmc_project.State.BMC.LastRebootCause.POR"** (POR i.e. Power-On-Reset).
+  > _busctl get-property xyz.openbmc_project.State.BMC /xyz/openbmc_project/state/bmc0 xyz.openbmc_project.State.BMC LastRebootCause_
+
+  Meanwhile, you can check `Reboot BMC` page from `Control` item of **WebUI** then the last bmc reboot cause will prefix to last bmc reboot date/time in `Current BMC boot status` title as below:
+
+  <img align="bottomleft" width="30%" src="https://cdn.rawgit.com/NTC-CCBG/snapshots/8199e33/openbmc/bmc_reboot_cause.png">
+
+
+
+  * **Watchdog (Trigger by reboot command)**
+
+  You can use below busctl command to verify last bmc reboot cause when execute reboot command.  
+  The result will be **"xyz.openbmc_project.State.BMC.LastRebootCause.Watchdog"**.
+  > _busctl get-property xyz.openbmc_project.State.BMC /xyz/openbmc_project/state/bmc0 xyz.openbmc_project.State.BMC LastRebootCause_
+
+  Meanwhile, you can check `Reboot BMC` page from `Control` item of WebUI then the last bmc reboot cause will prefix to last bmc reboot date/time in `Current BMC boot status` title as below:
+
+  <img align="bottomleft" width="30%" src="https://cdn.rawgit.com/NTC-CCBG/snapshots/0860e7d/openbmc/bmc_reboot_cause_wd.png">
+
+**Maintainer**
+* Tim Lee
+
 ## OpenBMC Test Automation
 
 **Source URL**
@@ -2399,3 +2435,5 @@ image-rwfs    |  0 MB  | middle layer of the overlayfs, rw files in this partiti
 * 2020.11.06 Add PLDM sensors
 * 2020.11.13 Add MCU Firmware Update
 * 2020.12.03 Add MCTP
+* 2021.03.18 Update Server power operations
+* 2021.03.18 Add BMC Reboot Cause
