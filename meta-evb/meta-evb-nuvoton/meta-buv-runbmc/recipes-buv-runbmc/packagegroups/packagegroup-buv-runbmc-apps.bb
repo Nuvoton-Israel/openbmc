@@ -7,6 +7,7 @@ PROVIDES = "${PACKAGES}"
 PACKAGES = " \
     ${PN}-buv-system \
     ${PN}-buv-common-utils \
+    ${PN}-buv-dev \
     "
 
 SUMMARY_${PN}-buv-common-utils = "BUV NUVOTON common utils"
@@ -36,3 +37,11 @@ SUMMARY_${PN}-buv-system = "BUV NUVOTON System"
 RDEPENDS_${PN}-buv-system = " \
     intel-ipmi-oem \
     "
+
+SUMMARY_${PN}-buv-dev = "BUV NUVOTON development tools"
+RDEPENDS_${PN}-buv-dev = " \
+    ent \
+    dhrystone \
+    rw-perf \
+    "
+
