@@ -493,7 +493,7 @@
 };
 
 &udc9 {
-	status = "okay";
+	status = "disabled";
 };
 
 &aes {
