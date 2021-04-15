@@ -178,7 +178,7 @@ do_populate_sdk[sstate-inputdirs] = "${SDKDEPLOYDIR}"
 do_populate_sdk[sstate-outputdirs] = "${SDK_DEPLOY}"
 do_populate_sdk[stamp-extra-info] = "${MACHINE_ARCH}${SDKMACHINE}"
 
-PSEUDO_IGNORE_PATHS .= ",${SDKDEPLOYDIR}"
+PSEUDO_IGNORE_PATHS .= ",${SDKDEPLOYDIR},${WORKDIR}/oe-sdk-repo,${WORKDIR}/sstate-build-populate_sdk"
 
 fakeroot create_sdk_files() {
 	cp ${COREBASE}/scripts/relocate_sdk.py ${SDK_OUTPUT}/${SDKPATH}/
@@ -263,7 +263,7 @@ fakeroot create_shar() {
 
 	rm -f ${T}/pre_install_command ${T}/post_install_command
 
-	if [ ${SDK_RELOCATE_AFTER_INSTALL} -eq 1 ] ; then
+	if [ "${SDK_RELOCATE_AFTER_INSTALL}" = "1" ] ; then
 		cp ${TOOLCHAIN_SHAR_REL_TMPL} ${T}/post_install_command
 	fi
 	cat << "EOF" >> ${T}/pre_install_command
@@ -328,6 +328,13 @@ def sdk_variables(d):
     return " ".join(variables)
 
 do_populate_sdk[vardeps] += "${@sdk_variables(d)}"
+
+python () {
+    variables = sdk_command_variables(d)
+    for var in variables:
+        if d.getVar(var, False):
+            d.setVarFlag(var, 'func', '1')
+}
 
 do_populate_sdk[file-checksums] += "${TOOLCHAIN_SHAR_REL_TMPL}:True \
                                     ${TOOLCHAIN_SHAR_EXT_TMPL}:True"

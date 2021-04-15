@@ -15,10 +15,18 @@ SRC_URI = "https://github.com/apple/cups/releases/download/v${PV}/${BP}-source.t
            file://0004-cups-fix-multilib-install-file-conflicts.patch \
            file://volatiles.99_cups \
            file://cups-volatiles.conf \
+           file://CVE-2020-10001.patch \
            "
 
 UPSTREAM_CHECK_URI = "https://github.com/apple/cups/releases"
 UPSTREAM_CHECK_REGEX = "cups-(?P<pver>\d+\.\d+(\.\d+)?)-source.tar"
+
+# Issue only applies to MacOS
+CVE_CHECK_WHITELIST += "CVE-2008-1033"
+# Issue affects pdfdistiller plugin used with but not part of cups
+CVE_CHECK_WHITELIST += "CVE-2009-0032"
+# This is an Ubuntu only issue.
+CVE_CHECK_WHITELIST += "CVE-2018-6553"
 
 LEAD_SONAME = "libcupsdriver.so"
 
@@ -47,6 +55,8 @@ EXTRA_OECONF = " \
                --enable-debug \
                --disable-relro \
                --enable-libusb \
+               --with-system-groups=lpadmin \
+               --with-cups-group=lp \
                --with-domainsocket=/run/cups/cups.sock \
                DSOFLAGS='${LDFLAGS}' \
                "

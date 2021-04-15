@@ -1,5 +1,10 @@
 SUMMARY = "Utilities for managing POSIX Access Control Lists"
+DESCRIPTION = "ACL allows you to provide different levels of access to files \
+and folders for different users."
+
 HOMEPAGE = "http://savannah.nongnu.org/projects/acl/"
+BUGTRACKER = "http://savannah.nongnu.org/bugs/?group=acl"
+
 SECTION = "libs"
 
 LICENSE = "LGPLv2.1+ & GPLv2+"

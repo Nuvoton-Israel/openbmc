@@ -1,5 +1,6 @@
 SUMMARY = "Tools to change and administer password and group data"
 HOMEPAGE = "http://github.com/shadow-maint/shadow"
+DESCRIPTION = "${SUMMARY}"
 BUGTRACKER = "http://github.com/shadow-maint/shadow/issues"
 SECTION = "base/utils"
 LICENSE = "BSD | Artistic-1.0"
@@ -70,6 +71,8 @@ PAM_PLUGINS = "libpam-runtime \
                pam-plugin-mail \
                pam-plugin-shells \
                pam-plugin-rootok"
+
+PAM_PLUGINS_remove_libc-musl = "pam-plugin-lastlog"
 
 PACKAGECONFIG ??= "${@bb.utils.filter('DISTRO_FEATURES', 'pam', d)} \
                    ${@bb.utils.contains('DISTRO_FEATURES', 'xattr', 'attr', '', d)}"

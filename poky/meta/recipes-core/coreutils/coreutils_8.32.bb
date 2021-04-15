@@ -39,6 +39,9 @@ PACKAGECONFIG_class-target ??= "\
 # The lib/oe/path.py requires xattr
 PACKAGECONFIG_class-native ??= "xattr"
 
+# oe-core builds need xattr support
+PACKAGECONFIG_class-nativesdk ??= "xattr"
+
 # with, without, depends, rdepends
 #
 PACKAGECONFIG[acl] = "--enable-acl,--disable-acl,acl,"
@@ -114,7 +117,7 @@ inherit update-alternatives
 ALTERNATIVE_PRIORITY = "100"
 # Make hostname's priority higher than busybox but lower than net-tools
 ALTERNATIVE_PRIORITY[hostname] = "90"
-ALTERNATIVE_${PN} = "lbracket ${bindir_progs} ${base_bindir_progs} ${sbindir_progs} base64 nice printenv mktemp df"
+ALTERNATIVE_${PN} = "lbracket ${bindir_progs} ${base_bindir_progs} ${sbindir_progs} base32 base64 nice printenv mktemp df"
 ALTERNATIVE_${PN}-doc = "base64.1 nice.1 mktemp.1 df.1 groups.1 kill.1 uptime.1 stat.1 hostname.1"
 
 ALTERNATIVE_LINK_NAME[hostname.1] = "${mandir}/man1/hostname.1"
@@ -199,3 +202,6 @@ do_install_ptest () {
 }
 
 FILES_${PN}-ptest += "${bindir}/getlimits"
+
+# These are specific to Opensuse
+CVE_WHITELIST += "CVE-2013-0221 CVE-2013-0222 CVE-2013-0223"

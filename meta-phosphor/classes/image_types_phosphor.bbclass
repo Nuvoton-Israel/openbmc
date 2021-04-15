@@ -332,6 +332,14 @@ make_signatures() {
 		openssl dgst -sha256 -sign ${SIGNING_KEY} -out "${file}.sig" $file
 		signature_files="${signature_files} ${file}.sig"
 	done
+
+	if [ -n "$signature_files" ]; then
+		sort_signature_files=`echo "$signature_files" | tr ' ' '\n' | sort | tr '\n' ' '`
+		cat $sort_signature_files > image-full
+		openssl dgst -sha256 -sign ${SIGNING_KEY} -out image-full.sig image-full
+		signature_files="${signature_files} image-full.sig"
+		rm -rf image-full
+	fi
 }
 
 do_generate_static_alltar() {
@@ -493,9 +501,11 @@ python do_generate_phosphor_manifest() {
     purpose = d.getVar('VERSION_PURPOSE', True)
     version = do_get_version(d)
     target_machine = d.getVar('MACHINE', True)
+    extended_version = (d.getVar('EXTENDED_VERSION', True) or "")
     with open('MANIFEST', 'w') as fd:
         fd.write('purpose={}\n'.format(purpose))
         fd.write('version={}\n'.format(version.strip('"')))
+        fd.write('ExtendedVersion={}\n'.format(extended_version))
         fd.write('KeyType={}\n'.format(get_pubkey_type(d)))
         fd.write('HashType=RSA-SHA256\n')
         fd.write('MachineName={}\n'.format(target_machine))

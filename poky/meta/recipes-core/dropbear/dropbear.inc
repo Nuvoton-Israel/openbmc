@@ -1,5 +1,6 @@
 SUMMARY = "A lightweight SSH and SCP implementation"
 HOMEPAGE = "http://matt.ucc.asn.au/dropbear/dropbear.html"
+DESCRIPTION = "Dropbear is a relatively small SSH server and client. It runs on a variety of POSIX-based platforms. Dropbear is open source software, distributed under a MIT-style license. Dropbear is particularly useful for "embedded"-type Linux (or other Unix) systems, such as wireless routers."
 SECTION = "console/network"
 
 # some files are from other projects and have others license terms:
@@ -57,6 +58,9 @@ EXTRA_OECONF += "\
 # This option appends to CFLAGS and LDFLAGS from OE
 # This is causing [textrel] QA warning
 EXTRA_OECONF += "--disable-harden"
+
+# musl does not implement wtmp/logwtmp APIs
+EXTRA_OECONF_append_libc-musl = " --disable-wtmp --disable-lastlog"
 
 do_install() {
 	install -d ${D}${sysconfdir} \

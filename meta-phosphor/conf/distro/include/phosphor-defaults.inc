@@ -52,7 +52,7 @@ VIRTUAL-RUNTIME_obmc-inventory-manager ?= "phosphor-inventory-manager"
 # obmc-led-manager
 #
 # Provides an implementation of the xyz.openbmc_project.ledmanager interface.
-VIRTUAL-RUNTIME_obmc-leds-manager ?= "phosphor-led-manager-ledmanager"
+VIRTUAL-RUNTIME_obmc-leds-manager ?= "phosphor-led-manager"
 
 # obmc-led-monitor
 #
@@ -225,6 +225,19 @@ OBMC_DBUS_IFACE_ROOT ?= "xyz.openbmc_project"
 # Will add a build dependency to host-ipmid on the
 # phosphor-ipmi-fru-whitelist-native recipe.
 VIRTUAL-RUNTIME_phosphor-ipmi-providers ?= "phosphor-ipmi-fru"
+
+# Set security headers on builds
+require conf/distro/include/security_flags.inc
+
+# Disable security on croserver.
+# Remove if https://github.com/open-power/eCMD/pull/433 is ever merged
+SECURITY_STRINGFORMAT_pn-croserver = ""
+# obmc-libobmc-intf doesn't compile with security flags enabled
+SECURITY_CFLAGS_pn-obmc-libobmc-intf = ""
+
+# remove when https://gerrit.openbmc-project.xyz/c/openbmc/pldm/+/39984
+# is merged and rev bumped
+SECURITY_CFLAGS_pn-pldm = ""
 
 # Set the root password to '0penBmc'
 inherit extrausers

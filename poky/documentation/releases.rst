@@ -9,6 +9,8 @@
 *******************************
 
 - :yocto_docs:`3.2 Documentation </3.2>`
+- :yocto_docs:`3.2.1 Documentation </3.2.1>`
+- :yocto_docs:`3.2.2 Documentation </3.2.2>`
 
 ****************************
 3.1 'dunfell' Release Series
@@ -18,6 +20,9 @@
 - :yocto_docs:`3.1.1 Documentation </3.1.1>`
 - :yocto_docs:`3.1.2 Documentation </3.1.2>`
 - :yocto_docs:`3.1.3 Documentation </3.1.3>`
+- :yocto_docs:`3.1.4 Documentation </3.1.4>`
+- :yocto_docs:`3.1.5 Documentation </3.1.5>`
+- :yocto_docs:`3.1.6 Documentation </3.1.6>`
 
 ==========================
  Previous Release Manuals

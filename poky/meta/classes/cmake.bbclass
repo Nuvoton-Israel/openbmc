@@ -81,6 +81,8 @@ def map_host_os_to_system_name(host_os):
 def map_host_arch_to_uname_arch(host_arch):
     if host_arch == "powerpc":
         return "ppc"
+    if host_arch == "powerpc64le":
+        return "ppc64le"
     if host_arch == "powerpc64":
         return "ppc64"
     return host_arch
@@ -100,7 +102,8 @@ set( CMAKE_CXX_COMPILER ${OECMAKE_CXX_COMPILER} )
 set( CMAKE_C_COMPILER_LAUNCHER ${OECMAKE_C_COMPILER_LAUNCHER} )
 set( CMAKE_CXX_COMPILER_LAUNCHER ${OECMAKE_CXX_COMPILER_LAUNCHER} )
 set( CMAKE_ASM_COMPILER ${OECMAKE_C_COMPILER} )
-set( CMAKE_AR ${OECMAKE_AR} CACHE FILEPATH "Archiver" )
+find_program( CMAKE_AR ${OECMAKE_AR} DOC "Archiver" REQUIRED )
+
 set( CMAKE_C_FLAGS "${OECMAKE_C_FLAGS}" CACHE STRING "CFLAGS" )
 set( CMAKE_CXX_FLAGS "${OECMAKE_CXX_FLAGS}" CACHE STRING "CXXFLAGS" )
 set( CMAKE_ASM_FLAGS "${OECMAKE_C_FLAGS}" CACHE STRING "ASM FLAGS" )
@@ -187,6 +190,7 @@ cmake_do_configure() {
 	  -DCMAKE_INSTALL_SO_NO_EXE=0 \
 	  -DCMAKE_TOOLCHAIN_FILE=${WORKDIR}/toolchain.cmake \
 	  -DCMAKE_NO_SYSTEM_FROM_IMPORTED=1 \
+	  -DCMAKE_EXPORT_NO_PACKAGE_REGISTRY=ON \
 	  ${EXTRA_OECMAKE} \
 	  -Wno-dev
 }

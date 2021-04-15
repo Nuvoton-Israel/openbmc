@@ -1,4 +1,6 @@
 SUMMARY = "Utilities for manipulating filesystem extended attributes"
+DESCRIPTION = "Implement the ability for a user to attach name:value pairs to objects within the XFS filesystem."
+
 HOMEPAGE = "http://savannah.nongnu.org/projects/attr/"
 SECTION = "libs"
 

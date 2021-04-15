@@ -30,6 +30,8 @@ SRC_URI_append_class-target = " \
             file://phar-makefile.patch \
             file://0001-opcache-config.m4-enable-opcache.patch \
             file://xfail_two_bug_tests.patch \
+            file://CVE-2020-7070.patch \
+            file://CVE-2020-7069.patch \
           "
 
 S = "${WORKDIR}/php-${PV}"
@@ -155,7 +157,6 @@ do_install_prepend_class-target() {
 # fixme
 do_install_append_class-target() {
     install -d ${D}${sysconfdir}/
-    rm -rf ${D}/${TMPDIR}
     rm -rf ${D}/.registry
     rm -rf ${D}/.channels
     rm -rf ${D}/.[a-z]*
@@ -178,14 +179,6 @@ do_install_append_class-target() {
             -e 's,@LOCALSTATEDIR@,${localstatedir},g' \
             ${D}${systemd_unitdir}/system/php-fpm.service
     fi
-
-    TMP=`dirname ${D}/${TMPDIR}`
-    while test ${TMP} != ${D}; do
-        if [ -d ${TMP} ]; then
-            rmdir ${TMP}
-        fi
-        TMP=`dirname ${TMP}`;
-    done
 
     if ${@bb.utils.contains('PACKAGECONFIG', 'apache2', 'true', 'false', d)}; then
         install -d ${D}${sysconfdir}/apache2/modules.d
@@ -212,7 +205,7 @@ php_sysroot_preprocess () {
 
 MODPHP_PACKAGE = "${@bb.utils.contains('PACKAGECONFIG', 'apache2', '${PN}-modphp', '', d)}"
 
-PACKAGES = "${PN}-dbg ${PN}-cli ${PN}-cgi ${PN}-fpm ${PN}-fpm-apache2 ${PN}-pear ${PN}-phar ${MODPHP_PACKAGE} ${PN}-dev ${PN}-staticdev ${PN}-doc ${PN}-opcache ${PN}"
+PACKAGES = "${PN}-dbg ${PN}-cli ${PN}-phpdbg ${PN}-cgi ${PN}-fpm ${PN}-fpm-apache2 ${PN}-pear ${PN}-phar ${MODPHP_PACKAGE} ${PN}-dev ${PN}-staticdev ${PN}-doc ${PN}-opcache ${PN}"
 
 RDEPENDS_${PN} += "libgcc"
 RDEPENDS_${PN}-pear = "${PN}"
@@ -221,6 +214,8 @@ RDEPENDS_${PN}-cli = "${PN}"
 RDEPENDS_${PN}-modphp = "${PN} apache2"
 RDEPENDS_${PN}-opcache = "${PN}"
 
+ALLOW_EMPTY_${PN} = "1"
+
 INITSCRIPT_PACKAGES = "${PN}-fpm"
 inherit update-rc.d
 
@@ -228,6 +223,7 @@ FILES_${PN}-dbg =+ "${bindir}/.debug \
                     ${libexecdir}/apache2/modules/.debug"
 FILES_${PN}-doc += "${PHP_LIBDIR}/php/doc"
 FILES_${PN}-cli = "${bindir}/php"
+FILES_${PN}-phpdbg = "${bindir}/phpdbg"
 FILES_${PN}-phar = "${bindir}/phar*"
 FILES_${PN}-cgi = "${bindir}/php-cgi"
 FILES_${PN}-fpm = "${sbindir}/php-fpm ${sysconfdir}/php-fpm.conf ${datadir}/fpm ${sysconfdir}/init.d/php-fpm ${systemd_unitdir}/system/php-fpm.service ${sysconfdir}/php-fpm.d/www.conf.default"

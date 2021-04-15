@@ -33,7 +33,7 @@ INHIBIT_DEFAULT_DEPS = "1"
 # IMAGE_FEATURES may contain any available package group
 IMAGE_FEATURES ?= ""
 IMAGE_FEATURES[type] = "list"
-IMAGE_FEATURES[validitems] += "debug-tweaks read-only-rootfs stateless-rootfs empty-root-password allow-empty-password allow-root-login post-install-logging"
+IMAGE_FEATURES[validitems] += "debug-tweaks read-only-rootfs read-only-rootfs-delayed-postinsts stateless-rootfs empty-root-password allow-empty-password allow-root-login post-install-logging"
 
 # Generate companion debugfs?
 IMAGE_GEN_DEBUGFS ?= "0"
@@ -112,7 +112,7 @@ def rootfs_command_variables(d):
             'IMAGE_PREPROCESS_COMMAND','RPM_PREPROCESS_COMMANDS','RPM_POSTPROCESS_COMMANDS','DEB_PREPROCESS_COMMANDS','DEB_POSTPROCESS_COMMANDS']
 
 python () {
-    variables = rootfs_command_variables(d) + sdk_command_variables(d)
+    variables = rootfs_command_variables(d)
     for var in variables:
         if d.getVar(var, False):
             d.setVarFlag(var, 'func', '1')
@@ -179,6 +179,8 @@ IMAGE_LOCALES_ARCHIVE ?= '1'
 # Prefer image, but use the fallback files for lookups if the image ones
 # aren't yet available.
 PSEUDO_PASSWD = "${IMAGE_ROOTFS}:${STAGING_DIR_NATIVE}"
+
+PSEUDO_IGNORE_PATHS .= ",${WORKDIR}/intercept_scripts,${WORKDIR}/oe-rootfs-repo,${WORKDIR}/sstate-build-image_complete"
 
 PACKAGE_EXCLUDE ??= ""
 PACKAGE_EXCLUDE[type] = "list"
@@ -248,7 +250,6 @@ fakeroot python do_rootfs () {
 }
 do_rootfs[dirs] = "${TOPDIR}"
 do_rootfs[cleandirs] += "${S} ${IMGDEPLOYDIR}"
-do_rootfs[umask] = "022"
 do_rootfs[file-checksums] += "${POSTINST_INTERCEPT_CHECKSUMS}"
 addtask rootfs after do_prepare_recipe_sysroot
 
@@ -261,7 +262,6 @@ fakeroot python do_image () {
     execute_pre_post_process(d, pre_process_cmds)
 }
 do_image[dirs] = "${TOPDIR}"
-do_image[umask] = "022"
 addtask do_image after do_rootfs
 
 fakeroot python do_image_complete () {
@@ -272,7 +272,6 @@ fakeroot python do_image_complete () {
     execute_pre_post_process(d, post_process_cmds)
 }
 do_image_complete[dirs] = "${TOPDIR}"
-do_image_complete[umask] = "022"
 SSTATETASKS += "do_image_complete"
 SSTATE_SKIP_CREATION_task-image-complete = '1'
 do_image_complete[sstate-inputdirs] = "${IMGDEPLOYDIR}"
@@ -508,7 +507,7 @@ python () {
 # Compute the rootfs size
 #
 def get_rootfs_size(d):
-    import subprocess
+    import subprocess, oe.utils
 
     rootfs_alignment = int(d.getVar('IMAGE_ROOTFS_ALIGNMENT'))
     overhead_factor = float(d.getVar('IMAGE_OVERHEAD_FACTOR'))
@@ -519,9 +518,7 @@ def get_rootfs_size(d):
     initramfs_fstypes = d.getVar('INITRAMFS_FSTYPES') or ''
     initramfs_maxsize = d.getVar('INITRAMFS_MAXSIZE')
 
-    output = subprocess.check_output(['du', '-ks',
-                                      d.getVar('IMAGE_ROOTFS')])
-    size_kb = int(output.split()[0])
+    size_kb = oe.utils.directory_size(d.getVar("IMAGE_ROOTFS")) / 1024
 
     base_size = size_kb * overhead_factor
     bb.debug(1, '%f = %d * %f' % (base_size, size_kb, overhead_factor))
@@ -613,7 +610,7 @@ deltask do_populate_lic
 deltask do_populate_sysroot
 do_package[noexec] = "1"
 deltask do_package_qa
-do_packagedata[noexec] = "1"
+deltask do_packagedata
 deltask do_package_write_ipk
 deltask do_package_write_deb
 deltask do_package_write_rpm

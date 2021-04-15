@@ -1,6 +1,6 @@
 def get_musl_loader_arch(d):
     import re
-    ldso_arch = None
+    ldso_arch = "NotSupported"
 
     targetarch = d.getVar("TARGET_ARCH")
     if targetarch.startswith("microblaze"):
@@ -9,8 +9,8 @@ def get_musl_loader_arch(d):
         ldso_arch = "mips${ABIEXTENSION}${MIPSPKGSFX_BYTE}${MIPSPKGSFX_R6}${MIPSPKGSFX_ENDIAN}${@['', '-sf'][d.getVar('TARGET_FPU') == 'soft']}"
     elif targetarch == "powerpc":
         ldso_arch = "powerpc${@['', '-sf'][d.getVar('TARGET_FPU') == 'soft']}"
-    elif targetarch == "powerpc64":
-        ldso_arch = "powerpc64"
+    elif targetarch.startswith("powerpc64"):
+        ldso_arch = "powerpc64${@bb.utils.contains('TUNE_FEATURES', 'bigendian', '', 'le', d)}"
     elif targetarch == "x86_64":
         ldso_arch = "x86_64"
     elif re.search("i.86", targetarch):
@@ -32,7 +32,7 @@ def get_musl_loader(d):
 def get_glibc_loader(d):
     import re
 
-    dynamic_loader = None
+    dynamic_loader = "NotSupported"
     targetarch = d.getVar("TARGET_ARCH")
     if targetarch in ["powerpc", "microblaze"]:
         dynamic_loader = "${base_libdir}/ld.so.1"
@@ -58,7 +58,7 @@ def get_linuxloader(d):
     overrides = d.getVar("OVERRIDES").split(":")
 
     if "libc-baremetal" in overrides:
-        return None
+        return "NotSupported"
 
     if "libc-musl" in overrides:
         dynamic_loader = get_musl_loader(d)

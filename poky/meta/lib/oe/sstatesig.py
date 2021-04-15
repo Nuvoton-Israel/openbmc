@@ -162,12 +162,7 @@ class SignatureGeneratorOEBasicHashMixIn(object):
             else:
                 return super().get_taskhash(tid, deps, dataCaches)
 
-        # get_taskhash will call get_unihash internally in the parent class, we
-        # need to disable our filter of it whilst this runs else
-        # incorrect hashes can be calculated.
-        self._internal = True
         h = super().get_taskhash(tid, deps, dataCaches)
-        self._internal = False
 
         (mc, _, task, fn) = bb.runqueue.split_tid_mcfn(tid)
 
@@ -439,7 +434,7 @@ def find_sstate_manifest(taskdata, taskdata2, taskname, d, multilibcache):
         d2 = multilibcache[variant]
 
     if taskdata.endswith("-native"):
-        pkgarchs = ["${BUILD_ARCH}"]
+        pkgarchs = ["${BUILD_ARCH}", "${BUILD_ARCH}_${ORIGNATIVELSBSTRING}"]
     elif taskdata.startswith("nativesdk-"):
         pkgarchs = ["${SDK_ARCH}_${SDK_OS}", "allarch"]
     elif "-cross-canadian" in taskdata:
@@ -458,7 +453,7 @@ def find_sstate_manifest(taskdata, taskdata2, taskname, d, multilibcache):
         manifest = d2.expand("${SSTATE_MANIFESTS}/manifest-%s-%s.%s" % (pkgarch, taskdata, taskname))
         if os.path.exists(manifest):
             return manifest, d2
-    bb.warn("Manifest %s not found in %s (variant '%s')?" % (manifest, d2.expand(" ".join(pkgarchs)), variant))
+    bb.error("Manifest %s not found in %s (variant '%s')?" % (manifest, d2.expand(" ".join(pkgarchs)), variant))
     return None, d2
 
 def OEOuthashBasic(path, sigfile, task, d):
@@ -557,9 +552,11 @@ def OEOuthashBasic(path, sigfile, task, d):
                     try:
                         update_hash(" %10s" % pwd.getpwuid(s.st_uid).pw_name)
                         update_hash(" %10s" % grp.getgrgid(s.st_gid).gr_name)
-                    except KeyError:
+                    except KeyError as e:
                         bb.warn("KeyError in %s" % path)
-                        raise
+                        msg = ("KeyError: %s\nPath %s is owned by uid %d, gid %d, which doesn't match "
+                            "any user/group on target. This may be due to host contamination." % (e, path, s.st_uid, s.st_gid))
+                        raise Exception(msg).with_traceback(e.__traceback__)
 
                 if include_timestamps:
                     update_hash(" %10d" % s.st_mtime)

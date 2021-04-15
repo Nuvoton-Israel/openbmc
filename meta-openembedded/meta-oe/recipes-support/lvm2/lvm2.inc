@@ -7,7 +7,7 @@ LIC_FILES_CHKSUM = "file://COPYING;md5=12713b4d9386533feeb07d6e4831765a \
 
 DEPENDS += "libaio"
 
-SRC_URI = "git://sourceware.org/git/lvm2.git \
+SRC_URI = "git://sourceware.org/git/lvm2.git;branch=main \
            file://lvm.conf \
            file://0001-implement-libc-specific-reopen_stream.patch \
            file://0002-Guard-use-of-mallinfo-with-__GLIBC__.patch \
@@ -18,7 +18,7 @@ SRC_URI = "git://sourceware.org/git/lvm2.git \
            file://reproducible-build.patch \
            "
 
-SRCREV = "b9391b1b9f0b73303fa21f8f92574d17ce4c2b02"
+SRCREV = "3e8bd8d1bd70691f09a170785836aeb4f83154e6"
 S = "${WORKDIR}/git"
 
 inherit autotools-brokensep pkgconfig systemd license

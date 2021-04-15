@@ -3,7 +3,7 @@ SECTION = "console/utils"
 LICENSE = "Apache-2.0 & GPL-2.0 & BSD-2-Clause & BSD-3-Clause"
 LIC_FILES_CHKSUM = " \
     file://${COMMON_LICENSE_DIR}/Apache-2.0;md5=89aea4e17d99a7cacdbeed46a0096b10 \
-    file://${COMMON_LICENSE_DIR}/GPL-2.0;md5=801f80980d171dd6425610833a22dbe6 \
+    file://${COMMON_LICENSE_DIR}/GPL-2.0-only;md5=801f80980d171dd6425610833a22dbe6 \
     file://${COMMON_LICENSE_DIR}/BSD-2-Clause;md5=cb641bc04cda31daea161b1bc15da69f \
     file://${COMMON_LICENSE_DIR}/BSD-3-Clause;md5=550794465ba0ec5312d6919e203a55f9 \
 "
@@ -67,7 +67,8 @@ COMPATIBLE_HOST_powerpc64le = "(null)"
 
 inherit systemd
 
-SYSTEMD_SERVICE_${PN} = "android-tools-adbd.service"
+SYSTEMD_PACKAGES = "${PN}-adbd"
+SYSTEMD_SERVICE_${PN}-adbd = "android-tools-adbd.service"
 
 # Find libbsd headers during native builds
 CC_append_class-native = " -I${STAGING_INCDIR}"
@@ -157,9 +158,15 @@ do_install() {
     fi
 }
 
-PACKAGES += "${PN}-fstools"
+PACKAGES =+ "${PN}-fstools ${PN}-adbd"
 
-RDEPENDS_${BPN} = "${BPN}-conf bash"
+RDEPENDS_${BPN}-adbd = "${BPN}-conf"
+RDEPENDS_${BPN}-fstools = "bash"
+
+FILES_${PN}-adbd = "\
+    ${bindir}/adbd \
+    ${systemd_unitdir}/system/android-tools-adbd.service \
+"
 
 FILES_${PN}-fstools = "\
     ${bindir}/ext2simg \

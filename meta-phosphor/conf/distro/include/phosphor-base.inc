@@ -10,14 +10,6 @@ DISTRO_EXTRA_RRECOMMENDS += " ${POKY_DEFAULT_EXTRA_RRECOMMENDS}"
 
 DISTROOVERRIDES .= ":openbmc-phosphor"
 
-POKYQEMUDEPS = "${@bb.utils.contains("INCOMPATIBLE_LICENSE", "GPL-3.0", "", "packagegroup-core-device-devel",d)}"
-DISTRO_EXTRA_RDEPENDS_append_qemuarm = " ${POKYQEMUDEPS}"
-DISTRO_EXTRA_RDEPENDS_append_qemuarm64 = " ${POKYQEMUDEPS}"
-DISTRO_EXTRA_RDEPENDS_append_qemumips = " ${POKYQEMUDEPS}"
-DISTRO_EXTRA_RDEPENDS_append_qemuppc = " ${POKYQEMUDEPS}"
-DISTRO_EXTRA_RDEPENDS_append_qemux86 = " ${POKYQEMUDEPS}"
-DISTRO_EXTRA_RDEPENDS_append_qemux86-64 = " ${POKYQEMUDEPS}"
-
 TCLIBCAPPEND = ""
 
 QEMU_TARGETS ?= "arm aarch64 i386 mips mipsel mips64 mips64el nios2 ppc x86_64"
@@ -124,9 +116,6 @@ MACHINE_FEATURES += " \
 DISTRO_EXTRA_RDEPENDS_remove_qemuarm = "packagegroup-core-device-devel"
 
 include conf/distro/include/openbmc-phosphor/${MACHINE}.inc
-
-KERNEL_FEATURES_append = " phosphor-gpio-keys"
-KERNEL_FEATURES_remove_qemuall = " phosphor-gpio-keys"
 
 IMAGE_CLASSES_append = " image_types_phosphor phosphor-rootfs-postcommands"
 IMAGE_CLASSES_append_npcm7xx = " image_types_phosphor_nuvoton"

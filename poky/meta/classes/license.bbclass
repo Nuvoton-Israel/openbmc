@@ -31,6 +31,7 @@ python do_populate_lic() {
             f.write("%s: %s\n" % (key, info[key]))
 }
 
+PSEUDO_IGNORE_PATHS .= ",${@','.join(((d.getVar('COMMON_LICENSE_DIR') or '') + ' ' + (d.getVar('LICENSE_PATH') or '')).split())}"
 # it would be better to copy them in do_install_append, but find_license_filesa is python
 python perform_packagecopy_prepend () {
     enabled = oe.data.typed_value('LICENSE_CREATE_PACKAGE', d)
@@ -251,16 +252,9 @@ def return_spdx(d, license):
 def canonical_license(d, license):
     """
     Return the canonical (SPDX) form of the license if available (so GPLv3
-    becomes GPL-3.0), for the license named 'X+', return canonical form of
-    'X' if available and the tailing '+' (so GPLv3+ becomes GPL-3.0+),
-    or the passed license if there is no canonical form.
+    becomes GPL-3.0) or the passed license if there is no canonical form.
     """
-    lic = d.getVarFlag('SPDXLICENSEMAP', license) or ""
-    if not lic and license.endswith('+'):
-        lic = d.getVarFlag('SPDXLICENSEMAP', license.rstrip('+'))
-        if lic:
-            lic += '+'
-    return lic or license
+    return d.getVarFlag('SPDXLICENSEMAP', license) or license
 
 def available_licenses(d):
     """
@@ -287,11 +281,16 @@ def expand_wildcard_licenses(d, wildcard_licenses):
     wildcards from SPDXLICENSEMAP flags and AVAILABLE_LICENSES.
     """
     import fnmatch
+
     licenses = wildcard_licenses[:]
     spdxmapkeys = d.getVarFlags('SPDXLICENSEMAP').keys()
     for wld_lic in wildcard_licenses:
         spdxflags = fnmatch.filter(spdxmapkeys, wld_lic)
         licenses += [d.getVarFlag('SPDXLICENSEMAP', flag) for flag in spdxflags]
+        # Assume if we're passed "GPLv3" or "*GPLv3" it means -or-later as well
+        if not wld_lic.endswith(("-or-later", "-only", "*", "+")):
+            spdxflags = fnmatch.filter(spdxmapkeys, wld_lic + "+")
+            licenses += [d.getVarFlag('SPDXLICENSEMAP', flag) for flag in spdxflags]
 
     spdx_lics = d.getVar('AVAILABLE_LICENSES').split()
     for wld_lic in wildcard_licenses:

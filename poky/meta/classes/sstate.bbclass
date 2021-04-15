@@ -72,6 +72,7 @@ BB_HASHFILENAME = "False ${SSTATE_PKGSPEC} ${SSTATE_SWSPEC}"
 
 SSTATE_ARCHS = " \
     ${BUILD_ARCH} \
+    ${BUILD_ARCH}_${ORIGNATIVELSBSTRING} \
     ${BUILD_ARCH}_${SDK_ARCH}_${SDK_OS} \
     ${BUILD_ARCH}_${TARGET_ARCH} \
     ${SDK_ARCH}_${SDK_OS} \
@@ -80,6 +81,7 @@ SSTATE_ARCHS = " \
     ${PACKAGE_ARCH} \
     ${PACKAGE_EXTRA_ARCHS} \
     ${MACHINE_ARCH}"
+SSTATE_ARCHS[vardepsexclude] = "ORIGNATIVELSBSTRING"
 
 SSTATE_MANMACH ?= "${SSTATE_PKGARCH}"
 
@@ -121,6 +123,8 @@ SSTATE_HASHEQUIV_REPORT_TASKDATA[doc] = "Report additional useful data to the \
 python () {
     if bb.data.inherits_class('native', d):
         d.setVar('SSTATE_PKGARCH', d.getVar('BUILD_ARCH', False))
+        if d.getVar("PN") == "pseudo-native":
+            d.appendVar('SSTATE_PKGARCH', '_${ORIGNATIVELSBSTRING}')
     elif bb.data.inherits_class('crosssdk', d):
         d.setVar('SSTATE_PKGARCH', d.expand("${BUILD_ARCH}_${SDK_ARCH}_${SDK_OS}"))
     elif bb.data.inherits_class('cross', d):
@@ -858,6 +862,8 @@ BB_HASHCHECK_FUNCTION = "sstate_checkhashes"
 
 def sstate_checkhashes(sq_data, d, siginfo=False, currentcount=0, summary=True, **kwargs):
     found = set()
+    foundLocal = set()
+    foundNet = set()
     missed = set()
 
     def gethash(task):
@@ -890,6 +896,7 @@ def sstate_checkhashes(sq_data, d, siginfo=False, currentcount=0, summary=True, 
         if os.path.exists(sstatefile):
             bb.debug(2, "SState: Found valid sstate file %s" % sstatefile)
             found.add(tid)
+            foundLocal.add(tid)
             continue
         else:
             missed.add(tid)
@@ -935,6 +942,7 @@ def sstate_checkhashes(sq_data, d, siginfo=False, currentcount=0, summary=True, 
                 fetcher.checkstatus()
                 bb.debug(2, "SState: Successful fetch test for %s" % srcuri)
                 found.add(tid)
+                foundNet.add(tid)
                 if tid in missed:
                     missed.remove(tid)
             except:
@@ -996,7 +1004,7 @@ def sstate_checkhashes(sq_data, d, siginfo=False, currentcount=0, summary=True, 
         match = 0
         if total:
             match = len(found) / total * 100
-        bb.plain("Sstate summary: Wanted %d Found %d Missed %d Current %d (%d%% match, %d%% complete)" % (total, len(found), len(missed), currentcount, match, complete))
+        bb.plain("Sstate summary: Wanted %d Local %d Network %d Missed %d Current %d (%d%% match, %d%% complete)" % (total, len(foundLocal), len(foundNet),len(missed), currentcount, match, complete))
 
     if hasattr(bb.parse.siggen, "checkhashes"):
         bb.parse.siggen.checkhashes(sq_data, missed, found, d)
@@ -1138,14 +1146,18 @@ python sstate_eventhandler() {
 
 SSTATE_PRUNE_OBSOLETEWORKDIR ?= "1"
 
-# Event handler which removes manifests and stamps file for
-# recipes which are no longer reachable in a build where they
-# once were.
+#
+# Event handler which removes manifests and stamps file for recipes which are no
+# longer 'reachable' in a build where they once were. 'Reachable' refers to
+# whether a recipe is parsed so recipes in a layer which was removed would no
+# longer be reachable. Switching between systemd and sysvinit where recipes
+# became skipped would be another example.
+#
 # Also optionally removes the workdir of those tasks/recipes
 #
-addhandler sstate_eventhandler2
-sstate_eventhandler2[eventmask] = "bb.event.ReachableStamps"
-python sstate_eventhandler2() {
+addhandler sstate_eventhandler_reachablestamps
+sstate_eventhandler_reachablestamps[eventmask] = "bb.event.ReachableStamps"
+python sstate_eventhandler_reachablestamps() {
     import glob
     d = e.data
     stamps = e.stamps.values()
@@ -1214,4 +1226,60 @@ python sstate_eventhandler2() {
 
     if preservestamps:
         os.remove(preservestampfile)
+}
+
+
+#
+# Bitbake can generate an event showing which setscene tasks are 'stale',
+# i.e. which ones will be rerun. These are ones where a stamp file is present but
+# it is stable (e.g. taskhash doesn't match). With that list we can go through
+# the manifests for matching tasks and "uninstall" those manifests now. We do
+# this now rather than mid build since the distribution of files between sstate
+# objects may have changed, new tasks may run first and if those new tasks overlap
+# with the stale tasks, we'd see overlapping files messages and failures. Thankfully
+# removing these files is fast.
+#
+addhandler sstate_eventhandler_stalesstate
+sstate_eventhandler_stalesstate[eventmask] = "bb.event.StaleSetSceneTasks"
+python sstate_eventhandler_stalesstate() {
+    d = e.data
+    tasks = e.tasks
+
+    bb.utils.mkdirhier(d.expand("${SSTATE_MANIFESTS}"))
+
+    for a in list(set(d.getVar("SSTATE_ARCHS").split())):
+        toremove = []
+        i = d.expand("${SSTATE_MANIFESTS}/index-" + a)
+        if not os.path.exists(i):
+            continue
+        with open(i, "r") as f:
+            lines = f.readlines()
+            for l in lines:
+                try:
+                    (stamp, manifest, workdir) = l.split()
+                    for tid in tasks:
+                        for s in tasks[tid]:
+                            if s.startswith(stamp):
+                                taskname = bb.runqueue.taskname_from_tid(tid)[3:]
+                                manname = manifest + "." + taskname
+                                if os.path.exists(manname):
+                                    bb.debug(2, "Sstate for %s is stale, removing related manifest %s" % (tid, manname))
+                                    toremove.append((manname, tid, tasks[tid]))
+                                    break
+                except ValueError:
+                    bb.fatal("Invalid line '%s' in sstate manifest '%s'" % (l, i))
+
+        if toremove:
+            msg = "Removing %d stale sstate objects for arch %s" % (len(toremove), a)
+            bb.event.fire(bb.event.ProcessStarted(msg, len(toremove)), d)
+
+            removed = 0
+            for (manname, tid, stamps) in toremove:
+                sstate_clean_manifest(manname, d)
+                for stamp in stamps:
+                    bb.utils.remove(stamp)
+                removed = removed + 1
+                bb.event.fire(bb.event.ProcessProgress(msg, removed), d)
+
+            bb.event.fire(bb.event.ProcessFinished(msg), d)
 }

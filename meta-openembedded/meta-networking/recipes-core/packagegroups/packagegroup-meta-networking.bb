@@ -112,6 +112,7 @@ RDEPENDS_packagegroup-meta-networking-filter = "\
     libnftnl \
     conntrack-tools \
     ebtables \
+    ipset \
     libnetfilter-acct \
     libnetfilter-conntrack \
     libnetfilter-cthelper \
@@ -220,6 +221,7 @@ RDEPENDS_packagegroup-meta-networking-support = "\
     macchanger \
     nbdkit \
     ssmping \
+    libmaxminddb \
     libowfat \
     ncp \
     strongswan \
@@ -232,7 +234,8 @@ RDEPENDS_packagegroup-meta-networking-support = "\
     traceroute \
     tunctl \
     wireshark \
-    ntop \
+    ndpi \
+    ntopng \
     nuttcp \
     nvmetcli \
     open-isns \
