@@ -21,6 +21,7 @@ SRC_URI = "http://www.rsyslog.com/download/files/download/rsyslog/${BPN}-${PV}.t
            file://initscript \
            file://rsyslog.conf \
            file://rsyslog.logrotate \
+           file://rsyslog.service \
            file://use-pkgconfig-to-check-libgcrypt.patch \
            file://run-ptest \
 "
@@ -29,8 +30,8 @@ SRC_URI_append_libc-musl = " \
     file://0001-Include-sys-time-h.patch \
 "
 
-SRC_URI[md5sum] = "33de768941953ceeca9d1a437b47891b"
-SRC_URI[sha256sum] = "d9589e64866f2fdc5636af4cae9d60ebf1e3257bb84b81ee953ede6a05878e97"
+SRC_URI[md5sum] = "1f6150dfd2ef38db37c2165e98d2f2b1"
+SRC_URI[sha256sum] = "94ee0d0312c2edea737665594cbe4a9475e4e3b593e12b5b8ae3a743ac9c72a7"
 
 UPSTREAM_CHECK_URI = "https://github.com/rsyslog/rsyslog/releases"
 UPSTREAM_CHECK_REGEX = "(?P<pver>\d+(\.\d+)+)"
@@ -77,6 +78,7 @@ PACKAGECONFIG[postgresql] = "--enable-pgsql,--disable-pgsql,postgresql,"
 PACKAGECONFIG[libdbi] = "--enable-libdbi,--disable-libdbi,libdbi,"
 PACKAGECONFIG[mail] = "--enable-mail,--disable-mail,,"
 PACKAGECONFIG[valgrind] = ",--without-valgrind-testbench,valgrind,"
+PACKAGECONFIG[imhttp] = "--enable-imhttp,--disable-imhttp,civetweb,"
 
 do_configure_prepend() {
     sed -i -e 's|python |python3 |g' ${S}/tests/*.sh
@@ -147,8 +149,9 @@ do_install_append() {
         echo '$ModLoad mmjsonparse' >> ${D}${sysconfdir}/rsyslog.d/mmjsonparse.conf
     fi
     if ${@bb.utils.contains('DISTRO_FEATURES','systemd','true','false',d)}; then
-        sed -i -e "s#;Requires=syslog.socket#Requires=syslog.socket#g" ${D}${systemd_system_unitdir}/rsyslog.service
-        sed -i -e "s#;Alias=syslog.service#Alias=syslog.service#g" ${D}${systemd_system_unitdir}/rsyslog.service
+        install -d ${D}${systemd_system_unitdir}
+        install -m 644 ${WORKDIR}/rsyslog.service ${D}${systemd_system_unitdir}
+        sed -i -e "s,@sbindir@,${sbindir},g" ${D}${systemd_system_unitdir}/rsyslog.service
     fi
 }
 
