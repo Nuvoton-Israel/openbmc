@@ -22,7 +22,7 @@ Can I still use the Yocto Project?
 **A:** You can get the required tools on your host development system a
 couple different ways (i.e. building a tarball or downloading a
 tarball). See the
-":ref:`ref-manual/ref-system-requirements:required git, tar, python and gcc versions`"
+":ref:`ref-manual/system-requirements:required git, tar, python and gcc versions`"
 section for steps on how to update your build tools.
 
 **Q:** How can you claim Poky / OpenEmbedded-Core is stable?
@@ -45,9 +45,9 @@ section for steps on how to update your build tools.
 **A:** Support for an additional board is added by creating a Board
 Support Package (BSP) layer for it. For more information on how to
 create a BSP layer, see the
-":ref:`dev-manual/dev-manual-common-tasks:understanding and creating layers`"
+":ref:`dev-manual/common-tasks:understanding and creating layers`"
 section in the Yocto Project Development Tasks Manual and the
-:doc:`../bsp-guide/bsp-guide`.
+:doc:`/bsp-guide/index`.
 
 Usually, if the board is not completely exotic, adding support in the
 Yocto Project is fairly straightforward.
@@ -55,9 +55,9 @@ Yocto Project is fairly straightforward.
 **Q:** Are there any products built using the OpenEmbedded build system?
 
 **A:** The software running on the `Vernier
-LabQuest <http://vernier.com/labquest/>`__ is built using the
+LabQuest <https://vernier.com/labquest/>`__ is built using the
 OpenEmbedded build system. See the `Vernier
-LabQuest <http://www.vernier.com/products/interfaces/labq/>`__ website
+LabQuest <https://www.vernier.com/products/interfaces/labq/>`__ website
 for more information. There are a number of pre-production devices using
 the OpenEmbedded build system and the Yocto Project team announces them
 as soon as they are released.
@@ -73,7 +73,7 @@ device.
 
 **A:** To add a package, you need to create a BitBake recipe. For
 information on how to create a BitBake recipe, see the
-":ref:`dev-manual/dev-manual-common-tasks:writing a new recipe`"
+":ref:`dev-manual/common-tasks:writing a new recipe`"
 section in the Yocto Project Development Tasks Manual.
 
 **Q:** Do I have to reflash my entire board with a new Yocto Project
@@ -140,7 +140,7 @@ The Yocto Project also includes a
 ``meta-poky/conf/site.conf.sample`` file that shows how to configure CVS
 and Git proxy servers if needed. For more information on setting up
 various proxy types and configuring proxy servers, see the
-":yocto_wiki:`Working Behind a Network Proxy </wiki/Working_Behind_a_Network_Proxy>`"
+":yocto_wiki:`Working Behind a Network Proxy </Working_Behind_a_Network_Proxy>`"
 Wiki page.
 
 **Q:** What's the difference between target and target\ ``-native``?
@@ -198,16 +198,16 @@ and also any configuration information about how that package was
 configured and built.
 
 You can find more information on licensing in the
-":ref:`overview-manual/overview-manual-development-environment:licensing`"
+":ref:`overview-manual/development-environment:licensing`"
 section in the Yocto
 Project Overview and Concepts Manual and also in the
-":ref:`dev-manual/dev-manual-common-tasks:maintaining open source license compliance during your product's lifecycle`"
+":ref:`dev-manual/common-tasks:maintaining open source license compliance during your product's lifecycle`"
 section in the Yocto Project Development Tasks Manual.
 
 **Q:** How do I disable the cursor on my touchscreen device?
 
 **A:** You need to create a form factor file as described in the
-":ref:`bsp-filelayout-misc-recipes`" section in
+":ref:`bsp-guide/bsp:miscellaneous bsp-specific recipe files`" section in
 the Yocto Project Board Support Packages (BSP) Developer's Guide. Set
 the ``HAVE_TOUCHSCREEN`` variable equal to one as follows:
 ::
@@ -220,7 +220,7 @@ default?
 **A:** The default interfaces file provided by the netbase recipe does
 not automatically bring up network interfaces. Therefore, you will need
 to add a BSP-specific netbase that includes an interfaces file. See the
-":ref:`bsp-filelayout-misc-recipes`" section in
+":ref:`bsp-guide/bsp:miscellaneous bsp-specific recipe files`" section in
 the Yocto Project Board Support Packages (BSP) Developer's Guide for
 information on creating these types of miscellaneous recipe files.
 
@@ -273,7 +273,7 @@ OpenEmbedded build system to use its internally built toolchain (i.e.
 particular, "external-\*" refers to external toolchains. One example is
 the Sourcery G++ Toolchain. The support for this toolchain resides in
 the separate ``meta-sourcery`` layer at
-http://github.com/MentorEmbedded/meta-sourcery/.
+https://github.com/MentorEmbedded/meta-sourcery/.
 
 In addition to the toolchain configuration, you also need a
 corresponding toolchain recipe file. This recipe file needs to package
@@ -362,7 +362,7 @@ redirect requests through proxy servers.
 .. note::
 
    You can find more information on the
-   ":yocto_wiki:`Working Behind a Network Proxy </wiki/Working_Behind_a_Network_Proxy>`"
+   ":yocto_wiki:`Working Behind a Network Proxy </Working_Behind_a_Network_Proxy>`"
    Wiki page.
 
 **Q:** Can I get rid of build output so I can start over?

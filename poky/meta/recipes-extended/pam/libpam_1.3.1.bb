@@ -29,10 +29,6 @@ SRC_URI = "https://github.com/linux-pam/linux-pam/releases/download/v${PV}/Linux
 SRC_URI[md5sum] = "558ff53b0fc0563ca97f79e911822165"
 SRC_URI[sha256sum] = "eff47a4ecd833fbf18de9686632a70ee8d0794b79aecb217ebd0ce11db4cd0db"
 
-SRC_URI_append_libc-musl = " file://0001-Add-support-for-defining-missing-funcitonality.patch \
-                             file://include_paths_header.patch \
-                           "
-
 DEPENDS = "bison-native flex flex-native cracklib libxml2-native virtual/crypt"
 
 EXTRA_OECONF = "--includedir=${includedir}/security \
@@ -132,6 +128,13 @@ python populate_packages_prepend () {
     do_split_packages(d, pam_filterdir, r'^(.*)$', 'pam-filter-%s', 'PAM filter for %s', extra_depends='')
 }
 
+do_compile_ptest() {
+        cd tests
+        sed -i -e 's/$(MAKE) $(AM_MAKEFLAGS) check-TESTS//' Makefile
+        oe_runmake check-am
+        cd -
+}
+
 do_install() {
 	autotools_do_install
 
@@ -149,6 +152,13 @@ do_install() {
 	if ${@bb.utils.contains('DISTRO_FEATURES','systemd','true','false',d)}; then
 		echo "session optional pam_systemd.so" >> ${D}${sysconfdir}/pam.d/common-session
 	fi
+}
+
+do_install_ptest() {
+    if [ ${PTEST_ENABLED} = "1" ]; then
+        mkdir -p ${D}${PTEST_PATH}/tests
+        install -m 0755 ${B}/tests/.libs/* ${D}${PTEST_PATH}/tests
+    fi
 }
 
 inherit features_check

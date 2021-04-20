@@ -38,7 +38,7 @@ def taskname_from_tid(tid):
     return tid.rsplit(":", 1)[1]
 
 def mc_from_tid(tid):
-    if tid.startswith('mc:'):
+    if tid.startswith('mc:') and tid.count(':') >= 2:
         return tid.split(':')[1]
     return ""
 
@@ -47,13 +47,13 @@ def split_tid(tid):
     return (mc, fn, taskname)
 
 def split_mc(n):
-    if n.startswith("mc:"):
+    if n.startswith("mc:") and n.count(':') >= 2:
         _, mc, n = n.split(":", 2)
         return (mc, n)
     return ('', n)
 
 def split_tid_mcfn(tid):
-    if tid.startswith('mc:'):
+    if tid.startswith('mc:') and tid.count(':') >= 2:
         elems = tid.split(':')
         mc = elems[1]
         fn = ":".join(elems[2:-1])
@@ -544,8 +544,8 @@ class RunQueueData:
         for tid in self.runtaskentries:
             if task_done[tid] is False or deps_left[tid] != 0:
                 problem_tasks.append(tid)
-                logger.debug(2, "Task %s is not buildable", tid)
-                logger.debug(2, "(Complete marker was %s and the remaining dependency count was %s)\n", task_done[tid], deps_left[tid])
+                logger.debug2("Task %s is not buildable", tid)
+                logger.debug2("(Complete marker was %s and the remaining dependency count was %s)\n", task_done[tid], deps_left[tid])
             self.runtaskentries[tid].weight = weight[tid]
 
         if problem_tasks:
@@ -643,7 +643,7 @@ class RunQueueData:
                 (mc, fn, taskname, taskfn) = split_tid_mcfn(tid)
                 #runtid = build_tid(mc, fn, taskname)
 
-                #logger.debug(2, "Processing %s,%s:%s", mc, fn, taskname)
+                #logger.debug2("Processing %s,%s:%s", mc, fn, taskname)
 
                 depends = set()
                 task_deps = self.dataCaches[mc].task_deps[taskfn]
@@ -1199,9 +1199,9 @@ class RunQueueData:
         """
         Dump some debug information on the internal data structures
         """
-        logger.debug(3, "run_tasks:")
+        logger.debug3("run_tasks:")
         for tid in self.runtaskentries:
-            logger.debug(3, " %s: %s   Deps %s RevDeps %s", tid,
+            logger.debug3(" %s: %s   Deps %s RevDeps %s", tid,
                          self.runtaskentries[tid].weight,
                          self.runtaskentries[tid].depends,
                          self.runtaskentries[tid].revdeps)
@@ -1238,10 +1238,11 @@ class RunQueue:
         self.fakeworker = {}
 
     def _start_worker(self, mc, fakeroot = False, rqexec = None):
-        logger.debug(1, "Starting bitbake-worker")
+        logger.debug("Starting bitbake-worker")
         magic = "decafbad"
         if self.cooker.configuration.profile:
             magic = "decafbadbad"
+        fakerootlogs = None
         if fakeroot:
             magic = magic + "beef"
             mcdata = self.cooker.databuilder.mcdata[mc]
@@ -1251,10 +1252,11 @@ class RunQueue:
             for key, value in (var.split('=') for var in fakerootenv):
                 env[key] = value
             worker = subprocess.Popen(fakerootcmd + ["bitbake-worker", magic], stdout=subprocess.PIPE, stdin=subprocess.PIPE, env=env)
+            fakerootlogs = self.rqdata.dataCaches[mc].fakerootlogs
         else:
             worker = subprocess.Popen(["bitbake-worker", magic], stdout=subprocess.PIPE, stdin=subprocess.PIPE)
         bb.utils.nonblockingfd(worker.stdout)
-        workerpipe = runQueuePipe(worker.stdout, None, self.cfgData, self, rqexec)
+        workerpipe = runQueuePipe(worker.stdout, None, self.cfgData, self, rqexec, fakerootlogs=fakerootlogs)
 
         workerdata = {
             "taskdeps" : self.rqdata.dataCaches[mc].task_deps,
@@ -1271,6 +1273,7 @@ class RunQueue:
             "date" : self.cfgData.getVar("DATE"),
             "time" : self.cfgData.getVar("TIME"),
             "hashservaddr" : self.cooker.hashservaddr,
+            "umask" : self.cfgData.getVar("BB_DEFAULT_UMASK"),
         }
 
         worker.stdin.write(b"<cookerconfig>" + pickle.dumps(self.cooker.configuration) + b"</cookerconfig>")
@@ -1283,7 +1286,7 @@ class RunQueue:
     def _teardown_worker(self, worker):
         if not worker:
             return
-        logger.debug(1, "Teardown for bitbake-worker")
+        logger.debug("Teardown for bitbake-worker")
         try:
            worker.process.stdin.write(b"<quit></quit>")
            worker.process.stdin.flush()
@@ -1356,12 +1359,12 @@ class RunQueue:
 
         # If the stamp is missing, it's not current
         if not os.access(stampfile, os.F_OK):
-            logger.debug(2, "Stampfile %s not available", stampfile)
+            logger.debug2("Stampfile %s not available", stampfile)
             return False
         # If it's a 'nostamp' task, it's not current
         taskdep = self.rqdata.dataCaches[mc].task_deps[taskfn]
         if 'nostamp' in taskdep and taskname in taskdep['nostamp']:
-            logger.debug(2, "%s.%s is nostamp\n", fn, taskname)
+            logger.debug2("%s.%s is nostamp\n", fn, taskname)
             return False
 
         if taskname != "do_setscene" and taskname.endswith("_setscene"):
@@ -1385,18 +1388,18 @@ class RunQueue:
                     continue
                 if fn == fn2 or (fulldeptree and fn2 not in stampwhitelist):
                     if not t2:
-                        logger.debug(2, 'Stampfile %s does not exist', stampfile2)
+                        logger.debug2('Stampfile %s does not exist', stampfile2)
                         iscurrent = False
                         break
                     if t1 < t2:
-                        logger.debug(2, 'Stampfile %s < %s', stampfile, stampfile2)
+                        logger.debug2('Stampfile %s < %s', stampfile, stampfile2)
                         iscurrent = False
                         break
                     if recurse and iscurrent:
                         if dep in cache:
                             iscurrent = cache[dep]
                             if not iscurrent:
-                                logger.debug(2, 'Stampfile for dependency %s:%s invalid (cached)' % (fn2, taskname2))
+                                logger.debug2('Stampfile for dependency %s:%s invalid (cached)' % (fn2, taskname2))
                         else:
                             iscurrent = self.check_stamp_task(dep, recurse=True, cache=cache)
                             cache[dep] = iscurrent
@@ -1466,7 +1469,7 @@ class RunQueue:
             if not self.dm_event_handler_registered:
                  res = bb.event.register(self.dm_event_handler_name,
                                          lambda x: self.dm.check(self) if self.state in [runQueueRunning, runQueueCleanUp] else False,
-                                         ('bb.event.HeartbeatEvent',))
+                                         ('bb.event.HeartbeatEvent',), data=self.cfgData)
                  self.dm_event_handler_registered = True
 
             dump = self.cooker.configuration.dump_signatures
@@ -1505,7 +1508,7 @@ class RunQueue:
         build_done = self.state is runQueueComplete or self.state is runQueueFailed
 
         if build_done and self.dm_event_handler_registered:
-            bb.event.remove(self.dm_event_handler_name, None)
+            bb.event.remove(self.dm_event_handler_name, None, data=self.cfgData)
             self.dm_event_handler_registered = False
 
         if build_done and self.rqexe:
@@ -1761,7 +1764,7 @@ class RunQueueExecute:
         for scheduler in schedulers:
             if self.scheduler == scheduler.name:
                 self.sched = scheduler(self, self.rqdata)
-                logger.debug(1, "Using runqueue scheduler '%s'", scheduler.name)
+                logger.debug("Using runqueue scheduler '%s'", scheduler.name)
                 break
         else:
             bb.fatal("Invalid scheduler '%s'.  Available schedulers: %s" %
@@ -1771,7 +1774,7 @@ class RunQueueExecute:
         self.sqdata = SQData()
         build_scenequeue_data(self.sqdata, self.rqdata, self.rq, self.cooker, self.stampcache, self)
 
-    def runqueue_process_waitpid(self, task, status):
+    def runqueue_process_waitpid(self, task, status, fakerootlog=None):
 
         # self.build_stamps[pid] may not exist when use shared work directory.
         if task in self.build_stamps:
@@ -1786,7 +1789,7 @@ class RunQueueExecute:
             self.sq_live.remove(task)
         else:
             if status != 0:
-                self.task_fail(task, status)
+                self.task_fail(task, status, fakerootlog=fakerootlog)
             else:
                 self.task_complete(task)
         return True
@@ -1899,7 +1902,7 @@ class RunQueueExecute:
                     break
             if alldeps:
                 self.setbuildable(revdep)
-                logger.debug(1, "Marking task %s as buildable", revdep)
+                logger.debug("Marking task %s as buildable", revdep)
 
     def task_complete(self, task):
         self.stats.taskCompleted()
@@ -1907,14 +1910,31 @@ class RunQueueExecute:
         self.task_completeoutright(task)
         self.runq_tasksrun.add(task)
 
-    def task_fail(self, task, exitcode):
+    def task_fail(self, task, exitcode, fakerootlog=None):
         """
         Called when a task has failed
         Updates the state engine with the failure
         """
         self.stats.taskFailed()
         self.failed_tids.append(task)
-        bb.event.fire(runQueueTaskFailed(task, self.stats, exitcode, self.rq), self.cfgData)
+
+        fakeroot_log = ""
+        if fakerootlog and os.path.exists(fakerootlog):
+            with open(fakerootlog) as fakeroot_log_file:
+                fakeroot_failed = False
+                for line in reversed(fakeroot_log_file.readlines()):
+                    for fakeroot_error in ['mismatch', 'error', 'fatal']:
+                        if fakeroot_error in line.lower():
+                            fakeroot_failed = True
+                    if 'doing new pid setup and server start' in line:
+                        break
+                    fakeroot_log = line + fakeroot_log
+
+            if not fakeroot_failed:
+                fakeroot_log = None
+
+        bb.event.fire(runQueueTaskFailed(task, self.stats, exitcode, self.rq, fakeroot_log=fakeroot_log), self.cfgData)
+
         if self.rqdata.taskData[''].abort:
             self.rq.state = runQueueCleanUp
 
@@ -1929,7 +1949,7 @@ class RunQueueExecute:
     def summarise_scenequeue_errors(self):
         err = False
         if not self.sqdone:
-            logger.debug(1, 'We could skip tasks %s', "\n".join(sorted(self.scenequeue_covered)))
+            logger.debug('We could skip tasks %s', "\n".join(sorted(self.scenequeue_covered)))
             completeevent = sceneQueueComplete(self.sq_stats, self.rq)
             bb.event.fire(completeevent, self.cfgData)
         if self.sq_deferred:
@@ -1941,6 +1961,10 @@ class RunQueueExecute:
         if self.holdoff_tasks:
             logger.error("Scenequeue had holdoff tasks: %s" % pprint.pformat(self.holdoff_tasks))
             err = True
+
+        for tid in self.scenequeue_covered.intersection(self.scenequeue_notcovered):
+            # No task should end up in both covered and uncovered, that is a bug.
+            logger.error("Setscene task %s in both covered and notcovered." % tid)
 
         for tid in self.rqdata.runq_setscene_tids:
             if tid not in self.scenequeue_covered and tid not in self.scenequeue_notcovered:
@@ -1986,7 +2010,7 @@ class RunQueueExecute:
                 if nexttask in self.sq_buildable and nexttask not in self.sq_running and self.sqdata.stamps[nexttask] not in self.build_stamps.values():
                     if nexttask not in self.sqdata.unskippable and len(self.sqdata.sq_revdeps[nexttask]) > 0 and self.sqdata.sq_revdeps[nexttask].issubset(self.scenequeue_covered) and self.check_dependencies(nexttask, self.sqdata.sq_revdeps[nexttask]):
                         if nexttask not in self.rqdata.target_tids:
-                            logger.debug(2, "Skipping setscene for task %s" % nexttask)
+                            logger.debug2("Skipping setscene for task %s" % nexttask)
                             self.sq_task_skip(nexttask)
                             self.scenequeue_notneeded.add(nexttask)
                             if nexttask in self.sq_deferred:
@@ -1999,28 +2023,28 @@ class RunQueueExecute:
                     if nexttask in self.sq_deferred:
                         if self.sq_deferred[nexttask] not in self.runq_complete:
                             continue
-                        logger.debug(1, "Task %s no longer deferred" % nexttask)
+                        logger.debug("Task %s no longer deferred" % nexttask)
                         del self.sq_deferred[nexttask]
                         valid = self.rq.validate_hashes(set([nexttask]), self.cooker.data, 0, False, summary=False)
                         if not valid:
-                            logger.debug(1, "%s didn't become valid, skipping setscene" % nexttask)
+                            logger.debug("%s didn't become valid, skipping setscene" % nexttask)
                             self.sq_task_failoutright(nexttask)
                             return True
                         else:
                             self.sqdata.outrightfail.remove(nexttask)
                     if nexttask in self.sqdata.outrightfail:
-                        logger.debug(2, 'No package found, so skipping setscene task %s', nexttask)
+                        logger.debug2('No package found, so skipping setscene task %s', nexttask)
                         self.sq_task_failoutright(nexttask)
                         return True
                     if nexttask in self.sqdata.unskippable:
-                        logger.debug(2, "Setscene task %s is unskippable" % nexttask)
+                        logger.debug2("Setscene task %s is unskippable" % nexttask)
                     task = nexttask
                     break
         if task is not None:
             (mc, fn, taskname, taskfn) = split_tid_mcfn(task)
             taskname = taskname + "_setscene"
             if self.rq.check_stamp_task(task, taskname_from_tid(task), recurse = True, cache=self.stampcache):
-                logger.debug(2, 'Stamp for underlying task %s is current, so skipping setscene variant', task)
+                logger.debug2('Stamp for underlying task %s is current, so skipping setscene variant', task)
                 self.sq_task_failoutright(task)
                 return True
 
@@ -2030,12 +2054,12 @@ class RunQueueExecute:
                     return True
 
             if self.rq.check_stamp_task(task, taskname, cache=self.stampcache):
-                logger.debug(2, 'Setscene stamp current task %s, so skip it and its dependencies', task)
+                logger.debug2('Setscene stamp current task %s, so skip it and its dependencies', task)
                 self.sq_task_skip(task)
                 return True
 
             if self.cooker.configuration.skipsetscene:
-                logger.debug(2, 'No setscene tasks should be executed. Skipping %s', task)
+                logger.debug2('No setscene tasks should be executed. Skipping %s', task)
                 self.sq_task_failoutright(task)
                 return True
 
@@ -2097,12 +2121,12 @@ class RunQueueExecute:
                     return True
 
             if task in self.tasks_covered:
-                logger.debug(2, "Setscene covered task %s", task)
+                logger.debug2("Setscene covered task %s", task)
                 self.task_skip(task, "covered")
                 return True
 
             if self.rq.check_stamp_task(task, taskname, cache=self.stampcache):
-                logger.debug(2, "Stamp current task %s", task)
+                logger.debug2("Stamp current task %s", task)
 
                 self.task_skip(task, "existing")
                 self.runq_tasksrun.add(task)
@@ -2322,7 +2346,7 @@ class RunQueueExecute:
                     remapped = True
 
                 if not remapped:
-                    #logger.debug(1, "Task %s hash changes: %s->%s %s->%s" % (tid, orighash, newhash, origuni, newuni))
+                    #logger.debug("Task %s hash changes: %s->%s %s->%s" % (tid, orighash, newhash, origuni, newuni))
                     self.rqdata.runtaskentries[tid].hash = newhash
                     self.rqdata.runtaskentries[tid].unihash = newuni
                     changed.add(tid)
@@ -2337,7 +2361,7 @@ class RunQueueExecute:
             for mc in self.rq.fakeworker:
                 self.rq.fakeworker[mc].process.stdin.write(b"<newtaskhashes>" + pickle.dumps(bb.parse.siggen.get_taskhashes()) + b"</newtaskhashes>")
 
-            hashequiv_logger.debug(1, pprint.pformat("Tasks changed:\n%s" % (changed)))
+            hashequiv_logger.debug(pprint.pformat("Tasks changed:\n%s" % (changed)))
 
         for tid in changed:
             if tid not in self.rqdata.runq_setscene_tids:
@@ -2356,7 +2380,7 @@ class RunQueueExecute:
             # Check no tasks this covers are running
             for dep in self.sqdata.sq_covered_tasks[tid]:
                 if dep in self.runq_running and dep not in self.runq_complete:
-                    hashequiv_logger.debug(2, "Task %s is running which blocks setscene for %s from running" % (dep, tid))
+                    hashequiv_logger.debug2("Task %s is running which blocks setscene for %s from running" % (dep, tid))
                     valid = False
                     break
             if not valid:
@@ -2430,7 +2454,10 @@ class RunQueueExecute:
 
         for dep in sorted(self.sqdata.sq_deps[task]):
             if fail and task in self.sqdata.sq_harddeps and dep in self.sqdata.sq_harddeps[task]:
-                logger.debug(2, "%s was unavailable and is a hard dependency of %s so skipping" % (task, dep))
+                if dep in self.scenequeue_covered or dep in self.scenequeue_notcovered:
+                    # dependency could be already processed, e.g. noexec setscene task
+                    continue
+                logger.debug2("%s was unavailable and is a hard dependency of %s so skipping" % (task, dep))
                 self.sq_task_failoutright(dep)
                 continue
             if self.sqdata.sq_revdeps[dep].issubset(self.scenequeue_covered | self.scenequeue_notcovered):
@@ -2460,7 +2487,7 @@ class RunQueueExecute:
         completed dependencies as buildable
         """
 
-        logger.debug(1, 'Found task %s which could be accelerated', task)
+        logger.debug('Found task %s which could be accelerated', task)
         self.scenequeue_covered.add(task)
         self.scenequeue_updatecounters(task)
 
@@ -2754,6 +2781,20 @@ def build_scenequeue_data(sqdata, rqdata, rq, cooker, stampcache, sqrq):
 
     update_scenequeue_data(sqdata.sq_revdeps, sqdata, rqdata, rq, cooker, stampcache, sqrq, summary=True)
 
+    # Compute a list of 'stale' sstate tasks where the current hash does not match the one
+    # in any stamp files. Pass the list out to metadata as an event.
+    found = {}
+    for tid in rqdata.runq_setscene_tids:
+        (mc, fn, taskname, taskfn) = split_tid_mcfn(tid)
+        stamps = bb.build.find_stale_stamps(taskname, rqdata.dataCaches[mc], taskfn)
+        if stamps:
+            if mc not in found:
+                found[mc] = {}
+            found[mc][tid] = stamps
+    for mc in found:
+        event = bb.event.StaleSetSceneTasks(found[mc])
+        bb.event.fire(event, cooker.databuilder.mcdata[mc])
+
 def update_scenequeue_data(tids, sqdata, rqdata, rq, cooker, stampcache, sqrq, summary=True):
 
     tocheck = set()
@@ -2775,13 +2816,13 @@ def update_scenequeue_data(tids, sqdata, rqdata, rq, cooker, stampcache, sqrq, s
             continue
 
         if rq.check_stamp_task(tid, taskname + "_setscene", cache=stampcache):
-            logger.debug(2, 'Setscene stamp current for task %s', tid)
+            logger.debug2('Setscene stamp current for task %s', tid)
             sqdata.stamppresent.add(tid)
             sqrq.sq_task_skip(tid)
             continue
 
         if rq.check_stamp_task(tid, taskname, recurse = True, cache=stampcache):
-            logger.debug(2, 'Normal stamp current for task %s', tid)
+            logger.debug2('Normal stamp current for task %s', tid)
             sqdata.stamppresent.add(tid)
             sqrq.sq_task_skip(tid)
             continue
@@ -2875,12 +2916,16 @@ class runQueueTaskFailed(runQueueEvent):
     """
     Event notifying a task failed
     """
-    def __init__(self, task, stats, exitcode, rq):
+    def __init__(self, task, stats, exitcode, rq, fakeroot_log=None):
         runQueueEvent.__init__(self, task, stats, rq)
         self.exitcode = exitcode
+        self.fakeroot_log = fakeroot_log
 
     def __str__(self):
-        return "Task (%s) failed with exit code '%s'" % (self.taskstring, self.exitcode)
+        if self.fakeroot_log:
+            return "Task (%s) failed with exit code '%s' \nPseudo log:\n%s" % (self.taskstring, self.exitcode, self.fakeroot_log)
+        else:
+            return "Task (%s) failed with exit code '%s'" % (self.taskstring, self.exitcode)
 
 class sceneQueueTaskFailed(sceneQueueEvent):
     """
@@ -2932,7 +2977,7 @@ class runQueuePipe():
     """
     Abstraction for a pipe between a worker thread and the server
     """
-    def __init__(self, pipein, pipeout, d, rq, rqexec):
+    def __init__(self, pipein, pipeout, d, rq, rqexec, fakerootlogs=None):
         self.input = pipein
         if pipeout:
             pipeout.close()
@@ -2941,6 +2986,7 @@ class runQueuePipe():
         self.d = d
         self.rq = rq
         self.rqexec = rqexec
+        self.fakerootlogs = fakerootlogs
 
     def setrunqueueexec(self, rqexec):
         self.rqexec = rqexec
@@ -2986,7 +3032,11 @@ class runQueuePipe():
                     task, status = pickle.loads(self.queue[10:index])
                 except (ValueError, pickle.UnpicklingError, AttributeError, IndexError) as e:
                     bb.msg.fatal("RunQueue", "failed load pickle '%s': '%s'" % (e, self.queue[10:index]))
-                self.rqexec.runqueue_process_waitpid(task, status)
+                (_, _, _, taskfn) = split_tid_mcfn(task)
+                fakerootlog = None
+                if self.fakerootlogs and taskfn and taskfn in self.fakerootlogs:
+                    fakerootlog = self.fakerootlogs[taskfn]
+                self.rqexec.runqueue_process_waitpid(task, status, fakerootlog=fakerootlog)
                 found = True
                 self.queue = self.queue[index+11:]
                 index = self.queue.find(b"</exitcode>")

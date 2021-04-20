@@ -13,10 +13,10 @@ Signed-off-by: kfting <kfting@nuvoton.com>
  2 files changed, 65 insertions(+), 1 deletion(-)
 
 diff --git a/user_mgr.cpp b/user_mgr.cpp
-index 2f22323..694ef99 100644
+index c65a822..4bba149 100644
 --- a/user_mgr.cpp
 +++ b/user_mgr.cpp
-@@ -864,6 +864,54 @@ DbusUserObj UserMgr::getPrivilegeMapperObject(void)
+@@ -915,6 +915,54 @@ DbusUserObj UserMgr::getPrivilegeMapperObject(void)
      return objects;
  }
  
@@ -68,10 +68,10 @@ index 2f22323..694ef99 100644
 +    return ldapGroupName;
 +}
 +
- std::string UserMgr::getLdapGroupName(const std::string &userName)
+ std::string UserMgr::getLdapGroupName(const std::string& userName)
  {
      struct passwd pwd
-@@ -1038,7 +1086,22 @@ UserInfoMap UserMgr::getUserInfo(std::string userName)
+@@ -1087,7 +1135,22 @@ UserInfoMap UserMgr::getUserInfo(std::string userName)
  
              if (priv.empty())
              {
@@ -94,16 +94,16 @@ index 2f22323..694ef99 100644
 +                }
              }
          }
-         catch (const std::bad_variant_access &e)
+         catch (const std::bad_variant_access& e)
 diff --git a/user_mgr.hpp b/user_mgr.hpp
-index c008cea..00eb530 100644
+index f5aac22..23c33f0 100644
 --- a/user_mgr.hpp
 +++ b/user_mgr.hpp
-@@ -331,6 +331,7 @@ class UserMgr : public Ifaces
+@@ -339,6 +339,7 @@ class UserMgr : public Ifaces
       *  @return - group name
       */
-     virtual std::string getLdapGroupName(const std::string &userName);
-+    virtual std::string getLdapGroupNameEx(const std::string &userName, const std::string &grpName);
+     virtual std::string getLdapGroupName(const std::string& userName);
++    virtual std::string getLdapGroupNameEx(const std::string& userName, const std::string& grpName);
  
      /** @brief get privilege mapper object
       *  method to get dbus privilege mapper object

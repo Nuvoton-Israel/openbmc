@@ -5,14 +5,30 @@ Subject: [PATCH] Use pgood to check host stat
 
 In case the PCH is not connected BMC
 ---
- host_check_main.cpp | 63 ++++++++++++++++++++++++++++++++++-----------
- 1 file changed, 48 insertions(+), 15 deletions(-)
+ host_check_main.cpp | 65 ++++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 50 insertions(+), 15 deletions(-)
 
 diff --git a/host_check_main.cpp b/host_check_main.cpp
-index e055abc..bf96bb9 100644
+index e055abc..8bd29a8 100644
 --- a/host_check_main.cpp
 +++ b/host_check_main.cpp
-@@ -122,7 +122,7 @@ int main()
+@@ -28,6 +28,7 @@ constexpr auto CONTROL_HOST_INTERFACE = "xyz.openbmc_project.Control.Host";
+ bool cmdDone = false;
+ bool hostRunning = false;
+ 
++#if 0
+ // Function called on host control signals
+ static int hostControlSignal(sd_bus_message* msg, void* userData,
+                              sd_bus_error* retError)
+@@ -59,6 +60,7 @@ static int hostControlSignal(sd_bus_message* msg, void* userData,
+ 
+     return 0;
+ }
++#endif
+ 
+ // Send hearbeat to host to determine if it's running
+ void sendHeartbeat(sdbusplus::bus::bus& bus)
+@@ -122,7 +124,7 @@ int main()
      std::string s = "type='signal',member='CommandComplete',path='"s +
                      CONTROL_HOST_PATH + "',interface='" +
                      CONTROL_HOST_INTERFACE + "'";
@@ -21,7 +37,7 @@ index e055abc..bf96bb9 100644
      // Setup Signal Handler
      sdbusplus::bus::match::match hostControlSignals(bus, s.c_str(),
                                                      hostControlSignal, nullptr);
-@@ -137,24 +137,57 @@ int main()
+@@ -137,24 +139,57 @@ int main()
              break;
          bus.wait();
      }

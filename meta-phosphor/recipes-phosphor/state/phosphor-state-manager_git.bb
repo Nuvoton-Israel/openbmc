@@ -14,6 +14,7 @@ STATE_MGR_PACKAGES = " \
     ${PN}-host \
     ${PN}-chassis \
     ${PN}-bmc \
+    ${PN}-hypervisor \
     ${PN}-discover \
     ${PN}-host-check \
     ${PN}-reset-sensor-states \
@@ -59,6 +60,8 @@ DBUS_SERVICE_${PN}-host += "xyz.openbmc_project.State.Host.service"
 DBUS_SERVICE_${PN}-host += "phosphor-reboot-host@.service"
 SYSTEMD_SERVICE_${PN}-host += "phosphor-reset-host-reboot-attempts@.service"
 SYSTEMD_SERVICE_${PN}-host += "phosphor-clear-one-time@.service"
+SYSTEMD_SERVICE_${PN}-host += "phosphor-set-host-transition-to-running@.service"
+SYSTEMD_SERVICE_${PN}-host += "phosphor-set-host-transition-to-off@.service"
 
 FILES_${PN}-chassis = "${bindir}/phosphor-chassis-state-manager"
 DBUS_SERVICE_${PN}-chassis += "xyz.openbmc_project.State.Chassis.service"
@@ -67,6 +70,9 @@ FILES_${PN}-chassis += "${bindir}/obmcutil"
 
 FILES_${PN}-bmc = "${bindir}/phosphor-bmc-state-manager"
 DBUS_SERVICE_${PN}-bmc += "xyz.openbmc_project.State.BMC.service"
+
+FILES_${PN}-hypervisor = "${bindir}/phosphor-hypervisor-state-manager"
+DBUS_SERVICE_${PN}-hypervisor += "xyz.openbmc_project.State.Hypervisor.service"
 
 FILES_${PN}-discover = "${bindir}/phosphor-discover-system-state"
 SYSTEMD_SERVICE_${PN}-discover += "phosphor-discover-system-state@.service"
@@ -146,7 +152,7 @@ HOST_LINK_ACTION_FMT = "${HOST_ACTION_FMT}:obmc-host-{0}@{1}.target"
 FAN_LINK_FMT = "obmc-fan-control-ready@.target:obmc-fan-control-ready@{0}.target"
 
 # Targets to be executed on checkstop and watchdog timeout
-HOST_ERROR_TARGETS = "crash timeout"
+HOST_ERROR_TARGETS = "timeout"
 
 QUIESCE_TMPL = "obmc-host-quiesce@.target"
 CRASH_TIMEOUT_TGTFMT = "obmc-host-{0}@{1}.target"
@@ -174,6 +180,6 @@ SYSTEMD_LINK_${PN}-obmc-targets += "${@compose_list(d, 'FAN_LINK_FMT', 'OBMC_CHA
 SYSTEMD_LINK_${PN}-obmc-targets += "${@compose_list(d, 'QUIESCE_FMT', 'HOST_ERROR_TARGETS', 'OBMC_HOST_INSTANCES')}"
 
 SRC_URI += "git://github.com/openbmc/phosphor-state-manager"
-SRCREV = "bbbc01655243fecc83f8734f12a57e665b90ff9a"
+SRCREV = "4a4c1a69432dd88a4204e7a15a838aae75ae1d12"
 
 S = "${WORKDIR}/git"

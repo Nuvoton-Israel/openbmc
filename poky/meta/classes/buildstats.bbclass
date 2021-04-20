@@ -104,14 +104,74 @@ def write_task_data(status, logfile, e, d):
             f.write("Status: FAILED \n")
         f.write("Ended: %0.2f \n" % e.time)
 
+def write_host_data(logfile, e, d):
+    import subprocess, os, datetime
+    # minimum time allowed for each command to run, in seconds
+    time_threshold = 0.5
+    # the total number of commands
+    num_cmds = 0
+    # interval at which data will be logged
+    interval = int(d.getVar("BB_HEARTBEAT_EVENT", False))
+    # the commands to be run at each interval
+    cmds = d.getVar('BB_LOG_HOST_STAT_CMDS')
+    # if no commands are passed, issue a warning and return
+    if cmds is None:
+        d.setVar("BB_LOG_HOST_STAT_ON_INTERVAL", "0")
+        d.setVar("BB_LOG_HOST_STAT_ON_FAILURE", "0")
+        bb.warn("buildstats: Collecting host data failed. Set BB_LOG_HOST_STAT_CMDS=\"command1 ; command2 ; ... \" in conf/local.conf\n")
+        return
+    # find the total commands
+    c_san = []
+    for cmd in cmds.split(";"):
+        if len(cmd) == 0:
+            continue
+        num_cmds += 1
+        c_san.append(cmd)
+    if num_cmds <= 0:
+        d.setVar("BB_LOG_HOST_STAT_ON_INTERVAL", "0")
+        d.setVar("BB_LOG_HOST_STAT_ON_FAILURE", "0")
+        return
+
+    # return if the interval is not enough to run all commands within the specified BB_HEARTBEAT_EVENT interval
+    limit = interval / num_cmds
+    if limit <= time_threshold:
+        d.setVar("BB_LOG_HOST_STAT_ON_INTERVAL", "0")
+        d.setVar("BB_LOG_HOST_STAT_ON_FAILURE", "0")
+        bb.warn("buildstats: Collecting host data failed. BB_HEARTBEAT_EVENT interval not enough to run the specified commands. HINT: Increase value of BB_HEARTBEAT_EVENT in conf/local.conf\n")
+        return
+
+    # set the environment variables 
+    path = d.getVar("PATH")
+    opath = d.getVar("BB_ORIGENV", False).getVar("PATH")
+    ospath = os.environ['PATH']
+    os.environ['PATH'] = path + ":" + opath + ":" + ospath
+    with open(logfile, "a") as f:
+        f.write("Event Time: %f\nDate: %s\n" % (e.time, datetime.datetime.now()))
+        for c in c_san:
+            try:
+                output = subprocess.check_output(c.split(), stderr=subprocess.STDOUT, timeout=limit).decode('utf-8')
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError) as err:
+                output = "Error running command: %s\n%s\n" % (c, err)
+            f.write("%s\n%s\n" % (c, output))
+    # reset the environment
+    os.environ['PATH'] = ospath
+
 python run_buildstats () {
     import bb.build
     import bb.event
     import time, subprocess, platform
 
     bn = d.getVar('BUILDNAME')
-    bsdir = os.path.join(d.getVar('BUILDSTATS_BASE'), bn)
-    taskdir = os.path.join(bsdir, d.getVar('PF'))
+    ########################################################################
+    # bitbake fires HeartbeatEvent even before a build has been
+    # triggered, causing BUILDNAME to be None
+    ########################################################################
+    if bn is not None:
+        bsdir = os.path.join(d.getVar('BUILDSTATS_BASE'), bn)
+        taskdir = os.path.join(bsdir, d.getVar('PF'))
+        if isinstance(e, bb.event.HeartbeatEvent) and bb.utils.to_boolean(d.getVar("BB_LOG_HOST_STAT_ON_INTERVAL")):
+            bb.utils.mkdirhier(bsdir)
+            write_host_data(os.path.join(bsdir, "host_stats"), e, d)
 
     if isinstance(e, bb.event.BuildStarted):
         ########################################################################
@@ -186,10 +246,12 @@ python run_buildstats () {
         build_status = os.path.join(bsdir, "build_stats")
         with open(build_status, "a") as f:
             f.write(d.expand("Failed at: ${PF} at task: %s \n" % e.task))
+            if bb.utils.to_boolean(d.getVar("BB_LOG_HOST_STAT_ON_FAILURE")):
+                write_host_data(build_status, e, d)
 }
 
 addhandler run_buildstats
-run_buildstats[eventmask] = "bb.event.BuildStarted bb.event.BuildCompleted bb.build.TaskStarted bb.build.TaskSucceeded bb.build.TaskFailed"
+run_buildstats[eventmask] = "bb.event.BuildStarted bb.event.BuildCompleted bb.event.HeartbeatEvent bb.build.TaskStarted bb.build.TaskSucceeded bb.build.TaskFailed"
 
 python runqueue_stats () {
     import buildstats

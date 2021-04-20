@@ -118,6 +118,8 @@ def fire_class_handlers(event, d):
             if _eventfilter:
                 if not _eventfilter(name, handler, event, d):
                     continue
+            if d is not None and not name in (d.getVar("__BBHANDLERS_MC") or set()):
+                continue
             execute_handler(name, handler, event, d)
 
 ui_queue = []
@@ -227,11 +229,19 @@ def fire_from_worker(event, d):
     fire_ui_handlers(event, d)
 
 noop = lambda _: None
-def register(name, handler, mask=None, filename=None, lineno=None):
+def register(name, handler, mask=None, filename=None, lineno=None, data=None):
     """Register an Event handler"""
+
+    if data is not None and data.getVar("BB_CURRENT_MC"):
+        mc = data.getVar("BB_CURRENT_MC")
+        name = '%s%s' % (mc.replace('-', '_'), name)
 
     # already registered
     if name in _handlers:
+        if data is not None:
+            bbhands_mc = (data.getVar("__BBHANDLERS_MC") or set())
+            bbhands_mc.add(name)
+            data.setVar("__BBHANDLERS_MC", bbhands_mc)
         return AlreadyRegistered
 
     if handler is not None:
@@ -268,16 +278,32 @@ def register(name, handler, mask=None, filename=None, lineno=None):
                     _event_handler_map[m] = {}
                 _event_handler_map[m][name] = True
 
+        if data is not None:
+            bbhands_mc = (data.getVar("__BBHANDLERS_MC") or set())
+            bbhands_mc.add(name)
+            data.setVar("__BBHANDLERS_MC", bbhands_mc)
+
         return Registered
 
-def remove(name, handler):
+def remove(name, handler, data=None):
     """Remove an Event handler"""
+    if data is not None:
+        if data.getVar("BB_CURRENT_MC"):
+            mc = data.getVar("BB_CURRENT_MC")
+            name = '%s%s' % (mc.replace('-', '_'), name)
+
     _handlers.pop(name)
     if name in _catchall_handlers:
         _catchall_handlers.pop(name)
     for event in _event_handler_map.keys():
         if name in _event_handler_map[event]:
             _event_handler_map[event].pop(name)
+
+    if data is not None:
+        bbhands_mc = (data.getVar("__BBHANDLERS_MC") or set())
+        if name in bbhands_mc:
+            bbhands_mc.remove(name)
+            data.setVar("__BBHANDLERS_MC", bbhands_mc)
 
 def get_handlers():
     return _handlers
@@ -643,6 +669,17 @@ class ReachableStamps(Event):
     def __init__(self, stamps):
         Event.__init__(self)
         self.stamps = stamps
+
+class StaleSetSceneTasks(Event):
+    """
+    An event listing setscene tasks which are 'stale' and will
+    be rerun. The metadata may use to clean up stale data.
+    tasks is a mapping of tasks and matching stale stamps.
+    """
+
+    def __init__(self, tasks):
+        Event.__init__(self)
+        self.tasks = tasks
 
 class FilesMatchingFound(Event):
     """

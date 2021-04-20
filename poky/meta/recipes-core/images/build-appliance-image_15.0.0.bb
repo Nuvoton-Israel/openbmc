@@ -20,12 +20,12 @@ IMAGE_ROOTFS_EXTRA_SPACE = "41943040"
 APPEND += "rootfstype=ext4 quiet"
 
 DEPENDS = "zip-native python3-pip-native"
-IMAGE_FSTYPES = "wic.vmdk"
+IMAGE_FSTYPES = "wic.vmdk wic.vhd wic.vhdx"
 
-inherit core-image module-base setuptools3
+inherit core-image setuptools3
 
-SRCREV ?= "76dac9d657f3b2864dec3bfcd2ee392fafdcdfe6"
-SRC_URI = "git://git.yoctoproject.org/poky;branch=gatesgarth \
+SRCREV ?= "c6483187f96c6d21b7129ad78de3ff976fbe5970"
+SRC_URI = "git://git.yoctoproject.org/poky \
            file://Yocto_Build_Appliance.vmx \
            file://Yocto_Build_Appliance.vmxf \
            file://README_VirtualBox_Guest_Additions.txt \
@@ -60,12 +60,6 @@ fakeroot do_populate_poky_src () {
 
 	# Place the README_VirtualBox_Toaster file in builders home folder.
 	cp ${WORKDIR}/README_VirtualBox_Toaster.txt ${IMAGE_ROOTFS}/home/builder/
-
-	# Create a symlink, needed for out-of-tree kernel modules build
-	if [ ! -e ${IMAGE_ROOTFS}/lib/modules/${KERNEL_VERSION}/build ]; then
-		rm -f  ${IMAGE_ROOTFS}/lib/modules/${KERNEL_VERSION}/build
-		lnr ${IMAGE_ROOTFS}${KERNEL_SRC_PATH} ${IMAGE_ROOTFS}/lib/modules/${KERNEL_VERSION}/build
-	fi
 
 	echo "INHERIT += \"rm_work\"" >> ${IMAGE_ROOTFS}/home/builder/poky/build/conf/auto.conf
 	echo "export LC_ALL=en_US.utf8" >> ${IMAGE_ROOTFS}/home/builder/.bashrc
@@ -129,6 +123,8 @@ create_bundle_files () {
 	mkdir -p Yocto_Build_Appliance
 	cp *.vmx* Yocto_Build_Appliance
 	ln -sf ${IMGDEPLOYDIR}/${IMAGE_NAME}${IMAGE_NAME_SUFFIX}.wic.vmdk Yocto_Build_Appliance/Yocto_Build_Appliance.vmdk
+	ln -sf ${IMGDEPLOYDIR}/${IMAGE_NAME}${IMAGE_NAME_SUFFIX}.wic.vhdx Yocto_Build_Appliance/Yocto_Build_Appliance.vhdx
+	ln -sf ${IMGDEPLOYDIR}/${IMAGE_NAME}${IMAGE_NAME_SUFFIX}.wic.vhd Yocto_Build_Appliance/Yocto_Build_Appliance.vhd
 	zip -r ${IMGDEPLOYDIR}/Yocto_Build_Appliance-${DATETIME}.zip Yocto_Build_Appliance
 	ln -sf Yocto_Build_Appliance-${DATETIME}.zip ${IMGDEPLOYDIR}/Yocto_Build_Appliance.zip
 }

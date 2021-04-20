@@ -311,13 +311,7 @@ class SignatureGeneratorBasic(SignatureGenerator):
 
         data = self.basehash[tid]
         for dep in self.runtaskdeps[tid]:
-            if dep in self.unihash:
-                if self.unihash[dep] is None:
-                    data = data + self.taskhash[dep]
-                else:
-                    data = data + self.unihash[dep]
-            else:
-                data = data + self.get_unihash(dep)
+            data = data + self.get_unihash(dep)
 
         for (f, cs) in self.file_checksum_values[tid]:
             if cs:
@@ -547,7 +541,7 @@ class SignatureGeneratorUniHashMixIn(object):
                 # is much more interesting, so it is reported at debug level 1
                 hashequiv_logger.debug((1, 2)[unihash == taskhash], 'Found unihash %s in place of %s for %s from %s' % (unihash, taskhash, tid, self.server))
             else:
-                hashequiv_logger.debug(2, 'No reported unihash for %s:%s from %s' % (tid, taskhash, self.server))
+                hashequiv_logger.debug2('No reported unihash for %s:%s from %s' % (tid, taskhash, self.server))
         except hashserv.client.HashConnectionError as e:
             bb.warn('Error contacting Hash Equivalence Server %s: %s' % (self.server, str(e)))
 
@@ -621,12 +615,12 @@ class SignatureGeneratorUniHashMixIn(object):
                 new_unihash = data['unihash']
 
                 if new_unihash != unihash:
-                    hashequiv_logger.debug(1, 'Task %s unihash changed %s -> %s by server %s' % (taskhash, unihash, new_unihash, self.server))
+                    hashequiv_logger.debug('Task %s unihash changed %s -> %s by server %s' % (taskhash, unihash, new_unihash, self.server))
                     bb.event.fire(bb.runqueue.taskUniHashUpdate(fn + ':do_' + task, new_unihash), d)
                     self.set_unihash(tid, new_unihash)
                     d.setVar('BB_UNIHASH', new_unihash)
                 else:
-                    hashequiv_logger.debug(1, 'Reported task %s as unihash %s to %s' % (taskhash, unihash, self.server))
+                    hashequiv_logger.debug('Reported task %s as unihash %s to %s' % (taskhash, unihash, self.server))
             except hashserv.client.HashConnectionError as e:
                 bb.warn('Error contacting Hash Equivalence Server %s: %s' % (self.server, str(e)))
         finally:
@@ -754,7 +748,7 @@ def clean_basepath(basepath):
     if basepath[0] == '/':
         return cleaned
 
-    if basepath.startswith("mc:"):
+    if basepath.startswith("mc:") and basepath.count(':') >= 2:
         mc, mc_name, basepath = basepath.split(":", 2)
         mc_suffix = ':mc:' + mc_name
     else:

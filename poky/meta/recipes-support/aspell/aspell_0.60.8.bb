@@ -1,5 +1,14 @@
 SUMMARY = "GNU Aspell spell-checker"
+
+DESCRIPTION = "Spell checker designed to eventually replace Ispell. \
+It can either be used as a library or as an independent spell checker. \
+Its main feature is that it does a superior job of suggesting possible \
+replacements for a misspelled word than just about any other spell \
+checker out there for the English language."
+
 SECTION = "console/utils"
+
+HOMEPAGE = "http://aspell.net/"
 
 LICENSE = "LGPLv2 | LGPLv2.1"
 LIC_FILES_CHKSUM = "file://COPYING;md5=7fbc338309ac38fefcd64b04bb903e34"

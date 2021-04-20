@@ -8,7 +8,7 @@ PE = "1"
 
 # We use the revision in order to avoid having to fetch it from the
 # repo during parse
-SRCREV = "07850c9dfcd720e7668c60e084b397ef78153dd9"
+SRCREV = "869b79f73711d5a7b6c0bfa3c8888dc2583d1526"
 
 SRC_URI = "git://git@github.com/openbmc/u-boot.git;nobranch=1;protocol=https"
 

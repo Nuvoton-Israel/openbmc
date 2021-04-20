@@ -51,7 +51,7 @@ Consider the following:
    :term:`SYSROOT_PREPROCESS_FUNCS`.
 
    For an example, see the ``pixbufcache`` class in ``meta/classes/`` in
-   the :ref:`overview-manual/overview-manual-development-environment:yocto project source repositories`.
+   the :ref:`overview-manual/development-environment:yocto project source repositories`.
 
    .. note::
 
@@ -198,7 +198,7 @@ The following changes took place for BitBake:
    fetcher passes the new parameter through the ``SVN_SSH`` environment
    variable during the :ref:`ref-tasks-fetch` task.
 
-   See the ":ref:`bitbake:svn-fetcher`"
+   See the ":ref:`bitbake:bitbake-user-manual/bitbake-user-manual-fetching:subversion (svn) fetcher (\`\`svn://\`\`)`"
    section in the BitBake
    User Manual for additional information.
 
@@ -238,7 +238,7 @@ to substitute a GPLv2 version of a GPLv3 recipe, then you must add the
 .. note::
 
    You can ``find meta-gplv2`` layer in the OpenEmbedded layer index at
-   https://layers.openembedded.org/layerindex/branch/master/layer/meta-gplv2/.
+   :oe_layer:`/meta-gplv2`.
 
 These relocated GPLv2 recipes do not receive the same level of
 maintenance as other core recipes. The recipes do not get security fixes
@@ -274,7 +274,7 @@ The following package management changes took place:
    fixed.
 
    For more information, see the `DNF
-   Documentation <http://dnf.readthedocs.io/en/latest/>`__.
+   Documentation <https://dnf.readthedocs.io/en/latest/>`__.
 
 -  Rpm 5.x is replaced with Rpm 4.x. This is done for two major reasons:
 
@@ -323,7 +323,7 @@ The following package management changes took place:
    .. note::
 
       For further details on this change, see the
-      :yocto_git:`commit message </cgit/cgit.cgi/poky/commit/?id=f4d4f99cfbc2396e49c1613a7d237b9e57f06f81>`.
+      :yocto_git:`commit message </poky/commit/?id=f4d4f99cfbc2396e49c1613a7d237b9e57f06f81>`.
 
 .. _migration-2.3-removed-recipes:
 
@@ -366,7 +366,7 @@ The following changes have been made to Wic:
 .. note::
 
    For more information on Wic, see the
-   ":ref:`dev-manual/dev-manual-common-tasks:creating partitioned images using wic`"
+   ":ref:`dev-manual/common-tasks:creating partitioned images using wic`"
    section in the Yocto Project Development Tasks Manual.
 
 -  *Default Output Directory Changed:* Wic's default output directory is
@@ -404,7 +404,7 @@ The following QA checks have changed:
 
    For additional information, see the
    :ref:`insane <ref-classes-insane>` class and the
-   ":ref:`ref-manual/ref-qa-checks:errors and warnings`" section.
+   ":ref:`ref-manual/qa-checks:errors and warnings`" section.
 
 .. _migration-2.3-miscellaneous-changes:
 

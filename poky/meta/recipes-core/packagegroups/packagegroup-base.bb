@@ -8,7 +8,6 @@ PACKAGE_ARCH = "${MACHINE_ARCH}"
 
 inherit packagegroup
 
-PROVIDES = "${PACKAGES}"
 PACKAGES = ' \
             packagegroup-base \
             packagegroup-base-extended \
@@ -157,10 +156,12 @@ RDEPENDS_packagegroup-base-apm = "\
 
 SUMMARY_packagegroup-base-ext2 = "ext2 filesystem support"
 RDEPENDS_packagegroup-base-ext2 = "\
-    hdparm \
-    e2fsprogs \
     e2fsprogs-e2fsck \
     e2fsprogs-mke2fs"
+
+RRECOMMENDS_packagegroup-base-ext2 = "\
+    hdparm \
+    e2fsprogs"
 
 SUMMARY_packagegroup-base-vfat = "FAT filesystem support"
 RRECOMMENDS_packagegroup-base-vfat = "\
@@ -173,7 +174,7 @@ RRECOMMENDS_packagegroup-base-vfat = "\
 SUMMARY_packagegroup-base-alsa = "ALSA sound support"
 RDEPENDS_packagegroup-base-alsa = "\
     alsa-utils-alsactl \
-    alsa-utils-alsamixer \
+    alsa-utils-amixer \
     ${VIRTUAL-RUNTIME_alsa-state}"
 
 RRECOMMENDS_packagegroup-base-alsa = "\

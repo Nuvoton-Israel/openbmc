@@ -17,6 +17,32 @@ import stat
 import os
 import datetime
 
+# For sample packages, see:
+# https://autobuilder.yocto.io/pub/repro-fail/oe-reproducible-20201127-0t7wr_oo/
+# https://autobuilder.yocto.io/pub/repro-fail/oe-reproducible-20201127-4s9ejwyp/
+# https://autobuilder.yocto.io/pub/repro-fail/oe-reproducible-20201127-haiwdlbr/
+# https://autobuilder.yocto.io/pub/repro-fail/oe-reproducible-20201127-hwds3mcl/
+# https://autobuilder.yocto.io/pub/repro-fail/oe-reproducible-20201203-sua0pzvc/
+# (both packages/ and packages-excluded/)
+
+# ruby-ri-docs, meson:
+#https://autobuilder.yocto.io/pub/repro-fail/oe-reproducible-20210215-0_td9la2/packages/diff-html/
+exclude_packages = [
+	'glide',
+	'go-helloworld',
+	'go-runtime',
+	'go_',
+	'go-',
+	'ruby-ri-docs'
+	]
+
+def is_excluded(package):
+    package_name = os.path.basename(package)
+    for i in exclude_packages:
+        if package_name.startswith(i):
+            return i
+    return None
+
 MISSING = 'MISSING'
 DIFFERENT = 'DIFFERENT'
 SAME = 'SAME'
@@ -39,14 +65,21 @@ class PackageCompareResults(object):
         self.total = []
         self.missing = []
         self.different = []
+        self.different_excluded = []
         self.same = []
+        self.active_exclusions = set()
 
     def add_result(self, r):
         self.total.append(r)
         if r.status == MISSING:
             self.missing.append(r)
         elif r.status == DIFFERENT:
-            self.different.append(r)
+            exclusion = is_excluded(r.reference)
+            if exclusion:
+                self.different_excluded.append(r)
+                self.active_exclusions.add(exclusion)
+            else:
+                self.different.append(r)
         else:
             self.same.append(r)
 
@@ -54,10 +87,14 @@ class PackageCompareResults(object):
         self.total.sort()
         self.missing.sort()
         self.different.sort()
+        self.different_excluded.sort()
         self.same.sort()
 
     def __str__(self):
-        return 'same=%i different=%i missing=%i total=%i' % (len(self.same), len(self.different), len(self.missing), len(self.total))
+        return 'same=%i different=%i different_excluded=%i missing=%i total=%i\nunused_exclusions=%s' % (len(self.same), len(self.different), len(self.different_excluded), len(self.missing), len(self.total), self.unused_exclusions())
+
+    def unused_exclusions(self):
+        return sorted(set(exclude_packages) - self.active_exclusions)
 
 def compare_file(reference, test, diffutils_sysroot):
     result = CompareResult()
@@ -68,7 +105,7 @@ def compare_file(reference, test, diffutils_sysroot):
         result.status = MISSING
         return result
 
-    r = runCmd(['cmp', '--quiet', reference, test], native_sysroot=diffutils_sysroot, ignore_status=True)
+    r = runCmd(['cmp', '--quiet', reference, test], native_sysroot=diffutils_sysroot, ignore_status=True, sync=False)
 
     if r.status:
         result.status = DIFFERENT
@@ -104,8 +141,14 @@ class DiffoscopeTests(OESelftestTestCase):
             self.assertTrue(os.path.exists(os.path.join(tmpdir, 'index.html')), "HTML index not found!")
 
 class ReproducibleTests(OESelftestTestCase):
-    package_classes = ['deb', 'ipk']
-    images = ['core-image-minimal', 'core-image-sato', 'core-image-full-cmdline']
+    # Test the reproducibility of whatever is built between sstate_targets and targets
+
+    package_classes = ['deb', 'ipk', 'rpm']
+
+    # targets are the things we want to test the reproducibility of
+    targets = ['core-image-minimal', 'core-image-sato', 'core-image-full-cmdline', 'core-image-weston', 'world']
+    # sstate targets are things to pull from sstate to potentially cut build/debugging time
+    sstate_targets = []
     save_results = False
     if 'OEQA_DEBUGGING_SAVED_OUTPUT' in os.environ:
         save_results = os.environ['OEQA_DEBUGGING_SAVED_OUTPUT']
@@ -176,20 +219,33 @@ class ReproducibleTests(OESelftestTestCase):
             PACKAGE_CLASSES = "{package_classes}"
             INHIBIT_PACKAGE_STRIP = "1"
             TMPDIR = "{tmpdir}"
+            LICENSE_FLAGS_WHITELIST = "commercial"
+            DISTRO_FEATURES_append = ' systemd pam'
+            USERADDEXTENSION = "useradd-staticids"
+            USERADD_ERROR_DYNAMIC = "skip"
+            USERADD_UID_TABLES += "files/static-passwd"
+            USERADD_GID_TABLES += "files/static-group"
             ''').format(package_classes=' '.join('package_%s' % c for c in self.package_classes),
                         tmpdir=tmpdir)
 
         if not use_sstate:
+            if self.sstate_targets:
+               self.logger.info("Building prebuild for %s (sstate allowed)..." % (name))
+               self.write_config(config)
+               bitbake(' '.join(self.sstate_targets))
+
             # This config fragment will disable using shared and the sstate
             # mirror, forcing a complete build from scratch
             config += textwrap.dedent('''\
                 SSTATE_DIR = "${TMPDIR}/sstate"
-                SSTATE_MIRROR = ""
+                SSTATE_MIRRORS = ""
                 ''')
 
+        self.logger.info("Building %s (sstate%s allowed)..." % (name, '' if use_sstate else ' NOT'))
         self.write_config(config)
         d = get_bb_vars(capture_vars)
-        bitbake(' '.join(self.images))
+        # targets used to be called images
+        bitbake(' '.join(getattr(self, 'images', self.targets)))
         return d
 
     def test_reproducible_builds(self):
@@ -213,6 +269,7 @@ class ReproducibleTests(OESelftestTestCase):
             self.logger.info('Non-reproducible packages will be copied to %s', save_dir)
 
         vars_A = self.do_test_build('reproducibleA', self.build_from_sstate)
+
         vars_B = self.do_test_build('reproducibleB', False)
 
         # NOTE: The temp directories from the reproducible build are purposely
@@ -227,6 +284,7 @@ class ReproducibleTests(OESelftestTestCase):
                 deploy_A = vars_A['DEPLOY_DIR_' + c.upper()]
                 deploy_B = vars_B['DEPLOY_DIR_' + c.upper()]
 
+                self.logger.info('Checking %s packages for differences...' % c)
                 result = self.compare_packages(deploy_A, deploy_B, diffutils_sysroot)
 
                 self.logger.info('Reproducibility summary for %s: %s' % (c, result))
@@ -235,6 +293,7 @@ class ReproducibleTests(OESelftestTestCase):
 
                 self.write_package_list(package_class, 'missing', result.missing)
                 self.write_package_list(package_class, 'different', result.different)
+                self.write_package_list(package_class, 'different_excluded', result.different_excluded)
                 self.write_package_list(package_class, 'same', result.same)
 
                 if self.save_results:
@@ -242,8 +301,12 @@ class ReproducibleTests(OESelftestTestCase):
                         self.copy_file(d.reference, '/'.join([save_dir, 'packages', strip_topdir(d.reference)]))
                         self.copy_file(d.test, '/'.join([save_dir, 'packages', strip_topdir(d.test)]))
 
+                    for d in result.different_excluded:
+                        self.copy_file(d.reference, '/'.join([save_dir, 'packages-excluded', strip_topdir(d.reference)]))
+                        self.copy_file(d.test, '/'.join([save_dir, 'packages-excluded', strip_topdir(d.test)]))
+
                 if result.missing or result.different:
-                    fails.append("The following %s packages are missing or different: %s" %
+                    fails.append("The following %s packages are missing or different and not in exclusion list: %s" %
                             (c, '\n'.join(r.test for r in (result.missing + result.different))))
 
         # Clean up empty directories

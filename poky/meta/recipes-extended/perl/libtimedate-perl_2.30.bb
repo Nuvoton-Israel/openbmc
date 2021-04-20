@@ -1,5 +1,6 @@
 SUMMARY = "Perl modules useful for manipulating date and time information"
 HOMEPAGE = "https://metacpan.org/release/TimeDate"
+DESCRIPTION = "This is the perl5 TimeDate distribution. It requires perl version 5.003 or later."
 SECTION = "libs"
 # You can redistribute it and/or modify it under the same terms as Perl itself.
 LICENSE = "Artistic-1.0 | GPL-1.0+"
@@ -13,7 +14,6 @@ inherit cpan ptest-perl
 
 BBCLASSEXTEND = "native"
 
-RDEPENDS_${PN}_class-native = ""
 RDEPENDS_${PN} += "perl-module-carp perl-module-exporter perl-module-strict perl-module-time-local"
 RDEPENDS_${PN}-ptest += "perl-module-test-more perl-module-utf8"
 

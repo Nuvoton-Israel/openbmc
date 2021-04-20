@@ -21,18 +21,18 @@ Result:
 
 Signed-off-by: Tim Lee <timlee660101@gmail.com>
 ---
- lpcsnoop/snoop.hpp |  26 +++++++++
- main.cpp           | 133 ++++++++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 158 insertions(+), 1 deletion(-)
+ lpcsnoop/snoop.hpp |  27 +++++++++
+ main.cpp           | 134 +++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 161 insertions(+)
 
 diff --git a/lpcsnoop/snoop.hpp b/lpcsnoop/snoop.hpp
-index acaeca7..89e9f56 100644
+index 68d51b4..b2e44ac 100644
 --- a/lpcsnoop/snoop.hpp
 +++ b/lpcsnoop/snoop.hpp
-@@ -8,6 +8,32 @@
- #define SNOOP_OBJECTPATH "/xyz/openbmc_project/state/boot/raw"
+@@ -9,6 +9,33 @@
  /* The LPC snoop on port 80h is mapped to this dbus service. */
  #define SNOOP_BUSNAME "xyz.openbmc_project.State.Boot.Raw"
+ 
 +#include <xyz/openbmc_project/State/Boot/Progress/server.hpp>
 +#include <xyz/openbmc_project/State/OperatingSystem/Status/server.hpp>
 +
@@ -59,21 +59,21 @@ index acaeca7..89e9f56 100644
 +std::variant<std::string> pciinit = "xyz.openbmc_project.State.Boot.Progress.ProgressStages.PCIInit";
 +std::variant<std::string> boardinit = "xyz.openbmc_project.State.Boot.Progress.ProgressStages.MotherboardInit";
 +std::variant<std::string> standby = "xyz.openbmc_project.State.OperatingSystem.Status.OSStatus.Standby";
- 
++
  template <typename... T>
  using ServerObject = typename sdbusplus::server::object::object<T...>;
+ using PostInterface = sdbusplus::xyz::openbmc_project::State::Boot::server::Raw;
 diff --git a/main.cpp b/main.cpp
-index 89f0224..2175d56 100644
+index 74d8072..0a32375 100644
 --- a/main.cpp
 +++ b/main.cpp
-@@ -32,9 +32,96 @@
+@@ -32,8 +32,95 @@
  #include <sdeventplus/source/io.hpp>
  #include <thread>
  
 +#include <fstream>
 +#include <nlohmann/json.hpp>
 +
- static const char* snoopFilename = "/dev/aspeed-lpc-snoop0";
  static size_t codeSize = 1; /* Size of each POST code in bytes */
  
 +static constexpr auto biosDefs = "/etc/default/obmc/bios/bios_defs.json";
@@ -163,12 +163,19 @@ index 89f0224..2175d56 100644
  static void usage(const char* name)
  {
      fprintf(stderr,
-@@ -67,7 +154,45 @@ void PostCodeEventHandler(sdeventplus::source::IO& s, int postFd,
-         // since we are single threaded, external users will never see the
-         // first value.
-         reporter->value(~code, true);
--        reporter->value(code);
-+        code = reporter->value(code);
+@@ -52,6 +139,7 @@ static void usage(const char* name)
+ void PostCodeEventHandler(sdeventplus::source::IO& s, int postFd, uint32_t,
+                           PostReporter* reporter, bool verbose)
+ {
++    postcode_t postcode;
+     uint64_t code = 0;
+     ssize_t readb;
+     while ((readb = read(postFd, &code, codeSize)) > 0)
+@@ -67,6 +155,46 @@ void PostCodeEventHandler(sdeventplus::source::IO& s, int postFd, uint32_t,
+         reporter->value(std::make_tuple(~code, secondary_post_code_t{}), true);
+         reporter->value(std::make_tuple(code, secondary_post_code_t{}));
+ 
++        code = std::get<primary_post_code_t>(postcode);
 +        if (code == OS_START)
 +        {
 +            // Set BootProgress property value to OSStart
@@ -207,22 +214,23 @@ index 89f0224..2175d56 100644
 +                                     BootProgressPropertyString, boardinit))
 +                return;
 +        }
- 
++
          // read depends on old data being cleared since it doens't always read
          // the full code size
-@@ -156,6 +281,12 @@ int main(int argc, char* argv[])
-         }
-     }
- 
-+    // Get POST CODE from JSON configure file.
-+    OS_START = getPostCodeNum(POST_CODE_OS_START);
-+    MEM_INIT = getPostCodeNum(POST_CODE_MEM_INIT);
-+    PCI_INIT = getPostCodeNum(POST_CODE_PCI_INIT);
-+    BOARD_INIT = getPostCodeNum(POST_CODE_BOARD_INIT);
+         code = 0;
+@@ -143,6 +271,12 @@ int main(int argc, char* argv[])
+                 }
+                 break;
+             case 'd':
++                // Get POST CODE from JSON configure file.
++                OS_START = getPostCodeNum(POST_CODE_OS_START);
++                MEM_INIT = getPostCodeNum(POST_CODE_MEM_INIT);
++                PCI_INIT = getPostCodeNum(POST_CODE_PCI_INIT);
++                BOARD_INIT = getPostCodeNum(POST_CODE_BOARD_INIT);
 +
-     postFd = open(snoopFilename, O_NONBLOCK);
-     if (postFd < 0)
-     {
+                 postFd = open(optarg, O_NONBLOCK);
+                 if (postFd < 0)
+                 {
 -- 
 2.17.1
 

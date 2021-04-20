@@ -1,7 +1,11 @@
+<<<<<<< HEAD:meta-openembedded/meta-networking/recipes-connectivity/netplan/netplan/0002-Makefile-Use-first-prerquisite-only-for-target-rule.patch
 From 1da4451fd3470e6600b027cb78526b440e296f8b Mon Sep 17 00:00:00 2001
 From: Khem Raj <raj.khem@gmail.com>
 Date: Wed, 12 Aug 2020 10:47:08 -0700
 Subject: [PATCH 2/2] Makefile: Use first prerquisite only for target rule
+=======
+Subject: [PATCH 2/2] Makefile: Exclude .h files from target rule
+>>>>>>> 06dc92d6f1c36c2f0c9b9ca31540c6cd17e515a7:meta-openembedded/meta-networking/recipes-connectivity/netplan/netplan/0002-Makefile-Exclude-.h-files-from-target-rule.patch
 
 This ensures that src/_features.h is not added to compiler cmdline which
 can confuse the compiler as it may not understand .h as valid input and
@@ -18,6 +22,7 @@ Signed-off-by: Khem Raj <raj.khem@gmail.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/Makefile b/Makefile
+<<<<<<< HEAD:meta-openembedded/meta-networking/recipes-connectivity/netplan/netplan/0002-Makefile-Use-first-prerquisite-only-for-target-rule.patch
 index 4495773..c05dea3 100644
 --- a/Makefile
 +++ b/Makefile
@@ -27,9 +32,24 @@ index 4495773..c05dea3 100644
  netplan-dbus: src/dbus.c src/_features.h
 -	$(CC) $(BUILDFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $^ `pkg-config --cflags --libs libsystemd glib-2.0`
 +	$(CC) $(BUILDFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $< `pkg-config --cflags --libs libsystemd glib-2.0`
+=======
+index 4fa6bd8..567d326 100644
+--- a/Makefile
++++ b/Makefile
+@@ -46,7 +46,7 @@ generate: libnetplan.so.$(NETPLAN_SOVER) nm.o networkd.o openvswitch.o generate.
+ 	$(CC) $(BUILDFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $^ -L. -lnetplan `pkg-config --cflags --libs glib-2.0 gio-2.0 yaml-0.1 uuid`
+ 
+ netplan-dbus: src/dbus.c src/_features.h util.o
+-	$(CC) $(BUILDFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $^ `pkg-config --cflags --libs libsystemd glib-2.0 gio-2.0`
++	$(CC) $(BUILDFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $(patsubst %.h,,$^) `pkg-config --cflags --libs libsystemd glib-2.0 gio-2.0`
+>>>>>>> 06dc92d6f1c36c2f0c9b9ca31540c6cd17e515a7:meta-openembedded/meta-networking/recipes-connectivity/netplan/netplan/0002-Makefile-Exclude-.h-files-from-target-rule.patch
  
  src/_features.h: src/[^_]*.[hc]
  	printf "#include <stddef.h>\nstatic const char *feature_flags[] __attribute__((__unused__)) = {\n" > $@
 -- 
+<<<<<<< HEAD:meta-openembedded/meta-networking/recipes-connectivity/netplan/netplan/0002-Makefile-Use-first-prerquisite-only-for-target-rule.patch
 2.28.0
+=======
+2.25.1
+>>>>>>> 06dc92d6f1c36c2f0c9b9ca31540c6cd17e515a7:meta-openembedded/meta-networking/recipes-connectivity/netplan/netplan/0002-Makefile-Exclude-.h-files-from-target-rule.patch
 

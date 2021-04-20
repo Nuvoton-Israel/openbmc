@@ -28,8 +28,8 @@ The way directories are staged in sysroot has been simplified and
 introduces the new :term:`SYSROOT_DIRS`,
 :term:`SYSROOT_DIRS_NATIVE`, and
 :term:`SYSROOT_DIRS_BLACKLIST`. See the
-`v2 patch series on the OE-Core Mailing
-List <http://lists.openembedded.org/pipermail/openembedded-core/2016-May/121365.html>`__
+:oe_lists:`v2 patch series on the OE-Core Mailing List
+</pipermail/openembedded-core/2016-May/121365.html>`
 for additional information.
 
 .. _migration-2.2-removal-of-old-images-from-tmp-deploy-now-enabled:
@@ -292,9 +292,9 @@ The following changes took place for BitBake:
    functionality. These changes will affect external tools that use
    BitBake's tinfoil module. For information on these changes, see the
    changes made to the scripts supplied with OpenEmbedded-Core:
-   `1 <http://git.yoctoproject.org/cgit/cgit.cgi/poky/commit/?id=189371f8393971d00bca0fceffd67cc07784f6ee>`__
+   :yocto_git:`1 </poky/commit/?id=189371f8393971d00bca0fceffd67cc07784f6ee>`
    and
-   `2 <http://git.yoctoproject.org/cgit/cgit.cgi/poky/commit/?id=4a5aa7ea4d07c2c90a1654b174873abb018acc67>`__.
+   :yocto_git:`2 </poky/commit/?id=4a5aa7ea4d07c2c90a1654b174873abb018acc67>`.
 
 -  The task management code has been rewritten to avoid using ID
    indirection in order to improve performance. This change is unlikely

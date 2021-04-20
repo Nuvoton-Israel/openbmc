@@ -583,7 +583,7 @@ def _exec_task(fn, task, d, quieterr):
         logger.error("No such task: %s" % task)
         return 1
 
-    logger.debug(1, "Executing task %s", task)
+    logger.debug("Executing task %s", task)
 
     localdata = _task_data(fn, task, d)
     tempdir = localdata.getVar('T')
@@ -596,7 +596,7 @@ def _exec_task(fn, task, d, quieterr):
         curnice = os.nice(0)
         nice = int(nice) - curnice
         newnice = os.nice(nice)
-        logger.debug(1, "Renice to %s " % newnice)
+        logger.debug("Renice to %s " % newnice)
     ionice = localdata.getVar("BB_TASK_IONICE_LEVEL")
     if ionice:
         try:
@@ -720,7 +720,7 @@ def _exec_task(fn, task, d, quieterr):
 
         logfile.close()
         if os.path.exists(logfn) and os.path.getsize(logfn) == 0:
-            logger.debug(2, "Zero size logfn %s, removing", logfn)
+            logger.debug2("Zero size logfn %s, removing", logfn)
             bb.utils.remove(logfn)
             bb.utils.remove(loglink)
     event.fire(TaskSucceeded(task, fn, logfn, localdata), localdata)
@@ -853,6 +853,23 @@ def make_stamp(task, d, file_name = None):
         stampbase = stamp_internal(task, d, None, True)
         file_name = d.getVar('BB_FILENAME')
         bb.parse.siggen.dump_sigtask(file_name, task, stampbase, True)
+
+def find_stale_stamps(task, d, file_name=None):
+    current = stamp_internal(task, d, file_name)
+    current2 = stamp_internal(task + "_setscene", d, file_name)
+    cleanmask = stamp_cleanmask_internal(task, d, file_name)
+    found = []
+    for mask in cleanmask:
+        for name in glob.glob(mask):
+            if "sigdata" in name or "sigbasedata" in name:
+                continue
+            if name.endswith('.taint'):
+                continue
+            if name == current or name == current2:
+                continue
+            logger.debug2("Stampfile %s does not match %s or %s" % (name, current, current2))
+            found.append(name)
+    return found
 
 def del_stamp(task, d, file_name = None):
     """

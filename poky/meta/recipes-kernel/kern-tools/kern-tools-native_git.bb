@@ -1,10 +1,14 @@
 SUMMARY = "Tools for managing Yocto Project style branched kernels"
+DESCRIPTION = "Powerful set of tools or managing Yocto Linux kernel sources \
+and configuration data. You can use these tools to make a single configuration \
+change, apply multiple patches, or work with your own kernel sources."
+HOMEPAGE = "https://www.yoctoproject.org/"
 LICENSE = "GPLv2"
 LIC_FILES_CHKSUM = "file://tools/kgit;beginline=5;endline=9;md5=9c30e971d435e249624278c3e343e501"
 
 DEPENDS = "git-native"
 
-SRCREV = "df4390b18a500a1a7d4695e1856971f8e36ce517"
+SRCREV = "8f6aaab7f64c6de30d267e31a73f7c3bb30125a9"
 PR = "r12"
 PV = "0.2+git${SRCPV}"
 
