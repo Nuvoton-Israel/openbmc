@@ -1,0 +1,25 @@
+From a534acf8dfbd7efe008fb680892b33aff12ebeb5 Mon Sep 17 00:00:00 2001
+From: kfting <kfting@nuvoton.com>
+Date: Mon, 19 Apr 2021 16:21:58 +0800
+Subject: [PATCH] support a larger FIT format image on Arbel EVB
+
+Signed-off-by: kfting <kfting@nuvoton.com>
+---
+ include/configs/arbel.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/configs/arbel.h b/include/configs/arbel.h
+index 99ac3318d3..afc85cbea6 100644
+--- a/include/configs/arbel.h
++++ b/include/configs/arbel.h
+@@ -58,6 +58,7 @@
+ #define CONFIG_SYS_PBSIZE               (CONFIG_SYS_CBSIZE + sizeof(CONFIG_SYS_PROMPT) + 16)
+ #define CONFIG_SYS_PROMPT_HUSH_PS2	    "> "
+ 
++#define CONFIG_SYS_BOOTM_LEN            (20 << 20) /* 20MB */
+ #define CONFIG_SYS_BOOTMAPSZ            (20 << 20)
+ #define CONFIG_SYS_LOAD_ADDR            0x8000
+ #define CONFIG_SYS_SDRAM_BASE           0x0
+-- 
+2.17.1
+
