@@ -43,5 +43,6 @@ RDEPENDS_${PN}-buv-dev = " \
     ent \
     dhrystone \
     rw-perf \
+    htop \
     "
 

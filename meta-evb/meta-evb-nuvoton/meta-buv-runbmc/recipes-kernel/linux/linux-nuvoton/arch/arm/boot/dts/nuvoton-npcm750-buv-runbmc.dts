@@ -48,6 +48,7 @@
 		spi1 = &spi1;
 		fiu0 = &fiu0;
 		fiu1 = &fiu3;
+		fiu2 = &fiux;
 	};
 
 	chosen {
@@ -126,6 +127,7 @@
 			<&gpio4 13 0>,
 			<&gpio2 24 0>,
 			<&gpio2 26 0>;
+		status = "disabled";
     };
 };
 
@@ -213,6 +215,30 @@
 			#size-cells = <1>;
 			bios@0 {
 				label = "bios";
+				reg = <0x0 0x2000000>;
+			};
+		};
+	};
+};
+
+&fiux {
+	pinctrl-0 = <&spix_pins>;
+	status = "okay";
+	spix-mode;
+	spi-nor@0 {
+		compatible = "m25p80-nonjedec";
+		spi-max-frequency = <5000000>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		reg = <0>;
+		spi-rx-bus-width = <1>;
+
+		partitions@F8000000 {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			xbios@0 {
+				label = "xbios";
 				reg = <0x0 0x2000000>;
 			};
 		};
@@ -404,30 +430,58 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pwm0_pins &pwm1_pins
 			&pwm2_pins &pwm3_pins
+			&pwm4_pins &pwm5_pins
+			&pwm6_pins &pwm7_pins
 			&fanin0_pins &fanin1_pins
-			&fanin2_pins &fanin3_pins>;
+			&fanin2_pins &fanin3_pins
+			&fanin4_pins &fanin5_pins
+			&fanin6_pins &fanin7_pins
+			&fanin8_pins &fanin9_pins
+			&fanin10_pins &fanin11_pins
+			&fanin12_pins &fanin13_pins
+			&fanin14_pins &fanin15_pins>;
 	status = "okay";
 	fan@0 {
 		reg = <0x00>;
-		fan-tach-ch = /bits/ 8 <0x00>;
+		fan-tach-ch = /bits/ 8 <0x00 0x01>;
 		cooling-levels = <127 255>;
 		fan_filter_en;
 	};
 	fan@1 {
 		reg = <0x01>;
-		fan-tach-ch = /bits/ 8 <0x01>;
+		fan-tach-ch = /bits/ 8 <0x02 0x03>;
 		cooling-levels = /bits/ 8 <127 255>;
 		fan_filter_en;
 	};
 	fan@2 {
 		reg = <0x02>;
-		fan-tach-ch = /bits/ 8 <0x02>;
+		fan-tach-ch = /bits/ 8 <0x04 0x05>;
 		cooling-levels = /bits/ 8 <127 255>;
 		fan_filter_en;
 	};
 	fan@3 {
 		reg = <0x03>;
-		fan-tach-ch = /bits/ 8 <0x03>;
+		fan-tach-ch = /bits/ 8 <0x06 0x07>;
+		cooling-levels = /bits/ 8 <127 255>;
+	};
+	fan@4 {
+		reg = <0x04>;
+		fan-tach-ch = /bits/ 8 <0x08 0x09>;
+		cooling-levels = /bits/ 8 <127 255>;
+	};
+	fan@5 {
+		reg = <0x05>;
+		fan-tach-ch = /bits/ 8 <0x0A 0x0B>;
+		cooling-levels = /bits/ 8 <127 255>;
+	};
+	fan@6 {
+		reg = <0x06>;
+		fan-tach-ch = /bits/ 8 <0x0C 0x0D>;
+		cooling-levels = /bits/ 8 <127 255>;
+	};
+	fan@7 {
+		reg = <0x07>;
+		fan-tach-ch = /bits/ 8 <0x0E 0x0F>;
 		cooling-levels = /bits/ 8 <127 255>;
 	};
 };

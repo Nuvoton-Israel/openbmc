@@ -1,4 +1,4 @@
-From 579569eedeb4f04482ca659297619096ac02922c Mon Sep 17 00:00:00 2001
+From 242c4b216cf6e408d113c7cd0a3c73ff104f3529 Mon Sep 17 00:00:00 2001
 From: YSChu <yschu@nuvoton.com>
 Date: Wed, 14 Aug 2019 15:16:12 +0800
 Subject: [PATCH 2/4] add "Scale" d-bus interface property
@@ -13,30 +13,30 @@ Signed-off-by: YSChu <yschu@nuvoton.com>
  5 files changed, 10 insertions(+)
 
 diff --git a/include/CPUSensor.hpp b/include/CPUSensor.hpp
-index 29cd54a..8eeefed 100644
+index 29b8209..bbc99d1 100644
 --- a/include/CPUSensor.hpp
 +++ b/include/CPUSensor.hpp
-@@ -32,6 +32,7 @@ class CPUSensor : public Sensor
+@@ -30,6 +30,7 @@ class CPUSensor : public Sensor
+     static constexpr unsigned int sensorScaleFactor = 1000;
+     static constexpr unsigned int sensorPollMs = 1000;
      static constexpr size_t warnAfterErrorCount = 10;
-     static constexpr double maxReading = 127;
-     static constexpr double minReading = -128;
 +    static constexpr int64_t Scale = 0;
      static constexpr const char* labelTcontrol = "Tcontrol";
  
    private:
 diff --git a/src/ADCSensor.cpp b/src/ADCSensor.cpp
-index 454944a..81383b0 100644
+index 25fd192..46ae434 100644
 --- a/src/ADCSensor.cpp
 +++ b/src/ADCSensor.cpp
 @@ -43,6 +43,7 @@ static constexpr unsigned int sensorScaleFactor = 1000;
- static constexpr double roundFactor = 10000; // 3 decimal places
- static constexpr double maxReading = 20;
- static constexpr double minReading = 0;
+ static constexpr double roundFactor = 10000;     // 3 decimal places
+ static constexpr double maxVoltageReading = 1.8; // pre sensor scaling
+ static constexpr double minVoltageReading = 0;
 +static constexpr int64_t Scale = 0;
  
  ADCSensor::ADCSensor(const std::string& path,
                       sdbusplus::asio::object_server& objectServer,
-@@ -65,6 +66,7 @@ ADCSensor::ADCSensor(const std::string& path,
+@@ -67,6 +68,7 @@ ADCSensor::ADCSensor(const std::string& path,
          "xyz.openbmc_project.Sensor.Value");
      sensorInterface->register_property("Unit",
          std::string("xyz.openbmc_project.Sensor.Value.Unit.Volts"));
@@ -45,10 +45,10 @@ index 454944a..81383b0 100644
      {
          thresholdInterfaceWarning = objectServer.add_interface(
 diff --git a/src/CPUSensor.cpp b/src/CPUSensor.cpp
-index 6a0fa7a..9c87282 100644
+index 1d04500..e0c62c6 100644
 --- a/src/CPUSensor.cpp
 +++ b/src/CPUSensor.cpp
-@@ -71,6 +71,7 @@ CPUSensor::CPUSensor(const std::string& path, const std::string& objectType,
+@@ -74,6 +74,7 @@ CPUSensor::CPUSensor(const std::string& path, const std::string& objectType,
                  interfacePath, "xyz.openbmc_project.Sensor.Value");
              sensorInterface->register_property("Unit",
                  std::string("xyz.openbmc_project.Sensor.Value.Unit.DegreesC"));
@@ -57,10 +57,10 @@ index 6a0fa7a..9c87282 100644
              {
                  thresholdInterfaceWarning = objectServer.add_interface(
 diff --git a/src/HwmonTempSensor.cpp b/src/HwmonTempSensor.cpp
-index 6a7d0a4..c55056a 100644
+index dbac325..767394c 100644
 --- a/src/HwmonTempSensor.cpp
 +++ b/src/HwmonTempSensor.cpp
-@@ -37,6 +37,7 @@ static constexpr size_t warnAfterErrorCount = 10;
+@@ -36,6 +36,7 @@ static constexpr size_t warnAfterErrorCount = 10;
  
  static constexpr double maxReading = 127;
  static constexpr double minReading = -128;
@@ -68,7 +68,7 @@ index 6a7d0a4..c55056a 100644
  
  HwmonTempSensor::HwmonTempSensor(
      const std::string& path, const std::string& objectType,
-@@ -58,6 +59,7 @@ HwmonTempSensor::HwmonTempSensor(
+@@ -57,6 +58,7 @@ HwmonTempSensor::HwmonTempSensor(
  
      sensorInterface->register_property("Unit",
          std::string("xyz.openbmc_project.Sensor.Value.Unit.DegreesC"));
@@ -77,10 +77,10 @@ index 6a7d0a4..c55056a 100644
      {
          thresholdInterfaceWarning = objectServer.add_interface(
 diff --git a/src/PSUSensor.cpp b/src/PSUSensor.cpp
-index 0f49157..6dc944b 100644
+index d1ca876..ae9f5b8 100644
 --- a/src/PSUSensor.cpp
 +++ b/src/PSUSensor.cpp
-@@ -75,21 +75,25 @@ PSUSensor::PSUSensor(const std::string& path, const std::string& objectType,
+@@ -77,21 +77,25 @@ PSUSensor::PSUSensor(const std::string& path, const std::string& objectType,
      {
          sensorInterface->register_property("Unit",
              std::string("xyz.openbmc_project.Sensor.Value.Unit.DegreesC"));
