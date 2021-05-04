@@ -1,5 +1,30 @@
+From 0296a81b55c8cd45e03ffaa0eb59f3953e6dd681 Mon Sep 17 00:00:00 2001
+From: Tim Lee <timlee660101@gmail.com>
+Date: Tue, 4 May 2021 15:25:20 +0800
+Subject: [PATCH 14/14] add config to config virtual media buffer size
+
+Signed-off-by: Medad CChien <ctcchien@nuvoton.com>
+Signed-off-by: Tim Lee <timlee660101@gmail.com>
+---
+ bmcweb_config.h.in       | 2 ++
+ include/vm_websocket.hpp | 2 +-
+ meson.build              | 1 +
+ meson_options.txt        | 1 +
+ 4 files changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/bmcweb_config.h.in b/bmcweb_config.h.in
+index 394cfdf16..9bdc07b0a 100644
+--- a/bmcweb_config.h.in
++++ b/bmcweb_config.h.in
+@@ -9,4 +9,6 @@ constexpr const int bmcwebInsecureDisableXssPrevention =
+ constexpr const size_t bmcwebHttpReqBodyLimitMb = @BMCWEB_HTTP_REQ_BODY_LIMIT_MB@;
+ 
+ constexpr const char* mesonInstallPrefix = "@MESON_INSTALL_PREFIX@";
++
++constexpr const size_t bmcwebVmBufferSize = @BMCWEB_VM_BUFFER_SIZE@;
+ // clang-format on
 diff --git a/include/vm_websocket.hpp b/include/vm_websocket.hpp
-index a175f0a8..ab8121d7 100644
+index a175f0a82..03f054e4b 100644
 --- a/include/vm_websocket.hpp
 +++ b/include/vm_websocket.hpp
 @@ -17,7 +17,7 @@ static crow::websocket::Connection* session = nullptr;
@@ -7,32 +32,34 @@ index a175f0a8..ab8121d7 100644
  // for the message header:
  // https://github.com/NetworkBlockDevice/nbd/blob/master/doc/proto.md#simple-reply-message
 -static constexpr auto nbdBufferSize = 131088;
-+static constexpr auto nbdBufferSize = 131088 * BMCWEB_VM_BUFFER_SIZE;
++static constexpr auto nbdBufferSize = 131088 * bmcwebVmBufferSize;
  
  class Handler : public std::enable_shared_from_this<Handler>
  {
- 
 diff --git a/meson.build b/meson.build
-index 529b9cbf..fc62c2e8 100644
+index 22a8c4a77..060893532 100644
 --- a/meson.build
 +++ b/meson.build
-@@ -340,6 +340,7 @@ srcfiles_unittest = ['include/ut/dbus_utility_test.cpp',
- 
- conf_data = configuration_data()
- conf_data.set('BMCWEB_HTTP_REQ_BODY_LIMIT_MB',get_option('http-body-limit'))
+@@ -355,6 +355,7 @@ conf_data.set('BMCWEB_HTTP_REQ_BODY_LIMIT_MB', get_option('http-body-limit'))
+ xss_enabled = get_option('insecure-disable-xss')
+ conf_data.set10('BMCWEB_INSECURE_DISABLE_XSS_PREVENTION', xss_enabled.enabled())
+ conf_data.set('MESON_INSTALL_PREFIX', get_option('prefix'))
 +conf_data.set('BMCWEB_VM_BUFFER_SIZE',get_option('vm-buffer-size'))
- conf_data.set('MESON_INSTALL_PREFIX',get_option('prefix'))
- configure_file(output: 'config.h',
+ configure_file(input: 'bmcweb_config.h.in',
+                output: 'bmcweb_config.h',
                 configuration: conf_data)
 diff --git a/meson_options.txt b/meson_options.txt
-index 1298b968..ef8619aa 100644
+index 9611631e8..09f1456ee 100644
 --- a/meson_options.txt
 +++ b/meson_options.txt
-@@ -22,6 +22,7 @@ option('cookie-auth', type : 'feature', value : 'enabled', description : '''Enab
- option('mutual-tls-auth', type : 'feature', value : 'enabled', description : '''Enables authenticating users through TLS client certificates. The insecure-disable-ssl must be disabled for this option to take effect.''')
+@@ -30,6 +30,7 @@ option('mutual-tls-auth', type : 'feature', value : 'enabled', description : '''
  option('ibm-management-console', type : 'feature', value : 'disabled', description : 'Enable the IBM management console specific functionality. Paths are under \'/ibm/v1/\'')
  option('http-body-limit', type: 'integer', min : 0, max : 512, value : 30, description : 'Specifies the http request body length limit')
+ option('redfish-allow-deprecated-hostname-patch', type : 'feature', value : 'disabled', description : 'Enable/disable Managers/bmc/NetworkProtocol HostName PATCH commands. The default condition is to prevent HostName changes from this URI, following the Redfish schema. Enabling this switch permits the HostName to be PATCHed at this URI. In Q4 2021 this feature will be removed, and the Redfish schema enforced, making the HostName read-only.')
 +option('vm-buffer-size', type: 'integer', min : 1, max : 10, value : 1, description : 'Specifies the buffer size for virtual media')
  
  # Insecure options. Every option that starts with a `insecure` flag should
  # not be enabled by default for any platform, unless the author fully comprehends
+-- 
+2.17.1
+
