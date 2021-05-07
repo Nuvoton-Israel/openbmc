@@ -1,7 +1,7 @@
 FILESEXTRAPATHS_prepend := "${THISDIR}/${PN}:"
 
 SRC_URI = "git://github.com/Nuvoton-Israel/phosphor-bmc-code-mgmt.git"
-SRCREV = "3bdf22dde6ea11bbcc797c9f9ed62776fcebbd79"
+SRCREV = "ecb9e8b2581ebd256a21514e0ada8ef501735b04"
 
 SRC_URI += "file://0001-fixed-build-break.patch"
 
