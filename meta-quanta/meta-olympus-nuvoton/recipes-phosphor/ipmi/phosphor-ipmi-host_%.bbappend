@@ -12,6 +12,7 @@ EXTRA_OECONF_olympus-nuvoton = " \
     --enable-boot-flag-safe-mode-support \
     SENSOR_YAML_GEN=${STAGING_DIR_HOST}${datadir}/olympus-nuvoton-yaml-config/ipmi-sensors.yaml \
     FRU_YAML_GEN=${STAGING_DIR_HOST}${datadir}/olympus-nuvoton-yaml-config/ipmi-fru-read.yaml \
+    --disable-dynamic_sensors \
     "
 
 SRC_URI_append_olympus-nuvoton = " file://phosphor-ipmi-host.service"
