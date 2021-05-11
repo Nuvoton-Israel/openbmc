@@ -1,0 +1,43 @@
+From 2056ef3100a97e822decfb11d587c2dd6a762257 Mon Sep 17 00:00:00 2001
+From: Tim Lee <timlee660101@gmail.com>
+Date: Tue, 11 May 2021 15:44:06 +0800
+Subject: [PATCH 30/30] remove parameters of CreateDump
+
+Signed-off-by: Tim Lee <timlee660101@gmail.com>
+---
+ .../Dump/Create.interface.yaml                | 19 -------------------
+ 1 file changed, 19 deletions(-)
+
+diff --git a/xyz/openbmc_project/Dump/Create.interface.yaml b/xyz/openbmc_project/Dump/Create.interface.yaml
+index b83798a9..965ab118 100644
+--- a/xyz/openbmc_project/Dump/Create.interface.yaml
++++ b/xyz/openbmc_project/Dump/Create.interface.yaml
+@@ -14,25 +14,6 @@ methods:
+     - name: CreateDump
+       description: >
+           Method to create a manual Dump.
+-      parameters:
+-        - name: AdditionalData
+-          type: dict[string, string]
+-          description: >
+-            The additional data, if any, for initiating the dump.
+-            The key in this case should be an implementation
+-            specific enum defined for the specific type of dump
+-            either in xyz or in a domain.
+-            The enum-format string is required to come from a
+-            parallel class with this specific Enum name.
+-            All of the Enum strings should be in the format
+-            'domain.Dump.Create.CreateParameters.ParamName'.
+-            e.g.:
+-              {
+-                "key1": "value1",
+-                "key2": "value2"
+-              }
+-            ends up in AdditionaData like:
+-              ["KEY1=value1", "KEY2=value2"]
+       returns:
+         - name: Path
+           type: object_path
+-- 
+2.17.1
+

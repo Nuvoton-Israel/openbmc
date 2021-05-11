@@ -1,0 +1,47 @@
+From 92600f820bebb8db5d4eaea46452d025da9b0be5 Mon Sep 17 00:00:00 2001
+From: Tim Lee <timlee660101@gmail.com>
+Date: Tue, 11 May 2021 15:33:30 +0800
+Subject: [PATCH] fix bmc dump cannot accept no additional parameters
+
+Signed-off-by: Tim Lee <timlee660101@gmail.com>
+---
+ dump_manager_bmc.cpp | 7 +------
+ dump_manager_bmc.hpp | 3 +--
+ 2 files changed, 2 insertions(+), 8 deletions(-)
+
+diff --git a/dump_manager_bmc.cpp b/dump_manager_bmc.cpp
+index aef7a3e..0236e46 100644
+--- a/dump_manager_bmc.cpp
++++ b/dump_manager_bmc.cpp
+@@ -35,13 +35,8 @@ void Manager::create(Type type, std::vector<std::string> fullPaths)
+ 
+ } // namespace internal
+ 
+-sdbusplus::message::object_path
+-    Manager::createDump(std::map<std::string, std::string> params)
++sdbusplus::message::object_path Manager::createDump()
+ {
+-    if (!params.empty())
+-    {
+-        log<level::WARNING>("BMC dump accepts no additional parameters");
+-    }
+     std::vector<std::string> paths;
+     auto id = captureDump(Type::UserRequested, paths);
+ 
+diff --git a/dump_manager_bmc.hpp b/dump_manager_bmc.hpp
+index 24cfd0c..79a7bc7 100644
+--- a/dump_manager_bmc.hpp
++++ b/dump_manager_bmc.hpp
+@@ -94,8 +94,7 @@ class Manager : virtual public CreateIface,
+      *
+      *  @return object_path - The object path of the new dump entry.
+      */
+-    sdbusplus::message::object_path
+-        createDump(std::map<std::string, std::string> params) override;
++    sdbusplus::message::object_path createDump() override;
+ 
+   private:
+     /** @brief Create Dump entry d-bus object
+-- 
+2.17.1
+

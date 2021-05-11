@@ -10,3 +10,4 @@ SRC_URI_append_olympus-nuvoton = " file://0028-MCTP-Daemon-D-Bus-interface-defin
 SRC_URI_append_olympus-nuvoton = " file://0024-Add-the-pre-timeout-interrupt-defined-in-IPMI-spec.patch"
 SRC_URI_append_olympus-nuvoton = " file://0025-Add-PreInterruptFlag-properity-in-DBUS.patch"
 SRC_URI_append_olympus-nuvoton = " file://0029-Add-LastRebootCause-property-in-BMC-interface.patch"
+SRC_URI_append_olympus-nuvoton = " file://0030-remove-parameters-of-CreateDump.patch"
