@@ -1,0 +1,26 @@
+From 298a2dfcac1c32a9ea0350e04cc4ca06a1ee6a8d Mon Sep 17 00:00:00 2001
+From: Brian Ma <chma0@nuvoton.com>
+Date: Fri, 14 May 2021 09:24:12 +0800
+Subject: [PATCH] Revert "Tasks for TFTP upload"
+
+This reverts commit d7a596bd7e449cdbfb92e961cc7049f80775e61f.
+---
+ redfish-core/lib/update_service.hpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/redfish-core/lib/update_service.hpp b/redfish-core/lib/update_service.hpp
+index ca1234f..7790575 100644
+--- a/redfish-core/lib/update_service.hpp
++++ b/redfish-core/lib/update_service.hpp
+@@ -480,7 +480,7 @@ class UpdateServiceActionsSimpleUpdate : public Node
+         // Setup callback for when new software detected
+         // Give TFTP 10 minutes to complete
+         monitorForSoftwareAvailable(
+-            asyncResp, req,
++            nullptr, req,
+             "/redfish/v1/UpdateService/Actions/UpdateService.SimpleUpdate",
+             600);
+ 
+-- 
+2.17.1
+

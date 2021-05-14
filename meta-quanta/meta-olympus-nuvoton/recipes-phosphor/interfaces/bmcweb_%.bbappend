@@ -4,6 +4,7 @@ SRC_URI_append_olympus-nuvoton = " file://0003-Redfish-Add-power-metrics-support
 SRC_URI_append_olympus-nuvoton = " file://0005-bmcweb-chassis-add-indicatorLED-support.patch"
 SRC_URI_append_olympus-nuvoton = " file://0014-add-config-to-config-virtual-media-buffer-size.patch"
 SRC_URI_append_olympus-nuvoton = " file://0015-redfish-log-service-corrects-odata-id-of-bmc-journal.patch"
+SRC_URI_append_olympus-nuvoton = " file://0001-Revert-Tasks-for-TFTP-upload.patch"
 
 # Enable CPU Log and Raw PECI support
 EXTRA_OEMESON_append = " -Dredfish-cpu-log=enabled"
