@@ -1,18 +1,18 @@
-From 2056ef3100a97e822decfb11d587c2dd6a762257 Mon Sep 17 00:00:00 2001
+From 23177567c7b3abdc44d1b52e46d79b1932e2bee3 Mon Sep 17 00:00:00 2001
 From: Tim Lee <timlee660101@gmail.com>
-Date: Tue, 11 May 2021 15:44:06 +0800
+Date: Thu, 13 May 2021 17:02:17 +0800
 Subject: [PATCH 30/30] remove parameters of CreateDump
 
 Signed-off-by: Tim Lee <timlee660101@gmail.com>
 ---
- .../Dump/Create.interface.yaml                | 19 -------------------
- 1 file changed, 19 deletions(-)
+ .../Dump/Create.interface.yaml                | 27 +++----------------
+ 1 file changed, 3 insertions(+), 24 deletions(-)
 
 diff --git a/xyz/openbmc_project/Dump/Create.interface.yaml b/xyz/openbmc_project/Dump/Create.interface.yaml
-index b83798a9..965ab118 100644
+index b83798a9..8a244183 100644
 --- a/xyz/openbmc_project/Dump/Create.interface.yaml
 +++ b/xyz/openbmc_project/Dump/Create.interface.yaml
-@@ -14,25 +14,6 @@ methods:
+@@ -14,32 +14,11 @@ methods:
      - name: CreateDump
        description: >
            Method to create a manual Dump.
@@ -36,8 +36,18 @@ index b83798a9..965ab118 100644
 -            ends up in AdditionaData like:
 -              ["KEY1=value1", "KEY2=value2"]
        returns:
-         - name: Path
-           type: object_path
+-        - name: Path
+-          type: object_path
++        - name: Id
++          type: uint32
+           description: >
+-            The object path of the object that implements
+-            xyz.openbmc_project.Common.Progress to track the progress
+-            of the dump
++            The Dump entry id number.
+       errors:
+         - xyz.openbmc_project.Common.File.Error.Write
+         - xyz.openbmc_project.Dump.Create.Error.Disabled
 -- 
 2.17.1
 

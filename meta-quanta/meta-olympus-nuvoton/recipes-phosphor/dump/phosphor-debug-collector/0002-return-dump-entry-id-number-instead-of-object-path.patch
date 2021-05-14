@@ -1,0 +1,72 @@
+From 643cd26b3aad29107a3e91420b8aeab4362d0a43 Mon Sep 17 00:00:00 2001
+From: Tim Lee <timlee660101@gmail.com>
+Date: Thu, 13 May 2021 16:20:43 +0800
+Subject: [PATCH 2/2] return dump entry id number instead of object path
+
+Signed-off-by: Tim Lee <timlee660101@gmail.com>
+---
+ dump_manager_bmc.cpp | 26 ++------------------------
+ dump_manager_bmc.hpp |  6 +++---
+ 2 files changed, 5 insertions(+), 27 deletions(-)
+
+diff --git a/dump_manager_bmc.cpp b/dump_manager_bmc.cpp
+index 0236e46..a7c0e57 100644
+--- a/dump_manager_bmc.cpp
++++ b/dump_manager_bmc.cpp
+@@ -35,32 +35,10 @@ void Manager::create(Type type, std::vector<std::string> fullPaths)
+ 
+ } // namespace internal
+ 
+-sdbusplus::message::object_path Manager::createDump()
++uint32_t Manager::createDump()
+ {
+     std::vector<std::string> paths;
+-    auto id = captureDump(Type::UserRequested, paths);
+-
+-    // Entry Object path.
+-    auto objPath = fs::path(baseEntryPath) / std::to_string(id);
+-
+-    try
+-    {
+-        std::time_t timeStamp = std::time(nullptr);
+-        entries.insert(std::make_pair(
+-            id, std::make_unique<bmc::Entry>(
+-                    bus, objPath.c_str(), id, timeStamp, 0, std::string(),
+-                    phosphor::dump::OperationStatus::InProgress, *this)));
+-    }
+-    catch (const std::invalid_argument& e)
+-    {
+-        log<level::ERR>(e.what());
+-        log<level::ERR>("Error in creating dump entry",
+-                        entry("OBJECTPATH=%s", objPath.c_str()),
+-                        entry("ID=%d", id));
+-        elog<InternalFailure>();
+-    }
+-
+-    return objPath.string();
++    return captureDump(Type::UserRequested, paths);
+ }
+ 
+ uint32_t Manager::captureDump(Type type,
+diff --git a/dump_manager_bmc.hpp b/dump_manager_bmc.hpp
+index 79a7bc7..49ba573 100644
+--- a/dump_manager_bmc.hpp
++++ b/dump_manager_bmc.hpp
+@@ -90,11 +90,11 @@ class Manager : virtual public CreateIface,
+     void restore() override;
+ 
+     /** @brief Implementation for CreateDump
+-     *  Method to create a BMC dump entry when user requests for a new BMC dump
++     *  Method to create Dump.
+      *
+-     *  @return object_path - The object path of the new dump entry.
++     *  @return id - The Dump entry id number.
+      */
+-    sdbusplus::message::object_path createDump() override;
++    uint32_t createDump() override;
+ 
+   private:
+     /** @brief Create Dump entry d-bus object
+-- 
+2.17.1
+
