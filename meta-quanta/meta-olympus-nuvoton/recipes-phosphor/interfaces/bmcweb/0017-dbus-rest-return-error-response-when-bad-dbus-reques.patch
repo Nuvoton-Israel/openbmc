@@ -1,0 +1,28 @@
+From a92496c98c29a48f382f91157fa8c7e3142d0c66 Mon Sep 17 00:00:00 2001
+From: Tim Lee <timlee660101@gmail.com>
+Date: Thu, 20 May 2021 13:30:02 +0800
+Subject: [PATCH 17/17] dbus rest return error response when bad dbus request
+
+Signed-off-by: Tim Lee <timlee660101@gmail.com>
+---
+ include/openbmc_dbus_rest.hpp | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/include/openbmc_dbus_rest.hpp b/include/openbmc_dbus_rest.hpp
+index 581e40b31..4cc740693 100644
+--- a/include/openbmc_dbus_rest.hpp
++++ b/include/openbmc_dbus_rest.hpp
+@@ -1695,6 +1695,10 @@ inline void handleGet(crow::Response& res, std::string& objectPath,
+                             {
+                                 BMCWEB_LOG_ERROR << "Bad dbus request error: "
+                                                  << ec2;
++                                setErrorResponse(res, boost::beast::http::status::not_found,
++                                                    notFoundDesc, notFoundMsg);
++                                res.end();
++                                return;
+                             }
+                             else
+                             {
+-- 
+2.17.1
+
