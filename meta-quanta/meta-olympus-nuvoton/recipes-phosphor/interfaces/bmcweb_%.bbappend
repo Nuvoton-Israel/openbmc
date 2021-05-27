@@ -5,7 +5,6 @@ SRC_URI_append_olympus-nuvoton = " file://0005-bmcweb-chassis-add-indicatorLED-s
 SRC_URI_append_olympus-nuvoton = " file://0014-add-config-to-config-virtual-media-buffer-size.patch"
 SRC_URI_append_olympus-nuvoton = " file://0015-redfish-log-service-corrects-odata-id-of-bmc-journal.patch"
 SRC_URI_append_olympus-nuvoton = " file://0016-manager-do-not-update-value-if-string-is-empty.patch"
-SRC_URI_append_olympus-nuvoton = " file://0017-dbus-rest-return-error-response-when-bad-dbus-reques.patch"
 
 # Enable CPU Log and Raw PECI support
 EXTRA_OEMESON_append = " -Dredfish-cpu-log=enabled"
