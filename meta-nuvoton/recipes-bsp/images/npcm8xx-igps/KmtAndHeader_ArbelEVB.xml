@@ -91,24 +91,6 @@
 	</BinField>
 
 	<BinField>
-		<name>BmcBB_Pointer</name>         <!-- name of field -->
-		<config>
-			<offset>124</offset>
-			<size>4</size>
-		</config>
-		<content format='32bit'>0</content>	<!-- content the user should fill -->
-	</BinField>
-
-	<BinField>
-		<name>BmcBB_Length</name>         <!-- name of field -->
-		<config>
-			<offset>128</offset>
-			<size>4</size>
-		</config>
-		<content format='32bit'>0x0</content>	<!-- content the user should fill -->
-	</BinField>
-
-	<BinField>
 		<!-- Code size -->
 		<name>FwLength</name>         <!-- name of field -->
 		<config>
@@ -164,7 +146,7 @@
 	</BinField>
 
 	<BinField>
-		<name>TipFW</name>             <!-- name of field -->
+		<name>kmt_map</name>             <!-- name of field -->
 		<config>
 			<offset>256</offset>
 			<size format='FileSize'>kmt_map.bin</size>                 <!-- size in the header calculated by tool-->

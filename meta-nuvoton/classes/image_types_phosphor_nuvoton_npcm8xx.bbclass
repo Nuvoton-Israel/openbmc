@@ -86,7 +86,14 @@ python do_generate_static_prepend() {
         CalcCRC32(binfile, begin_offset, embed_ecc, outputFile)
 
     def Merge_bin_files_and_pad(inF1, inF2, outF, align):
-        padding_size = align - (os.path.getsize(inF1) % align)
+        padding_size = 0
+        padding_size_end = 0
+        if (os.path.getsize(inF1) % align != 0):
+            padding_size = align - (os.path.getsize(inF1) % align)
+
+        if (os.path.getsize(inF2) % align != 0):
+            padding_size_end = align - (os.path.getsize(inF2) % align)
+
         with open(outF, "wb") as file3:
             with open(inF1, "rb") as file1:
                 data = file1.read()
@@ -97,6 +104,9 @@ python do_generate_static_prepend() {
             with open(inF2, "rb") as file2:
                 data = file2.read()
                 file3.write(data)
+            while padding_size_end > 0:
+                file3.write(b'\xFF')
+                padding_size_end -= 1
         file1.close()
         file2.close()
         file3.close()
