@@ -52,11 +52,11 @@
 			<offset>0x108</offset>       
 			<size>0x4</size> 
 		</config>
-		<content format='32bit'>0x01</content>                                   <!--Board_type: SVB-->
+		<content format='32bit'>0x02</content>                                   <!--Board_type: SVB-->
 	</BinField>
 	
 	<BinField>
-		<!-- supported values: 300, 500, 666, 700, 720, 750, 775, 787.5 800, 850, 900, 950, 1000, 1062.5 1066, 1100, 1150, 1200.  
+		<!-- supported values: 300, 500, 666, 700, 720, 750, 775, 787.5 800, 850, 900, 950, 975, 1000, 1037, 1050, 1062.5 1066, 1100, 1150, 1200.  
 		     Recommended: 1066 or 800. Note: not all values are tested  -->
 		<name>MC_FREQ_IN_MHZ</name>          
 		<config>
@@ -158,6 +158,16 @@
 		</config>
 		<content format='32bit'>0</content>     <!-- content the user should fill -->
 	</BinField>
+	
+	<BinField>
+		<!--  -->
+		<name>dram_max_size</name>
+		<config>
+			<offset>0x130</offset>
+			<size>0x4</size> 
+		</config>
+		<content format='32bit'>0x40000000</content>     <!-- content the user should fill -->
+	</BinField>
 
 	<BinField>
 		<!-- MC_CONFIG. 
@@ -165,7 +175,7 @@
 			 -->
 		<name>MC_CONFIG</name>          
 		<config>
-			<offset>0x130</offset>       
+			<offset>0x134</offset>       
 			<size>0x1</size> 
 		</config>
 		<content format='32bit'>0x00</content>  
@@ -179,7 +189,7 @@
 			0x02: GPIOs TRIS.  -->
 		<name>HOST_IF</name>          
 		<config>
-			<offset>0x131</offset>       
+			<offset>0x135</offset>       
 			<size>0x1</size> 
 		</config>
 		<content format='32bit'>0x00</content>
