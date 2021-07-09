@@ -290,6 +290,28 @@
             },
             "Index": 0,
             "Name": "Fan1",
+            "PowerState": "Always",
+            "Thresholds": [
+                {
+                    "Direction": "less than",
+                    "Name": "lower critical",
+                    "Severity": 1,
+                    "Value": 500
+                },
+                {
+                    "Direction": "greater than",
+                    "Name": "upper non critical",
+                    "Severity": 0,
+                    "Value": 8500
+                },
+                {
+                    "Direction": "greater than",
+                    "Name": "upper critical",
+                    "Severity": 1,
+                    "Value": 11500
+                }
+            ],
+            "MaxReading": 14000,
             "EntityId": 29,
             "EntityInstance": 1,
             "Type": "NuvotonFan"
@@ -304,6 +326,28 @@
             },
             "Index": 1,
             "Name": "Fan2",
+            "PowerState": "Always",
+            "Thresholds": [
+                {
+                    "Direction": "less than",
+                    "Name": "lower critical",
+                    "Severity": 1,
+                    "Value": 500
+                },
+                {
+                    "Direction": "greater than",
+                    "Name": "upper non critical",
+                    "Severity": 0,
+                    "Value": 8500
+                },
+                {
+                    "Direction": "greater than",
+                    "Name": "upper critical",
+                    "Severity": 1,
+                    "Value": 11500
+                }
+            ],
+            "MaxReading": 14000,
             "EntityId": 29,
             "EntityInstance": 2,
             "Type": "NuvotonFan"
@@ -318,6 +362,28 @@
             },
             "Index": 2,
             "Name": "Fan3",
+            "PowerState": "Always",
+            "Thresholds": [
+                {
+                    "Direction": "less than",
+                    "Name": "lower critical",
+                    "Severity": 1,
+                    "Value": 500
+                },
+                {
+                    "Direction": "greater than",
+                    "Name": "upper non critical",
+                    "Severity": 0,
+                    "Value": 8500
+                },
+                {
+                    "Direction": "greater than",
+                    "Name": "upper critical",
+                    "Severity": 1,
+                    "Value": 11500
+                }
+            ],
+            "MaxReading": 14000,
             "EntityId": 29,
             "EntityInstance": 3,
             "Type": "NuvotonFan"
@@ -332,6 +398,28 @@
             },
             "Index": 3,
             "Name": "Fan4",
+            "PowerState": "Always",
+            "Thresholds": [
+                {
+                    "Direction": "less than",
+                    "Name": "lower critical",
+                    "Severity": 1,
+                    "Value": 500
+                },
+                {
+                    "Direction": "greater than",
+                    "Name": "upper non critical",
+                    "Severity": 0,
+                    "Value": 8500
+                },
+                {
+                    "Direction": "greater than",
+                    "Name": "upper critical",
+                    "Severity": 1,
+                    "Value": 11500
+                }
+            ],
+            "MaxReading": 14000,
             "EntityId": 29,
             "EntityInstance": 4,
             "Type": "NuvotonFan"
