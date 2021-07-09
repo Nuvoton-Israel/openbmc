@@ -1,39 +1,66 @@
-From fe4f67dcec3db126c6c39f9756e43c7fb226986c Mon Sep 17 00:00:00 2001
-From: Mohaimen <mohaimen.alsamarai@foxconn.com>
-Date: Thu, 22 Oct 2020 17:31:05 -0500
-Subject: [PATCH] Ampere Altra (MAX) SSIF IPMI driver
+From 03cd7c38332df0adfc2d910a40fb5bd7b74f104a Mon Sep 17 00:00:00 2001
+From: Lancelot Kao <lancelot.cy.kao@fii-na.corp-partner.google.com>
+Date: Wed, 12 May 2021 11:16:12 -0500
+Subject: [PATCH] Ampere Altra MAX SSIF IPMI driver
 
-1. Add Ampere SSIF IPMI driver to provide the interface
-between CPU & BMC
-2. Add Ampere SSIF IPMI driver supports Nuvoton chipset
+The SMBus system interface (SSIF) IPMI BMC driver can be used to perform
+in-band IPMI communication with their host in management (BMC) side.
 
-Signed-off-by: Mohaimen alsmarai <Mohaimen.alsamarai@fii-na.com>
-Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+Using the older driver from google
+
+Signed-off-by: Lancelot Kao <lancelot.cy.kao@fii-na.corp-partner.google.com>
 ---
- drivers/char/ipmi/Kconfig     |   12 +
- drivers/char/ipmi/Makefile    |    1 +
- drivers/char/ipmi/ssif-bmc.c  | 1071 +++++++++++++++++++++++++++++++++
- include/uapi/linux/ssif-bmc.h |   27 +
- 4 files changed, 1111 insertions(+)
- create mode 100644 drivers/char/ipmi/ssif-bmc.c
- create mode 100644 include/uapi/linux/ssif-bmc.h
+ drivers/char/ipmi/Kconfig            |  33 ++
+ drivers/char/ipmi/Makefile           |   3 +
+ drivers/char/ipmi/ssif_bmc.c         | 598 +++++++++++++++++++++++++++
+ drivers/char/ipmi/ssif_bmc.h         |  91 ++++
+ drivers/char/ipmi/ssif_bmc_aspeed.c  | 132 ++++++
+ drivers/char/ipmi/ssif_bmc_npcm7xx.c | 331 +++++++++++++++
+ drivers/i2c/i2c-core-smbus.c         |   3 +-
+ include/linux/i2c.h                  |   1 +
+ 8 files changed, 1191 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/char/ipmi/ssif_bmc.c
+ create mode 100644 drivers/char/ipmi/ssif_bmc.h
+ create mode 100644 drivers/char/ipmi/ssif_bmc_aspeed.c
+ create mode 100644 drivers/char/ipmi/ssif_bmc_npcm7xx.c
 
 diff --git a/drivers/char/ipmi/Kconfig b/drivers/char/ipmi/Kconfig
-index 4bad0614109b..3d90b5a20584 100644
+index 56eba099e705..9b9890016291 100644
 --- a/drivers/char/ipmi/Kconfig
 +++ b/drivers/char/ipmi/Kconfig
-@@ -133,6 +133,18 @@ config ASPEED_BT_IPMI_BMC
+@@ -133,6 +133,39 @@ config ASPEED_BT_IPMI_BMC
  	  found on Aspeed SOCs (AST2400 and AST2500). The driver
  	  implements the BMC side of the BT interface.
  
 +config SSIF_IPMI_BMC
-+	depends on ARCH_NPCM7XX || ARCH_ASPEED || COMPILE_TEST
-+	depends on I2C
++	tristate "SSIF IPMI BMC driver"
++	select I2C
 +	select I2C_SLAVE
-+	tristate "NPCM7XX & AST2500 SSIF IPMI bmc driver"
++	help
++	  This enables the IPMI SMBus system interface (SSIF) at the
++	  management (BMC) side.
++
++	  The driver implements the BMC side of the SMBus system
++	  interface (SSIF).
++
++config ASPEED_SSIF_IPMI_BMC
++	depends on ARCH_ASPEED || COMPILE_TEST
++	select SSIF_IPMI_BMC
++	tristate "Aspeed SSIF IPMI BMC driver"
 +	help
 +	  Provides a driver for the SSIF IPMI interface found on
-+	  Nuvoton npcm7xx SoC & Aspeed AST2500 SoC.
++	  Aspeed AST2500 SoC.
++
++	  The driver implements the BMC side of the SMBus system
++	  interface (SSIF), specific for Aspeed AST2500 SoC.
++
++config NPCM7XX_SSIF_IPMI_BMC
++	depends on ARCH_NPCM7XX || COMPILE_TEST
++	select SSIF_IPMI_BMC
++	select I2C_SLAVE
++	tristate "Nuvonton SSIF IPMI BMC driver"
++	help
++	  Provides a driver for the Nuvoton SSIF IPMI interface
 +
 +	  The driver implements the BMC side of
 +	  the IPMI over SSIF interface.
@@ -42,26 +69,27 @@ index 4bad0614109b..3d90b5a20584 100644
  	tristate 'IPMB Interface handler'
  	depends on I2C
 diff --git a/drivers/char/ipmi/Makefile b/drivers/char/ipmi/Makefile
-index 0822adc2ec41..0a5fdd0b37fc 100644
+index 0822adc2ec41..11ad2c9b043a 100644
 --- a/drivers/char/ipmi/Makefile
 +++ b/drivers/char/ipmi/Makefile
-@@ -26,4 +26,5 @@ obj-$(CONFIG_IPMI_KCS_BMC) += kcs_bmc.o
- obj-$(CONFIG_ASPEED_BT_IPMI_BMC) += bt-bmc.o
+@@ -27,3 +27,6 @@ obj-$(CONFIG_ASPEED_BT_IPMI_BMC) += bt-bmc.o
  obj-$(CONFIG_ASPEED_KCS_IPMI_BMC) += kcs_bmc_aspeed.o
  obj-$(CONFIG_NPCM7XX_KCS_IPMI_BMC) += kcs_bmc_npcm7xx.o
-+obj-$(CONFIG_SSIF_IPMI_BMC) += ssif-bmc.o
  obj-$(CONFIG_IPMB_DEVICE_INTERFACE) += ipmb_dev_int.o
-diff --git a/drivers/char/ipmi/ssif-bmc.c b/drivers/char/ipmi/ssif-bmc.c
++obj-$(CONFIG_SSIF_IPMI_BMC) += ssif_bmc.o
++obj-$(CONFIG_ASPEED_SSIF_IPMI_BMC) += ssif_bmc_aspeed.o
++obj-$(CONFIG_NPCM7XX_SSIF_IPMI_BMC) += ssif_bmc_npcm7xx.o
+diff --git a/drivers/char/ipmi/ssif_bmc.c b/drivers/char/ipmi/ssif_bmc.c
 new file mode 100644
-index 000000000000..ed3ef32c0d1c
+index 000000000000..c982925474ad
 --- /dev/null
-+++ b/drivers/char/ipmi/ssif-bmc.c
-@@ -0,0 +1,1071 @@
++++ b/drivers/char/ipmi/ssif_bmc.c
+@@ -0,0 +1,598 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * The driver for BMC side of SSIF interface
 + *
-+ * Copyright (c) 2020, Ampere Computing LLC
++ * Copyright (c) 2021, Ampere Computing LLC
 + *
 + * This program is free software; you can redistribute it and/or
 + * modify it under the terms of the GNU General Public License as
@@ -77,54 +105,628 @@ index 000000000000..ed3ef32c0d1c
 + * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 + */
 +
-+#include <linux/atomic.h>
-+#include <linux/errno.h>
 +#include <linux/i2c.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/ipmi_smi.h>
-+#include <linux/mfd/syscon.h>
 +#include <linux/miscdevice.h>
 +#include <linux/module.h>
 +#include <linux/of.h>
 +#include <linux/platform_device.h>
 +#include <linux/poll.h>
-+#include <linux/regmap.h>
 +#include <linux/sched.h>
-+#include <linux/ssif-bmc.h>
-+#include <linux/timer.h>
 +#include <linux/mutex.h>
-+#include <linux/slab.h>
 +#include <linux/spinlock.h>
-+#include <linux/uaccess.h>
-+#include <linux/wait.h>
 +
-+#include <linux/bitfield.h>
-+#include <linux/clk.h>
-+#include <linux/debugfs.h>
-+#include <linux/iopoll.h>
-+#include <linux/irq.h>
-+#include <linux/jiffies.h>
-+#include <linux/kernel.h>
-+#include <linux/mfd/syscon.h>
++#include "ssif_bmc.h"
 +
-+#define PFX "IPMI SSIF BMC : "
++#define POLY    (0x1070U << 3)
++static u8 crc8(u16 data)
++{
++	int i;
 +
-+#define DEVICE_NAME	"ipmi-ssif-host"
++	for (i = 0; i < 8; i++) {
++		if (data & 0x8000)
++			data = data ^ POLY;
++		data = data << 1;
++	}
++	return (u8)(data >> 8);
++}
 +
-+#define MSG_PAYLOAD_LEN_MAX	252
++/* Incremental CRC8 over count bytes in the array pointed to by p */
++static u8 i2c_calculate_pec(u8 crc, u8 *p, size_t count)
++{
++	int i;
++
++	for (i = 0; i < count; i++)
++		crc = crc8((crc ^ p[i]) << 8);
++	return crc;
++}
++
++static u8 i2c_8bit_addr(u8 addr_7bit)
++{
++	return (addr_7bit << 1);
++}
++
++/*
++ * Call in WRITE context
++ */
++static int send_ssif_bmc_response(struct ssif_bmc_ctx *ssif_bmc, bool non_blocking)
++{
++	unsigned long flags;
++	int ret;
++
++	if (!non_blocking) {
++retry:
++		ret = wait_event_interruptible(ssif_bmc->wait_queue,
++				!ssif_bmc->response_in_progress);
++		if (ret)
++			return ret;
++	}
++
++	spin_lock_irqsave(&ssif_bmc->lock, flags);
++	if (ssif_bmc->response_in_progress) {
++		spin_unlock_irqrestore(&ssif_bmc->lock, flags);
++		if (non_blocking)
++			return -EAGAIN;
++
++		goto retry;
++	}
++
++	/*
++	 * Check the response data length from userspace to determine the type
++	 * of the response message whether it is single-part or multi-part.
++	 */
++	ssif_bmc->is_multi_part_read =
++		(ssif_msg_len(&ssif_bmc->response) >
++		 (MAX_PAYLOAD_PER_TRANSACTION + 1)) ?
++		true : false; /* 1: byte of length */
++
++	ssif_bmc->response_in_progress = true;
++	spin_unlock_irqrestore(&ssif_bmc->lock, flags);
++
++	return 0;
++}
++
++/*
++ * Call in READ context
++ */
++static int receive_ssif_bmc_request(struct ssif_bmc_ctx *ssif_bmc, bool non_blocking)
++{
++	unsigned long flags;
++	int ret;
++
++	if (!non_blocking) {
++retry:
++		ret = wait_event_interruptible(
++				ssif_bmc->wait_queue,
++				ssif_bmc->request_available);
++		if (ret)
++			return ret;
++	}
++
++	spin_lock_irqsave(&ssif_bmc->lock, flags);
++	if (!ssif_bmc->request_available) {
++		spin_unlock_irqrestore(&ssif_bmc->lock, flags);
++		if (non_blocking)
++			return -EAGAIN;
++		goto retry;
++	}
++	spin_unlock_irqrestore(&ssif_bmc->lock, flags);
++
++	return 0;
++}
++
++/* Handle SSIF message that will be sent to user */
++static ssize_t ssif_bmc_read(struct file *file, char __user *buf, size_t count,
++					loff_t *ppos)
++{
++	struct ssif_bmc_ctx *ssif_bmc = to_ssif_bmc(file);
++	unsigned long flags;
++	ssize_t ret;
++
++	mutex_lock(&ssif_bmc->file_mutex);
++
++	ret = receive_ssif_bmc_request(ssif_bmc, file->f_flags & O_NONBLOCK);
++	if (ret < 0)
++		goto out;
++
++	spin_lock_irqsave(&ssif_bmc->lock, flags);
++	count = min_t(ssize_t, count, ssif_msg_len(&ssif_bmc->request));
++	ret = copy_to_user(buf, &ssif_bmc->request, count);
++	if (!ret)
++		ssif_bmc->request_available = false;
++	spin_unlock_irqrestore(&ssif_bmc->lock, flags);
++out:
++	mutex_unlock(&ssif_bmc->file_mutex);
++
++	return (ret < 0) ? ret : count;
++}
++
++/* Handle SSIF message that is written by user */
++static ssize_t ssif_bmc_write(struct file *file, const char __user *buf, size_t count,
++					loff_t *ppos)
++{
++	struct ssif_bmc_ctx *ssif_bmc = to_ssif_bmc(file);
++	unsigned long flags;
++	ssize_t ret;
++
++	if (count > sizeof(struct ssif_msg))
++		return -EINVAL;
++
++	mutex_lock(&ssif_bmc->file_mutex);
++
++	spin_lock_irqsave(&ssif_bmc->lock, flags);
++	ret = copy_from_user(&ssif_bmc->response, buf, count);
++	if ( ret || count < ssif_msg_len(&ssif_bmc->response)) {
++		spin_unlock_irqrestore(&ssif_bmc->lock, flags);
++		ret = -EINVAL;
++		goto out;
++	}
++	spin_unlock_irqrestore(&ssif_bmc->lock, flags);
++
++	ret = send_ssif_bmc_response(ssif_bmc, file->f_flags & O_NONBLOCK);
++	if (!ret) {
++		if (ssif_bmc->set_ssif_bmc_status)
++			ssif_bmc->set_ssif_bmc_status(ssif_bmc, SSIF_BMC_READY);
++	}
++out:
++	mutex_unlock(&ssif_bmc->file_mutex);
++
++	return (ret < 0) ? ret : count;
++}
++
++static long ssif_bmc_ioctl(struct file *file, unsigned int cmd, unsigned long param)
++{
++	return 0;
++}
++
++static unsigned int ssif_bmc_poll(struct file *file, poll_table *wait)
++{
++	struct ssif_bmc_ctx *ssif_bmc = to_ssif_bmc(file);
++	unsigned int mask = 0;
++
++	mutex_lock(&ssif_bmc->file_mutex);
++	poll_wait(file, &ssif_bmc->wait_queue, wait);
++
++	/*
++	 * The request message is now available so userspace application can
++	 * get the request
++	 */
++	if (ssif_bmc->request_available)
++		mask |= POLLIN;
++
++	mutex_unlock(&ssif_bmc->file_mutex);
++	return mask;
++}
++
++static int ssif_bmc_open(struct inode *node, struct file *file)
++{
++	// reset status for avoid driver state error
++	struct ssif_bmc_ctx *ssif_bmc = to_ssif_bmc(file);
++
++	mutex_lock(&ssif_bmc->file_mutex);
++	ssif_bmc->request_available = false;
++	ssif_bmc->response_in_progress = false;
++	// will reset automatic at I2C driver get data
++	//ssif_bmc->msg_idx = 0;
++	//ssif_bmc->msg_idwx = 0;
++	mutex_unlock(&ssif_bmc->file_mutex);
++	// avoid while reopen sysfs, the i2c cannot receive data (in master mode)
++	if (ssif_bmc->set_ssif_bmc_status)
++		ssif_bmc->set_ssif_bmc_status(ssif_bmc, SSIF_BMC_READY);
++	printk(KERN_INFO "ssif open\n");
++
++	return 0;
++}
++
++/*
++ * System calls to device interface for user apps
++ */
++static const struct file_operations ssif_bmc_fops = {
++	.owner		= THIS_MODULE,
++	.read		= ssif_bmc_read,
++	.write		= ssif_bmc_write,
++	.poll		= ssif_bmc_poll,
++	.unlocked_ioctl	= ssif_bmc_ioctl,
++	.open		= ssif_bmc_open,
++};
++
++/* Called with ssif_bmc->lock held. */
++static int handle_request(struct ssif_bmc_ctx *ssif_bmc)
++{
++	if (ssif_bmc->set_ssif_bmc_status)
++		ssif_bmc->set_ssif_bmc_status(ssif_bmc, SSIF_BMC_BUSY);
++
++	/* Request message is available to process */
++	ssif_bmc->request_available = true;
++	/*
++	 * This is the new READ request.
++	 * Clear the response buffer of the previous transaction
++	 */
++	memset(&ssif_bmc->response, 0, sizeof(struct ssif_msg));
++	wake_up_all(&ssif_bmc->wait_queue);
++	return 0;
++}
++
++/* Called with ssif_bmc->lock held. */
++static int complete_response(struct ssif_bmc_ctx *ssif_bmc)
++{
++	/* Invalidate response in buffer to denote it having been sent. */
++	ssif_bmc->response.len = 0;
++	ssif_bmc->response_in_progress = false;
++	ssif_bmc->num_bytes_processed = 0;
++	ssif_bmc->remain_data_len = 0;
++	memset(&ssif_bmc->response_buffer, 0, MAX_PAYLOAD_PER_TRANSACTION);
++	wake_up_all(&ssif_bmc->wait_queue);
++	return 0;
++}
++
++static void set_response_buffer(struct ssif_bmc_ctx *ssif_bmc)
++{
++	u8 response_data_len = 0;
++	int idx = 0;
++	u8 data_len;
++	ssif_bmc->bytes_to_send = 0;
++
++	if(ssif_bmc->response.len == 0)
++		return;
++	if (!ssif_bmc->is_multi_part_read) {
++		switch (ssif_bmc->smbus_cmd) {
++		case SSIF_IPMI_RESPONSE:
++			memcpy(ssif_bmc->response_buffer,
++				&ssif_bmc->response,
++				MAX_PAYLOAD_PER_TRANSACTION + 1);
++			ssif_bmc->bytes_to_send = ssif_bmc->response.len + 1;
++			ssif_bmc->block_num = 0xFF;
++			break;
++
++		default:
++			/* Do not expect to go to this case */
++			pr_err("Error: Unexpected SMBus command received 0x%x\n",
++					ssif_bmc->smbus_cmd);
++			break;
++		}
++		return;
++	}
++
++	data_len = ssif_bmc->response.len;
++	switch (ssif_bmc->smbus_cmd) {
++	case SSIF_IPMI_RESPONSE:
++		/*
++		 * Read Start length is 32 bytes.
++		 * Read Start transfer first 30 bytes of IPMI response
++		 * and 2 special code 0x00, 0x01.
++		 */
++		ssif_bmc->remain_data_len =
++			data_len - MAX_IPMI_DATA_PER_START_TRANSACTION;
++		ssif_bmc->block_num = 0;
++
++		ssif_bmc->response_buffer[idx++] = MAX_PAYLOAD_PER_TRANSACTION;
++		ssif_bmc->response_buffer[idx++] = 0x00; /* Start Flag */
++		ssif_bmc->response_buffer[idx++] = 0x01; /* Start Flag */
++		ssif_bmc->response_buffer[idx++] = ssif_bmc->response.netfn_lun;
++		ssif_bmc->response_buffer[idx++] = ssif_bmc->response.cmd;
++
++		response_data_len = MAX_PAYLOAD_PER_TRANSACTION - idx + 1;
++
++		memcpy(&ssif_bmc->response_buffer[idx],
++			ssif_bmc->response.payload,
++			response_data_len);
++		ssif_bmc->bytes_to_send = MAX_PAYLOAD_PER_TRANSACTION;
++		break;
++
++	case SSIF_IPMI_MULTI_PART_RESPONSE_MIDDLE:
++		/*
++		 * IPMI READ Middle or READ End messages can carry up to 31 bytes
++		 * IPMI data plus block number byte.
++		 */
++		if (ssif_bmc->remain_data_len <=
++				MAX_IPMI_DATA_PER_MIDDLE_TRANSACTION) {
++			/*
++			 * This is READ End message
++			 *  Return length is the remaining response data length
++			 *  plus block number
++			 *  Block number 0xFF is to indicate this is last message
++			 *
++			 * Return length is: remain response plus block number
++			 */
++			ssif_bmc->block_num = 0xFF;
++			ssif_bmc->response_buffer[idx++] = ssif_bmc->remain_data_len + 1;
++			ssif_bmc->response_buffer[idx++] = ssif_bmc->block_num;
++			response_data_len = ssif_bmc->remain_data_len;
++		} else {
++			/*
++			 * This is READ Middle message
++			 *  Response length is the maximum SMBUS transfer length
++			 *  Block number byte is incremented
++			 * Return length is maximum SMBUS transfer length
++			 */
++			ssif_bmc->remain_data_len -= MAX_IPMI_DATA_PER_MIDDLE_TRANSACTION;
++			response_data_len = MAX_IPMI_DATA_PER_MIDDLE_TRANSACTION;
++			ssif_bmc->response_buffer[idx++] = MAX_PAYLOAD_PER_TRANSACTION;
++			ssif_bmc->response_buffer[idx++] = ssif_bmc->block_num;
++			ssif_bmc->block_num++;
++		}
++
++		ssif_bmc->bytes_to_send = response_data_len + 2;
++		memcpy(&ssif_bmc->response_buffer[idx],
++			ssif_bmc->response.payload + ssif_bmc->num_bytes_processed,
++			response_data_len);
++		break;
++
++	default:
++		/* Do not expect to go to this case */
++		pr_err("Error: Unexpected SMBus command received 0x%x\n",
++				ssif_bmc->smbus_cmd);
++		break;
++	}
++
++	ssif_bmc->num_bytes_processed += response_data_len;
++
++	return;
++}
++
++/* Process the IPMI response that will be read by master */
++static void event_request_read(struct ssif_bmc_ctx *ssif_bmc, u8 *val)
++{
++	u8 *buf;
++	if(ssif_bmc->msg_idx == 0 &&
++		ssif_bmc->response_buffer[ssif_bmc->msg_idx] == 0) {
++		*val = 1;
++	} else {
++		*val = ssif_bmc->response_buffer[ssif_bmc->msg_idx];
++	}
++}
++
++static void event_received_write(struct ssif_bmc_ctx *ssif_bmc, u8 *val)
++{
++	u8 *buf;
++	u8 index;
++	u8 smbus_cmd;
++
++	buf = (u8 *) &ssif_bmc->request;
++	if (ssif_bmc->msg_idwx >= sizeof(struct ssif_msg))
++		return;
++
++	smbus_cmd = ssif_bmc->smbus_cmd;
++	switch (smbus_cmd) {
++	case SSIF_IPMI_REQUEST:
++		/* Single-part write */
++		buf[ssif_bmc->msg_idwx - 1] = *val;
++		ssif_bmc->msg_idwx++;
++		break;
++	case SSIF_IPMI_MULTI_PART_REQUEST_START:
++	case SSIF_IPMI_MULTI_PART_REQUEST_MIDDLE:
++	case SSIF_IPMI_MULTI_PART_REQUEST_END:
++		/* Multi-part write */
++		if (ssif_bmc->msg_idwx == 1) {
++			/* 2nd byte received is length */
++			if (smbus_cmd == SSIF_IPMI_MULTI_PART_REQUEST_START) {
++				/* Reset length to zero */
++				ssif_bmc->request.len = 0;
++			}
++			ssif_bmc->request.len += *val;
++			ssif_bmc->recv_data_len = *val;
++			ssif_bmc->msg_idwx++;
++			if((smbus_cmd == SSIF_IPMI_MULTI_PART_REQUEST_MIDDLE)
++				&& *val < 0x20)
++				ssif_bmc->smbus_cmd = SSIF_IPMI_MULTI_PART_REQUEST_END;
++			break;
++		}
++		index = ssif_bmc->request.len - ssif_bmc->recv_data_len;
++		buf[ssif_bmc->msg_idwx - 1 + index] = *val;
++		ssif_bmc->msg_idwx++;
++		break;
++	default:
++		/* Do not expect to go to this case */
++		pr_err("Error: Unexpected SMBus command received 0x%x\n",
++				ssif_bmc->smbus_cmd);
++		break;
++	}
++}
++
++static void complete_received(struct ssif_bmc_ctx *ssif_bmc)
++{
++	u8 cmd = ssif_bmc->smbus_cmd;
++
++	if ((cmd == SSIF_IPMI_REQUEST) ||
++	    (cmd == SSIF_IPMI_MULTI_PART_REQUEST_END))
++		handle_request(ssif_bmc);
++
++	return;
++}
++
++static void initialize_transfer(struct ssif_bmc_ctx *ssif_bmc, u8 *val)
++{
++	/* SMBUS command can vary (single or multi-part) */
++	ssif_bmc->smbus_cmd = *val;
++	ssif_bmc->msg_idwx++;
++
++	if((ssif_bmc->smbus_cmd == SSIF_IPMI_REQUEST) ||
++	   (ssif_bmc->smbus_cmd == SSIF_IPMI_MULTI_PART_REQUEST_START))
++	{
++		/* The response can be delayed in BMC causing host SSIF driver
++		   to timeout and send a new request once BMC slave is ready.
++		   In that case check for pending response and clear it
++		 */
++		if(ssif_bmc->response_in_progress)
++		{
++			pr_info("Warn: SSIF new request with pending response");
++			complete_response(ssif_bmc);
++		}
++	}
++	if((ssif_bmc->smbus_cmd == SSIF_IPMI_RESPONSE) ||
++	   (ssif_bmc->smbus_cmd == SSIF_IPMI_MULTI_PART_RESPONSE_MIDDLE) )
++	{
++		set_response_buffer(ssif_bmc);
++	}
++}
++
++/*
++ * Callback function to handle I2C slave events
++ */
++static int ssif_bmc_cb(struct i2c_client *client,
++				enum i2c_slave_event event, u8 *val)
++{
++	struct ssif_bmc_ctx *ssif_bmc = i2c_get_clientdata(client);
++
++	spin_lock(&ssif_bmc->lock);
++
++	/* I2C Event Handler:
++	 *   I2C_SLAVE_READ_REQUESTED	0x0
++	 *   I2C_SLAVE_WRITE_REQUESTED	0x1
++	 *   I2C_SLAVE_READ_PROCESSED	0x2
++	 *   I2C_SLAVE_WRITE_RECEIVED	0x3
++	 *   I2C_SLAVE_STOP		0x4
++	 */
++	switch (event) {;
++
++	case I2C_SLAVE_WRITE_REQUESTED:
++		ssif_bmc->prev_event = I2C_SLAVE_WRITE_REQUESTED;
++		/* Reset message index */
++		ssif_bmc->msg_idx = 0;
++		ssif_bmc->msg_idwx = 0;
++		break;
++
++	case I2C_SLAVE_WRITE_RECEIVED:
++		ssif_bmc->prev_event = I2C_SLAVE_WRITE_RECEIVED;
++		/*
++		 * First byte is SMBUS command, not a part of SSIF message.
++		 * SSIF request buffer starts with msg_idx 1 for the first
++		 *  buffer byte.
++		 */
++		if (ssif_bmc->msg_idwx == 0) {
++			initialize_transfer(ssif_bmc, val);
++		} else {
++			event_received_write(ssif_bmc, val);
++		}
++		break;
++
++	case I2C_SLAVE_READ_PROCESSED:
++		ssif_bmc->prev_event = I2C_SLAVE_READ_PROCESSED;
++		if(ssif_bmc->response_in_progress) {
++			ssif_bmc->msg_idx++;
++			if((ssif_bmc->msg_idx == ssif_bmc->bytes_to_send) &&
++				(ssif_bmc->block_num == 0xFF)) {
++				complete_response(ssif_bmc);
++				break;
++			}
++		}
++	case I2C_SLAVE_READ_REQUESTED:
++		ssif_bmc->prev_event = I2C_SLAVE_READ_REQUESTED;
++		event_request_read(ssif_bmc, val);
++		break;
++
++	case I2C_SLAVE_STOP:
++		/*
++		 * PEC byte is appended at the end of each transaction.
++		 * Detect PEC is support or not after receiving write request
++		 * completely.
++		 */
++		if (ssif_bmc->prev_event == I2C_SLAVE_WRITE_RECEIVED)
++			complete_received(ssif_bmc);
++		break;
++
++	default:
++		break;
++	}
++
++	spin_unlock(&ssif_bmc->lock);
++
++	return 0;
++}
++
++struct ssif_bmc_ctx *ssif_bmc_alloc(struct i2c_client *client, int sizeof_priv)
++{
++	struct ssif_bmc_ctx *ssif_bmc;
++	int ret;
++
++	ssif_bmc = devm_kzalloc(&client->dev, sizeof(*ssif_bmc) + sizeof_priv, GFP_KERNEL);
++	if (!ssif_bmc)
++		return ERR_PTR(-ENOMEM);
++
++	spin_lock_init(&ssif_bmc->lock);
++
++	init_waitqueue_head(&ssif_bmc->wait_queue);
++	ssif_bmc->request_available = false;
++	ssif_bmc->response_in_progress = false;
++
++	mutex_init(&ssif_bmc->file_mutex);
++
++	/* Register misc device interface */
++	ssif_bmc->miscdev.minor = MISC_DYNAMIC_MINOR;
++	ssif_bmc->miscdev.name = DEVICE_NAME;
++	ssif_bmc->miscdev.fops = &ssif_bmc_fops;
++	ssif_bmc->miscdev.parent = &client->dev;
++	ret = misc_register(&ssif_bmc->miscdev);
++	if (ret)
++		goto out;
++
++	ssif_bmc->client = client;
++	ssif_bmc->client->flags |= I2C_CLIENT_SLAVE;
++
++	/* Register I2C slave */
++	i2c_set_clientdata(client, ssif_bmc);
++	ret = i2c_slave_register(client, ssif_bmc_cb);
++	if (ret) {
++		misc_deregister(&ssif_bmc->miscdev);
++		goto out;
++	}
++
++	return ssif_bmc;
++
++out:
++	devm_kfree(&client->dev, ssif_bmc);
++	return ERR_PTR(ret);;
++}
++EXPORT_SYMBOL(ssif_bmc_alloc);
++
++MODULE_AUTHOR("Chuong Tran <chuong@os.amperecomputing.com>");
++MODULE_AUTHOR("Quan Nguyen <quan@os.amperecomputing.com>");
++MODULE_DESCRIPTION("Linux device driver of the BMC IPMI SSIF interface.");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/char/ipmi/ssif_bmc.h b/drivers/char/ipmi/ssif_bmc.h
+new file mode 100644
+index 000000000000..42969f71a8d9
+--- /dev/null
++++ b/drivers/char/ipmi/ssif_bmc.h
+@@ -0,0 +1,91 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * The driver for BMC side of SSIF interface
++ *
++ * Copyright (c) 2021, Ampere Computing LLC
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
++ */
++#ifndef __SSIF_BMC_H__
++#define __SSIF_BMC_H__
++
++#define DEVICE_NAME				"ipmi-ssif-host"
++
++#define MSG_PAYLOAD_LEN_MAX			252
 +
 +/* A standard SMBus Transaction is limited to 32 data bytes */
-+#define MAX_PAYLOAD_PER_TRANSACTION	32
++#define MAX_PAYLOAD_PER_TRANSACTION		32
 +
 +#define MAX_IPMI_DATA_PER_START_TRANSACTION	30
 +#define MAX_IPMI_DATA_PER_MIDDLE_TRANSACTION	31
 +
-+#define	SSIF_IPMI_REQUEST			2
-+#define	SSIF_IPMI_MULTI_PART_REQUEST_START	6
-+#define	SSIF_IPMI_MULTI_PART_REQUEST_MIDDLE	7
-+#define	SSIF_IPMI_RESPONSE			3
-+#define	SSIF_IPMI_MULTI_PART_RESPONSE_MIDDLE	9
++#define	SSIF_IPMI_REQUEST			0x2
++#define	SSIF_IPMI_RESPONSE			0x3
++#define	SSIF_IPMI_MULTI_PART_REQUEST_START	0x6
++#define	SSIF_IPMI_MULTI_PART_REQUEST_MIDDLE	0x7
++#define SSIF_IPMI_MULTI_PART_REQUEST_END	0x8
++#define	SSIF_IPMI_MULTI_PART_RESPONSE_MIDDLE	0x9
 +
 +struct ssif_msg {
 +	u8 len;
@@ -138,169 +740,247 @@ index 000000000000..ed3ef32c0d1c
 +	return ssif_msg->len + 1;
 +}
 +
-+struct ssif_bmc {
++#define SSIF_BMC_BUSY   0x01
++#define SSIF_BMC_READY  0x02
++
++struct ssif_bmc_ctx {
 +	struct i2c_client	*client;
-+	struct npcm_i2c	*i2c_bus;
 +	struct miscdevice	miscdev;
 +	u8			smbus_cmd;
 +	struct ssif_msg		request;
 +	bool			request_available;
 +	struct ssif_msg		response;
 +	bool			response_in_progress;
-+	/* Response buffer for Multi-part Read command */
-+	u8			response_buffer[MAX_PAYLOAD_PER_TRANSACTION];
-+	/* Flag to identify the response is a multi-part */
-+	bool			is_multi_part;
-+	bool			middle_start_response;
++	/* Response buffer for Multi-part Read Transaction */
++	u8			response_buffer[MAX_PAYLOAD_PER_TRANSACTION+1];
++	/* Flag to identify a Multi-part Read Transaction */
++	bool			is_multi_part_read;
 +	u8			num_bytes_processed;
 +	u8			remain_data_len;
-+	/*  Block Number of Multi-part Read Middle command */
++	u8			recv_data_len;
++	u8			bytes_to_send;
++	/* Block Number of a Multi-part Read Transaction */
 +	u8			block_num;
-+	size_t			processed_idx;
 +	size_t			msg_idx;
 +	size_t			msg_idwx;
++	enum i2c_slave_event	prev_event;
++	bool			pec_support;
 +	spinlock_t		lock;
 +	wait_queue_head_t	wait_queue;
 +	struct mutex		file_mutex;
-+	u8			user_num;	// debug only counter
++	void (*set_ssif_bmc_status)(struct ssif_bmc_ctx *, unsigned int );
++	void			*priv;
 +};
 +
-+/* ASPEED I2C Register */
-+#define ASPEED_I2C_FUN_CTRL_REG				0x00
-+#define ASPEED_I2C_AC_TIMING_REG1			0x04
-+#define ASPEED_I2C_AC_TIMING_REG2			0x08
-+#define ASPEED_I2C_INTR_CTRL_REG			0x0c
-+#define ASPEED_I2C_INTR_STS_REG				0x10
-+#define ASPEED_I2C_CMD_REG				0x14
-+#define ASPEED_I2C_DEV_ADDR_REG				0x18
-+#define ASPEED_I2C_BYTE_BUF_REG				0x20
++static inline struct ssif_bmc_ctx *to_ssif_bmc(struct file *file)
++{
++	return container_of(file->private_data, struct ssif_bmc_ctx, miscdev);
++}
 +
-+/* Global Register Definition */
-+/* 0x00 : I2C Interrupt Status Register  */
-+/* 0x08 : I2C Interrupt Target Assignment  */
++struct ssif_bmc_ctx *ssif_bmc_alloc(struct i2c_client *client, int sizeof_priv);
 +
-+/* Device Register Definition */
-+/* 0x00 : I2CD Function Control Register  */
-+#define ASPEED_I2CD_MULTI_MASTER_DIS			BIT(15)
-+#define ASPEED_I2CD_SDA_DRIVE_1T_EN			BIT(8)
-+#define ASPEED_I2CD_M_SDA_DRIVE_1T_EN			BIT(7)
-+#define ASPEED_I2CD_M_HIGH_SPEED_EN			BIT(6)
-+#define ASPEED_I2CD_SLAVE_EN				BIT(1)
-+#define ASPEED_I2CD_MASTER_EN				BIT(0)
-+
-+/* 0x04 : I2CD Clock and AC Timing Control Register #1 */
-+#define ASPEED_I2CD_TIME_TBUF_MASK			GENMASK(31, 28)
-+#define ASPEED_I2CD_TIME_THDSTA_MASK			GENMASK(27, 24)
-+#define ASPEED_I2CD_TIME_TACST_MASK			GENMASK(23, 20)
-+#define ASPEED_I2CD_TIME_SCL_HIGH_SHIFT			16
-+#define ASPEED_I2CD_TIME_SCL_HIGH_MASK			GENMASK(19, 16)
-+#define ASPEED_I2CD_TIME_SCL_LOW_SHIFT			12
-+#define ASPEED_I2CD_TIME_SCL_LOW_MASK			GENMASK(15, 12)
-+#define ASPEED_I2CD_TIME_BASE_DIVISOR_MASK		GENMASK(3, 0)
-+#define ASPEED_I2CD_TIME_SCL_REG_MAX			GENMASK(3, 0)
-+/* 0x08 : I2CD Clock and AC Timing Control Register #2 */
-+#define ASPEED_NO_TIMEOUT_CTRL				0
-+
-+/* 0x0c : I2CD Interrupt Control Register &
-+ * 0x10 : I2CD Interrupt Status Register
++#endif /* __SSIF_BMC_H__ */
+diff --git a/drivers/char/ipmi/ssif_bmc_aspeed.c b/drivers/char/ipmi/ssif_bmc_aspeed.c
+new file mode 100644
+index 000000000000..a563fcff5acc
+--- /dev/null
++++ b/drivers/char/ipmi/ssif_bmc_aspeed.c
+@@ -0,0 +1,132 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * The driver for BMC side of Aspeed SSIF interface
 + *
-+ * These share bit definitions, so use the same values for the enable &
-+ * status bits.
++ * Copyright (c) 2021, Ampere Computing LLC
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 + */
-+#define ASPEED_I2CD_INTR_SDA_DL_TIMEOUT			BIT(14)
-+#define ASPEED_I2CD_INTR_BUS_RECOVER_DONE		BIT(13)
-+#define ASPEED_I2CD_INTR_SLAVE_MATCH			BIT(7)
-+#define ASPEED_I2CD_INTR_SCL_TIMEOUT			BIT(6)
-+#define ASPEED_I2CD_INTR_ABNORMAL			BIT(5)
-+#define ASPEED_I2CD_INTR_NORMAL_STOP			BIT(4)
-+#define ASPEED_I2CD_INTR_ARBIT_LOSS			BIT(3)
-+#define ASPEED_I2CD_INTR_RX_DONE			BIT(2)
-+#define ASPEED_I2CD_INTR_TX_NAK				BIT(1)
-+#define ASPEED_I2CD_INTR_TX_ACK				BIT(0)
-+#define ASPEED_I2CD_INTR_ALL						\
-+		(ASPEED_I2CD_INTR_SDA_DL_TIMEOUT |			\
-+		 ASPEED_I2CD_INTR_BUS_RECOVER_DONE |			\
-+		 ASPEED_I2CD_INTR_SCL_TIMEOUT |				\
-+		 ASPEED_I2CD_INTR_ABNORMAL |				\
-+		 ASPEED_I2CD_INTR_NORMAL_STOP |				\
-+		 ASPEED_I2CD_INTR_ARBIT_LOSS |				\
-+		 ASPEED_I2CD_INTR_RX_DONE |				\
-+		 ASPEED_I2CD_INTR_TX_NAK |				\
-+		 ASPEED_I2CD_INTR_TX_ACK)
 +
-+/* 0x14 : I2CD Command/Status Register	*/
-+#define ASPEED_I2CD_SCL_LINE_STS			BIT(18)
-+#define ASPEED_I2CD_SDA_LINE_STS			BIT(17)
-+#define ASPEED_I2CD_BUS_BUSY_STS			BIT(16)
-+#define ASPEED_I2CD_BUS_RECOVER_CMD			BIT(11)
++#include <linux/i2c.h>
++#include <linux/miscdevice.h>
++#include <linux/module.h>
++#include <linux/poll.h>
++#include <linux/iopoll.h>
 +
-+/* Command Bit */
-+#define ASPEED_I2CD_M_STOP_CMD				BIT(5)
-+#define ASPEED_I2CD_M_S_RX_CMD_LAST			BIT(4)
-+#define ASPEED_I2CD_M_RX_CMD				BIT(3)
-+#define ASPEED_I2CD_S_TX_CMD				BIT(2)
-+#define ASPEED_I2CD_M_TX_CMD				BIT(1)
-+#define ASPEED_I2CD_M_START_CMD				BIT(0)
++#include "ssif_bmc.h"
 +
-+/* 0x18 : I2CD Slave Device Address Register	*/
-+#define ASPEED_I2CD_DEV_ADDR_MASK			GENMASK(6, 0)
-+
-+enum aspeed_i2c_master_state {
-+	ASPEED_I2C_MASTER_INACTIVE,
-+	ASPEED_I2C_MASTER_START,
-+	ASPEED_I2C_MASTER_TX_FIRST,
-+	ASPEED_I2C_MASTER_TX,
-+	ASPEED_I2C_MASTER_RX_FIRST,
-+	ASPEED_I2C_MASTER_RX,
-+	ASPEED_I2C_MASTER_STOP,
++struct aspeed_i2c_bus {
++	struct i2c_adapter              adap;
++	struct device                   *dev;
++	void __iomem                    *base;
++	struct reset_control            *rst;
++	/* Synchronizes I/O mem access to base. */
++	spinlock_t                      lock;
 +};
 +
-+enum aspeed_i2c_slave_state {
-+	ASPEED_I2C_SLAVE_STOP,
-+	ASPEED_I2C_SLAVE_START,
-+	ASPEED_I2C_SLAVE_READ_REQUESTED,
-+	ASPEED_I2C_SLAVE_READ_PROCESSED,
-+	ASPEED_I2C_SLAVE_WRITE_REQUESTED,
-+	ASPEED_I2C_SLAVE_WRITE_RECEIVED,
++#define ASPEED_I2C_INTR_CTRL_REG	0x0c
++#define ASPEED_I2CD_INTR_SLAVE_MATCH	BIT(7)
++#define ASPEED_I2CD_INTR_RX_DONE	BIT(2)
++static void aspeed_i2c_enable_interrupt(struct aspeed_i2c_bus *bus, unsigned long mask)
++{
++	unsigned long current_mask;
++
++	current_mask = readl(bus->base + ASPEED_I2C_INTR_CTRL_REG);
++	writel(current_mask | mask, bus->base + ASPEED_I2C_INTR_CTRL_REG);
++}
++
++static void aspeed_i2c_disable_interrupt(struct aspeed_i2c_bus *bus, unsigned long mask)
++{
++	unsigned long current_mask;
++
++	current_mask = readl(bus->base + ASPEED_I2C_INTR_CTRL_REG);
++	writel(current_mask & ~mask, bus->base + ASPEED_I2C_INTR_CTRL_REG);
++}
++
++static void aspeed_set_ssif_bmc_status(struct ssif_bmc_ctx *ssif_bmc, unsigned int status)
++{
++	struct aspeed_i2c_bus *bus;
++	unsigned long flags;
++
++	bus = (struct aspeed_i2c_bus *)ssif_bmc->priv;
++	if (!bus)
++		return;
++
++	spin_lock_irqsave(&bus->lock, flags);
++
++	if (status & SSIF_BMC_BUSY) {
++		/* Ignore RX_DONE and SLAVE_MATCH when slave busy processing */
++		aspeed_i2c_disable_interrupt(bus, ASPEED_I2CD_INTR_RX_DONE);
++		aspeed_i2c_disable_interrupt(bus, ASPEED_I2CD_INTR_SLAVE_MATCH);
++	} else if (status & SSIF_BMC_READY) {
++		/* Enable RX_DONE and SLAVE_MATCH when slave ready */
++		aspeed_i2c_enable_interrupt(bus, ASPEED_I2CD_INTR_RX_DONE);
++		aspeed_i2c_enable_interrupt(bus, ASPEED_I2CD_INTR_SLAVE_MATCH);
++	}
++
++	spin_unlock_irqrestore(&bus->lock, flags);
++}
++
++static int ssif_bmc_probe(struct i2c_client *client, const struct i2c_device_id *id)
++{
++	struct ssif_bmc_ctx *ssif_bmc;
++
++	ssif_bmc = ssif_bmc_alloc(client, sizeof(struct aspeed_i2c_bus));
++	if (IS_ERR(ssif_bmc))
++		return PTR_ERR(ssif_bmc);
++
++	ssif_bmc->priv = i2c_get_adapdata(client->adapter);
++	ssif_bmc->set_ssif_bmc_status = aspeed_set_ssif_bmc_status;
++
++	return 0;
++}
++
++static int ssif_bmc_remove(struct i2c_client *client)
++{
++	struct ssif_bmc_ctx *ssif_bmc = i2c_get_clientdata(client);
++
++	i2c_slave_unregister(client);
++	misc_deregister(&ssif_bmc->miscdev);
++
++	return 0;
++}
++
++static const struct of_device_id ssif_bmc_match[] = {
++	{ .compatible = "aspeed,ast2500-ssif-bmc" },
++	{ },
 +};
++
++static const struct i2c_device_id ssif_bmc_id[] = {
++	{ DEVICE_NAME, 0 },
++	{ },
++};
++
++MODULE_DEVICE_TABLE(i2c, ssif_bmc_id);
++
++static struct i2c_driver ssif_bmc_driver = {
++	.driver		= {
++		.name		= DEVICE_NAME,
++		.of_match_table = ssif_bmc_match,
++	},
++	.probe		= ssif_bmc_probe,
++	.remove		= ssif_bmc_remove,
++	.id_table	= ssif_bmc_id,
++};
++
++module_i2c_driver(ssif_bmc_driver);
++
++MODULE_AUTHOR("Chuong Tran <chuong@os.amperecomputing.com>");
++MODULE_AUTHOR("Quan Nguyen <quan@os.amperecomputing.com>");
++MODULE_DESCRIPTION("Linux device driver of Aspeed BMC IPMI SSIF interface.");
++MODULE_LICENSE("GPL v2");
+diff --git a/drivers/char/ipmi/ssif_bmc_npcm7xx.c b/drivers/char/ipmi/ssif_bmc_npcm7xx.c
+new file mode 100644
+index 000000000000..1568234c9f60
+--- /dev/null
++++ b/drivers/char/ipmi/ssif_bmc_npcm7xx.c
+@@ -0,0 +1,331 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * The driver for BMC side of NPCM7xx SSIF interface
++ *
++ * Copyright (c) 2021, Ampere Computing LLC
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
++ */
++
++
++#include <linux/bitfield.h>
++#include <linux/i2c.h>
++#include <linux/miscdevice.h>
++#include <linux/module.h>
++#include <linux/poll.h>
++#include <linux/iopoll.h>
++
++#include "ssif_bmc.h"
 +
 +/* Common regs */
-+#define NPCM_I2CSDA			0x00
-+#define NPCM_I2CST			0x02
-+#define NPCM_I2CCST			0x04
-+#define NPCM_I2CCTL1			0x06
-+#define NPCM_I2CADDR1			0x08
-+#define NPCM_I2CCTL2			0x0A
-+#define NPCM_I2CADDR2			0x0C
-+#define NPCM_I2CCTL3			0x0E
-+#define NPCM_I2CCST2			0x18
-+#define NPCM_I2CCST3			0x19
-+#define I2C_VER				0x1F
++ #define NPCM_I2CCTL1            0x06
++ #define NPCM_I2CADDR1            0x08
++ #define NPCM_I2CCTL2            0x0A
++ #define NPCM_I2CADDR2            0x0C
++ #define NPCM_I2CCTL3            0x0E
++ #define I2C_VER                0x1F
 +
-+/* NPCM_I2CCTL3 reg fields */
-+#define NPCM_I2CCTL3_SCLFRQ8_7		GENMASK(1, 0)
-+#define NPCM_I2CCTL3_ARPMEN		BIT(2)
-+#define NPCM_I2CCTL3_IDL_START		BIT(3)
-+#define NPCM_I2CCTL3_400K_MODE		BIT(4)
-+#define NPCM_I2CCTL3_BNK_SEL		BIT(5)
-+#define NPCM_I2CCTL3_SDA_LVL		BIT(6)
-+#define NPCM_I2CCTL3_SCL_LVL		BIT(7)
++ /* NPCM_I2CCTL3 reg fields */
++ #define NPCM_I2CCTL3_ARPMEN        BIT(2)
++ #define NPCM_I2CCTL3_BNK_SEL        BIT(5)
 +
-+/* NPCM_I2CCTL1 reg fields */
-+#define NPCM_I2CCTL1_START		BIT(0)
-+#define NPCM_I2CCTL1_STOP		BIT(1)
-+#define NPCM_I2CCTL1_INTEN		BIT(2)
-+#define NPCM_I2CCTL1_EOBINTE		BIT(3)
-+#define NPCM_I2CCTL1_ACK		BIT(4)
-+#define NPCM_I2CCTL1_GCMEN		BIT(5)
-+#define NPCM_I2CCTL1_NMINTE		BIT(6)
-+#define NPCM_I2CCTL1_STASTRE		BIT(7)
++ /* NPCM_I2CCTL1 reg fields */
++ #define NPCM_I2CCTL1_START        BIT(0)
++ #define NPCM_I2CCTL1_STOP        BIT(1)
++ #define NPCM_I2CCTL1_INTEN        BIT(2)
++ #define NPCM_I2CCTL1_EOBINTE        BIT(3)
++ #define NPCM_I2CCTL1_ACK        BIT(4)
++ #define NPCM_I2CCTL1_GCMEN        BIT(5)
++ #define NPCM_I2CCTL1_NMINTE        BIT(6)
++ #define NPCM_I2CCTL1_STASTRE        BIT(7)
 +
-+#define I2C_HW_FIFO_SIZE		16
++ #define I2C_HW_FIFO_SIZE        16
 +
-+#define NPCM_I2CADDR_SAEN		BIT(7)
++ #define NPCM_I2CADDR_SAEN        BIT(7)
 +
-+/* RW1S fields (inside a RW reg): */
++ /* RW1S fields (inside a RW reg): */
 +#define NPCM_I2CCTL1_RWS   \
 +	(NPCM_I2CCTL1_START | NPCM_I2CCTL1_STOP | NPCM_I2CCTL1_ACK)
 +
@@ -380,135 +1060,55 @@ index 000000000000..ed3ef32c0d1c
 +	I2C_READ_OPER,
 +};
 +
-+struct aspeed_i2c_bus {
-+	struct i2c_adapter		adap;
-+	struct device			*dev;
-+	void __iomem			*base;
-+	struct reset_control		*rst;
-+	/* Synchronizes I/O mem access to base. */
-+	spinlock_t			lock;
-+	struct completion		cmd_complete;
-+	u32				(*get_clk_reg_val)(u32 divisor);
-+	unsigned long			parent_clk_frequency;
-+	u32				bus_frequency;
-+	/* Transaction state. */
-+	enum aspeed_i2c_master_state	master_state;
-+	struct i2c_msg			*msgs;
-+	size_t				buf_index;
-+	size_t				msgs_index;
-+	size_t				msgs_count;
-+	bool				send_stop;
-+	int				cmd_err;
-+	/* Protected only by i2c_lock_bus */
-+	int				master_xfer_result;
-+#if IS_ENABLED(CONFIG_I2C_SLAVE)
-+	struct i2c_client		*slave;
-+	enum aspeed_i2c_slave_state	slave_state;
-+	bool				stop_bus;
-+#endif /* CONFIG_I2C_SLAVE */
-+};
-+
-+/* Status of one I2C module */
 +struct npcm_i2c {
-+	struct i2c_adapter		adap;
-+	struct device			*dev;
-+	unsigned char __iomem		*reg;
-+	spinlock_t lock;  /* IRQ synchronization */
-+	struct completion		cmd_complete;
-+	int				cmd_err;
-+	struct i2c_msg			*msgs;
-+	int				msgs_num;
-+	int				num;
-+	u32				apb_clk;
++	struct i2c_adapter	adap;
++	struct device		*dev;
++	unsigned char __iomem	*reg;
++	spinlock_t		lock;  /* IRQ synchronization */
++	struct completion	cmd_complete;
++	int			cmd_err;
++	struct i2c_msg		*msgs;
++	int			msgs_num;
++	int			num;
++	u32			apb_clk;
 +	struct i2c_bus_recovery_info	rinfo;
-+	enum i2c_state			state;
-+	enum i2c_oper			operation;
-+	enum i2c_mode			master_or_slave;
-+	enum i2c_state_ind		stop_ind;
-+	u8				dest_addr;
-+	u8				*rd_buf;
-+	u16				rd_size;
-+	u16				rd_ind;
-+	u8				*wr_buf;
-+	u16				wr_size;
-+	u16				wr_ind;
-+	bool				fifo_use;
-+	u16				PEC_mask; /* PEC bit mask per slave address */
-+	bool				PEC_use;
-+	bool				read_block_use;
-+	unsigned long			int_time_stamp;
-+	unsigned long			bus_freq; /* in Hz */
++	enum i2c_state		state;
++	enum i2c_oper		operation;
++	enum i2c_mode		master_or_slave;
++	enum i2c_state_ind	stop_ind;
++	u8			dest_addr;
++	u8			*rd_buf;
++	u16			rd_size;
++	u16			rd_ind;
++	u8			*wr_buf;
++	u16			wr_size;
++	u16			wr_ind;
++	bool			fifo_use;
++	u16			PEC_mask; /* PEC bit mask per slave address */
++	bool			PEC_use;
++	bool			read_block_use;
++	unsigned long		int_time_stamp;
++	unsigned long		bus_freq; /* in Hz */
 +#if IS_ENABLED(CONFIG_I2C_SLAVE)
-+	u8				own_slave_addr;
-+	struct i2c_client		*slave;
-+	int				slv_rd_size;
-+	int				slv_rd_ind;
-+	int				slv_wr_size;
-+	int				slv_wr_ind;
-+	u8				slv_rd_buf[I2C_HW_FIFO_SIZE];
-+	u8				slv_wr_buf[I2C_HW_FIFO_SIZE];
++	u8			own_slave_addr;
++	struct i2c_client	*slave;
++	int			slv_rd_size;
++	int			slv_rd_ind;
++	int			slv_wr_size;
++	int			slv_wr_ind;
++	u8			slv_rd_buf[I2C_HW_FIFO_SIZE];
++	u8			slv_wr_buf[I2C_HW_FIFO_SIZE];
 +#endif
-+	struct dentry			*debugfs; /* debugfs device directory */
-+	u64				ber_cnt;
-+	u64				rec_succ_cnt;
-+	u64				rec_fail_cnt;
-+	u64				nack_cnt;
-+	u64				timeout_cnt;
++	struct dentry		*debugfs; /* debugfs device directory */
++	u64			ber_cnt;
++	u64			rec_succ_cnt;
++	u64			rec_fail_cnt;
++	u64			nack_cnt;
++	u64			timeout_cnt;
 +};
-+
-+void aspeed_i2c_disable_interrupt (struct aspeed_i2c_bus *bus,
-+		unsigned long mask)
-+{
-+	unsigned long current_mask;
-+
-+	current_mask = readl(bus->base + ASPEED_I2C_INTR_CTRL_REG);
-+	writel(current_mask & ~mask, bus->base + ASPEED_I2C_INTR_CTRL_REG);
-+
-+	return;
-+}
-+
-+void aspeed_i2c_disable_slave(struct aspeed_i2c_bus *bus)
-+{
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&bus->lock, flags);
-+
-+	aspeed_i2c_disable_interrupt(bus, ASPEED_I2CD_INTR_RX_DONE);
-+	aspeed_i2c_disable_interrupt(bus, ASPEED_I2CD_INTR_SLAVE_MATCH);
-+
-+	spin_unlock_irqrestore(&bus->lock, flags);
-+
-+	return;
-+}
-+
-+void aspeed_i2c_enable_interrupt (struct aspeed_i2c_bus *bus,
-+		unsigned long mask)
-+{
-+	unsigned long current_mask;
-+
-+	current_mask = readl(bus->base + ASPEED_I2C_INTR_CTRL_REG);
-+	writel(current_mask | mask, bus->base + ASPEED_I2C_INTR_CTRL_REG);
-+
-+	return;
-+}
-+
-+void aspeed_i2c_enable_slave(struct aspeed_i2c_bus *bus)
-+{
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&bus->lock, flags);
-+
-+	aspeed_i2c_enable_interrupt(bus, ASPEED_I2CD_INTR_RX_DONE);
-+	aspeed_i2c_enable_interrupt(bus, ASPEED_I2CD_INTR_SLAVE_MATCH);
-+
-+	spin_unlock_irqrestore(&bus->lock, flags);
-+
-+	return;
-+}
-+
 +
 +static inline void npcm_i2c_select_bank(struct npcm_i2c *bus,
-+					enum i2c_bank bank)
++		enum i2c_bank bank)
 +{
 +	u8 i2cctl3 = ioread8(bus->reg + NPCM_I2CCTL3);
 +
@@ -516,6 +1116,7 @@ index 000000000000..ed3ef32c0d1c
 +		i2cctl3 = i2cctl3 & ~NPCM_I2CCTL3_BNK_SEL;
 +	else
 +		i2cctl3 = i2cctl3 | NPCM_I2CCTL3_BNK_SEL;
++
 +	iowrite8(i2cctl3, bus->reg + NPCM_I2CCTL3);
 +}
 +
@@ -530,569 +1131,96 @@ index 000000000000..ed3ef32c0d1c
 +		i2cctl1 |= NPCM_I2CCTL1_NMINTE;
 +	else
 +		i2cctl1 &= ~NPCM_I2CCTL1_NMINTE;
++
 +	iowrite8(i2cctl1, bus->reg + NPCM_I2CCTL1);
 +}
 +
 +static int npcm_i2c_slave_enable(struct npcm_i2c *bus, enum i2c_addr addr_type,
-+				 u8 addr, bool enable)
++		u8 addr, bool enable)
 +{
-+	unsigned long flags;
++	u8 i2cctl1;
++	u8 i2cctl3;
++	u8 sa_reg;
++	int ret = 0;
 +
-+	spin_lock_irqsave(&bus->lock, flags);
++	sa_reg = (addr & 0x7F) | FIELD_PREP(NPCM_I2CADDR_SAEN, enable);
++	if (addr_type == I2C_GC_ADDR) {
++		i2cctl1 = ioread8(bus->reg + NPCM_I2CCTL1);
++		if (enable)
++			i2cctl1 |= NPCM_I2CCTL1_GCMEN;
++		else
++			i2cctl1 &= ~NPCM_I2CCTL1_GCMEN;
 +
-+	//npcm_i2c_slave_int_enable(bus, enable);
-+	if (!enable)
-+		iowrite8((bus->slave->addr & 0x7F),
-+				 bus->reg + NPCM_I2CADDR1);
-+	else
-+		iowrite8((bus->slave->addr & 0x7F) | NPCM_I2CADDR_SAEN,
-+			 bus->reg + NPCM_I2CADDR1);
-+	spin_unlock_irqrestore(&bus->lock, flags);
-+	return 0;
-+}
-+
-+/*
-+ * Call in READ context
-+ */
-+static int receive_ssif_bmc_request(struct ssif_bmc *ssif_bmc, bool non_blocking,
-+					struct ssif_msg *request)
-+{
-+	int res;
-+	unsigned long flags;
-+
-+	if (!non_blocking) {
-+try_again:
-+		res = wait_event_interruptible(
-+				ssif_bmc->wait_queue,
-+				ssif_bmc->request_available);
-+		if (res)
-+			return res;
-+	}
-+
-+	spin_lock_irqsave(&ssif_bmc->lock, flags);
-+	if (!ssif_bmc->request_available) {
-+		spin_unlock_irqrestore(&ssif_bmc->lock, flags);
-+		if (non_blocking)
-+			return -EAGAIN;
-+		goto try_again;
-+	}
-+
-+	memcpy(request, &ssif_bmc->request, sizeof(*request));
-+	ssif_bmc->request_available = false;
-+	spin_unlock_irqrestore(&ssif_bmc->lock, flags);
-+
-+	return 0;
-+}
-+
-+/*
-+ * Call in WRITE context
-+ */
-+static int send_ssif_bmc_response(struct ssif_bmc *ssif_bmc, bool non_blocking,
-+					struct ssif_msg *response)
-+{
-+	int res;
-+	unsigned long flags;
-+	u8 *buf = (u8*)response;
-+
-+	if (!non_blocking) {
-+try_again:
-+		res = wait_event_interruptible(ssif_bmc->wait_queue,
-+					       !ssif_bmc->response_in_progress);
-+		if (res)
-+			return res;
-+	}
-+
-+	spin_lock_irqsave(&ssif_bmc->lock, flags);
-+	if (ssif_bmc->response_in_progress) {
-+		spin_unlock_irqrestore(&ssif_bmc->lock, flags);
-+		if (non_blocking)
-+			return -EAGAIN;
-+		goto try_again;
-+	}
-+
-+	memcpy(&ssif_bmc->response, response, sizeof(*response));
-+	ssif_bmc->response_in_progress = true;
-+
-+	/* Check the response length to determine single or multi-part output */
-+	if (ssif_msg_len(&ssif_bmc->response) >
-+		(MAX_PAYLOAD_PER_TRANSACTION + 1)) { /* 1: byte of length */
-+		ssif_bmc->is_multi_part = true;
-+	} else {
-+		ssif_bmc->is_multi_part = false;
-+	}
-+
-+	spin_unlock_irqrestore(&ssif_bmc->lock, flags);
-+
-+	return 0;
-+}
-+
-+static inline struct ssif_bmc *to_ssif_bmc(struct file *file)
-+{
-+	return container_of(file->private_data, struct ssif_bmc, miscdev);
-+}
-+
-+/* Handle SSIF message that will be sent to user */
-+static ssize_t ssif_bmc_read(struct file *file, char __user *buf, size_t count,
-+					loff_t *ppos)
-+{
-+	struct ssif_bmc *ssif_bmc = to_ssif_bmc(file);
-+	struct ssif_msg msg;
-+	ssize_t ret;
-+
-+	mutex_lock(&ssif_bmc->file_mutex);
-+	ret = receive_ssif_bmc_request(ssif_bmc, file->f_flags, &msg);
-+	if (ret < 0)
++		iowrite8(i2cctl1, bus->reg + NPCM_I2CCTL1);
 +		goto out;
-+	count = min_t(ssize_t, count, ssif_msg_len(&msg));
-+	if (copy_to_user(buf, &msg, count)) {
++	}
++
++	if (addr_type == I2C_ARP_ADDR) {
++		i2cctl3 = ioread8(bus->reg + NPCM_I2CCTL3);
++		if (enable)
++			i2cctl3 |= NPCM_I2CCTL3_ARPMEN;
++		else
++			i2cctl3 &= ~NPCM_I2CCTL3_ARPMEN;
++		iowrite8(i2cctl3, bus->reg + NPCM_I2CCTL3);
++		goto out;
++	}
++
++	if (addr_type >= I2C_ARP_ADDR) {
 +		ret = -EFAULT;
 +		goto out;
 +	}
 +
++	/* select bank 0 for address 3 to 10 */
++	if (addr_type > I2C_SLAVE_ADDR2)
++		npcm_i2c_select_bank(bus, I2C_BANK_0);
++	/* Set and enable the address */
++	iowrite8(sa_reg, bus->reg + npcm_i2caddr[addr_type]);
++	npcm_i2c_slave_int_enable(bus, enable);
++	if (addr_type > I2C_SLAVE_ADDR2)
++		npcm_i2c_select_bank(bus, I2C_BANK_1);
++
 +out:
-+	mutex_unlock(&ssif_bmc->file_mutex);
-+	if (ret < 0)
-+		return ret;
-+	else
-+		return count;
-+}
-+
-+/* Handle SSIF message that is written by user */
-+static ssize_t ssif_bmc_write(struct file *file, const char __user *buf, size_t count,
-+					loff_t *ppos)
-+{
-+	struct ssif_bmc *ssif_bmc = to_ssif_bmc(file);
-+	struct ssif_msg msg;
-+	ssize_t ret;
-+	struct i2c_client *client = ssif_bmc->client;
-+	struct npcm_i2c *bus = i2c_get_adapdata(client->adapter);
-+
-+	if (count > sizeof(msg))
-+		return -EINVAL;
-+
-+	if (copy_from_user(&msg, buf, count) || count < ssif_msg_len(&msg))
-+		return -EINVAL;
-+
-+	mutex_lock(&ssif_bmc->file_mutex);
-+	ret = send_ssif_bmc_response(ssif_bmc, file->f_flags, &msg);
-+	mutex_unlock(&ssif_bmc->file_mutex);
-+
-+	if (ret < 0)
-+		return ret;
-+#if 1
-+	/* FIXME: Re-enable I2C Slave to accept the incoming interrupt.
-+	 * When user application is done with the response, master can
-+	 * start to get the response after this.
-+	 */
-+	//if (IS_ENABLED(CONFIG_ARCH_NPCM7XX))
-+		npcm_i2c_slave_enable(bus, I2C_SLAVE_ADDR1, client->addr, true);
-+//	else
-+//		aspeed_i2c_enable_slave(ssif_bmc->i2c_bus);
-+#endif
-+	return count;
-+}
-+
-+static long ssif_bmc_ioctl(struct file *file, unsigned int cmd, unsigned long param)
-+{
 +	return 0;
++
 +}
 +
-+static unsigned int ssif_bmc_poll(struct file *file, poll_table *wait)
++void npcm_set_ssif_bmc_status(struct ssif_bmc_ctx *ssif_bmc, unsigned int status)
 +{
-+	struct ssif_bmc *ssif_bmc = to_ssif_bmc(file);
-+	unsigned int mask = 0;
++	struct npcm_i2c *bus;
++	unsigned long flags;
 +
-+	mutex_lock(&ssif_bmc->file_mutex);
-+	poll_wait(file, &ssif_bmc->wait_queue, wait);
-+
-+	/* Allows user app can start to get the request */
-+	if (ssif_bmc->request_available)
-+		mask |= POLLIN;
-+
-+	mutex_unlock(&ssif_bmc->file_mutex);
-+	return mask;
-+}
-+
-+static int ssif_bmc_open(struct inode *node, struct file *f)
-+{
-+	// reset status for avoid driver state error
-+	struct ssif_bmc *ssif_bmc = to_ssif_bmc(f);
-+	struct npcm_i2c *bus = i2c_get_adapdata(ssif_bmc->client->adapter);
-+
-+	mutex_lock(&ssif_bmc->file_mutex);
-+	ssif_bmc->request_available = false;
-+	ssif_bmc->response_in_progress = false;
-+	ssif_bmc->user_num++;
-+	// will reset automatic at I2C driver get data
-+	//ssif_bmc->msg_idx = 0;
-+	//ssif_bmc->msg_idwx = 0;
-+	mutex_unlock(&ssif_bmc->file_mutex);
-+	// avoid while reopen sysfs, the i2c cannot receive data (in master mode)
-+	npcm_i2c_slave_enable(bus, I2C_SLAVE_ADDR1, ssif_bmc->client->addr, true);
-+	printk(KERN_INFO "ssif open, user:%d\n", ssif_bmc->user_num);
-+	if (ssif_bmc->user_num > 1)
-+		printk(KERN_WARNING "SSIF-BMC only support one client daemon\n");
-+	return 0;
-+}
-+
-+static int ssif_bmc_release(struct inode *node, struct file *f)
-+{
-+	struct ssif_bmc *ssif_bmc = to_ssif_bmc(f);
-+	mutex_lock(&ssif_bmc->file_mutex);
-+	ssif_bmc->user_num--;
-+	mutex_unlock(&ssif_bmc->file_mutex);
-+	return 0;
-+}
-+
-+/*
-+ * System calls to device interface for user apps
-+ */
-+static const struct file_operations ssif_bmc_fops = {
-+	.owner		= THIS_MODULE,
-+	.read		= ssif_bmc_read,
-+	.write		= ssif_bmc_write,
-+	.poll		= ssif_bmc_poll,
-+	.unlocked_ioctl	= ssif_bmc_ioctl,
-+	.open		= ssif_bmc_open,
-+	.release	= ssif_bmc_release,
-+};
-+
-+/* Called with ssif_bmc->lock held. */
-+static int handle_request(struct ssif_bmc *ssif_bmc)
-+{
-+	/* FIXME: Disable I2C Slave to prevent incoming interrupts
-+	 * It should be called as soon as possible right after the request
-+	 * is received.
-+	 */
-+	struct i2c_client *client = ssif_bmc->client;
-+	struct npcm_i2c *bus = i2c_get_adapdata(client->adapter);
-+//#if 1
-+	//if (IS_ENABLED(CONFIG_ARCH_NPCM7XX))
-+		npcm_i2c_slave_enable(bus, I2C_SLAVE_ADDR1, client->addr, false);
-+//	else
-+	//	aspeed_i2c_disable_slave(ssif_bmc->i2c_bus);
-+//#endif
-+
-+	/* Data request is available to process */
-+	ssif_bmc->request_available = true;
-+	/* This is the new READ request.
-+	 * Clear the response buffer of previous transfer
-+	 */
-+	memset(&ssif_bmc->response, 0, sizeof(struct ssif_msg));
-+	wake_up_all(&ssif_bmc->wait_queue);
-+	return 0;
-+}
-+
-+/* Called with ssif_bmc->lock held. */
-+static int complete_response(struct ssif_bmc *ssif_bmc)
-+{
-+	/* Invalidate response in buffer to denote it having been sent. */
-+	ssif_bmc->response.len = 0;
-+	ssif_bmc->response_in_progress = false;
-+	ssif_bmc->num_bytes_processed = 0;
-+	ssif_bmc->remain_data_len = 0;
-+	memset(&ssif_bmc->response_buffer, 0, MAX_PAYLOAD_PER_TRANSACTION);
-+	wake_up_all(&ssif_bmc->wait_queue);
-+	return 0;
-+}
-+
-+static void set_response_buffer(struct ssif_bmc *ssif_bmc)
-+{
-+	u8 response_data_len = 0;
-+
-+	switch(ssif_bmc->smbus_cmd) {
-+	case SSIF_IPMI_RESPONSE:
-+		/* IPMI READ Start can carry up to 30 bytes IPMI Data
-+		 * and Start Flag 0x00 0x01.
-+		 */
-+		ssif_bmc->response_buffer[0] = 0x00; /* Start Flag */
-+		ssif_bmc->response_buffer[1] = 0x01; /* Start Flag */
-+		ssif_bmc->response_buffer[2] = ssif_bmc->response.netfn_lun;
-+		ssif_bmc->response_buffer[3] = ssif_bmc->response.cmd;
-+		ssif_bmc->response_buffer[4] = ssif_bmc->response.payload[0];
-+
-+		response_data_len = MAX_PAYLOAD_PER_TRANSACTION - 5;
-+
-+		memcpy(ssif_bmc->response_buffer + 5,
-+				ssif_bmc->response.payload + 1,
-+				response_data_len);
-+
-+		break;
-+	case SSIF_IPMI_MULTI_PART_RESPONSE_MIDDLE:
-+		/* IPMI READ Middle or Read End can carry up to 31 bytes IPMI
-+		 * data plus block number byte.
-+		 */
-+		ssif_bmc->response_buffer[0] = ssif_bmc->block_num;
-+
-+		if (ssif_bmc->remain_data_len < MAX_IPMI_DATA_PER_MIDDLE_TRANSACTION)
-+			response_data_len = ssif_bmc->remain_data_len;
-+		else
-+			response_data_len = MAX_IPMI_DATA_PER_MIDDLE_TRANSACTION;
-+
-+		memcpy(ssif_bmc->response_buffer + 1,
-+			ssif_bmc->response.payload + 1 + ssif_bmc->num_bytes_processed,
-+			response_data_len
-+			);
-+
-+		break;
-+	default:
-+		/* Do not expect to go to this case */
-+		pr_err("Error: Unexpected SMBus command received 0x%x\n",
-+				ssif_bmc->smbus_cmd);
-+		break;
-+	}
-+
-+	ssif_bmc->num_bytes_processed += response_data_len;
-+}
-+
-+static void event_request_read(struct ssif_bmc *ssif_bmc, u8 *val)
-+{
-+	u8 *buf;
-+	u8 data_len;
-+
-+	buf = (u8 *) &ssif_bmc->response;
-+	data_len = ssif_bmc->response.len;
-+
-+	/* Single part processing */
-+	if (!ssif_bmc->is_multi_part) {
-+		/* TODO: slave must do NACK to Master I2C bus to notify that
-+		 * the response is not ready to read. ASPEED does not support
-+		 * NACK at slave mode, the only way to NACK is to disable slave
-+		 * mode, which would also prevent the slave from responding to
-+		 * incoming messages when it is unable to provide an outgoing
-+		 * message.
-+		 */
-+		if (buf[ssif_bmc->msg_idx] == 0) {
-+			/* Workaround: Set return length is 1, master will
-+			 * resend SMBUS READ command.
-+			 * Return zero len would lead I2C master bus be timeout
-+			 */
-+			*val = 0x1;
-+		} else {
-+			*val = buf[ssif_bmc->msg_idx];
-+		}
-+
++	bus = (struct npcm_i2c *)ssif_bmc->priv;
++	if (!bus)
 +		return;
-+	}
 +
-+	/* Multi-part processing */
-+	switch(ssif_bmc->smbus_cmd) {
-+	case SSIF_IPMI_RESPONSE:
-+		/* Read Start length is 32 bytes
-+		 * Read Start transfer first 30 bytes of IPMI response
-+		 *  and 2 special code 0x00, 0x01
-+		 */
-+		*val = MAX_PAYLOAD_PER_TRANSACTION;
-+		ssif_bmc->remain_data_len =
-+			data_len - MAX_IPMI_DATA_PER_START_TRANSACTION;
-+		ssif_bmc->block_num = 0;
-+		if (ssif_bmc->remain_data_len >
-+				MAX_IPMI_DATA_PER_MIDDLE_TRANSACTION) {
-+			ssif_bmc->middle_start_response = true;
-+		}
-+		break;
-+	case SSIF_IPMI_MULTI_PART_RESPONSE_MIDDLE:
-+		/* Read middle part */
-+		if (ssif_bmc->remain_data_len <=
-+				MAX_IPMI_DATA_PER_MIDDLE_TRANSACTION) {
-+			/* This is READ End message
-+			 * Return length is: remain response plus block number
-+			 */
-+			*val = ssif_bmc->remain_data_len + 1;
-+			ssif_bmc->block_num = 0xFF;
-+		} else {
-+			/* This is READ Middle message
-+			 * Return length is maximum SMBUS transfer length
-+			 */
-+			*val = MAX_PAYLOAD_PER_TRANSACTION;
-+			if (!ssif_bmc->middle_start_response) {
-+				ssif_bmc->block_num++;
-+			} else {
-+				/* Start Read Middle part of response */
-+				ssif_bmc->block_num = 0;
-+				ssif_bmc->middle_start_response = false;
-+			}
-+			ssif_bmc->remain_data_len -=
-+				MAX_IPMI_DATA_PER_MIDDLE_TRANSACTION;
-+		}
-+		break;
-+	default:
-+		/* Do not expect to go to this case */
-+		pr_err("Error: Unexpected SMBus command received 0x%x\n",
-+				ssif_bmc->smbus_cmd);
-+		break;
-+	}
++	spin_lock_irqsave(&bus->lock, flags);
 +
-+	/* Prepare the response buffer that ready to be sent */
-+	set_response_buffer(ssif_bmc);
-+}
++	if (status & SSIF_BMC_BUSY)
++		npcm_i2c_slave_enable(bus, I2C_SLAVE_ADDR1, ssif_bmc->client->addr, false);
++	else if (status & SSIF_BMC_READY)
++		npcm_i2c_slave_enable(bus, I2C_SLAVE_ADDR1, ssif_bmc->client->addr, true);
 +
-+static void event_process_read(struct ssif_bmc *ssif_bmc, u8 *val)
-+{
-+	u8 *buf;
-+
-+	if (!ssif_bmc->is_multi_part) {
-+		/* Read byte-to-byte if len of response is non-zero */
-+		buf = (u8 *) &ssif_bmc->response;
-+		if (ssif_bmc->response.len &&
-+		    ssif_bmc->msg_idx < ssif_msg_len(&ssif_bmc->response)) {
-+			*val = buf[ssif_bmc->msg_idx];
-+		} else {
-+			*val = 0;
-+		}
-+		/* Invalidate response buffer to denote it is sent */
-+		if (ssif_bmc->msg_idx + 1 >= ssif_msg_len(&ssif_bmc->response))
-+			complete_response(ssif_bmc);
-+	} else {
-+		/* Multi-part processing */
-+		switch (ssif_bmc->smbus_cmd) {
-+		case SSIF_IPMI_RESPONSE:
-+		case SSIF_IPMI_MULTI_PART_RESPONSE_MIDDLE:
-+			buf = (u8 *) &ssif_bmc->response_buffer;
-+			*val = buf[ssif_bmc->msg_idx - 1];
-+			break;
-+		default:
-+			/* Do not expect to go to this case */
-+			pr_err("Error: Unexpected SMBus command received 0x%x\n",
-+					ssif_bmc->smbus_cmd);
-+			break;
-+		}
-+
-+		/* Invalidate response buffer to denote last response is sent */
-+		if ((ssif_bmc->block_num == 0xFF)
-+			&& (ssif_bmc->msg_idx > ssif_bmc->remain_data_len)) {
-+			complete_response(ssif_bmc);
-+		}
-+	}
-+
-+}
-+
-+/*
-+ * Callback function to handle I2C slave events
-+ */
-+static int ssif_bmc_cb(struct i2c_client *client,
-+				enum i2c_slave_event event, u8 *val)
-+{
-+	struct ssif_bmc *ssif_bmc = i2c_get_clientdata(client);
-+	u8 *buf;
-+
-+	spin_lock(&ssif_bmc->lock);
-+
-+	/* I2C Event Handler:
-+	 *	I2C_SLAVE_READ_REQUESTED 	0x0
-+	 * 	I2C_SLAVE_WRITE_REQUESTED 	0x1
-+	 * 	I2C_SLAVE_READ_PROCESSED	0x2
-+	 * 	I2C_SLAVE_WRITE_RECEIVED	0x3
-+	 * 	I2C_SLAVE_STOP			0x4
-+	 */
-+	switch (event) {
-+	case I2C_SLAVE_READ_REQUESTED:
-+
-+		if (ssif_bmc->msg_idx > 0) {
-+			event_process_read(ssif_bmc, val);
-+		} else {
-+			event_request_read(ssif_bmc, val);
-+		}
-+
-+		/*
-+		 * Do not increment buffer_idx here, because we don't know if
-+		 * this byte will be actually used. Read Linux I2C slave docs
-+		 * for details.
-+		 */
-+		break;
-+
-+	case I2C_SLAVE_WRITE_REQUESTED:
-+		ssif_bmc->msg_idx = 0;
-+		ssif_bmc->msg_idwx = 0;
-+		break;
-+
-+	case I2C_SLAVE_READ_PROCESSED:
-+		ssif_bmc->msg_idx++;
-+		break;
-+
-+	case I2C_SLAVE_WRITE_RECEIVED:
-+		/* First byte is SMBUS command, not a part of SSIF message */
-+		if (ssif_bmc->msg_idwx == 0) {
-+			/* SMBUS read command can vary (single or multi-part) */
-+			ssif_bmc->smbus_cmd = *val;
-+			ssif_bmc->msg_idwx++;
-+		} else {
-+			buf = (u8 *) &ssif_bmc->request;
-+			if (ssif_bmc->msg_idwx >= sizeof(struct ssif_msg))
-+				break;
-+
-+			/* Write byte-to-byte to buffer */
-+			buf[ssif_bmc->msg_idwx - 1] = *val;
-+			ssif_bmc->msg_idwx++;
-+			if ((ssif_bmc->msg_idwx - 1) >= ssif_msg_len(&ssif_bmc->request))
-+				handle_request(ssif_bmc);
-+			/* TODO: support SSIF Multi-part Write*/
-+		}
-+		break;
-+
-+	case I2C_SLAVE_STOP:
-+		/* Reset msg index */
-+		ssif_bmc->msg_idx = 0;
-+		ssif_bmc->msg_idwx = 0;
-+		break;
-+
-+	default:
-+		break;
-+	}
-+
-+	spin_unlock(&ssif_bmc->lock);
-+
-+	return 0;
++	spin_unlock_irqrestore(&bus->lock, flags);
 +}
 +
 +static int ssif_bmc_probe(struct i2c_client *client,
-+			        const struct i2c_device_id *id)
++			const struct i2c_device_id *id)
 +{
-+	struct ssif_bmc *ssif_bmc;
-+	int ret;
++	struct ssif_bmc_ctx *ssif_bmc;
 +
-+	ssif_bmc = devm_kzalloc(&client->dev, sizeof(*ssif_bmc), GFP_KERNEL);
-+	if (!ssif_bmc)
-+		return -ENOMEM;
++	ssif_bmc = ssif_bmc_alloc(client, sizeof(struct npcm_i2c));
++	if (IS_ERR(ssif_bmc))
++		return PTR_ERR(ssif_bmc);
 +
-+	spin_lock_init(&ssif_bmc->lock);
++	ssif_bmc->priv = i2c_get_adapdata(client->adapter);
++	ssif_bmc->set_ssif_bmc_status = npcm_set_ssif_bmc_status;
 +
-+	init_waitqueue_head(&ssif_bmc->wait_queue);
-+	ssif_bmc->request_available = false;
-+	ssif_bmc->response_in_progress = false;
-+
-+	mutex_init(&ssif_bmc->file_mutex);
-+
-+	/* Register misc device interface */
-+	ssif_bmc->miscdev.minor = MISC_DYNAMIC_MINOR;
-+	ssif_bmc->miscdev.name = DEVICE_NAME;
-+	ssif_bmc->miscdev.fops = &ssif_bmc_fops;
-+	ssif_bmc->miscdev.parent = &client->dev;
-+	ret = misc_register(&ssif_bmc->miscdev);
-+	if (ret)
-+		return ret;
-+
-+	ssif_bmc->msg_idx =0;
-+	ssif_bmc->msg_idwx = 0;
-+
-+	ssif_bmc->client = client;
-+	ssif_bmc->client->flags |= I2C_CLIENT_SLAVE;
-+	/* Register I2C slave */
-+	i2c_set_clientdata(client, ssif_bmc);
-+	ret = i2c_slave_register(client, ssif_bmc_cb);
-+	if (ret) {
-+		misc_deregister(&ssif_bmc->miscdev);
-+		return ret;
-+	}
-+
-+	ssif_bmc->i2c_bus = i2c_get_adapdata(client->adapter);
-+	ssif_bmc->user_num = 0;
 +	return 0;
 +}
 +
 +static int ssif_bmc_remove(struct i2c_client *client)
 +{
-+	struct ssif_bmc *ssif_bmc = i2c_get_clientdata(client);
++	struct ssif_bmc_ctx *ssif_bmc = i2c_get_clientdata(client);
 +
 +	i2c_slave_unregister(client);
 +	misc_deregister(&ssif_bmc->miscdev);
@@ -1101,10 +1229,10 @@ index 000000000000..ed3ef32c0d1c
 +}
 +
 +static const struct of_device_id ssif_bmc_match[] = {
-+	{ .compatible = "aspeed,ast2500-ssif-bmc" },
 +	{ .compatible = "nuvoton,npcm7xx-ssif-bmc" },
 +	{ },
 +};
++
 +static const struct i2c_device_id ssif_bmc_id[] = {
 +	{ DEVICE_NAME, 0 },
 +	{ },
@@ -1124,43 +1252,42 @@ index 000000000000..ed3ef32c0d1c
 +
 +module_i2c_driver(ssif_bmc_driver);
 +
-+MODULE_AUTHOR("Chuong Tran <chuong.tran@amperecomputing.com>");
-+MODULE_AUTHOR("Thang Q. Nguyen <thangqn@amperecomputing.com>");
-+MODULE_DESCRIPTION("Linux device driver of the BMC IPMI SSIF interface.");
-+MODULE_LICENSE("GPL");
-diff --git a/include/uapi/linux/ssif-bmc.h b/include/uapi/linux/ssif-bmc.h
-new file mode 100644
-index 000000000000..8a8b85b33240
---- /dev/null
-+++ b/include/uapi/linux/ssif-bmc.h
-@@ -0,0 +1,27 @@
-+/* SPDX-License-Identifier: GPL-2.0+ WITH Linux-syscall-note */
-+/*
-+ * Copyright (c) 2020, Ampere Computing LLC.
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version
-+ * 2 of the License, or (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef _UAPI_LINUX_SSIF_BMC_H
-+#define _UAPI_LINUX_SSIF_BMC_H
-+
-+#include <linux/ioctl.h>
-+
-+#define __SSIF_BMC_IOCTL_MAGIC	0xb1
-+#define SSIF_BMC_IOCTL_SMS_ATN	_IO(__SSIF_BMC_IOCTL_MAGIC, 0x00)
-+
-+#endif /* _UAPI_LINUX_SSIF_BMC_H */
++MODULE_AUTHOR("Mohaimen <mohaimen.alsamarai@foxconn.com>");
++MODULE_DESCRIPTION("Device driver of the Nuvoton BMC IPMI SSIF interface.");
++MODULE_LICENSE("GPL v2");
+diff --git a/drivers/i2c/i2c-core-smbus.c b/drivers/i2c/i2c-core-smbus.c
+index f5c9787992e9..b37697b7cbfd 100644
+--- a/drivers/i2c/i2c-core-smbus.c
++++ b/drivers/i2c/i2c-core-smbus.c
+@@ -38,7 +38,7 @@ static u8 crc8(u16 data)
+ }
+ 
+ /* Incremental CRC8 over count bytes in the array pointed to by p */
+-static u8 i2c_smbus_pec(u8 crc, u8 *p, size_t count)
++u8 i2c_smbus_pec(u8 crc, u8 *p, size_t count)
+ {
+ 	int i;
+ 
+@@ -46,6 +46,7 @@ static u8 i2c_smbus_pec(u8 crc, u8 *p, size_t count)
+ 		crc = crc8((crc ^ p[i]) << 8);
+ 	return crc;
+ }
++EXPORT_SYMBOL(i2c_smbus_pec);
+ 
+ /* Assume a 7-bit address, which is reasonable for SMBus */
+ static u8 i2c_smbus_msg_pec(u8 pec, struct i2c_msg *msg)
+diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+index 56622658b215..0d75e5bcdde6 100644
+--- a/include/linux/i2c.h
++++ b/include/linux/i2c.h
+@@ -144,6 +144,7 @@ s32 __i2c_smbus_xfer(struct i2c_adapter *adapter, u16 addr,
+ /* Now follow the 'nice' access routines. These also document the calling
+    conventions of i2c_smbus_xfer. */
+ 
++u8 i2c_smbus_pec(u8 crc, u8 *p, size_t count);
+ s32 i2c_smbus_read_byte(const struct i2c_client *client);
+ s32 i2c_smbus_write_byte(const struct i2c_client *client, u8 value);
+ s32 i2c_smbus_read_byte_data(const struct i2c_client *client, u8 command);
 -- 
 2.17.1
 
