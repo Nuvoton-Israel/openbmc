@@ -8,7 +8,7 @@ SRC_URI_append_buv-runbmc = " \
     file://fan-boot-control.service \
     "
 SRC_URI_append_buv-runbmc = " \
-    ${@entity_enabled(d, '', 'file://phosphor-pid-control.service')}"
+    ${@entity_enabled(d, '', 'file://phosphor-pid-control_buv.service')}"
 
 FILES_${PN}_append_buv-runbmc = " ${bindir}/fan-default-speed.sh"
 FILES_${PN}_append_buv-runbmc = " \
@@ -32,8 +32,8 @@ do_install_append_buv-runbmc() {
 
     install -d ${D}${systemd_unitdir}/system/
     if [ "${DISTRO}" != "buv-entity" ];then
-        install -m 0644 ${WORKDIR}/phosphor-pid-control.service \
-            ${D}${systemd_unitdir}/system
+        install -m 0644 ${WORKDIR}/phosphor-pid-control_buv.service \
+            ${D}${systemd_unitdir}/system/phosphor-pid-control.service
     fi
     install -m 0644 ${WORKDIR}/fan-reboot-control.service \
         ${D}${systemd_unitdir}/system

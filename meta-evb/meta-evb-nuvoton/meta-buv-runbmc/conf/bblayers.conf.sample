@@ -13,6 +13,7 @@ BBLAYERS ?= " \
   ##OEROOT##/meta-phosphor \
   ##OEROOT##/meta-nuvoton \
   ##OEROOT##/meta-evb/meta-evb-nuvoton/meta-buv-runbmc \
+  ##OEROOT##/meta-intel-openbmc \
   "
 BBLAYERS_NON_REMOVABLE ?= " \
   ##OEROOT##/meta \
@@ -22,4 +23,5 @@ BBLAYERS_NON_REMOVABLE ?= " \
   ##OEROOT##/meta-phosphor \
   ##OEROOT##/meta-nuvoton \
   ##OEROOT##/meta-evb/meta-evb-nuvoton/meta-buv-runbmc \
+  ##OEROOT##/meta-intel-openbmc \
   "
