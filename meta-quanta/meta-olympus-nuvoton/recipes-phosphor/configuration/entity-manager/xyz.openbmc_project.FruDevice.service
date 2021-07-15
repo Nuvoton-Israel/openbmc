@@ -2,10 +2,6 @@
 Description=Fru Device
 StopWhenUnneeded=true
 After=xyz.openbmc_project.CloseMuxes.service dbus.service
-Wants=obmc-read-eeprom@system-chassis-bmc.service
-After=obmc-read-eeprom@system-chassis-bmc.service
-Wants=obmc-read-eeprom@system-chassis-motherboard.service
-After=obmc-read-eeprom@system-chassis-motherboard.service
 
 [Service]
 ExecStart=/usr/bin/fru-device

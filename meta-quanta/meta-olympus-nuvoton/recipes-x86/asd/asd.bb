@@ -7,7 +7,7 @@ PV = "0.1+git${SRCPV}"
 LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=0d1c657b2ba1e8877940a8d1614ec560"
 
-S = "${WORKDIR}/git/"
+S = "${WORKDIR}/git"
 inherit cmake
 DEPENDS = "sdbusplus openssl libpam libgpiod safec"
 

@@ -17,6 +17,7 @@ BBLAYERS ?= " \
   ##OEROOT##/meta-google \
   ##OEROOT##/meta-quanta \
   ##OEROOT##/meta-quanta/meta-olympus-nuvoton \
+  ##OEROOT##/meta-intel-openbmc \
   "
 BBLAYERS_NON_REMOVABLE ?= " \
   ##OEROOT##/meta \
@@ -30,4 +31,5 @@ BBLAYERS_NON_REMOVABLE ?= " \
   ##OEROOT##/meta-google \
   ##OEROOT##/meta-quanta \
   ##OEROOT##/meta-quanta/meta-olympus-nuvoton \
+  ##OEROOT##/meta-intel-openbmc \
   "

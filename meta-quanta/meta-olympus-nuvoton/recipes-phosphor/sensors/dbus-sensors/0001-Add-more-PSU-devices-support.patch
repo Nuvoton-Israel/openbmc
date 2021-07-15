@@ -1,0 +1,26 @@
+From d9c1e78f711032faeb2f43157f61147976d59ffb Mon Sep 17 00:00:00 2001
+From: Brian Ma <chma0@nuvoton.com>
+Date: Thu, 15 Jul 2021 14:54:27 +0800
+Subject: [PATCH] Add more PSU devices support
+
+---
+ src/PSUSensorMain.cpp | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/PSUSensorMain.cpp b/src/PSUSensorMain.cpp
+index 6595db9..f926ddc 100644
+--- a/src/PSUSensorMain.cpp
++++ b/src/PSUSensorMain.cpp
+@@ -72,7 +72,8 @@ static std::vector<std::string> pmbusNames = {
+     "ina230",   "ipsps1",    "isl68137",  "isl68220",  "isl68223",
+     "isl69243", "isl69260",  "lm25066",   "max16601",  "max20710",
+     "max20730", "max20734",  "max20796",  "max34451",  "pmbus",
+-    "pxe1610",  "raa228000", "raa228228", "raa229004", "tps546d24"};
++    "pxe1610",  "raa228000", "raa228228", "raa229004", "tps546d24",
++    "flexpower", "tps53659", "tps53679"};
+ 
+ namespace fs = std::filesystem;
+ 
+-- 
+2.17.1
+

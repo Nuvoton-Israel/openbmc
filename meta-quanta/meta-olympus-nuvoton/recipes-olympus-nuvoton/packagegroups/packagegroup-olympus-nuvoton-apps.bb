@@ -1,3 +1,4 @@
+inherit entity-utils
 SUMMARY = "OpenBMC for OLYMPUS NUVOTON system - Applications"
 PR = "r1"
 
@@ -43,13 +44,11 @@ RDEPENDS_${PN}-system = " \
         webui-vue \
         obmc-ikvm \
         obmc-console \
-        phosphor-ipmi-fru \
         phosphor-host-postd \
         phosphor-ipmi-ipmb \
         phosphor-ipmi-blobs \
         ipmitool \
         phosphor-sel-logger \
-        first-boot-set-psu \
         phosphor-node-manager-proxy \
         phosphor-image-signing \
         openssl-bin \
@@ -68,4 +67,11 @@ RDEPENDS_${PN}-system = " \
         nuvoton-ipmi-oem \
         olympus-nuvoton-iptable-restore \
         srvcfg-manager \
+        "
+RDEPENDS_${PN}-system_append = " \
+        ${@entity_enabled(d, '', 'first-boot-set-psu')} \
+        "
+
+RDEPENDS_${PN}-system_append_olympus-entity = " \
+        intel-ipmi-oem \
         "
