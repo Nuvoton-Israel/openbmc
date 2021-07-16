@@ -1,0 +1,88 @@
+From 900cce8c015455b6331ac670b845276070f5794c Mon Sep 17 00:00:00 2001
+From: Tim Lee <timlee660101@gmail.com>
+Date: Fri, 16 Jul 2021 17:38:34 +0800
+Subject: [PATCH 3/3] smbios: fix present and functional property to true
+
+Signed-off-by: Tim Lee <timlee660101@gmail.com>
+---
+ include/dimm.hpp | 9 ++++++++-
+ src/dimm.cpp     | 9 +++++++--
+ 2 files changed, 15 insertions(+), 3 deletions(-)
+
+diff --git a/include/dimm.hpp b/include/dimm.hpp
+index 4230ae4..c3bd9c7 100644
+--- a/include/dimm.hpp
++++ b/include/dimm.hpp
+@@ -20,6 +20,7 @@
+ #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
+ #include <xyz/openbmc_project/Inventory/Item/Dimm/server.hpp>
+ #include <xyz/openbmc_project/Inventory/Item/server.hpp>
++#include <xyz/openbmc_project/State/Decorator/OperationalStatus/server.hpp>
+ 
+ namespace phosphor
+ {
+@@ -36,7 +37,9 @@ class Dimm :
+     sdbusplus::server::object::object<
+         sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Asset>,
+     sdbusplus::server::object::object<
+-        sdbusplus::xyz::openbmc_project::Inventory::server::Item>
++        sdbusplus::xyz::openbmc_project::Inventory::server::Item>,
++    sdbusplus::server::object::object<
++        sdbusplus::xyz::openbmc_project::State::Decorator::server::OperationalStatus>
+ {
+   public:
+     Dimm() = delete;
+@@ -58,6 +61,9 @@ class Dimm :
+         sdbusplus::server::object::object<
+             sdbusplus::xyz::openbmc_project::Inventory::server::Item>(
+             bus, objPath.c_str()),
++        sdbusplus::server::object::object<
++            sdbusplus::xyz::openbmc_project::State::Decorator::server::OperationalStatus>(
++            bus, objPath.c_str()),
+         dimmNum(dimmId), storage(smbiosTableStorage)
+     {
+         memoryInfoUpdate();
+@@ -77,6 +83,7 @@ class Dimm :
+     std::string partNumber(std::string value) override;
+     uint8_t memoryAttributes(uint8_t value) override;
+     uint16_t memoryConfiguredSpeedInMhz(uint16_t value) override;
++    bool functional(bool value) override;
+ 
+   private:
+     uint8_t dimmNum;
+diff --git a/src/dimm.cpp b/src/dimm.cpp
+index e2cfbc6..b29b245 100644
+--- a/src/dimm.cpp
++++ b/src/dimm.cpp
+@@ -174,8 +174,6 @@ void Dimm::dimmManufacturer(const uint8_t positionNum, const uint8_t structLen,
+     bool val = true;
+     if (result == "NO DIMM")
+     {
+-        val = false;
+-
+         // No dimm presence so making manufacturer value as "" (instead of
+         // NO DIMM - as there won't be any manufacturer for DIMM which is not
+         // present).
+@@ -183,6 +181,7 @@ void Dimm::dimmManufacturer(const uint8_t positionNum, const uint8_t structLen,
+     }
+     manufacturer(result);
+     present(val);
++    functional(val);
+ }
+ 
+ std::string Dimm::manufacturer(std::string value)
+@@ -237,5 +236,11 @@ uint16_t Dimm::memoryConfiguredSpeedInMhz(uint16_t value)
+         memoryConfiguredSpeedInMhz(value);
+ }
+ 
++bool Dimm::functional(bool value)
++{
++    return sdbusplus::xyz::openbmc_project::State::Decorator::server::OperationalStatus::functional(
++        value);
++}
++
+ } // namespace smbios
+ } // namespace phosphor
+-- 
+2.17.1
+
