@@ -13,11 +13,11 @@ BBLAYERS ?= " \
   ##OEROOT##/meta-openembedded/meta-python \
   ##OEROOT##/meta-security \
   ##OEROOT##/meta-phosphor \
+  ##OEROOT##/meta-intel-openbmc \
   ##OEROOT##/meta-nuvoton \
   ##OEROOT##/meta-google \
   ##OEROOT##/meta-quanta \
   ##OEROOT##/meta-quanta/meta-olympus-nuvoton \
-  ##OEROOT##/meta-intel-openbmc \
   "
 BBLAYERS_NON_REMOVABLE ?= " \
   ##OEROOT##/meta \
@@ -27,9 +27,9 @@ BBLAYERS_NON_REMOVABLE ?= " \
   ##OEROOT##/meta-openembedded/meta-python \
   ##OEROOT##/meta-security \
   ##OEROOT##/meta-phosphor \
+  ##OEROOT##/meta-intel-openbmc \
   ##OEROOT##/meta-nuvoton \
   ##OEROOT##/meta-google \
   ##OEROOT##/meta-quanta \
   ##OEROOT##/meta-quanta/meta-olympus-nuvoton \
-  ##OEROOT##/meta-intel-openbmc \
   "
