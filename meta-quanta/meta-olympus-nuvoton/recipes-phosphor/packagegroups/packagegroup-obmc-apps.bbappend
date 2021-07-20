@@ -8,4 +8,6 @@ RDEPENDS_${PN}-inventory_remove = " \
        "
 RDEPENDS_${PN}-host-state-mgmt_append_olympus-nuvoton = " olympus-nuvoton-debug-collector"
 
-IMAGE_FEATURES_remove = "${@entity_enabled(d, '', 'obmc-fru-ipmi')}"
+RDEPENDS_${PN}-fru-ipmi_remove = " \
+       ${@entity_enabled(d, '','fru-device')} \
+       "
