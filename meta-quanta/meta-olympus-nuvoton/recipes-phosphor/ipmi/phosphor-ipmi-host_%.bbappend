@@ -14,10 +14,11 @@ EXTRA_OECONF_olympus-nuvoton = " \
     --enable-boot-flag-safe-mode-support \
     ${@entity_enabled(d, '', 'SENSOR_YAML_GEN=${STAGING_DIR_HOST}${datadir}/olympus-nuvoton-yaml-config/ipmi-sensors.yaml')} \
     ${@entity_enabled(d, '', 'FRU_YAML_GEN=${STAGING_DIR_HOST}${datadir}/olympus-nuvoton-yaml-config/ipmi-fru-read.yaml')} \
-    ${@entity_enabled(d, '', '--disable-dynamic_sensors')} \
     "
+PACKAGECONFIG_append_olympus-entity = " dynamic-sensors"
 
 SRC_URI_append_olympus-nuvoton = " file://phosphor-ipmi-host.service"
+SRC_URI_append_olympus-nuvoton = " file://0001-Change-Value-property-type-to-double-and-set-scale-d.patch"
 
 SYSTEMD_SERVICE_${PN}_append_olympus-nuvoton = " phosphor-ipmi-host.service"
 SYSTEMD_LINK_${PN}_remove_olympus-nuvoton += "${@compose_list_zip(d, 'SOFT_FMT', 'OBMC_HOST_INSTANCES')}"
