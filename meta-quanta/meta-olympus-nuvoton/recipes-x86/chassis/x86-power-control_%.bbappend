@@ -1,23 +1,15 @@
 FILESEXTRAPATHS_prepend_olympus-nuvoton := "${THISDIR}/${PN}:"
-inherit entity-utils
 
-OLYMPUS_FILES = " \
-    file://0001-support-host-boot-progress.patch \
-    file://0002-add-support-chassis-on-off-target-files.patch \
-    file://obmc-mapper.target \
-    file://obmc-chassis-poweroff.target \
-    file://obmc-chassis-poweron.target \
-    "
 SRC_URI_append_olympus-nuvoton = " file://power-config-host0.json"
-SRC_URI_append_olympus-nuvoton = " ${@entity_enabled(d, '', '${OLYMPUS_FILES}')}"
+SRC_URI_append_olympus-nuvoton = " file://0001-support-host-boot-progress.patch"
+SRC_URI_append_olympus-nuvoton = " file://0002-add-support-chassis-on-off-target-files.patch"
+SRC_URI_append_olympus-nuvoton = " file://obmc-mapper.target"
+SRC_URI_append_olympus-nuvoton = " file://obmc-chassis-poweroff.target"
+SRC_URI_append_olympus-nuvoton = " file://obmc-chassis-poweron.target"
 
-OLYMPUS_TARGETS = " \
-    obmc-mapper.target \
-    obmc-chassis-poweroff.target \
-    obmc-chassis-poweron.target \
-    "
-SYSTEMD_SERVICE_${PN}_append_olympus-nuvoton = " ${@entity_enabled(d, '', '${OLYMPUS_TARGETS}')}"
-
+SYSTEMD_SERVICE_${PN} += "obmc-mapper.target"
+SYSTEMD_SERVICE_${PN} += "obmc-chassis-poweroff.target"
+SYSTEMD_SERVICE_${PN} += "obmc-chassis-poweron.target"
 
 inherit obmc-phosphor-systemd
 
