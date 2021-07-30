@@ -1,19 +1,18 @@
-From e1b33446cf34c08f36149086c6bdfd3fbe694649 Mon Sep 17 00:00:00 2001
+From de343a99a59343d98cfb6584e05fe09312e404d2 Mon Sep 17 00:00:00 2001
 From: Brian Ma <chma0@nuvoton.com>
 Date: Thu, 6 Feb 2020 12:00:51 +0800
-Subject: [PATCH 2/2] Add force recovery functions
+Subject: [PATCH] add force recovery functions
 
-Signed-off-by: Brian Ma <chma0@nuvoton.com>
 ---
  NodeManagerProxy.cpp | 107 +++++++++++++++++++++++++++++++++++++++++++
  NodeManagerProxy.hpp |  21 +++++++++
  2 files changed, 128 insertions(+)
 
 diff --git a/NodeManagerProxy.cpp b/NodeManagerProxy.cpp
-index f45c7b4..f49debe 100644
+index ae5f992..571c39c 100644
 --- a/NodeManagerProxy.cpp
 +++ b/NodeManagerProxy.cpp
-@@ -205,6 +205,9 @@ int main(int argc, char *argv[])
+@@ -206,6 +206,9 @@ int main(int argc, char *argv[])
          [&healthData](const std::string &type, const std::string &level) {
              healthData.set(type, level);
          });
@@ -22,8 +21,8 @@ index f45c7b4..f49debe 100644
 +
      healthInterface->initialize();
  
-     Domain domainDcTotal(conn, server, dcTotal);
-@@ -240,3 +243,107 @@ int main(int argc, char *argv[])
+     sdbusplus::bus::match::match configurationMatch(
+@@ -239,3 +242,107 @@ int main(int argc, char *argv[])
      io.run();
      return 0;
  }
@@ -132,10 +131,10 @@ index f45c7b4..f49debe 100644
 +    return std::string(result);
 +}
 diff --git a/NodeManagerProxy.hpp b/NodeManagerProxy.hpp
-index ece1e4c..2627948 100644
+index 154c033..d84237c 100644
 --- a/NodeManagerProxy.hpp
 +++ b/NodeManagerProxy.hpp
-@@ -150,6 +150,15 @@ constexpr uint8_t dcTotal = 0x5;
+@@ -139,6 +139,15 @@ constexpr uint8_t highPowerIOsubsystem = 0x4;
  constexpr uint8_t ipmiGetDevIdNetFn = 0x6;
  constexpr uint8_t ipmiGetDevIdLun = 0;
  constexpr uint8_t ipmiGetDevIdCmd = 0x1;
@@ -151,9 +150,9 @@ index ece1e4c..2627948 100644
  
  /**
   * @brief Part of Get Device ID Command Response Payload
-@@ -254,6 +263,14 @@ typedef struct
+@@ -242,6 +251,14 @@ typedef struct
+     uint16_t statsPeriod;
  } __attribute__((packed)) nmIpmiSetNmPolicyReq;
- static_assert(sizeof(nmIpmiSetNmPolicyReq) == 17);
  
 +// recovery request format
 +typedef struct
@@ -164,10 +163,10 @@ index ece1e4c..2627948 100644
 +
 +
  /**
-  * @brief Set Node Manager Policy response format
+  * @brief Enable/Disable NM Policy Control request format
   */
-@@ -1478,4 +1495,8 @@ class Domain
-     }
+@@ -800,4 +817,8 @@ struct HealthData
+     boost::container::flat_set<std::string> warning;
  };
  
 +int ColdReset();
