@@ -16,6 +16,7 @@ BBLAYERS ?= " \
   ##OEROOT##/meta-evb \
   ##OEROOT##/meta-evb/meta-evb-nuvoton \
   ##OEROOT##/meta-evb/meta-evb-nuvoton/meta-evb-npcm845 \
+  ##OEROOT##/meta-intel-openbmc \
   "
 BBLAYERS_NON_REMOVABLE ?= " \
   ##OEROOT##/meta \
@@ -28,4 +29,5 @@ BBLAYERS_NON_REMOVABLE ?= " \
   ##OEROOT##/meta-evb \
   ##OEROOT##/meta-evb/meta-evb-nuvoton \
   ##OEROOT##/meta-evb/meta-evb-nuvoton/meta-evb-npcm845 \
+  ##OEROOT##/meta-intel-openbmc \
   "

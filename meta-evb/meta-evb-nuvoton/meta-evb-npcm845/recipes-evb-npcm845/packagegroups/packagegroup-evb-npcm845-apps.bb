@@ -11,11 +11,6 @@ PACKAGES = " \
         ${PN}-system \
         "
 
-PROVIDES += "virtual/obmc-chassis-mgmt"
-PROVIDES += "virtual/obmc-fan-mgmt"
-PROVIDES += "virtual/obmc-flash-mgmt"
-PROVIDES += "virtual/obmc-system-mgmt"
-
 RPROVIDES_${PN}-chassis += "virtual-obmc-chassis-mgmt"
 RPROVIDES_${PN}-fans += "virtual-obmc-fan-mgmt"
 RPROVIDES_${PN}-flash += "virtual-obmc-flash-mgmt"
@@ -47,7 +42,6 @@ RDEPENDS_${PN}-system = " \
         ipmitool \
         openssl-bin \
         phosphor-host-postd \
-        phosphor-ipmi-fru \
         phosphor-sel-logger \
         rsyslog \
         loadsvf \

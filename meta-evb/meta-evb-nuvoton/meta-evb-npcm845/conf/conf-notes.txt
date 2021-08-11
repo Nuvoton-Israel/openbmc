@@ -1,2 +1,5 @@
 Common targets are:
      obmc-phosphor-image
+
+Make buv-entity image by following command:
+     DISTRO=arbel-evb-entity bitbake obmc-phosphor-image
