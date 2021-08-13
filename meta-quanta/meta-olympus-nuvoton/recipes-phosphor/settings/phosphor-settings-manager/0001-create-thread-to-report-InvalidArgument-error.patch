@@ -1,4 +1,4 @@
-From 7a822b8b9221ccd4575df37ea20b2c8570540c71 Mon Sep 17 00:00:00 2001
+From b598b543806c935e7a3eef769edc862e24238bc0 Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Mon, 20 Jul 2020 11:04:31 +0800
 Subject: [PATCH] create thread to report InvalidArgument error
@@ -11,7 +11,7 @@ Signed-off-by: Stanley Chu <yschu@nuvoton.com>
  3 files changed, 21 insertions(+), 11 deletions(-)
 
 diff --git a/Makefile.am b/Makefile.am
-index 68cbd87..3379f11 100755
+index 68cbd87..2cb508c 100755
 --- a/Makefile.am
 +++ b/Makefile.am
 @@ -33,4 +33,5 @@ phosphor_settings_manager_LDADD = \
@@ -48,11 +48,11 @@ index 0790a7b..29aad62 100644
  {
      auto bus = sdbusplus::bus::new_default();
 diff --git a/settings_manager.mako.hpp b/settings_manager.mako.hpp
-index 6f8841f..c2b28c9 100644
+index d22fd2d..bbcde52 100644
 --- a/settings_manager.mako.hpp
 +++ b/settings_manager.mako.hpp
-@@ -61,6 +61,8 @@ using namespace phosphor::logging;
-     % endfor
+@@ -50,6 +50,8 @@ using namespace phosphor::logging;
+ #include "${i}"
  % endfor
  
 +void reportInvalidArgument(std::string name,  std::string value);
@@ -60,7 +60,7 @@ index 6f8841f..c2b28c9 100644
  namespace phosphor
  {
  namespace settings
-@@ -140,17 +142,12 @@ class Impl : public Parent
+@@ -125,17 +127,12 @@ class Impl : public Parent
              % if propName in validators:
                  if (!${fname}(value))
                  {
