@@ -1,3 +1,43 @@
+# IPMI message route in OpenBMC
+
+<img align="right" width="40%" src="https://github.com/NTC-CCBG/snapshots/blob/master/openbmc/ipmid_paths.png" />
+
+The IPMI command implementation in OpenBMC is base on D-Bus.
+Daemon monitor each owned channel, and pass IPMI command data on D-Bus via 
+call D-bus call "execute" provided by [phosphor ipmi host](https://github.com/openbmc/phosphor-host-ipmid).
+Once ipmid (phosphor ipmi host) execute method be called,
+it will get the registered function implemented in /usr/lib/ipmid-providers/, 
+and return response data by execute mapping function.
+
+Here are the interfaces to send IPMI command to BMC which Nuvoton implemented.
+* IPMB: [ipmbbridged](https://github.com/openbmc/ipmbbridge)
+  - The ipmbbridged not only pass message from IPMB, but also provide D-Bus method
+  "sendRequest" for node manager send request to ME.
+* SSIF: [ssifbridged](https://github.com/openbmc/ssifbridge)
+* KCS:  [kcsbridged](https://github.com/openbmc/kcsbridge)
+* Internet: [netipmid](https://github.com/openbmc/phosphor-net-ipmid)
+* D-Bus: [ipmitool](http://ipmitool.sourceforge.net/)
+  - The ipmitool integrated in OpenBMC does not need send IPMI command via other inteface,
+  call ipmid D-Bus method directly.  
+
+Users can choose any inteface to use, and enable all them on.
+(Note. KCS and SSIF is conflit inteface, user need choose one of them)
+There are few examples below to explain how the message route in OpenBMC implementation.
++ Watchdog in booting up
+  - The BIOS can send IPMI command set/reset watchdog via KCS,
+    and the daemon kcsbridged will receive the message from sysfs.
+    Then by pass message by execute D-Bus method to ipmid. 
+    Once the app handler in ipmid get the watchdog request,
+    it will perform the IPMI command by setting phosphor watchdog D-Bus property.
++ Power cap
+  - User can set a power cap to keep power consumption on BMC Web UI or send IPMI command by tools.
+    In this case, dcmi handler in ipmid will find the service which contains
+    object path /xyz/openbmc_project/control/host0/power_cap with interface
+    xyz.openbmc_project.Control.Power.Cap and try to change the power cap property.
+    Node manager handle the property change and make set power cap request to ipmbbridged,
+    then ipmbbridged pass message via IPMB to ME.
+
+
 # IPMI Commands Verified
 | Command | KCS | RMCP+ | IPMB |
 | :--- | :---: | :---: | :---: |
