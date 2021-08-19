@@ -72,6 +72,6 @@ RDEPENDS_${PN}-system_append = " \
         ${@entity_enabled(d, '', 'first-boot-set-psu')} \
         "
 
-RDEPENDS_${PN}-system_append_olympus-entity = " \
-        intel-ipmi-oem \
-        "
+#RDEPENDS_${PN}-system_append_olympus-entity = " \
+#        intel-ipmi-oem \
+#        "
