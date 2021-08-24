@@ -47,4 +47,7 @@ RDEPENDS_${PN}-system = " \
         loadsvf \
         pciutils \
         cpfw \
+        dhrystone \
+        ent \
+        rw-perf \
         "
