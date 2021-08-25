@@ -5,7 +5,7 @@ DESCRIPTION = "SMBIOS MDR version 2 service for Intel based platfrom"
 SRC_URI = "git://github.com/openbmc/smbios-mdr"
 SRCREV = "d23b84a7eb2be944b12e6539cf627f595b299fda"
 
-SRC_URI_append = " ${@entity_enabled(d, '', 'file://0003-smbios-fix-present-and-functional-property-to-true.patch')}"
+SRC_URI_append = " ${@entity_enabled(d, '', 'file://0004-smbios-add-functional-property-for-sdr-dimm-test.patch')}"
 SRC_URI += "file://smbios2"
 SRC_URI += "file://smbios-mdrv2.service"
 
