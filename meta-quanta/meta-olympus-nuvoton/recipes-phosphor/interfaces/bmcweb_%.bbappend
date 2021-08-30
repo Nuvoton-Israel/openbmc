@@ -8,9 +8,8 @@ SRC_URI_append_olympus-nuvoton = " file://0014-add-config-to-config-virtual-medi
 SRC_URI_append_olympus-nuvoton = " file://0016-manager-do-not-update-value-if-string-is-empty.patch"
 SRC_URI_append_olympus-nuvoton = " file://0018-redfish-log_services-fix-createDump-functionality.patch"
 
-# Enable CPU Log and Raw PECI support
-#EXTRA_OEMESON_append = " -Dredfish-cpu-log=enabled"
-#EXTRA_OEMESON_append = " -Dredfish-raw-peci=enabled"
+# Enable CPU Log support
+EXTRA_OEMESON_append = " -Dredfish-cpu-log=enabled"
 
 # Enable Redfish BMC Journal support
 EXTRA_OEMESON_append = " -Dredfish-bmc-journal=enabled"
