@@ -1525,21 +1525,23 @@ This source code is implements CrashDump for the Whitley platform and supports t
   On-Demand (Trigger by Redfish)
   ```
 
-  You can use below Redfish curl to trigger Crash Dump by On-Demand POST action.  
-  This action is used to trigger a new On-Demand Crash Dump is returned immediately.
-  > _/redfish/v1/Systems/system/LogServices/Crashdump/Actions/Oem/Crashdump.OnDemand_
+  You can use below Redfish curl to trigger Crash Dump by CollectDiagnosticData POST action.  
+  This action is used to trigger a new On-Demand Crash Dump is returned immediately.  
+  Currently, **DiagnosticDataType** only support **OEM** this parameter for Crashdump.  
+  However, **OEMDiagnosticDataType** support **OnDemand** and **OnTelemetry** these parameters.
+  > _curl -k -H "X-Auth-Token: $token" -X POST https://${bmc}/redfish/v1/Systems/system/LogServices/Crashdump/Actions/LogService.CollectDiagnosticData -d '{"DiagnosticDataType":"OEM", "OEMDiagnosticDataType": "OnDemand"}'_
 
-  Eventually, there is crashdump file will exist in /tmp/crashdumps folder on BMC.  
+  Eventually, there is crashdump file will exist in /tmp/crashdump/output folder on BMC.  
   And **trigger_type** content in crashdump file is **On-Demand** that means the Crash Dump daemon be called by On-Demand.
 
   You can use below busctl command to verify Crash Dump by On-Demand.
-  > _busctl call com.intel.crashdump /com/intel/crashdump/0 org.freedesktop.DBus.Properties Get ss "com.intel.crashdump" "Log"_
+  > _busctl call com.intel.crashdump /com/intel/crashdump/OnDemand org.freedesktop.DBus.Properties Get ss "com.intel.crashdump" "Log"_
 
   ```
   Direct call upon detection of an Error Event (Trigger by Intel Host Error Monitor)
   ```
 
-  The Intel Host Error Monitor [Intel-BMC/host-error-monitor](https://github.com/Intel-BMC/host-error-monitor) daemon is use to detect an host error event then trigger Crash Dump dameon be executed. And **trigger_type** content in crashdump file is **IERR** that means the Crash Dump daemon be called upon the BMC detecting an host error event.
+  The Host Error Monitor [OpenBMC/host-error-monitor](https://github.com/openbmc/host-error-monitor) daemon is use to detect an host error event then trigger Crash Dump dameon be executed. And **trigger_type** content in crashdump file is **IERR** that means the Crash Dump daemon be called upon the BMC detecting an host error event.
 
 * There are two ways to get crashdump file
   ```
@@ -1563,7 +1565,11 @@ This source code is implements CrashDump for the Whitley platform and supports t
 
 **How to use**
 
-* Configuring ASD on BMC and OpenIPC on Host (refer to [ASD](#asd))
+* Configuring ASD on BMC and OpenIPC on Host (refer [Intel At-Scale Debug](#intel-at-scale-debug))
+
+  Make sure Host CPU can be halted and resumed by executing itp.halt and itp.go command in cscripts folder.
+    > _>>> itp.halt_  
+    > _>>> itp.go_
 
 * Inject 3Strike Error
 
@@ -1582,6 +1588,22 @@ This source code is implements CrashDump for the Whitley platform and supports t
   Analysis data will be stored in JSON format name as **crasdump_decoded.json**  
   Execute crashdump() command in cscripts folder
     > _>>> crashdump_decode_analyze(crashdump.json)_
+
+* Host BIOS configurations
+
+  If you got unexpected command error from **ei.injectThreeStrike**, please check your BIOS settings.  
+  Processor config space there is a setting to lock or unlock the chipset.  
+  For error injection to work properly this setting must be set to unlocked or lock disabled.  
+  Please see your BIOS vendor of choice for where this setting.  
+  Below are Olympus SKX model Host BIOS settings as example:
+
+    > BIOS -> Platform Configuration -> PCH Configuration -> PCH DFX  
+    > **Enable Unlock All PCH registers**
+
+    > BIOS -> Socket Configuration -> Processor Configuration  
+    > **Enable 3StrikeTimerSocket**  
+    > **Disable Lock Chipset**  
+    > **Disable MSR Lock Control**
 
 **Maintainer**
 * Tim Lee
@@ -1954,16 +1976,11 @@ Here uses the RunBMC Olympus server as example.
     echo 40 > /sys/class/gpio/export
     echo 0 > /sys/class/gpio/gpio40/value
     ```
-3. configure BMC_TCK_MUX_SEL pin to CPU TCK
-    ```
-    echo 22 > /sys/class/gpio/export
-    echo 1 > /sys/class/gpio/gpio22/value
-    ```
-4. Run ASD daemon on BMC
+3. Run ASD daemon on BMC
     ```
     asd -u -n eth1 --log-level=warning -p 5123
     ```
-5. Launch CScripts on debug host
+4. Launch CScripts with OpenIPC on debug host
     ```
     Assume CScripts source folder = $CS, OpenIPC source folder = $OIPC
     Edit $OIPC/openipc/Config/SKX/SKX_ASD_RC-Pins.xml
@@ -1974,13 +1991,20 @@ Here uses the RunBMC Olympus server as example.
     export LD_LIBRARY_PATH=$IPC_PATH
     Go to $CS/cscripts, execute "python startCscripts.py -a ipc"
     ```
-6. Execute OpenIPC idcode operation in CScripts command prompt. It will show the TAP device's idcode.
+5. Execute OpenIPC idcode operation in CScripts command prompt. It will show the TAP device's idcode.
     ```
     >>> import ipccli
     >>> ipc = ipccli.baseaccess()
     >>> ipc.idcode(0)
+        '0x3A114013'
     ```
-
+6. Host must be power cycled before executing debug command. Shutdown/Power on host to power cycle host through BMC WebUI.
+    ```
+    >>> itp.halt
+        [GPC core group] Halt on 12 devices (successful return message)
+    >>> itp.go
+        [GPC core group] Resuming on 12 devices (successful return message)
+    ```
 
 ### CPLD Programming
 The motherboard on server have a CPLD device that can be upgraded firmware on it. BMC can load svf file to program CPLD via JTAG.  
@@ -2437,3 +2461,4 @@ image-rwfs    |  0 MB  | middle layer of the overlayfs, rw files in this partiti
 * 2020.12.03 Add MCTP
 * 2021.03.18 Update Server power operations
 * 2021.03.18 Add BMC Reboot Cause
+* 2021.09.06 Update Intel Crash Dump and At-Scale Debug
