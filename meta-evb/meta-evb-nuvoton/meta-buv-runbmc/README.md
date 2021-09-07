@@ -25,7 +25,7 @@ Please submit any patches against the meta-buv-runbmc layer to the maintainer of
 * Joseph Liu, <kwliu@nuvoton.com>
 
 # Quick Setup
-- [Quick Setup Guide](https://github.com/Nuvoton-Israel/openbmc/tree/runbmc/meta-evb/meta-evb-nuvoton/meta-buv-runbmc/HSBUV_Nuvoton_NPCM7XX_RunBMC_Setup_Guide.pdf)
+- [Quick Setup Guide](https://github.com/Nuvoton-Israel/openbmc/tree/runbmc/meta-evb/meta-evb-nuvoton/meta-buv-runbmc/QUICK_SETUP.md)
 
 
 # Rework for BUV Board
