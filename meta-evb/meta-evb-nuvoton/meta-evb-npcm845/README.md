@@ -36,6 +36,8 @@ Please submit any patches against the meta-evb-npcm845 layer to the maintainer o
   * [Network](#network)
   * [I3C](#i3c)
   * [JTag Master](#jtag-master)
+  * [SMB](#smb)
+  * [ESPI](#espi)
 
 # Getting Started
 
@@ -313,3 +315,127 @@ loadsvf -d /dev/jtag0 -s arbelevb_cpld.svf
 
 - The CPLD SVF can be downloaded from here:
 [arbelevb_cpld.svf](https://github.com/Nuvoton-Israel/openbmc/tree/npcm-v2.10/meta-evb/meta-evb-nuvoton/meta-evb-npcm845/recipes-evb-npcm845/loadsvf/files/arbelevb_cpld.svf )
+## SMB
+
+The EVB has 27 SMB interfaces on J3 and J4 headers.
+
+There is a TMP100 sensor (0x48) connected to SMB module 6.
+
+### TMP100 sensor
+- The following example in EVB debug console is to detect TMP100.
+```
+i2cdetect -y -q 6
+```
+- Or one can use the linux dts and driver configurations below.  
+> _Edit nuvoton-npcm845-evb.dts_  
+```
+  &i2c6 {
+    status = "okay";
+    tmp100@48 {
+      compatible = "tmp100";
+      reg = <0x48>;
+      status = "okay";
+    };
+  };
+```
+- Enable kernel configuration
+```
+CONFIG_REGMAP_I2C=y
+CONFIG_I2C=y
+CONFIG_I2C_BOARDINFO=y
+CONFIG_I2C_COMPAT=y
+CONFIG_I2C_CHARDEV=y
+CONFIG_I2C_HELPER_AUTO=y
+CONFIG_I2C_NPCM7XX=y
+CONFIG_SENSORS_LM75=y
+```
+- Boot EVB to Openbmc, there is a sysfs path that shows a hwmon interface.
+```
+/sys/class/hwmon/hwmon0/
+```
+### SMB acts as a slave emulated EEPROM
+
+The SMB module's slave functionality could be tested by the following
+procedure.
+
+Wire the SMB0 module and SMB1 module. The SMB1 module acts as a slave eeprom.
+
+- Enable kernel configuration
+```
+CONFIG_REGMAP_I2C=y
+CONFIG_I2C=y
+CONFIG_I2C_BOARDINFO=y
+CONFIG_I2C_COMPAT=y
+CONFIG_I2C_CHARDEV=y
+CONFIG_I2C_HELPER_AUTO=y
+CONFIG_I2C_NPCM7XX=y
+CONFIG_I2C_SLAVE=y
+CONFIG_I2C_SLAVE_EEPROM=y
+```
+- Build-time (linux dts) configuration or 
+> _Edit nuvoton-npcm845-evb.dts_  
+```
+  &i2c1 {
+    status = "okay";
+    slave_eeprom:slave_eeprom@40000064 {
+      compatible = "slave-24c02";
+      reg = <0x40000064>;
+      status = "okay";
+    };
+  };
+```
+- Runtime configuration  
+Input the following command in the EVB debug console.  
+```
+echo slave-24c02 0x1064 > /sys/bus/i2c/devices/i2c-1/new_device
+```
+- The emulated eeprom device (0x64) is detected by the following command in the
+EVB debug console.
+```
+i2cdetect -y -q 0
+```
+- The following commands could be used to validate the access to the emulated
+eeprom.
+```
+i2ctransfer -f -y 0 w2@0x64 0 0 r2
+i2ctransfer -f -y 0 w4@0x64 0 0 1 3 r0
+i2ctransfer -f -y 0 w2@0x64 0 0 r2
+```
+## ESPI
+
+The EVB has the J_eSPI header to support ESPI transactions.
+
+### Wiring
+- Connected to the host ESPI interface.
+  * eSPI_ALERT_N (optional): ESPI alert pin.  
+  * eSPI_RST_N: ESPI reset pin.  
+  * eSPI_IO0: ESPI IO[0] pin.  
+  * eSPI_IO1: ESPI IO[1] pin.  
+  * eSPI_IO2: ESPI IO[2] pin.  
+  * eSPI_IO3: ESPI IO[3] pin.  
+  * eSPI_CLK: ESPI clock pin.  
+  * eSPI_CS_N: ESPI chip select pin.  
+
+> _If _eSPI_ALERT_N is connected, please configure the alert mode accordingly on the host side._  
+> _To connect the external power 1.8V or 1.0V, please short the pin 2 only on the JP_ESPI_PWR header on EVB._  
+
+### ESPI channel support declaration in u-boot configuration
+- Enable u-boot configuration
+> _Edit nuvoton-npcm850-evb.dts in u-boot_  
+```
+  config {
+    espi-channel-support = <0xf>;
+  };
+```
+> _The configuration above claims that all channels would be supported._  
+- Rebuild and flash the u-boot binary.  
+
+### Validate ESPI
+- Boot EVB into u-boot first and then the host device.  
+- Check if values of the following registers are configured properly.  
+  * Bits **24~27** of **ESPICFG** register are set to **1** to support all four
+    channels.  
+  * The value of **ESPIHINDP** register is expected to be **0x0001111f**.
+  * Bit **8** of **MFSEL4** register is set to **1**.  
+- Issue ESPI request packets from the host.
+
