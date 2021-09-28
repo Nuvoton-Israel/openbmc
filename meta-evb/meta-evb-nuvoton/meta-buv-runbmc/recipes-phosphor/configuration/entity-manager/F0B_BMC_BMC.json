@@ -876,6 +876,12 @@
         "EntityId": 7,
         "EntityInstance": 1
     },
+    "xyz.openbmc_project.Inventory.Decorator.Asset": {
+        "Manufacturer": "$BOARD_MANUFACTURER",
+        "Model": "$PRODUCT_PRODUCT_NAME",
+        "PartNumber": "$BOARD_PART_NUMBER",
+        "SerialNumber": "$BOARD_SERIAL_NUMBER"
+    },
     "xyz.openbmc_project.Inventory.Item.Bmc": {},
     "xyz.openbmc_project.Common.UUID": {
         "UUID": "$BOARD_INFO_AM1"

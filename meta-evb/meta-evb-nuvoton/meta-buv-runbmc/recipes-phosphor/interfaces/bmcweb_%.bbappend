@@ -19,3 +19,6 @@ EXTRA_OEMESON:append:buv-runbmc = " -Dhttp-body-limit=35"
 
 # enable debug
 # EXTRA_OEMESON_append_buv-runbmc = " -Dbmcweb-logging=enabled"
+
+# Enable dbus rest API /xyz/
+EXTRA_OEMESON:append:buv-runbmc = " -Drest=enabled"

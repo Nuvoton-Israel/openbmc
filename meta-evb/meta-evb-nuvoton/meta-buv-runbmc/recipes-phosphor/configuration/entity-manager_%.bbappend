@@ -2,7 +2,7 @@ FILESEXTRAPATHS:prepend:buv-runbmc := "${THISDIR}/${PN}:"
 
 SRC_URI:append:buv-runbmc = " file://F0B_BMC_BMC.json"
 
-FILES_${PN}:append:buv-runbmc = " \
+FILES:${PN}:append:buv-runbmc = " \
     ${datadir}/entity-manager/F0B_BMC_BMC.json"
 
 do_install:append:buv-runbmc() {
