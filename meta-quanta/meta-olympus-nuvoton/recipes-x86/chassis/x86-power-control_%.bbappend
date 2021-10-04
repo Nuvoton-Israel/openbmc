@@ -1,7 +1,7 @@
 FILESEXTRAPATHS:prepend:olympus-nuvoton := "${THISDIR}/${PN}:"
 
 SRC_URI:append:olympus-nuvoton = " file://power-config-host0.json"
-#SRC_URI:append:olympus-nuvoton = " file://0001-support-host-boot-progress.patch"
+SRC_URI:append:olympus-nuvoton = " file://0001-support-host-boot-progress.patch"
 #SRC_URI:append:olympus-nuvoton = " file://0002-add-support-chassis-on-off-target-files.patch"
 SRC_URI:append:olympus-nuvoton = " file://obmc-mapper.target"
 SRC_URI:append:olympus-nuvoton = " file://obmc-chassis-poweroff.target"
