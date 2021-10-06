@@ -1,10 +1,10 @@
 inherit entity-utils
-#SRC_URI:remove:olympus-nuvoton = "git://github.com/openbmc/phosphor-host-ipmid"
-#SRC_URI:prepend:olympus-nuvoton = "git://github.com/Nuvoton-Israel/phosphor-host-ipmid"
-
-#SRCREV := "3f553e155500938a51a06173633c51be87ec463a"
 
 FILESEXTRAPATHS:append:olympus-nuvoton := "${THISDIR}/${PN}:"
+SRC_URI:append:olympus-nuvoton = " \
+    file://0059-Move-Set-SOL-config-parameter-to-host-ipmid.patch \
+    file://0060-Move-Get-SOL-config-parameter-to-host-ipmid.patch \
+    "
 
 DEPENDS:append:olympus-nuvoton = " \
     ${@entity_enabled(d, '', 'olympus-nuvoton-yaml-config')}"
