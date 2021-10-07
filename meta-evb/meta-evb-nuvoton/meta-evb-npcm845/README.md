@@ -40,6 +40,8 @@ Please submit any patches against the meta-evb-npcm845 layer to the maintainer o
   * [ESPI](#espi)
 - [Features of NPCM845 EVB](#features-of-npcm845-evb)
   * [MCU Firmware Update](#mcu-firmware-update)
+  * [iKVM](#ikvm)
+  * [Virtual Media](#virtual-media)
 
 # Getting Started
 
@@ -481,3 +483,124 @@ bitbake loadmcu
 loadmcu -d /dev/mcu0 -s mcu_fw.bin
 ```
 
+### iKVM
+<img align="right" width="30%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/ipkvm-2.10.png">
+
+This is a Virtual Network Computing (VNC) server program using [LibVNCServer](https://github.com/LibVNC/libvncserver).
+1. Support Video Capture and Differentiation(VCD), compare frames by hardware.
+2. Support Encoding Compression Engine(ECE), 16-bit hextile compression hardware encoding.
+3. Support USB HID, support Keyboard and Mouse.
+
+**Source URL**
+
+* [https://github.com/Nuvoton-Israel/obmc-ikvm](https://github.com/Nuvoton-Israel/obmc-ikvm)
+
+**How to use**
+
+1. Install Arbel EVB on a host PC via PCIE socket
+2. Connect USB1_DEV and host PC with a USB cable
+3. Power on host PC and Arbel EVB
+4. Make sure your workstation and Arbel EVB are in the same network.
+5. Launch a browser in your workstation and you will see the entry page.
+    ```
+    /* BMCWeb Server */
+    https://<arbel ip>
+    ```
+4. Login to OpenBMC home page
+    ```
+    Username: root
+    Password: 0penBmc
+    ```
+5. Navigate to OpenBMC WebUI viewer
+    ```
+    https://<arbel ip>/#/control/kvm
+    ```
+**Performance**
+
+* Host OS: Windows Server 2012 R2
+
+|Playing video: [AQUAMAN](https://www.youtube.com/watch?v=2wcj6SrX4zw)|[Real VNC viewer](https://www.realvnc.com/en/connect/download/viewer/) | noVNC viewer
+:-------------|:--------|:-----------|
+Host Resolution    | FPS    | FPS |
+1024x768  |  25    | 8 |
+1280x1024   |  20  | 4 |
+1600x1200   |  14   | 3 |
+
+|Scrolling bar: [Demo video](https://drive.google.com/file/d/1H71_H6yjO8NU4Qu_ZL4F59FQ0PQmEo2n/view)|[Real VNC viewer](https://www.realvnc.com/en/connect/download/viewer/) | noVNC viewer
+:-------------|:--------|:-----------|
+Host Resolution    | FPS    | FPS |
+1024x768  |  31    | 15 |
+1280x1024   |  24  | 12 |
+1600x1200   |  20   | 7 |
+
+**The preferred settings of RealVNC Viewer**
+```
+Picture quality: Custom
+ColorLevel: rgb565
+PreferredEncoding: Hextile
+```
+
+**Maintainer**
+
+* Joseph Liu
+
+### Virtual Media
+<img align="right" width="20%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/vm_app_win.png">
+<img align="right" width="30%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/virtual-media-2.10.png">
+
+Virtual Media (VM) is to emulate an USB drive on remote host PC via Network Block Device(NBD) and Mass Storage(MSTG).
+
+**Source URL**
+
+* [https://github.com/Nuvoton-Israel/openbmc/tree/runbmc/meta-phosphor/nuvoton-layer/recipes-connectivity/jsnbd](https://github.com/Nuvoton-Israel/openbmc/tree/runbmc/meta-phosphor/nuvoton-layer/recipes-connectivity/jsnbd)
+* [https://github.com/Nuvoton-Israel/openbmc-util/tree/master/virtual_media_openbmc2.6](https://github.com/Nuvoton-Israel/openbmc-util/tree/master/virtual_media_openbmc2.6)
+
+**How to use**
+
+1. Clone a physical USB drive to an image file
+    * For Linux - use tool like **dd**
+      ```
+      dd if=/dev/sda of=usb.img bs=1M count=100
+      ```
+      > _**bs** here is block size and **count** is block count._
+      >
+      > _For example, if the size of your USB drive is 1GB, then you could set "bs=1M" and "count=1024"_
+
+    * For Windows - use tool like **Win32DiskImager.exe**
+
+      > _NOTICE : A simple *.iso file cannot work for this._
+
+2. Enable Virtual Media
+
+    2.1 VM-WEB
+    1. Login and switch to webpage of VM on your browser
+        ```
+        https://XXX.XXX.XXX.XXX/#/control/virtual-media
+        ```
+
+    2. Operations of Virtual Media
+        * After `Choose File`, click `Start` to start VM network service
+        * After clicking `Start`, you will see a new USB device on HOST OS
+        * If you want to stop this service, just click `Stop` to stop VM network service.
+
+    2.2 VM standalone application
+    * Download [application source code](https://github.com/Nuvoton-Israel/openbmc-util/tree/master/virtual_media_openbmc2.6)
+    * Follow the [readme](https://github.com/Nuvoton-Israel/openbmc-util/blob/master/virtual_media_openbmc2.6/NBDServerWSWindows/README) instructions install QT and Openssl
+    * Start QT creator, open project **VirtualMedia.pro**, then build all
+    * Launch windows/linux application
+        > _NOTICE : use `sudo` to launch app in linux and install `nmap` first_
+    *  Operations
+        + After `Chose an Image File` or `Select an USB Drive`, click `Search` to check which BMCs are on line
+        + Select any on line BMC and key in `Account/Password`, choose the `Export Type` to Image, and click `Start VM` to start VM network service (still not hook USB disk to host platform)
+        + After `Start VM`, click `Mount USB` to hook the emulated USB disk to host platform, or click `Stop VM` to stop VM network service.
+        + After `Mount USB`, click `UnMount USB` to emulate unplugging the USB disk from host platform
+        + After `UnMount USB`, click `Stop VM` to stop VM network service, or click `Mount USB` to hook USB disk to host platform.
+
+3. Performance
+
+|Client |MountType |Encryption |Speed KB/s
+:---------------------|:----------------------------------------------|:---|:---------|
+Client WebUI(HTML5)  | CentOS-8.2.2004-x86_64-dvd1.iso (8GB Size)    |Yes| ~7800KB/s |
+
+**Maintainer**
+* Medad CChien
