@@ -42,6 +42,7 @@ Please submit any patches against the meta-evb-npcm845 layer to the maintainer o
   * [MCU Firmware Update](#mcu-firmware-update)
   * [iKVM](#ikvm)
   * [Virtual Media](#virtual-media)
+  * [Fan PID Control](#fan-pid-control)
 
 # Getting Started
 
@@ -604,3 +605,283 @@ Client WebUI(HTML5)  | CentOS-8.2.2004-x86_64-dvd1.iso (8GB Size)    |Yes| ~7800
 
 **Maintainer**
 * Medad CChien
+
+### Fan PID Control
+<img align="right" width="30%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/fan_stepwise_pwm.png">
+<img align="right" width="30%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/fan-2.10.png">
+
+NPCM845 has three PWM modules and each module has four PWM outputs. On EVB, the first module is for controlling four fans for dynamic adjustment according temperature variation and the second module is for controlling the brightness of four LEDs.
+
+**Source URL**
+
+* [https://github.com/openbmc/phosphor-pid-control](https://github.com/openbmc/phosphor-pid-control)
+* [https://github.com/openbmc/phosphor-hwmon](https://github.com/openbmc/phosphor-hwmon)
+* [https://github.com/Nuvoton-Israel/openbmc/tree/npcm-v2.10/meta-evb/meta-evb-nuvoton/meta-evb-npcm845/recipes-phosphor/fans/phosphor-pid-control](https://github.com/Nuvoton-Israel/openbmc/tree/npcm-v2.10/meta-evb/meta-evb-nuvoton/meta-evb-npcm845/recipes-phosphor/fans/phosphor-pid-control)
+
+**How to use**
+
+In order to automatically apply accurate and responsive correction to a fan control function, we use the `swampd` to handle output PWM signal. For enable this daemon, basically we need configuring the swampd configuration file and deploy a system service for start this daemon as below steps.
+
+>_NOTICE: In current solution, we only use stepwise mechanism to control fans. But the swampd also can controls fan with PID by tuning parameters according to customer platform._
+
+* The swampd(PID control daemon) is a Margin-based daemon running within the OpenBMC environment. It uses a well-defined [configuration file](https://github.com/Nuvoton-Israel/openbmc/blob/npcm-v2.10/meta-evb/meta-evb-nuvoton/meta-evb-npcm845/recipes-phosphor/fans/phosphor-pid-control/config-evb-npcm845.json) to control the temperature of the tray components to keep them within operating conditions.
+
+    Here is a configuraion example shows how to using one PWM control more than one fans on system.
+    ```
+    "sensors" : [
+        {
+            "name": "Fan1",
+            "type": "fan",
+            "readPath": "/xyz/openbmc_project/sensors/fan_tach/Fan1",
+            "writePath": "/sys/devices/platform/ahb/ahb:apb/f0103000.pwm-fan-controller/hwmon/**/pwm1",
+            "min": 0,
+            "max": 255
+        },
+        {
+            "name": "Fan2",
+            "type": "fan",
+            "readPath": "/xyz/openbmc_project/sensors/fan_tach/Fan2",
+            "writePath": "/sys/devices/platform/ahb/ahb:apb/f0103000.pwm-fan-controller/hwmon/**/pwm2",
+            "min": 0,
+            "max": 255
+        },
+        {
+            "name": "Fan3",
+            "type": "fan",
+            "readPath": "/xyz/openbmc_project/sensors/fan_tach/Fan3",
+            "writePath": "/sys/devices/platform/ahb/ahb:apb/f0103000.pwm-fan-controller/hwmon/**/pwm3",
+            "min": 0,
+            "max": 255
+        },
+        {
+            "name": "Fan4",
+            "type": "fan",
+            "readPath": "/xyz/openbmc_project/sensors/fan_tach/Fan4",
+            "writePath": "/sys/devices/platform/ahb/ahb:apb/f0103000.pwm-fan-controller/hwmon/**/pwm4",
+            "min": 0,
+            "max": 255
+        },
+        {
+            "name": "BMC_CPU_Temp0",
+            "type": "temp",
+            "readPath": "/xyz/openbmc_project/sensors/temperature/BMC_CPU_Temp0",
+            "writePath": "",
+            "min": 0,
+            "max": 0,
+            "ignoreDbusMinMax": true,
+            "timeout": 0
+        },
+        {
+            "name": "EVB_Temp",
+            "type": "temp",
+            "readPath": "/xyz/openbmc_project/sensors/temperature/EVB_Temp",
+            "writePath": "",
+            "min": 0,
+            "max": 0,
+            "ignoreDbusMinMax": true,
+            "timeout": 0
+        }
+    ],
+    "zones" : [
+        {
+            "id": 0,
+            "minThermalOutput": 0.0,
+            "failsafePercent": 100.0,
+            "pids": [
+                {
+                    "name": "Fan1",
+                    "type": "fan",
+                    "inputs": ["Fan1"],
+                    "setpoint": 40.0,
+                    "pid": {
+                        "samplePeriod": 1.0,
+                        "proportionalCoeff": 0.0,
+                        "integralCoeff": 0.0,
+                        "feedFwdOffsetCoeff": 0.0,
+                        "feedFwdGainCoeff": 1.0,
+                        "integralLimit_min": 0.0,
+                        "integralLimit_max": 0.0,
+                        "outLim_min": 10.0,
+                        "outLim_max": 100.0,
+                        "slewNeg": 0.0,
+                        "slewPos": 0.0
+                    }
+                },
+                {
+                    "name": "BMC_CPU_Temp0",
+                    "type": "stepwise",
+                    "inputs": ["BMC_CPU_Temp0"],
+                    "setpoint": 30.0,
+                    "pid": {
+                        "samplePeriod": 1.0,
+                        "positiveHysteresis": 0.0,
+                        "negativeHysteresis": 0.0,
+                        "isCeiling": false,
+                        "reading": {
+                            "0": 25,
+                            "1": 28,
+                            "2": 31,
+                            "3": 34,
+                            "4": 37,
+                            "5": 40,
+                            "6": 43,
+                            "7": 46,
+                            "8": 49,
+                            "9": 52,
+                            "10": 55,
+                            "11": 58,
+                            "12": 61,
+                            "13": 64,
+                            "14": 67,
+                            "15": 70
+                        },
+                        "output": {
+                            "0": 10,
+                            "1": 10,
+                            "2": 20,
+                            "3": 20,
+                            "4": 20,
+                            "5": 30,
+                            "6": 30,
+                            "7": 30,
+                            "8": 40,
+                            "9": 50,
+                            "10": 60,
+                            "11": 70,
+                            "12": 80,
+                            "13": 90,
+                            "14": 100,
+                            "15": 100
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "id": 1,
+            "minThermalOutput": 0.0,
+            "failsafePercent": 100.0,
+            "pids": [
+                {
+                    "name": "Fan4",
+                    "type": "fan",
+                    "inputs": ["Fan4"],
+                    "setpoint": 90.0,
+                    "pid": {
+                        "samplePeriod": 0.1,
+                        "proportionalCoeff": 0.0,
+                        "integralCoeff": 0.0,
+                        "feedFwdOffsetCoeff": 0.0,
+                        "feedFwdGainCoeff": 1.0,
+                        "integralLimit_min": 0.0,
+                        "integralLimit_max": 0.0,
+                        "outLim_min": 10.0,
+                        "outLim_max": 100.0,
+                        "slewNeg": 0.0,
+                        "slewPos": 0.0
+                    }
+                },
+                 {
+                    "name": "EVB_Temp",
+                    "type": "stepwise",
+                    "inputs": ["EVB_Temp"],
+                    "setpoint": 30.0,
+                    "pid": {
+                        "samplePeriod": 1.0,
+                        "positiveHysteresis": 0.0,
+                        "negativeHysteresis": 0.0,
+                        "isCeiling": false,
+                        "reading": {
+                            "0": 25,
+                            "1": 28,
+                            "2": 31,
+                            "3": 34,
+                            "4": 37,
+                            "5": 40,
+                            "6": 43,
+                            "7": 46,
+                            "8": 49,
+                            "9": 52,
+                            "10": 55,
+                            "11": 58,
+                            "12": 61,
+                            "13": 64,
+                            "14": 67,
+                            "15": 70
+                        },
+                        "output": {
+                            "0": 10,
+                            "1": 10,
+                            "2": 20,
+                            "3": 20,
+                            "4": 20,
+                            "5": 30,
+                            "6": 30,
+                            "7": 30,
+                            "8": 40,
+                            "9": 50,
+                            "10": 60,
+                            "11": 70,
+                            "12": 80,
+                            "13": 90,
+                            "14": 100,
+                            "15": 100
+                        }
+
+
+                    }
+                }
+
+            ]
+        }
+    ]
+
+    ```
+    The [PID README](https://github.com/openbmc/phosphor-pid-control/blob/master/configure.md) provide more detail about the meaning for each parameter.
+
+    Roughly speaking, there are two main section in configuration file: **sensor** and **zones**.
+    **Sensors** defined the all component which are involved PID like temperature sensors, or fans.
+    **Zones** defined the mechanism how the swampd control each fans by setting parameters.
+
+    The most important in **sensors** section is the settings of `readPath` and `writePath`.
+    Sensors like temperature sensor or margin sensor must only set readPath, and fill up empty string to writePath.
+    Fans could set the D-Bus path to readPath, also set the pwm system path to writePath.
+    More detail about readPath and writePath please refer README that mentioned above.
+
+    There are four PID controller types user can use: `fan`, `temp`, `margin`, and `stepwise` in **zones**.
+    User can tune the PID parameters following the [tuning README](https://github.com/openbmc/phosphor-pid-control/blob/master/tuning.md). 
+
+    In above example case, the fan PID controller has a lot of PID parameters. And we only use the stepwise controller to control whole zone, so the PID parameters in fan controller like `integralCoeff` or `outLim_max` would not work.
+    And the parameter `inputs` for stepwise controller must be thermal sensor.
+    Please note the parameter `setpoint` is no meaning for type `fan` and `stepwise` currently, and cannot be left out.
+
+    If user want to control whole zone by stepwise controller like example configuration, the key point is set reading and output.
+    The `stepwise` PID use the mapping of reading and output value instead of set RPM setpoint.
+    The reading and output value should be a pair, and user can set 20 pairs in maximum, one more pairs at least.
+    And the `stepwise` will return output setpoint if temperature **is larger** than reading value.
+    For example, assume here are pairs of `stepwise` reading and output:
+    ```
+    {
+      "reading": {25, 26, 27},
+      "output": {10, 20, 30}
+    }
+    ```
+
+    If the temperature reading is 25.5°C, the return value will be 10.
+    And if the reading value is 26.5°C, the stepwise controller will set 20% RPM to fan(s).
+
+
+* OpenBMC will run swampd through [phosphor-pid-control.service](https://github.com/Nuvoton-Israel/openbmc/blob/npcm-v2.10/meta-evb/meta-evb-nuvoton/meta-evb-npcm845/recipes-phosphor/fans/phosphor-pid-control/phosphor-pid-control.service) that controls the fans by pre-defined zones. Here is a example service.
+    ```
+    [Service]
+    Type=simple
+    ExecStart=/usr/bin/swampd
+    Restart=always
+    RestartSec=5
+    StartLimitInterval=0
+    ExecStopPost=/usr/bin/fan-default-speed.sh
+    ```
+    + **ExecStopPost** that means an additional commands that are executed after the service is stopped.
+
+**Maintainer**
+* Tim Lee		    
