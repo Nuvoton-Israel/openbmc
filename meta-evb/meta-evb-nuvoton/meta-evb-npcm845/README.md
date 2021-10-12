@@ -38,6 +38,7 @@ Please submit any patches against the meta-evb-npcm845 layer to the maintainer o
   * [JTag Master](#jtag-master)
   * [SMB](#smb)
   * [ESPI](#espi)
+  * [SIOX](#siox)
 - [Features of NPCM845 EVB](#features-of-npcm845-evb)
   * [MCU Firmware Update](#mcu-firmware-update)
   * [iKVM](#ikvm)
@@ -443,6 +444,74 @@ The EVB has the J_eSPI header to support ESPI transactions.
   * The value of **ESPIHINDP** register is expected to be **0x0001111f**.
   * Bit **8** of **MFSEL4** register is set to **1**.  
 - Issue ESPI request packets from the host.
+
+## SIOX
+
+The EVB has two SIOX modules connecting to CPLD. You could controll LED_CPLD_7 and do loopback test.
+
+### Source URL
+- [https://github.com/Nuvoton-Israel/linux/blob/NPCM-5.10-OpenBMC/drivers/gpio/gpio-npcm-sgpio.c](https://github.com/Nuvoton-Israel/linux/blob/NPCM-5.10-OpenBMC/drivers/gpio/gpio-npcm-sgpio.c)
+	
+###  How to Use
+- Please follow JTAG Master section to program CPLD
+ 
+- Edit nuvoton-common-npcm8xx.dtsi.
+```
+sgpio1: sgpio@101000 {
+	clocks = <&clk NPCM8XX_CLK_APB3>;
+	compatible = "nuvoton,npcm845-sgpio";
+	gpio-controller;
+	pinctrl-names = "default";
+	pinctrl-0 = <&iox1_pins>;
+	reg = <0x101000 0x200>;
+	status = "disabled";
+};
+
+sgpio2: sgpio@102000 {
+	clocks = <&clk NPCM8XX_CLK_APB3>;
+	compatible = "nuvoton,npcm845-sgpio";
+	gpio-controller;
+	pinctrl-names = "default";
+	pinctrl-0 = <&iox2_pins>;
+	reg = <0x102000 0x200>;
+	status = "disabled";
+};
+```
+- Edit nuvoton-npcm845-evb.dts to support 64 input and 64 output of the second module, and the ninth output pin is for green LED
+```
+sgpio2: sgpio@102000 {
+	status = "okay";
+	bus-frequency = <16000000>;
+	nin_gpios = <64>;
+	nout_gpios = <64>;
+	gpio-line-names = "","","","","","","","",
+		"g_led","","","","","","","";
+};	
+```
+- Enable Kernel config
+```
+CONFIG_GPIO_NUVOTON_SGPIO=y
+```
+- Boot EVB to Openbmc, you can check gpiochip8 infomation
+```
+cat /sys/kernel/debug/gpio
+gpioinfo 8
+```
+- Now, you can turn on/off LED_CPLD_7
+```
+cd /sys/class/gpio
+echo 392 > ./export
+echo 1 > gpio392/value
+echo 0 > gpio392/value
+```
+- Test loopback with output pin 384 and input pin 448
+```
+cd /sys/class/gpio
+echo 384 > ./export
+echo 448 > .export
+echo 1 > gpio385/value
+cat gpio448/value
+```
 
 ## Features of NPCM845 EVB
 ### MCU Firmware Update
