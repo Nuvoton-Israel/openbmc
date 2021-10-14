@@ -5,6 +5,7 @@ FILESEXTRAPATHS:prepend:olympus-nuvoton := "${THISDIR}/${PN}:"
 #SRC_URI:append:olympus-nuvoton = " file://0014-add-config-to-config-virtual-media-buffer-size.patch"
 #SRC_URI:append:olympus-nuvoton = " file://0016-manager-do-not-update-value-if-string-is-empty.patch"
 SRC_URI:append:olympus-nuvoton = " file://0018-redfish-log_services-fix-createDump-functionality.patch"
+SRC_URI:append:olympus-nuvoton = " file://0001-redfish-update_service-fix-fwUpdateErrorMatcher-cann.patch"
 
 # Enable CPU Log support
 EXTRA_OEMESON:append:olympus-nuvoton = " -Dredfish-cpu-log=enabled"
@@ -29,3 +30,6 @@ EXTRA_OEMESON:append:olympus-nuvoton = " -Dredfish-dump-log=enabled"
 
 # Enable dbus rest API /xyz/
 EXTRA_OEMESON:append:olympus-nuvoton = " -Drest=enabled"
+
+# Enable debug message
+#EXTRA_OEMESON:append:olympus-nuvoton = " -Dbmcweb-logging=enabled"
