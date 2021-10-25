@@ -4,6 +4,7 @@ FILESEXTRAPATHS:append:olympus-nuvoton := "${THISDIR}/${PN}:"
 SRC_URI:append:olympus-nuvoton = " \
     file://0059-Move-Set-SOL-config-parameter-to-host-ipmid.patch \
     file://0060-Move-Get-SOL-config-parameter-to-host-ipmid.patch \
+    file://Add-Set-BIOS-version-support.patch \
     "
 
 DEPENDS:append:olympus-nuvoton = " \
