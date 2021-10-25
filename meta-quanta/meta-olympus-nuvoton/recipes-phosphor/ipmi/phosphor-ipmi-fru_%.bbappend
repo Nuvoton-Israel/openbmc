@@ -6,7 +6,7 @@ FILESEXTRAPATHS:prepend:olympus-nuvoton := "${THISDIR}/${PN}:"
 DEPENDS:append:olympus-nuvoton = " \
     ${@entity_enabled(d, '', 'olympus-nuvoton-yaml-config')}"
 
-EXTRA_OECONF_olympus-nuvoton = " \
+EXTRA_OECONF:olympus-nuvoton = " \
     ${@entity_enabled(d, '', 'YAML_GEN=${STAGING_DIR_HOST}${datadir}/olympus-nuvoton-yaml-config/ipmi-fru-read.yaml')} \
     ${@entity_enabled(d, '', 'PROP_YAML=${STAGING_DIR_HOST}${datadir}/olympus-nuvoton-yaml-config/ipmi-extra-properties.yaml')} \
     "
