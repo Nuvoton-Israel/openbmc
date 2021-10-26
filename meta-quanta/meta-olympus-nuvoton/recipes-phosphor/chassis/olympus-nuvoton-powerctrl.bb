@@ -12,12 +12,12 @@ DEPENDS += "systemd"
 RDEPENDS:${PN} += "libsystemd"
 RDEPENDS:${PN} += "bash"
 
-SRC_URI_olympus-nuvoton = " \
+SRC_URI:olympus-nuvoton = " \
     file://init_once.sh \
     file://host-gpio.service \
     "
 
-do_install_olympus-nuvoton() {
+do_install:olympus-nuvoton() {
     install -d ${D}${bindir}
     install -m 0755 ${WORKDIR}/init_once.sh ${D}${bindir}/
 
