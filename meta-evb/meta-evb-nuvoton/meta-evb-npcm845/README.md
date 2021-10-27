@@ -44,6 +44,7 @@ Please submit any patches against the meta-evb-npcm845 layer to the maintainer o
   * [ADC](#adc)
   * [FAN](#fan)
   * [TMPS](#tmps)
+  * [PCIE RC](#pcie-rc)
 
 # Getting Started
 
@@ -793,4 +794,65 @@ BMC Temperature Sensor (TMPS)
 ```
 cat /sys/class/thermal/thermal_zone0/temp
 cat /sys/class/thermal/thermal_zone1/temp
+```
+
+## PCIE RC
+
+The PCIERC is used by the BMC CPU to control external PCIe devices connected to it.
+
+The EVB has one J_PCIE_RC header.
+
+**How to use**
+
+- Insert a Nuvoton EVB into J_PCIE_RC header.  
+Here a Runbmc BUV EVB is used.  
+
+- Power up the BUV EVB and then the Arbel EVB.
+
+- Locate the buv device by inputting the **lspci** command on the openbmc debug console. Here is an example result.  
+```
+00:00.0 PCI bridge: PLDA Device 1111 (rev 01)
+01:00.0 PCI bridge: PLDA PCI Express Bridge (rev 02)
+02:00.0 VGA compatible controller: Matrox Electronics Systems Ltd. Integrated Matrox G200eW3 Graphics Controller (rev 04)
+02:01.0 Unassigned class [ff00]: Winbond Electronics Corp Device 0750 (rev 04)
+```
+- The **02:01.0** is the target and the following commands on the openbmc debug console show more information.  
+```
+cd /sys/bus/pci/devices/0000\:02\:01.0
+echo 1 > enable
+lspci -v -s 02:01.0 -xxx
+```
+The example result is:
+```
+02:01.0 Unassigned class [ff00]: Winbond Electronics Corp Device 0750 (rev 04)
+        Subsystem: Winbond Electronics Corp Device 0750
+        Flags: slow devsel
+        Memory at eb810000 (32-bit, non-prefetchable) [size=32K]
+        Capabilities: [78] Power Management version 1
+lspci: Unable to load libkmod resources: error -2
+00: 50 10 50 07 02 00 90 84 04 00 00 ff 00 00 00 00
+10: 00 00 81 eb 00 00 00 00 00 00 00 00 00 00 00 00
+20: 00 00 00 00 00 00 00 00 00 00 00 00 50 10 50 07
+30: 00 00 00 00 78 00 00 00 00 00 00 00 00 01 10 20
+40: 00 00 00 00 40 61 22 46 00 00 00 00 00 00 00 00
+50: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+60: 50 27 a9 00 00 00 00 00 00 00 00 00 00 00 00 00
+70: 00 00 00 00 00 00 00 00 01 00 21 00 00 00 00 00
+80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+90: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+a0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+b0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+c0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+d0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+e0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+f0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+```
+- Display PCIE device memory information  
+The memory region is 0xeb810000 in the example result and the following command on the openbmc debug console can show memory information in the PCIE device.
+```
+devmem 0xeb810000 32
+```
+The example result is:
+```
+0x171BDE9B
 ```
