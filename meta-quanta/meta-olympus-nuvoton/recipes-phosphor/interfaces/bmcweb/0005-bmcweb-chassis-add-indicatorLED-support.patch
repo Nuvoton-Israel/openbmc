@@ -1,22 +1,21 @@
-From 8de728b5dde519ad80e758193de769ee018902e9 Mon Sep 17 00:00:00 2001
-From: Joseph Liu <kwliu@nuvoton.com>
-Date: Fri, 28 May 2021 15:31:04 +0800
-Subject: [PATCH 2/3] Redfish: chassis add indicatorLED support
+From 8e9cc4221d998cf9840696920d8bb76b1f53000d Mon Sep 17 00:00:00 2001
+From: Tim Lee <timlee660101@gmail.com>
+Date: Thu, 28 Oct 2021 16:59:47 +0800
+Subject: [PATCH 5/5] bmcweb chassis add indicatorLED support
 
-Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+Signed-off-by: Tim Lee <timlee660101@gmail.com>
 ---
- redfish-core/lib/chassis.hpp | 108 +++++++++++++++++++++++++++++++++--
- 1 file changed, 103 insertions(+), 5 deletions(-)
+ redfish-core/lib/chassis.hpp | 106 +++++++++++++++++++++++++++++++++--
+ 1 file changed, 101 insertions(+), 5 deletions(-)
 
 diff --git a/redfish-core/lib/chassis.hpp b/redfish-core/lib/chassis.hpp
-index e96a678f9..c32d1d320 100644
+index 5a837936e..4bdf908a7 100644
 --- a/redfish-core/lib/chassis.hpp
 +++ b/redfish-core/lib/chassis.hpp
-@@ -118,6 +118,74 @@ inline void getIntrusionByService(std::shared_ptr<bmcweb::AsyncResp> aResp,
+@@ -119,6 +119,73 @@ inline void getIntrusionByService(std::shared_ptr<bmcweb::AsyncResp> aResp,
          "xyz.openbmc_project.Chassis.Intrusion", "Status");
  }
  
-+
 +/**
 + * Retrieves physical Led properties over dbus
 + */
@@ -87,66 +86,65 @@ index e96a678f9..c32d1d320 100644
  /**
   * Retrieves physical security properties over dbus
   */
-@@ -257,8 +325,40 @@ class Chassis : public Node
+@@ -225,8 +292,39 @@ inline void requestRoutesChassis(App& app)
+                         auto health =
+                             std::make_shared<HealthPopulate>(asyncResp);
  
-                     auto health = std::make_shared<HealthPopulate>(asyncResp);
++                        // Get the list of all sensors for this Chassis element
++                        std::vector<std::string> sensorPaths = {
++                            "/all_sensors",
++                            "/sensors"
++                        };
++
++                        for (const std::string& sensorPath : sensorPaths)
++                        {
++                            crow::connections::systemBus->async_method_call(
++                                [health](const boost::system::error_code ec,
++                                        std::variant<std::vector<std::string>> &resp) {
++                                    if (ec)
++                                    {
++                                        return; // no sensors = no failures
++                                    }
++                                    std::vector<std::string> *data =
++                                        std::get_if<std::vector<std::string>>(&resp);
++                                    if (data == nullptr)
++                                    {
++                                        return;
++                                    }
++                                    health->inventory = std::move(*data);
++                                },
++                                "xyz.openbmc_project.ObjectMapper",
++                                path + sensorPath,
++                                "org.freedesktop.DBus.Properties", "Get",
++                                "xyz.openbmc_project.Association", "endpoints");
++                        }
++
++                        health->populate();
++
+                         crow::connections::systemBus->async_method_call(
+-                            [health](
++                            [asyncResp](
+                                 const boost::system::error_code ec2,
+                                 std::variant<std::vector<std::string>>& resp) {
+                                 if (ec2)
+@@ -240,15 +338,13 @@ inline void requestRoutesChassis(App& app)
+                                 {
+                                     return;
+                                 }
+-                                health->inventory = std::move(*data);
++                                getPhysicalLedData(asyncResp, std::move((*data)[0]));
+                             },
+                             "xyz.openbmc_project.ObjectMapper",
+-                            path + "/all_sensors",
++                            path + "/leds",
+                             "org.freedesktop.DBus.Properties", "Get",
+                             "xyz.openbmc_project.Association", "endpoints");
  
-+
-+                    // Get the list of all sensors for this Chassis element
-+                    std::vector<std::string> sensorPaths = {
-+                        "/all_sensors",
-+                        "/sensors"
-+                    };
-+
-+                    for (const std::string sensorPath : sensorPaths)
-+                    {
-+                        crow::connections::systemBus->async_method_call(
-+                            [health](const boost::system::error_code ec,
-+                                    std::variant<std::vector<std::string>> &resp) {
-+                                if (ec)
-+                                {
-+                                    return; // no sensors = no failures
-+                                }
-+                                std::vector<std::string> *data =
-+                                    std::get_if<std::vector<std::string>>(&resp);
-+                                if (data == nullptr)
-+                                {
-+                                    return;
-+                                }
-+                                health->inventory = std::move(*data);
-+                            },
-+                            "xyz.openbmc_project.ObjectMapper",
-+                            path + sensorPath,
-+                            "org.freedesktop.DBus.Properties", "Get",
-+                            "xyz.openbmc_project.Association", "endpoints");
-+                    }
-+
-+                    health->populate();
-+
-                     crow::connections::systemBus->async_method_call(
--                        [health](const boost::system::error_code ec2,
-+                        [asyncResp](const boost::system::error_code ec2,
-                                  std::variant<std::vector<std::string>>& resp) {
-                             if (ec2)
-                             {
-@@ -270,15 +370,13 @@ class Chassis : public Node
-                             {
-                                 return;
-                             }
--                            health->inventory = std::move(*data);
-+                            getPhysicalLedData(asyncResp, std::move((*data)[0]));
-                         },
-                         "xyz.openbmc_project.ObjectMapper",
--                        path + "/all_sensors",
-+                        path + "/leds",
-                         "org.freedesktop.DBus.Properties", "Get",
-                         "xyz.openbmc_project.Association", "endpoints");
- 
--                    health->populate();
+-                        health->populate();
 -
-                     if (connectionNames.size() < 1)
-                     {
-                         BMCWEB_LOG_ERROR << "Got 0 Connection names";
+                         if (connectionNames.size() < 1)
+                         {
+                             BMCWEB_LOG_ERROR << "Got 0 Connection names";
 -- 
 2.17.1
 
