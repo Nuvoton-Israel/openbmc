@@ -1,6 +1,6 @@
 FILESEXTRAPATHS:prepend:olympus-nuvoton := "${THISDIR}/${PN}:"
 
-#SRC_URI:append:olympus-nuvoton = " file://0003-Redfish-Add-power-metrics-support.patch"
+SRC_URI:append:olympus-nuvoton = " file://0003-Redfish-Add-power-metrics-support.patch"
 SRC_URI:append:olympus-nuvoton = " file://0005-bmcweb-chassis-add-indicatorLED-support.patch"
 #SRC_URI:append:olympus-nuvoton = " file://0014-add-config-to-config-virtual-media-buffer-size.patch"
 #SRC_URI:append:olympus-nuvoton = " file://0016-manager-do-not-update-value-if-string-is-empty.patch"
