@@ -45,6 +45,7 @@ Please submit any patches against the meta-evb-npcm845 layer to the maintainer o
   * [FAN](#fan)
   * [TMPS](#tmps)
   * [PCIE RC](#pcie-rc)
+  * [EMMC](#emmc)
 
 # Getting Started
 
@@ -855,4 +856,21 @@ devmem 0xeb810000 32
 The example result is:
 ```
 0x171BDE9B
+```
+
+## EMMC
+
+The evb has an 8G EMMC
+
+1. Use as internal storage
+```
+mkfs.ext4 /dev/mmcblk0
+mkdir tmp
+mount /dev/mmcblk0 tmp
+```
+	
+2. Export by Mass Storage
+- You need to setup configfs for mass storage first, then export emmc device node to below path.
+```
+echo "/dev/mmcblk0" > /sys/kernel/config/usb_gadget/mmc-storage/functions/mass_storage.usb0/lun.0/file
 ```
