@@ -51,4 +51,5 @@ RDEPENDS_${PN}-system = " \
         ent \
         rw-perf \
         loadmcu \
+        phosphor-ecc \
         "
