@@ -819,6 +819,50 @@ cat /sys/class/hwmon/hwmon1/fan2_input
 cat /sys/class/hwmon/hwmon1/fan3_input
 cat /sys/class/hwmon/hwmon1/fan4_input
 ```
+3. Change PWM by command in uboot
+```
+PWM Initial:
+mw.l 0xf0800264 0x00ff000f 1
+mw.l 0xf0103000 0x00000909 1
+mw.l 0xf0103004 0x00004444 1
+mw.l 0xf0103008 0x00099909 1
+
+PWM0:
+mw.l 0xf010300c 0x000000ff 1
+mw.l 0xf0103010 0x0 1
+mw.l 0xf0103010 0xff 1
+
+PWM1:
+mw.l 0xf0103018 0x000000ff 1
+mw.l 0xf010301c 0x0 1
+mw.l 0xf010301c 0xff 1
+
+PWM2:
+mw.l 0xf0103024 0x000000ff 1
+mw.l 0xf0103028 0x0 1
+mw.l 0xf0103028 0xff 1
+
+PWM3:
+mw.l 0xf0103030 0x000000ff 1
+mw.l 0xf0103034 0x0 1
+mw.l 0xf0103034 0xff 1
+```
+4. Read FAN RPMS by command in uboot
+```
+MFT0 initial:
+mw.b 0xf0180008 0xff 1
+mw.b 0xf018000a 0x09 1
+mw.b 0xf018000c 0x64 1
+mw.w 0xf0180014 0xafff 1
+mw.w 0xf0180016 0xafff 1
+mw.b 0xf0180018 0x44 1
+mw.w 0xf018001a 0x0 1
+mw.w 0xf018001c 0x0 1
+
+Read FANIN0 value:
+md.w 0xf0180002
+f0180002: f88c
+```
 
 # TMPS
 
