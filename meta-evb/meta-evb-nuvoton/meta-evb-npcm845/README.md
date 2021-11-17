@@ -47,6 +47,7 @@ Please submit any patches against the meta-evb-npcm845 layer to the maintainer o
   * [TMPS](#tmps)
   * [PCIE RC](#pcie-rc)
   * [EMMC](#emmc)
+  * [BIOS POST Code](#bios-post-code)
 
 # Getting Started
 
@@ -950,4 +951,23 @@ mount /dev/mmcblk0 tmp
 - You need to setup configfs for mass storage first, then export emmc device node to below path.
 ```
 echo "/dev/mmcblk0" > /sys/kernel/config/usb_gadget/mmc-storage/functions/mass_storage.usb0/lun.0/file
+```
+
+## BIOS POST Code
+
+The evb support a FIFO for monitoring BIOS POST Code.
+
+Typically, this feature is used by the BMC to watch host boot progress
+
+via port 0x80 writes made by the BIOS during the boot process.
+
+** Read BIOS POST Code by command in uboot**
+```
+BIOS POST Code Initial for Port 80:
+mw.b 0xf0007046 0x98
+mw.b 0xf000704c 0x28
+mw.b 0xf0007050 0x80
+
+Read BIOS POST Code from Port 80:
+md.b 0xf000704a 1
 ```
