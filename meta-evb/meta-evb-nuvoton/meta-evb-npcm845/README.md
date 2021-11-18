@@ -48,6 +48,10 @@ Please submit any patches against the meta-evb-npcm845 layer to the maintainer o
   * [PCIE RC](#pcie-rc)
   * [EMMC](#emmc)
   * [BIOS POST Code](#bios-post-code)
+  * [AES](#aes)
+  * [SHA](#sha)
+  * [RNG](#rng)
+  * [OTP](#otp)
 
 # Getting Started
 
@@ -463,6 +467,18 @@ i2ctransfer -f -y 0 w2@0x64 0 0 r2
 i2ctransfer -f -y 0 w4@0x64 0 0 1 3 r0
 i2ctransfer -f -y 0 w2@0x64 0 0 r2
 ```
+
+**Uboot test**
+
+A sensor (0x48) is connected to SMB module 6.  
+Wire between SMB module 6 and each SMB target module (0-5, 7-26) before inputting commands in uboot.
+- The following commands could be used to validate the access to the sensor.
+```
+I2c dev 0
+I2c probe 0x48
+```
+> 0 is an example. Replace it with 0-5, 7-26.
+
 ## ESPI
 
 The EVB has the J_eSPI header to support ESPI transactions.
@@ -772,6 +788,29 @@ The evb has 2 x USB device ports and 1 x USB host port.
         * After clicking `Start`, you will see a new USB device on HOST OS
         * If you want to stop this service, just click `Stop` to stop VM network service.
 
+**Uboot test**
+
+- Host test
+
+Use a usb disk formatted in FAT32 and store some contents in it.  
+Insert it into J_USB2_HOST first and then input the following commands.  
+The contents are expected to be displayed.
+```
+usb reset
+usb tree
+fatls usb 0
+```
+
+- Device test
+
+Connect a mini usb cable between J_USB1_DEV and the host computer.  
+Input the following commands.
+```
+ums 0 mmc 0
+```
+A prompt window will show on the host computer to format the USB drive.  
+You can format it in FAT32 to proceed the EMMC test.
+
 ## ADC
 The evb contains an Analog-to-Digital Converter (ADC) input interface.
 
@@ -953,6 +992,20 @@ mount /dev/mmcblk0 tmp
 echo "/dev/mmcblk0" > /sys/kernel/config/usb_gadget/mmc-storage/functions/mass_storage.usb0/lun.0/file
 ```
 
+**Uboot test**
+
+Follow the test steps in usb device test scenario and format the emmc in FAT32.  
+It's a USB drive attached to the host computer.
+
+- Create a txt file "test.txt" with some content in the USB drive and unplug the mini usb cable from the host computer.  
+- Input the following commands.
+```
+fatls mmc 0
+fatload mmc 0 0x12000000 test.txt
+md.l 0x12000000
+```
+You can check if the content at 0x12000000 is the same as what's stored in test.txt.
+
 ## BIOS POST Code
 
 The evb support a FIFO for monitoring BIOS POST Code.
@@ -970,4 +1023,48 @@ mw.b 0xf0007050 0x80
 
 Read BIOS POST Code from Port 80:
 md.b 0xf000704a 1
+```
+
+## AES
+
+**Uboot test**
+
+- Input the following commands.
+```
+mw.b 600000 11 20
+mw.b 600020 22 10
+mw.b 600030 33 10
+mw.b 600040 00 10
+aes_otp enc 0 600020 600030 600040 10
+md.b 600040 10
+mw.b 600050 00 10
+aes_otp dec 0 600020 600040 600050 10
+md.b 600050 10
+```
+
+## SHA
+
+**Uboot test**
+
+- Input the following command.
+```
+hash sha256 600040 10
+```
+
+## RNG
+
+**Uboot test**
+
+- Input the following command.
+```
+rng
+```
+
+## OTP
+
+**Uboot test**
+
+- Input the following command.
+```
+fuse read 0 0 64
 ```
