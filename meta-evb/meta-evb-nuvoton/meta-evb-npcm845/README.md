@@ -58,6 +58,7 @@ Please submit any patches against the meta-evb-npcm845 layer to the maintainer o
   * [RNG](#rng)
   * [OTP](#otp)
   * [PSPI](#pspi)
+  * [ECC](#ecc)
 
 # Getting Started
 
@@ -1373,4 +1374,55 @@ flashcp /tmp/tmp.bin /dev/mtd8
 U-Boot>sspi 5:0@10000000 32 9f
 FFEF4018
 ```
+
+## ECC
+
+The NPCM8XX has an cadence memory contreoller.
+
+### Linux Test
+
+- Edit nuvoton-npcm845-evb.dts.
+```
+    mc: memory-controller@f0824000 {
+        compatible = "nuvoton,npcm8xx-sdram-edac";
+        reg = <0x0 0xf0824000 0x0 0x1000>;
+        interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+        status = "okay";
+    };
+```
+- Enable Kernel config
+```
+CONFIG_EDAC=y
+CONFIG_EDAC_SUPPORT=y
+CONFIG_EDAC_NPCM8XX=y
+```
+- Boot to Openbmc, there is a sysfs interface that allow to force ecc event
+- Read this path to get more usage infomation
+- You can force uncorrectable or correctable event and error on any bit
+- For data erro, the bit range must be between 0 and 63
+- For checkcode error, the bit range must be between 0 and 7 
+```
+echo CE data 0 > /sys/devices/system/edac/mc/mc0/forced_ecc_error
+echo CE checkcode 0 > /sys/devices/system/edac/mc/mc0/forced_ecc_error
+echo UE > /sys/devices/system/edac/mc/mc0/forced_ecc_error
+```
+
+The result of reading the path is:
+```
+root@evb-npcm845:~# cat /sys/devices/system/edac/mc/mc0/forced_ecc_error
+CDNS-DDR4 Force Injection Help:
+CE: Corrected
+checkcode/data:source
+bit [0-63] for data [0-7] for checkcode:bit number
+--------------------------------------------------
+UE: Uncorrected
+```
+
+The result of forcing an ecc event is:
+```
+EDAC MC0: 1 CE DDR ECC nuvoton,npcm8xx-sdram-edac: addr=0xac8f080 data=0x5565ec5106 source_id=0x042800 on unknown memory (memory:0 page:0xac8f offset:0x80 grain:1 syndrome:0xf4)
+```
+
+
+
 
