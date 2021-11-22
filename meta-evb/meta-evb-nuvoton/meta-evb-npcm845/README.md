@@ -1422,7 +1422,3 @@ The result of forcing an ecc event is:
 ```
 EDAC MC0: 1 CE DDR ECC nuvoton,npcm8xx-sdram-edac: addr=0xac8f080 data=0x5565ec5106 source_id=0x042800 on unknown memory (memory:0 page:0xac8f offset:0x80 grain:1 syndrome:0xf4)
 ```
-
-
-
-
