@@ -45,6 +45,7 @@ Please submit any patches against the meta-evb-npcm845 layer to the maintainer o
   * [SMBus](#smbus)
   * [ESPI](#espi)
   * [SIOX](#siox)
+  * [SPIX](#spix)
   * [VGA](#vga)
   * [USB](#usb)
   * [ADC](#adc)
@@ -908,6 +909,59 @@ root@evb-npcm845:~# gpioset 8 0=1
 event:  RISING EDGE offset: 64 timestamp: [   83882.867414528]
 root@evb-npcm845:~# gpioset 8 0=0
 event: FALLING EDGE offset: 64 timestamp: [   83884.267443984]
+```
+
+## SPIX
+
+The EVB has one SPIX module connecting to CPLD.
+You could controll LED_CPLD_5, LED_CPLD_6 and LED_CPLD_8 to do loopback test.
+
+### U-boot test
+1. Please follow JTAG Master section to program CPLD first.
+2. SPIX Configuration:
+```
+mw.l 0xF080026C 0x19a08002
+mw.l 0xF0800274 0x00000000
+
+md.l 0xF0801008 1
+f0801008: 04139add
+
+mw.l 0xF0801058 0x000c9bc8
+mw.l 0xFB001000 0x00002300
+mw.l 0xFB001004 0x03000002
+```
+3. Read SRAM:
+```
+md.b 0xF8000200 80
+
+f8000200: f0 f0 f0 f0 f0 f0 f0 f0 f0 f0 f0 f0 f0 f0 f0 f0    ................
+f8000210: a5 a5 a5 a5 a5 a5 a5 a5 a5 a5 a5 a5 a5 a5 a5 a5    ................
+f8000220: 0f 0f 0f 0f 0f 0f 0f 0f 0f 0f 0f 0f 0f 0f 0f 0f    ................
+f8000230: 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a 5a    ZZZZZZZZZZZZZZZZ
+f8000240: 4e 50 43 4d 38 6d 6e 78 20 41 72 62 65 6c 20 45    NPCM8mnx Arbel E
+f8000250: 56 42 00 00 00 00 00 00 00 00 00 00 00 00 00 00    VB..............
+f8000260: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+f8000270: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+```
+4. Turn ON/OFF CPLD LED:
+```
+Turn On Red LED
+mw.b 0xF8000000 0x01
+
+Turn Off Red LED
+mw.b 0xF8000000 0x00
+
+Turn On Yellow LED
+mw.b 0xF8000001 0x00
+
+Turn Off Yellow LED
+mw.b 0xF8000001 0x01
+
+Turn On Blue LED
+mw.b 0xF8000001 0x0
+
+Turn Off Blue LED
+mw.b 0xF8000001 0x2
 ```
 
 ## VGA
