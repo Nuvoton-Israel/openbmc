@@ -128,5 +128,21 @@
 			bias-disable;
 			input-enable;
 		};
+		gpio4_pins: gpio4-pins {
+			pins = "GPIO4/IOX2DI/SMB1DSDA";
+			slew-rate = <1>;
+		};
+		gpio5_pins: gpio5-pins {
+			pins = "GPIO5/IOX2LD/SMB1DSCL";
+			slew-rate = <1>;
+		};
+		gpio6_pins: gpio6-pins {
+			pins = "GPIO6/IOX2CK/SMB2DSDA";
+			slew-rate = <1>;
+		};
+		gpio7_pins: gpio7o-pins {
+			pins = "GPIO7/IOX2D0/SMB2DSCL";
+			slew-rate = <1>;
+		};
 	};
 };
