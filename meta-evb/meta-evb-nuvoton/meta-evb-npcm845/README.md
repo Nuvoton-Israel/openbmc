@@ -1166,6 +1166,29 @@ Read FANIN0 value:
 md.w 0xf0180002
 f0180002: f88c
 ```
+### How convert the raw reading to RPM
+1. Converting formula
+```
+RPM = ((input_clk_freq * 60) / (fan_cnt * fan_pls_per_rev));
+
+Here, suppose that input_clk_freq = 122070 Hz and fan_pls_per_rev = 2
+(fan_pls_per_rev that means Fan Pulse Per Revolution)
+
+And fan_cnt = 0xFFFF – (raw reading from TnCRA/TnCRB register)
+Thus, we can simplify calculate RPM = 3662100 / fan_cnt
+```
+2. For example
+```
+Calculate RPM 1485:
+fan_cap = 0xf65d (TnCRA value get from uboot: md.w 0xf0180002 1)
+fan_cnt = 0x9a2
+fan1 = 3662100 / 0x9a2 = 1485 rpm
+
+Calculate RPM 1209:
+fan_cap = 0xf42a (TnCRA value get from uboot: md.w 0xf0180002 1)
+fan_cnt = 0xbd5
+fan1 = 3662100 / 0xbd5 = 1209 rpm
+```
 
 ## TMPS
 
