@@ -61,6 +61,7 @@ Please submit any patches against the meta-evb-npcm845 layer to the maintainer o
   * [PSPI](#pspi)
   * [ECC](#ecc)
   * [Host Serial Port](#host-serial-port)
+  * [GPIO](#gpio)
 
 # Getting Started
 
@@ -1535,3 +1536,204 @@ EDAC MC0: 1 CE DDR ECC nuvoton,npcm8xx-sdram-edac: addr=0xac8f080 data=0x5565ec5
   mw.l 0xf0800260 0x00216408 //bit10 = 1, mfse1.10: SI1_TXD/RXD selected.
   ```
 4. Power on the host, you will get host message from SI1_TXD/RXD
+
+## GPIO
+
+The NPCM8XX has eight GPIO modules with 256 pins(total). 
+Most of them are multiplexed with other system functions.
+You can program MFSEL registers to configure a pin as GPIO.
+
+- Physical connection
+
+Connect gpio0 to gpio1 on GPIOs header J4.
+```
+J4.3 (GPIO0)
+J4.4 (GPIO1)
+```
+
+### Linux Test
+
+- Edit nuvoton-common-npcm8xx.dtsi.
+```
+    gpio0: gpio@f0010000 {
+        gpio-controller;
+        #gpio-cells = <2>;
+        reg = <0x0 0xB0>;
+        interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
+        gpio-ranges = <&pinctrl 0 0 32>;
+    };
+    gpio1: gpio@f0011000 {
+        gpio-controller;
+        #gpio-cells = <2>;
+        reg = <0x1000 0xB0>;
+        interrupts = <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>;
+        gpio-ranges = <&pinctrl 0 32 32>;
+    };
+    gpio2: gpio@f0012000 {
+        gpio-controller;
+        #gpio-cells = <2>;
+        reg = <0x2000 0xB0>;
+        interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
+        gpio-ranges = <&pinctrl 0 64 32>;
+    };
+    gpio3: gpio@f0013000 {
+        gpio-controller;
+        #gpio-cells = <2>;
+        reg = <0x3000 0xB0>;
+        interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>;
+        gpio-ranges = <&pinctrl 0 96 32>;
+    };
+    gpio4: gpio@f0014000 {
+        gpio-controller;
+        #gpio-cells = <2>;
+        reg = <0x4000 0xB0>;
+        interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
+        gpio-ranges = <&pinctrl 0 128 32>;
+    };
+    gpio5: gpio@f0015000 {
+        gpio-controller;
+        #gpio-cells = <2>;
+        reg = <0x5000 0xB0>;
+        interrupts = <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>;
+        gpio-ranges = <&pinctrl 0 160 32>;
+    };
+    gpio6: gpio@f0016000 {
+        gpio-controller;
+        #gpio-cells = <2>;
+        reg = <0x6000 0xB0>;
+        interrupts = <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>;
+        gpio-ranges = <&pinctrl 0 192 32>;
+    };
+    gpio7: gpio@f0017000 {
+        gpio-controller;
+        #gpio-cells = <2>;
+        reg = <0x7000 0xB0>;
+        interrupts = <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>;
+        gpio-ranges = <&pinctrl 0 224 32>;
+    };
+```
+- Enable Kernel config
+```
+CONFIG_GPIOLIB=y
+CONFIG_GPIOLIB_FASTPATH_LIMIT=512
+CONFIG_OF_GPIO=y
+CONFIG_GPIOLIB_IRQCHIP=y
+CONFIG_GPIO_SYSFS=y
+CONFIG_GPIO_CDEV=y
+CONFIG_GPIO_CDEV_V1=y
+CONFIG_GPIO_GENERIC=y
+CONFIG_GPIO_GENERIC_PLATFORM=y
+```
+- Boot to Openbmc, there is a sysfs interface that allow to operate GPIO
+```
+echo 0 > /sys/class/gpio/export
+echo out > /sys/class/gpio/gpio0/direction
+echo 1 > /sys/class/gpio/gpio0/value
+echo 1 > /sys/class/gpio/export
+echo in > /sys/class/gpio/gpio1/direction
+cat /sys/class/gpio/gpio1/value
+```
+
+### U-boot test
+- dts
+```
+    gpio0: gpio0@f0010000 {
+        compatible = "nuvoton,npcm845-gpio";
+        reg = <0x0 0xf0010000 0x0 0x1000>;
+        #gpio-cells = <2>;
+        gpio-controller;
+        gpio-bank-name = "gpio0";
+        gpio-count = <32>;
+        gpio-port = <0>;
+    };
+
+    gpio1: gpio1@f0011000 {
+        compatible = "nuvoton,npcm845-gpio";
+        reg = <0x0 0xf0011000 0x0 0x1000>;
+        #gpio-cells = <2>;
+        gpio-controller;
+        gpio-bank-name = "gpio1";
+        gpio-count = <32>;
+        gpio-port = <1>;
+    };
+
+    gpio2: gpio2@f0012000 {
+        compatible = "nuvoton,npcm845-gpio";
+        reg = <0x0 0xf0012000 0x0 0x1000>;
+        #gpio-cells = <2>;
+        gpio-controller;
+        gpio-bank-name = "gpio2";
+        gpio-count = <32>;
+        gpio-port = <2>;
+    };
+
+    gpio3: gpio3@f0013000 {
+        compatible = "nuvoton,npcm845-gpio";
+        reg = <0x0 0xf0013000 0x0 0x1000>;
+        #gpio-cells = <2>;
+        gpio-controller;
+        gpio-bank-name = "gpio3";
+        gpio-count = <32>;
+        gpio-port = <3>;
+    };
+
+    gpio4: gpio4@f0014000 {
+        compatible = "nuvoton,npcm845-gpio";
+        reg = <0x0 0xf0014000 0x0 0x1000>;
+        #gpio-cells = <2>;
+        gpio-controller;
+        gpio-bank-name = "gpio4";
+        gpio-count = <32>;
+        gpio-port = <4>;
+    };
+
+    gpio5: gpio5@f0015000 {
+        compatible = "nuvoton,npcm845-gpio";
+        reg = <0x0 0xf0015000 0x0 0x1000>;
+        #gpio-cells = <2>;
+        gpio-controller;
+        gpio-bank-name = "gpio5";
+        gpio-count = <32>;
+        gpio-port = <5>;
+    };
+
+    gpio6: gpio6@f0016000 {
+        compatible = "nuvoton,npcm845-gpio";
+        reg = <0x0 0xf0016000 0x0 0x1000>;
+        #gpio-cells = <2>;
+        gpio-controller;
+        gpio-bank-name = "gpio6";
+        gpio-count = <32>;
+        gpio-port = <6>;
+    };
+
+    gpio7: gpio7@f0017000 {
+        compatible = "nuvoton,npcm845-gpio";
+        reg = <0x0 0xf0017000 0x0 0x1000>;
+        #gpio-cells = <2>;
+        gpio-controller;
+        gpio-bank-name = "gpio7";
+        gpio-count = <32>;
+        gpio-port = <7>;
+    };
+
+```
+
+- Enable u-boot config
+```
+CONFIG_DM_GPIO=y
+CONFIG_CMD_GPIO=y
+CONFIG_NPCM_GPIO=y
+```
+
+- use gpio command to operate GPIO.
+```
+U-Boot>gpio set 0
+gpio: pin 0 (gpio 0) value is 1
+U-Boot>gpio input 1
+gpio: pin 1 (gpio 1) value is 1
+U-Boot>gpio toggle 0
+gpio: pin 0 (gpio 0) value is 0
+U-Boot>gpio input 1
+gpio: pin 1 (gpio 1) value is 0
+```
