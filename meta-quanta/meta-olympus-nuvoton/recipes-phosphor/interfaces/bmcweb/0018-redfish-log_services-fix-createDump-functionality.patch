@@ -1,4 +1,4 @@
-From 994bdbb6a349b28fa8c0a6377e2218d2c0ed5d79 Mon Sep 17 00:00:00 2001
+From 659c0c5b7a72e62728fb336d3970881d05a6c557 Mon Sep 17 00:00:00 2001
 From: Tim Lee <timlee660101@gmail.com>
 Date: Mon, 7 Jun 2021 16:44:05 +0800
 Subject: [PATCH 18/18] redfish: log_services: fix createDump functionality
@@ -9,10 +9,10 @@ Signed-off-by: Tim Lee <timlee660101@gmail.com>
  1 file changed, 40 insertions(+), 3 deletions(-)
 
 diff --git a/redfish-core/lib/log_services.hpp b/redfish-core/lib/log_services.hpp
-index efed76463..7c90ffbc1 100644
+index 92caac9c1..62744f497 100644
 --- a/redfish-core/lib/log_services.hpp
 +++ b/redfish-core/lib/log_services.hpp
-@@ -812,21 +812,58 @@ inline void createDump(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
+@@ -849,21 +849,58 @@ inline void createDump(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
  
      crow::connections::systemBus->async_method_call(
          [asyncResp, req, dumpPath, dumpType](const boost::system::error_code ec,
@@ -70,7 +70,7 @@ index efed76463..7c90ffbc1 100644
          "/xyz/openbmc_project/dump/" +
              std::string(boost::algorithm::to_lower_copy(dumpType)),
 -        "xyz.openbmc_project.Dump.Create", "CreateDump");
-+        "xyz.openbmc_project.Dump.Create", "CreateDump", std::array<std::pair<const char*, const char*>, 0>());
++        "xyz.openbmc_project.Dump.Create", "CreateDump", std::array<std::pair<std::string, std::variant<std::string, uint64_t>>, 0>());
  }
  
  inline void clearDump(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
