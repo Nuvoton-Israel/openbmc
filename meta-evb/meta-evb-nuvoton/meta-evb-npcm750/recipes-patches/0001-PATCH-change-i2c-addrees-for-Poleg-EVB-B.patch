@@ -1,0 +1,44 @@
+From 22c24452643f583eb347b89b26d7b771e0f9f79a Mon Sep 17 00:00:00 2001
+From: minimada <mini.mada@gmail.com>
+Date: Mon, 17 Jun 2019 11:47:04 +0800
+Subject: [PATCH] [PATCH]change i2c addrees for Poleg EVB B
+
+---
+ .../0001-Enable-the-i2c-slave-mqueue-driver-by-Intel.patch    | 4 ++--
+ ...Port-the-ipmbbridge-for-the-cross-test-on-Poleg-EVBs.patch | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-kernel/linux/linux-nuvoton/0001-Enable-the-i2c-slave-mqueue-driver-by-Intel.patch b/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-kernel/linux/linux-nuvoton/0001-Enable-the-i2c-slave-mqueue-driver-by-Intel.patch
+index 73f51b860..2affca1bc 100644
+--- a/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-kernel/linux/linux-nuvoton/0001-Enable-the-i2c-slave-mqueue-driver-by-Intel.patch
++++ b/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-kernel/linux/linux-nuvoton/0001-Enable-the-i2c-slave-mqueue-driver-by-Intel.patch
+@@ -158,9 +158,9 @@ index e6b2b1d3ef25..7b9631313cba 100644
+  				bus-frequency = <100000>;
+ -				status = "disabled";
+ +				status = "okay";
+-+        ipmb@40000010 {
+++        ipmb@40000058 {
+ +            compatible = "slave-mqueue";
+-+            reg = <0x40000010>;
+++            reg = <0x40000058>;
+ +            status = "okay";
+ +        };
+  			};
+diff --git a/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/ipmi/phosphor-ipmi-ipmb/0001-Port-the-ipmbbridge-for-the-cross-test-on-Poleg-EVBs.patch b/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/ipmi/phosphor-ipmi-ipmb/0001-Port-the-ipmbbridge-for-the-cross-test-on-Poleg-EVBs.patch
+index 114dea6ba..a3c033fa6 100644
+--- a/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/ipmi/phosphor-ipmi-ipmb/0001-Port-the-ipmbbridge-for-the-cross-test-on-Poleg-EVBs.patch
++++ b/meta-evb/meta-evb-nuvoton/meta-evb-npcm750/recipes-phosphor/ipmi/phosphor-ipmi-ipmb/0001-Port-the-ipmbbridge-for-the-cross-test-on-Poleg-EVBs.patch
+@@ -47,8 +47,8 @@ index 2f78cd0..b0bb080 100644
+      // ME channel
+ -    {ipmbChannelType::me, "/sys/bus/i2c/devices/5-1010/slave-mqueue",
+ -     "/dev/i2c-5", 0x20, 0x2C}, // 8 bit addresses
+-+    {ipmbChannelType::ipmb, "/sys/bus/i2c/devices/4-1010/slave-mqueue",
+-+     "/dev/i2c-4", 0x20, 0x58}//, // 7 bit addresses
+++    {ipmbChannelType::ipmb, "/sys/bus/i2c/devices/4-1058/slave-mqueue",
+++     "/dev/i2c-4", 0x20, 0x10}//, // 7 bit addresses
+      // IPMB header channel
+ -    {ipmbChannelType::ipmb, "/sys/bus/i2c/devices/0-1010/slave-mqueue",
+ -     "/dev/i2c-0", 0x20, 0x58}}; // 8 bit addresses
+-- 
+2.17.1
+

@@ -1,0 +1,26 @@
+From ce3b617538d00b13250fd7a36f3bd9f647a3e81c Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Tue, 24 Mar 2020 10:29:34 +0800
+Subject: [PATCH] hand over pspi1 control to jtag master
+
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ arch/arm/boot/dts/nuvoton-npcm750-evb.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/nuvoton-npcm750-evb.dts b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
+index 8fb67f9b2b35..a4aeca42089c 100644
+--- a/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
++++ b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
+@@ -522,7 +522,7 @@
+ 
+ 			spi0: spi@200000 {
+ 				cs-gpios = <&gpio6 11 GPIO_ACTIVE_LOW>;
+-				status = "okay";
++				status = "disabled";
+ 				Flash@0 {
+ 					compatible = "winbond,w25q128",
+ 					"jedec,spi-nor";
+-- 
+2.17.1
+

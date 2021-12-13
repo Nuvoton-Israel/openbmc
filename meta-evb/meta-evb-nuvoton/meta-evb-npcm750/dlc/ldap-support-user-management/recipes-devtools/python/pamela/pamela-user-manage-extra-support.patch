@@ -1,0 +1,97 @@
+Index: pamela-0.3.0/pamela.py
+===================================================================
+--- pamela-0.3.0.orig/pamela.py
++++ pamela-0.3.0/pamela.py
+@@ -24,11 +24,12 @@ __all__ = [
+     'change_password',
+ ]
+ 
+-from ctypes import CDLL, POINTER, Structure, CFUNCTYPE, cast, pointer, sizeof
++from ctypes import CDLL, POINTER, Structure, CFUNCTYPE, cast, pointer, sizeof, cdll
+ from ctypes import c_void_p, c_uint, c_char_p, c_char, c_int
+ from ctypes.util import find_library
+ import getpass
+ import sys
++import os
+ 
+ # Python 3 bytes/unicode compat
+ if sys.version_info >= (3,):
+@@ -46,7 +47,8 @@ def _cast_bytes(s, encoding='utf8'):
+     return s
+ 
+ 
+-LIBPAM = CDLL(find_library("pam"))
++#LIBPAM = CDLL(find_library("pam"))
++LIBPAM = cdll.LoadLibrary(os.path.join("/lib", "libpam.so.0"))
+ LIBC = CDLL(find_library("c"))
+ 
+ CALLOC = LIBC.calloc
+@@ -69,6 +71,8 @@ PAM_DELETE_CRED = 0x0004
+ PAM_REINITIALIZE_CRED = 0x0008
+ PAM_REFRESH_CRED = 0x0010
+ 
++PAM_TTY = 3
++
+ class PamHandle(Structure):
+     """wrapper class for pam_handle_t"""
+     _fields_ = [
+@@ -85,7 +89,7 @@ PAM_STRERROR.argtypes = [PamHandle, c_in
+ 
+ def pam_strerror(handle, errno):
+     """Wrap bytes-only PAM_STRERROR in native str"""
+-    return _bytes_to_str(PAM_STRERROR(handle, errno))
++    return _bytes_to_str(PAM_STRERROR(handle, errno))    
+ 
+ class PAMError(Exception):
+     errno = None
+@@ -172,6 +176,10 @@ PAM_SETCRED = LIBPAM.pam_setcred
+ PAM_SETCRED.restype = c_int
+ PAM_SETCRED.argtypes = [PamHandle, c_int]
+ 
++PAM_SET_ITEM = LIBPAM.pam_set_item
++PAM_SET_ITEM.restype = c_int
++PAM_SET_ITEM.argtypes = [PamHandle, c_int, c_void_p]
++
+ 
+ @CONV_FUNC
+ def default_conv(n_messages, messages, p_response, app_data):
+@@ -231,17 +239,26 @@ def pam_start(service, username, conv_fu
+ 
+     if retval != 0:
+         PAM_END(handle, retval)
+-        raise PAMError(errno=retval)
++        #raise PAMError(errno=retval)
++        raise KeyError
+ 
+     return handle
+ 
++def pam_set_item(handle, item, item_value):
++    e = PAM_SET_ITEM(handle, item, item_value)
++    if e == 0:
++        return
++    #raise PAMError(errno=retval)
++    raise KeyError
++
+ def pam_end(handle, retval):
+     e = PAM_END(handle, retval)
+     if retval == 0 and e == 0:
+-        return
++        return True
+     if retval == 0:
+         retval = e
+-    raise PAMError(errno=retval)
++    #raise PAMError(errno=retval)
++    raise KeyError
+ 
+ def authenticate(username, password=None, service='login', encoding='utf-8',
+                  resetcred=PAM_REINITIALIZE_CRED):
+@@ -275,6 +292,9 @@ def authenticate(username, password=None
+ 
+     handle = pam_start(service, username, conv_func=conv_func, encoding=encoding)
+ 
++    nuvo_login_intf = 'web'
++    pam_set_item(handle, PAM_TTY, nuvo_login_intf)
++
+     retval = PAM_AUTHENTICATE(handle, 0)
+     # Re-initialize credentials (for Kerberos users, etc)
+     # Don't check return code of pam_setcred(), it shouldn't matter

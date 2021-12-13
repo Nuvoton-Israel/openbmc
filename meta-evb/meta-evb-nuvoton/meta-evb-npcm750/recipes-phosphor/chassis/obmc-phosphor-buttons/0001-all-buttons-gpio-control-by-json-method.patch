@@ -1,0 +1,90 @@
+From c15d6375619df47288283d9fd213dd4cda031a30 Mon Sep 17 00:00:00 2001
+From: CH Li <chli30@nuvoton.com>
+Date: Mon, 24 Dec 2018 11:32:19 +0800
+Subject: [PATCH] all buttons gpio control by json method
+
+---
+ CMakeLists.txt |  2 +-
+ src/gpio.cpp   | 31 +++++++++++++++++++++++--------
+ 2 files changed, 24 insertions(+), 9 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 2f631b7..50a9ac6 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -10,7 +10,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/inc)
+ set(POWER_DBUS_OBJECT_NAME "xyz/openbmc_project/Chassis/Buttons/Power")
+ set(RESET_DBUS_OBJECT_NAME "xyz/openbmc_project/Chassis/Buttons/Reset")
+ set(ID_DBUS_OBJECT_NAME "xyz/openbmc_project/Chassis/Buttons/ID")
+-set(GPIO_BASE_LABEL_NAME "1e780000.gpio")
++set(GPIO_BASE_LABEL_NAME "/pinctrl@f0800000/gpio@f0010000")
+ set(LONG_PRESS_TIME_MS 3000)
+ set(CHASSIS_STATE_OBJECT_NAME "xyz/openbmc_project/state/chassis")
+ set(HOST_STATE_OBJECT_NAME "xyz/openbmc_project/state/host")
+diff --git a/src/gpio.cpp b/src/gpio.cpp
+index a398d04..bf4f905 100644
+--- a/src/gpio.cpp
++++ b/src/gpio.cpp
+@@ -23,7 +23,7 @@
+ 
+ #include <experimental/filesystem>
+ #include <fstream>
+-#include <gpioplus/utility/aspeed.hpp>
++//#include <gpioplus/utility/aspeed.hpp>
+ #include <nlohmann/json.hpp>
+ #include <optional>
+ #include <phosphor-logging/log.hpp>
+@@ -77,13 +77,9 @@ uint32_t getGpioBase()
+ #endif
+ }
+ 
+-uint32_t getGpioNum(const std::string& gpioPin)
++uint32_t getGpioNum(const std::uint32_t gpioNum)
+ {
+-    // gpioplus promises that they will figure out how to easily
+-    // support multiple BMC vendors when the time comes.
+-    auto offset = gpioplus::utility::aspeed::nameToOffset(gpioPin);
+-
+-    return getGpioBase() + offset;
++    return getGpioBase() + gpioNum;
+ }
+ 
+ bool gpioDefined(const std::string& gpioName)
+@@ -129,7 +125,7 @@ std::optional<std::tuple<int, std::string>>
+ 
+         if (gpio != defs.end())
+         {
+-            return std::make_tuple(getGpioNum((*gpio)["pin"]),
++            return std::make_tuple(getGpioNum((*gpio)["num"]),
+                                    (*gpio)["direction"]);
+         }
+         else
+@@ -248,6 +244,25 @@ int configGpio(const char* gpioName, int* fd, sdbusplus::bus::bus& bus)
+     else if ((gpioDirection == "both"))
+     {
+ 
++        // Before set gpio configure as an interrupt pin, need to set direction as 'in' 
++        // or edge can't set as 'rising', 'falling' and 'both'
++        const char* in_direction = "in";
++        devPath = gpioDev + "/gpio" + std::to_string(gpioNum) + "/direction";
++
++        stream.open(devPath, std::fstream::out);
++        try
++        {
++            stream << in_direction;
++            stream.close();
++        }
++
++        catch (const std::exception& e)
++        {
++            log<level::ERR>("Error in writing!");
++            return -1;
++        }
++        devPath.clear();
++
+         // For gpio configured as ‘both’, it is an interrupt pin and trigged on
+         // both rising and falling signals
+         devPath = gpioDev + "/gpio" + std::to_string(gpioNum) + "/edge";
+-- 
+2.7.4
+

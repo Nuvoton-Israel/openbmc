@@ -1,0 +1,144 @@
+Index: dropbear-2017.75/auth.h
+===================================================================
+--- dropbear-2017.75.orig/auth.h
++++ dropbear-2017.75/auth.h
+@@ -29,6 +29,12 @@
+ #include "signkey.h"
+ #include "chansession.h"
+ 
++#if defined(HAVE_SECURITY_PAM_APPL_H)
++#include <security/pam_appl.h>
++#elif defined (HAVE_PAM_PAM_APPL_H)
++#include <pam/pam_appl.h>
++#endif
++
+ void svr_authinitialise(void);
+ void cli_authinitialise(void);
+ 
+@@ -40,6 +46,8 @@ void send_msg_userauth_banner(buffer *ms
+ void svr_auth_password(void);
+ void svr_auth_pubkey(void);
+ void svr_auth_pam(void);
++//ref:https://github.com/h0tw1r3/dropbear
++void svr_auth_pam_cleanup(void);
+ 
+ #ifdef ENABLE_SVR_PUBKEY_OPTIONS
+ int svr_pubkey_allows_agentfwd(void);
+@@ -122,6 +130,11 @@ struct AuthState {
+ #ifdef ENABLE_SVR_PUBKEY_OPTIONS
+ 	struct PubKeyOptions* pubkey_options;
+ #endif
++    //ref:https://github.com/h0tw1r3/dropbear
++#ifdef ENABLE_SVR_PAM_AUTH
++    pam_handle_t* pam;
++    unsigned pam_sesopen : 1;
++#endif
+ };
+ 
+ #ifdef ENABLE_SVR_PUBKEY_OPTIONS
+Index: dropbear-2017.75/svr-authpam.c
+===================================================================
+--- dropbear-2017.75.orig/svr-authpam.c
++++ dropbear-2017.75/svr-authpam.c
+@@ -211,12 +211,16 @@ void svr_auth_pam() {
+ 	userData.passwd = password;
+ 
+ 	/* Init pam */
+-	if ((rc = pam_start("dropbear", NULL, &pamConv, &pamHandlep)) != PAM_SUCCESS) {
++	//if ((rc = pam_start("dropbear", NULL, &pamConv, &pamHandlep)) != PAM_SUCCESS) {
++	//ref:https://github.com/h0tw1r3/dropbear
++	if ((rc = pam_start("dropbear", NULL, &pamConv,&ses.authstate.pam)) != PAM_SUCCESS) {
+ 		dropbear_log(LOG_WARNING, "pam_start() failed, rc=%d, %s", 
+ 				rc, pam_strerror(pamHandlep, rc));
+ 		goto cleanup;
+ 	}
+ 
++	pamHandlep = ses.authstate.pam;
++
+ 	/* just to set it to something */
+ 	if ((rc = pam_set_item(pamHandlep, PAM_TTY, "ssh")) != PAM_SUCCESS) {
+ 		dropbear_log(LOG_WARNING, "pam_set_item() failed, rc=%d, %s",
+@@ -253,21 +257,58 @@ void svr_auth_pam() {
+ 		goto cleanup;
+ 	}
+ 
++	//ref:https://github.com/h0tw1r3/dropbear
++	if ((rc = pam_open_session(pamHandlep, 0)) != PAM_SUCCESS) {
++		dropbear_log(LOG_WARNING, "pam_open_session() failed, rc=%d, %s",
++			rc, pam_strerror(pamHandlep, rc));
++		send_msg_userauth_failure(0, 1);
++		goto cleanup;
++	}
++	ses.authstate.pam_sesopen = 1;
++
+ 	/* successful authentication */
+ 	dropbear_log(LOG_NOTICE, "PAM password auth succeeded for '%s' from %s",
+ 			ses.authstate.pw_name,
+ 			svr_ses.addrstring);
+ 	send_msg_userauth_success();
++	//ref:https://github.com/h0tw1r3/dropbear
++	goto success;
+ 
+ cleanup:
++    //ref:https://github.com/h0tw1r3/dropbear
++    svr_auth_pam_cleanup();
++
++//ref:https://github.com/h0tw1r3/dropbear
++success:
+ 	if (password != NULL) {
+ 		m_burn(password, passwordlen);
+ 		m_free(password);
+ 	}
+-	if (pamHandlep != NULL) {
++
++	//ref:https://github.com/h0tw1r3/dropbear
++	//if (pamHandlep != NULL) {
++	//	TRACE(("pam_end"))
++	//	(void) pam_end(pamHandlep, 0 /* pam_status */);
++	//}
++}
++
++//ref:https://github.com/h0tw1r3/dropbear
++void svr_auth_pam_cleanup() {
++	int rc = PAM_SUCCESS;
++
++	if (ses.authstate.pam != NULL) {
++		if (ses.authstate.pam_sesopen) {
++			if ((rc = pam_close_session(ses.authstate.pam, PAM_SILENT)) != PAM_SUCCESS) {
++				dropbear_log(LOG_WARNING, "pam_close_session() failed, rc=%d, %s",
++						rc, pam_strerror(ses.authstate.pam, rc));
++			}
++			ses.authstate.pam_sesopen = 0;
++		}
++
+ 		TRACE(("pam_end"))
+-		(void) pam_end(pamHandlep, 0 /* pam_status */);
++		(void) pam_end(ses.authstate.pam, 0);
+ 	}
+ }
+ 
++
+ #endif /* ENABLE_SVR_PAM_AUTH */
+Index: dropbear-2017.75/svr-chansession.c
+===================================================================
+--- dropbear-2017.75.orig/svr-chansession.c
++++ dropbear-2017.75/svr-chansession.c
+@@ -323,6 +323,10 @@ static void closechansess(struct Channel
+ 	svr_agentcleanup(chansess);
+ #endif
+ 
++#ifdef ENABLE_SVR_PAM_AUTH
++	svr_auth_pam_cleanup();
++#endif
++
+ 	/* clear child pid entries */
+ 	for (i = 0; i < svr_ses.childpidsize; i++) {
+ 		if (svr_ses.childpids[i].chansess == chansess) {
+@@ -927,6 +931,7 @@ static void execchild(void *user_data) {
+ #endif /* HAVE_CLEARENV */
+ #endif /* DEBUG_VALGRIND */
+ 
++
+ 	/* We can only change uid/gid as root ... */
+ 	if (getuid() == 0) {
+ 

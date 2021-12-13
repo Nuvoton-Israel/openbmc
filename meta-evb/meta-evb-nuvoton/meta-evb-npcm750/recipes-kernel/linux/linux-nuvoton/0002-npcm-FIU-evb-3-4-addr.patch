@@ -1,0 +1,239 @@
+diff --git a/drivers/mtd/spi-nor/npcm-fiu.c b/drivers/mtd/spi-nor/npcm-fiu.c
+index be687d608c07..6c99f3436943 100644
+--- a/drivers/mtd/spi-nor/npcm-fiu.c
++++ b/drivers/mtd/spi-nor/npcm-fiu.c
+@@ -181,6 +181,12 @@ enum {
+ 	DWR_DBPCK_4_BIT_PER_CLK	= 2,
+ };
+ 
++/* SPI commands */
++#define NPCM_SPI_RD_STATUS_3_REG_CMD		0x15
++#define NPCM_SPI_EN_RST_CMD			0x66
++#define NPCM_SPI_RST_DEVICE_CMD			0x99
++#define NPCM_SPI_WR_EXT_ADDR_REG_CMD		0xC5
++
+ #define NPCM_FIU_DRD_16_BYTE_BURST	0x3000000
+ #define NPCM_FIU_DWR_16_BYTE_BURST	0x3000000
+ 
+@@ -193,6 +199,7 @@ enum {
+ #define NPCM_MAX_CHIP_NUM		4
+ #define CHUNK_SIZE			16
+ #define UMA_MICRO_SEC_TIMEOUT		150
++#define NPCM_FIU_BUSY_TIMEOUT		15000
+ 
+ enum {
+ 	FIU0 = 0,
+@@ -440,8 +447,8 @@ static int npcm_fiu_manualwrite(struct spi_nor *nor, u8 transaction_code,
+ 	regmap_update_bits(host->regmap, NPCM_FIU_UMA_CTS,
+ 			   NPCM_FIU_UMA_CTS_SW_CS, 0);
+ 
+-	ret = npcm_fiu_uma_write(nor, transaction_code, address, true,
+-				 NULL, 0);
++	ret = npcm_fiu_uma_write(nor, transaction_code, (address & 0xFFFFFF),
++				 true, NULL, 0);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -469,6 +476,35 @@ static int npcm_fiu_manualwrite(struct spi_nor *nor, u8 transaction_code,
+ 	return 0;
+ }
+ 
++
++static void npcm_fiu_flash_common_getstatus(struct spi_nor *nor, u8 *status)
++{
++	npcm_fiu_uma_read(nor, SPINOR_OP_RDSR, 0, 0, status, 1);
++}
++
++static int npcm_fiu_flash_common_waittillready(struct spi_nor *nor)
++{
++	u8 busy;
++	u32 cnt = 0;
++
++	do {
++		npcm_fiu_flash_common_getstatus(nor, &busy);
++		busy &= 0x01;
++	} while (busy && (cnt++ < NPCM_FIU_BUSY_TIMEOUT));
++
++	if (cnt >= NPCM_FIU_BUSY_TIMEOUT)
++		return -ETIMEDOUT;
++
++	return 0;
++}
++
++static void npcm_fiu_flash_high_addr_wr(struct spi_nor *nor, u8 HighAddr)
++{
++	npcm_fiu_uma_write(nor, SPINOR_OP_WREN, 0, false, NULL, 0);
++	npcm_fiu_uma_write(nor, NPCM_SPI_WR_EXT_ADDR_REG_CMD, 0, false,
++			      &HighAddr, sizeof(u8));
++}
++
+ static ssize_t npcm_fiu_write(struct spi_nor *nor, loff_t to,
+ 			      size_t len, const u_char *write_buf)
+ {
+@@ -487,10 +523,24 @@ static ssize_t npcm_fiu_write(struct spi_nor *nor, loff_t to,
+ 			if (actual_size > cnt)
+ 				actual_size = cnt;
+ 
++			if ((local_addr >> 24) && (mtd->size > MAP_SIZE_16MB)) {
++				npcm_fiu_flash_high_addr_wr(nor,
++							    local_addr >> 24);
++				npcm_fiu_uma_write(nor, SPINOR_OP_WREN, 0,
++						   false, NULL, 0);
++			}
++
+ 			ret = npcm_fiu_manualwrite(nor, nor->program_opcode,
+ 						   local_addr,
+ 						   (u_char *)write_buf,
+ 						   actual_size);
++
++			if ((local_addr >> 24) && (mtd->size > MAP_SIZE_16MB)) {
++				if (npcm_fiu_flash_common_waittillready(nor))
++					return -ETIMEDOUT;
++				npcm_fiu_flash_high_addr_wr(nor, 0);
++			}
++
+ 			if (ret)
+ 				return ret;
+ 
+@@ -503,7 +553,8 @@ static ssize_t npcm_fiu_write(struct spi_nor *nor, loff_t to,
+ 	return (len - cnt);
+ }
+ 
+-static void npcm_fiu_set_drd(struct spi_nor *nor, struct npcm_fiu_bus *host)
++static void npcm_fiu_set_drd(struct spi_nor *nor, struct npcm_fiu_bus *host,
++			     u32 addr_width)
+ {
+ 	regmap_update_bits(host->regmap, NPCM_FIU_DRD_CFG,
+ 			   NPCM_FIU_DRD_CFG_ACCTYPE,
+@@ -516,10 +567,11 @@ static void npcm_fiu_set_drd(struct spi_nor *nor, struct npcm_fiu_bus *host)
+ 			     spi_nor_get_protocol_addr_nbits(nor->read_proto))
+ 			    / NUM_BITS_IN_BYTE) << NPCM_FIU_DRD_DBW_SHIFT);
+ 	regmap_update_bits(host->regmap, NPCM_FIU_DRD_CFG,
+-			   NPCM_FIU_DRD_CFG_RDCMD, nor->read_opcode);
++			   NPCM_FIU_DRD_CFG_RDCMD,
++			   nor->read_opcode + (addr_width - 3));
+ 	regmap_update_bits(host->regmap, NPCM_FIU_DRD_CFG,
+ 			   NPCM_FIU_DRD_CFG_ADDSIZ,
+-			   (nor->addr_width - 3) << NPCM_FIU_DRD_ADDSIZ_SHIFT);
++			   (addr_width - 3) << NPCM_FIU_DRD_ADDSIZ_SHIFT);
+ }
+ 
+ static ssize_t npcm_fiu_read(struct spi_nor *nor, loff_t from, size_t len,
+@@ -537,12 +589,14 @@ static ssize_t npcm_fiu_read(struct spi_nor *nor, loff_t from, size_t len,
+ 	mtd = &nor->mtd;
+ 
+ 	if (chip->direct_read) {
+-		regmap_read(host->regmap, NPCM_FIU_DRD_CFG, &addr);
++		//regmap_read(host->regmap, NPCM_FIU_DRD_CFG, &addr);
+ 		if (host->direct_rd_proto != chip->direct_rd_proto) {
+-			npcm_fiu_set_drd(nor, host);
++			npcm_fiu_set_drd(nor, host, (mtd->size > MAP_SIZE_16MB) ? 4 : 3);
+ 			host->direct_rd_proto = chip->direct_rd_proto;
+ 		}
+ 		npcm_fiu_direct_read(mtd, from, len, &retlen, read_buf);
++		if (mtd->size > MAP_SIZE_16MB)
++		    npcm_fiu_flash_high_addr_wr(nor, 0);
+ 	} else {
+ 		i = 0;
+ 		currlen = (int)len;
+@@ -555,11 +609,21 @@ static ssize_t npcm_fiu_read(struct spi_nor *nor, loff_t from, size_t len,
+ 				readlen = 4;
+ 
+ 			buf_ptr = read_buf + i;
+-			ret = npcm_fiu_uma_read(nor, nor->read_opcode, addr,
++
++			if ((addr >> 24) && (mtd->size > MAP_SIZE_16MB)) {
++				npcm_fiu_flash_high_addr_wr(nor, addr >> 24);
++				npcm_fiu_uma_write(nor, SPINOR_OP_WREN, 0,
++						   false, NULL, 0);
++			}
++
++			ret = npcm_fiu_uma_read(nor, nor->read_opcode, (addr&0xFFFFFF),
+ 						true, buf_ptr, readlen);
+ 			if (ret)
+ 				return ret;
+ 
++			if ((addr >> 24) && (mtd->size > MAP_SIZE_16MB))
++				npcm_fiu_flash_high_addr_wr(nor, 0);
++
+ 			i += readlen;
+ 			currlen -= 4;
+ 		} while (currlen > 0);
+@@ -572,8 +636,23 @@ static ssize_t npcm_fiu_read(struct spi_nor *nor, loff_t from, size_t len,
+ 
+ static int npcm_fiu_erase(struct spi_nor *nor, loff_t offs)
+ {
+-	return npcm_fiu_uma_write(nor, nor->erase_opcode, (u32)offs, true,
+-				  NULL, 0);
++	struct mtd_info *mtd;
++	int ret;
++
++	mtd = &nor->mtd;
++
++	if ((offs >> 24) && (mtd->size > MAP_SIZE_16MB)) {
++		npcm_fiu_flash_high_addr_wr(nor, offs >> 24);
++		npcm_fiu_uma_write(nor, SPINOR_OP_WREN, 0, false, NULL, 0);
++	}
++
++	ret = npcm_fiu_uma_write(nor, nor->erase_opcode, (u32)(offs & 0xFFFFFF),
++				 true, NULL, 0);
++
++	if ((offs >> 24) && (mtd->size > MAP_SIZE_16MB))
++		npcm_fiu_flash_high_addr_wr(nor, 0);
++
++	return ret;
+ }
+ 
+ static int npcm_fiu_read_reg(struct spi_nor *nor, u8 opcode, u8 *buf,
+@@ -690,9 +769,12 @@ static void npcm_fiu_enable_direct_rd(struct spi_nor *nor,
+ 				      struct npcm_chip *chip)
+ {
+ 	struct device *dev = host->dev;
++	struct mtd_info *mtd;
+ 	struct regmap *gcr_regmap;
+ 	u32 flashsize;
+ 
++	mtd = &nor->mtd;
++
+ 	if (!host->res_mem) {
+ 		dev_warn(dev, "Reserved memory not defined, direct read disabled\n");
+ 		return;
+@@ -733,7 +815,8 @@ static void npcm_fiu_enable_direct_rd(struct spi_nor *nor,
+ 				   NPCM7XX_INTCR3_FIU_FIX,
+ 				   NPCM7XX_INTCR3_FIU_FIX);
+ 	}
+-	npcm_fiu_set_drd(nor, host);
++	npcm_fiu_set_drd(nor, host,
++			(mtd->size > MAP_SIZE_16MB) ? 4 : 3);
+ 
+ 	host->direct_rd_proto = nor->read_proto;
+ 	chip->direct_rd_proto = nor->read_proto;
+@@ -824,6 +907,28 @@ static int npcm_fiu_nor_register(struct device_node *np,
+ 	if (ret)
+ 		return ret;
+ 
++	if (mtd->size > MAP_SIZE_16MB) {
++		/* If Flash size is over 16MB the spi_nor_scan sets
++		   automatically the FLASH to work with 4 byte addressing.
++		   Our driver handle Flash size over 16MB with 3 byte address.
++		   Revert back to 3 byte address size cause issues so the
++		   sequence below resets WINBOND and MACRONIX FLASH to work
++		   again with 3 byte address (From Kernel 4.14 and above
++		   the address width statically configured by the driver)*/
++
++		npcm_fiu_uma_write(nor, NPCM_SPI_EN_RST_CMD, 0,
++				   false, NULL, 0);
++		npcm_fiu_uma_write(nor, NPCM_SPI_RST_DEVICE_CMD, 0,
++				   false, NULL, 0);
++
++		if (npcm_fiu_flash_common_waittillready(nor)) {
++			dev_err(dev, "Flash not ready\n");
++			return -ETIMEDOUT;
++		}
++
++		nor->addr_width = 3;
++	}
++
+ 	npcm_fiu_enable_direct_rd(nor, host, chip);
+ 	ret = mtd_device_register(mtd, NULL, 0);
+ 	if (ret) {
