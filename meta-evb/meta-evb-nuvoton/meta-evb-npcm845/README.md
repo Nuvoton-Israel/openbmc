@@ -1710,6 +1710,10 @@ CONFIG_EDAC=y
 CONFIG_EDAC_SUPPORT=y
 CONFIG_EDAC_NPCM8XX=y
 ```
+- Add this config in npcm8xx_edac.c to create a sysfs path for forcing ECC event
+```
+CONFIG_EDAC_DEBUG
+```
 - Boot to Openbmc, there is a sysfs interface that allow to force ecc event
 - Read this path to get more usage information
 - You can force uncorrectable or correctable event and error on any bit
