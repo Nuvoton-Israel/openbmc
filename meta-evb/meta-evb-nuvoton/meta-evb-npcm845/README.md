@@ -63,6 +63,7 @@ Please submit any patches against the meta-evb-npcm845 layer to the maintainer o
   * [PSPI](#pspi)
   * [ECC](#ecc)
   * [Host Serial Port](#host-serial-port)
+  * [PECI](#peci)
 - [Troubleshooting](#troubleshooting)
   * [Failed to probe SPI0 CS0 in u-boot](#failed-to-probe-SPI0-CS0-in-u-boot)
 
@@ -1765,6 +1766,47 @@ EDAC MC0: 1 CE DDR ECC nuvoton,npcm8xx-sdram-edac: addr=0xac8f080 data=0x5565ec5
   ```
 4. Power on the host, you will get host message from SI1_TXD/RXD
 
+## PECI
+
+Arbel EVB provides a J_PECI header for validation.
+
+- Flash an OpenBMC image which contains the **libpeci** package.
+- Connect Arbel EVB to a PECI client device via the J_PECI header.
+
+### Linux test
+
+Some PECI 3.1 raw command examples are provided below.  
+Output values might vary according to the client device.  
+The client address under test is 0x30.
+
+- Ping
+  ```
+  peci_cmds raw 0x30 0 0
+  ```  
+  > _If the client address is invalid (for example, 0x34), the following error message is returned._
+  ```
+  ERROR 3: command failed
+  ```
+- GetDIB
+  ```
+  root@evb-npcm845:~# peci_cmds raw 0x30 0x1 0x8 0xf7
+   0x04 0x31 0x00 0x00 0x00 0x00 0x00 0x00
+  ```
+- GetTemp
+  ```
+  root@evb-npcm845:~# peci_cmds raw 0x30 0x1 0x2 0x01
+   0x00 0x30
+  ```
+- RdPkgConfig
+  ```
+  root@evb-npcm845:~# peci_cmds raw 0x30 0x5 0x5 0xa1
+   0x40 0x50 0x06 0x00 0x00
+  ```
+- RdIAMSR
+  ```
+  root@evb-npcm845:~# peci_cmds raw 0x30 0x5 0x9 0xb1
+   0x40 0x65 0x7a 0xc4 0x3f 0x65 0x7a 0xc4 0x3f
+  ```
 
 # Troubleshooting
 
