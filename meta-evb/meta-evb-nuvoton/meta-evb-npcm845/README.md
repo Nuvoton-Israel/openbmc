@@ -1153,6 +1153,39 @@ root@evb-npcm845:~# gpioset 8 0=0
 event: FALLING EDGE offset: 64 timestamp: [   83884.267443984]
 ```
 
+### Interrupt Stress Test
+- Monitor pin 64 ~ 79 with gpiomon
+```
+root@evb-npcm845:~# gpiomon 8 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 &
+```
+- Prepare a script to toggle pin 0 ~ 15 which are loopback to 64 ~ 79 repeatedly
+```
+root@evb-npcm845:~# gpioset 8 0=1 1=1 2=1 3=1 4=1 5=1 6=1 7=1 8=1 9=1 10=1 11=1 12=1 13=1 14=1 15=1
+root@evb-npcm845:~# gpioset 8 0=0 1=0 2=0 3=0 4=0 5=0 6=0 7=0 8=0 9=0 10=0 11=0 12=0 13=0 14=0 15=0
+```
+- Monitor pin 96 ~ 103 from another consloe (login via SSH) 
+```
+root@evb-npcm845:~# gpiomon 8 96 97 98 99 100 101 102 103
+```
+- Connect and disconnect pin 96 ~ 103 to 3.3V on J_CPLD header repeatedly.
+```
+J_CPLD.1  (pin 96)
+J_CPLD.3  (pin 97)
+J_CPLD.5  (pin 98)
+J_CPLD.7  (pin 99)
+J_CPLD.9  (pin 100)
+J_CPLD.10 (pin 101)
+J_CPLD.11 (pin 102)
+J_CPLD.12 (pin 103)
+```
+- Result
+<img align="right" width="15%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/ARBEL_EVB_SIOX_INT_TEST.png">
+
+```
+From the left consloe, you could see interrupt 64 ~ 79 repeatly.
+From the right consloe, you could see gpiomon did get every interrupt from 96 to 103.
+```
+
 ## SPIX
 
 The EVB has one SPIX module connecting to CPLD.
