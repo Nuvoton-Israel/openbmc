@@ -37,6 +37,7 @@ Please submit any patches against the meta-evb-npcm845 layer to the maintainer o
     + [ISP](#ISP)
     + [U-BOOT](#u-boot)
   * [Boot from eMMC](#boot-from-emmc)
+  * [64MB OpenBMC](#64mb-openbmc)
 - [BMC Modules](#bmc-modules)
   * [GPIO](#gpio)
   * [UART](#uart)
@@ -333,6 +334,94 @@ setenv setmmcargs 'setenv bootargs ${bootargs} rootwait root=PARTLABEL=${rootfs}
 setenv loadaddr 0x10000000
 setenv mmcboot 'setenv bootpart 2; setenv rootfs rofs-a; run setmmcargs; ext4load mmc 0:${bootpart} ${loadaddr} fitImage && bootm; echo Error loading kernel FIT image'
 run mmcboot
+```
+
+## 64MB OpenBMC
+
+The default OpenBMC image size for Arbel EVB is 32MB.
+
+The following steps describe how to configure the image size to be 64MB as an example.
+
+* Edit meta-evb/meta-evb-nuvoton/meta-evb-npcm845/conf/machine/evb-npcm845.conf
+```
+FLASH_SIZE = "65536"
+FLASH_UBOOT_OFFSET = "0"
+FLASH_KERNEL_OFFSET = "2048"
+FLASH_ROFS_OFFSET = "27648"
+FLASH_RWFS_OFFSET = "49152"
+```
+> _The example above is to configure the rofs size is 21MB and rwfs size is 16MB._  
+> _FLASH_SIZE stands for the size of the whole flash._  
+> _FLASH_ROFS_OFFSET stands for the starting position of the ROFS partition in the flash._  
+> _FLASH_RWFS_OFFSET stands for the starting position of the RWFS partition in the flash._  
+> _The size is displayed in unit of KB (1024 bytes)._
+
+* Edit arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+```
+fiu0: spi@fb000000 {
+  status = "okay";
+  spi-nor@0 {
+    compatible = "jedec,spi-nor";
+    #address-cells = <1>;
+    #size-cells = <1>;
+    spi-rx-bus-width = <2>;
+    spi-tx-bus-width = <2>;
+    reg = <0>;
+    spi-max-frequency = <5000000>;
+    partitions@80000000 {
+      compatible = "fixed-partitions";
+      #address-cells = <1>;
+      #size-cells = <1>;
+      bmc@0{
+        label = "bmc";
+        reg = <0x000000 0x4000000>;
+      };
+      u-boot@0 {
+        label = "u-boot";
+        reg = <0x0000000 0xC0000>;
+        read-only;
+      };
+      u-boot-env@100000{
+        label = "u-boot-env";
+        reg = <0x00100000 0x40000>;
+      };
+      kernel@200000 {
+        label = "kernel";
+        reg = <0x0200000 0x800000>;
+      };
+      rofs@1B00000 {
+        label = "rofs";
+        reg = <0x1B00000 0x1500000>;
+      };
+      rwfs@3000000 {
+        label = "rwfs";
+        reg = <0x3000000 0x1000000>;
+      };
+    };
+  };
+};
+```
+> _Change the length of bmc node to 0x4000000._  
+> _Change the starting address of rofs node to 0x1B00000 and length of rofs node to 0x1500000._  
+> _Change the starting address of rwfs node to 0x3000000 and length of rwfs node to 0x1000000._  
+> _If you are using Red EVB board, please modify the dts according to the [dts patch](https://github.com/Nuvoton-Israel/openbmc/blob/npcm-v2.10/meta-evb/meta-evb-nuvoton/meta-evb-npcm845/recipes-kernel/linux/linux-nuvoton/0002-dts-nuvoton-evb-npcm845-boot-from-fiu0-cs1.patch)._  
+> _The size is displayed in unit of byte._
+
+### Linux test
+
+Rebuild and flash the image.  
+Check the partition size for rofs and rwfs.
+```
+root@evb-npcm845:~# cat /proc/mtd
+dev:    size   erasesize  name
+mtd0: 04000000 00001000 "bmc"
+mtd1: 000c0000 00001000 "u-boot"
+mtd2: 00040000 00001000 "u-boot-env"
+mtd3: 00800000 00001000 "kernel"
+mtd4: 01500000 00001000 "rofs"
+mtd5: 01000000 00001000 "rwfs"
+mtd6: 00400000 00001000 "spi1-system1"
+mtd7: 04000000 00001000 "spi3-system1"
 ```
 
 # BMC Modules
