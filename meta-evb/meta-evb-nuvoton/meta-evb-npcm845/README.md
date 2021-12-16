@@ -433,6 +433,34 @@ echo 1 > /sys/class/gpio/export
 echo in > /sys/class/gpio/gpio1/direction
 cat /sys/class/gpio/gpio1/value
 ```
+- Example for verify GPIO status from GPIO Registers
+```
+First, you need to check spec for GPIO Port Registers.
+
+Example: Get GPIO0 pin direction and value.
+GPIO0:   GPIO0_BA = 0xf0010000
+GPnOE:   offset   = 0x10
+GPnDOUT: offset   = 0x0c
+GPnDIN:  offset   = 0x04
+
+Get GPIO0 pin direction by GPnOE register
+devmem 0xf0010010 32
+0x30008000
+Bit 0 is 0 that means GPIO0 is Input
+Bit 0 is 1 that means GPIO0 is Output
+
+Get GPIO0 Output pin value by GPnDOUT register
+devmem 0xf001000c 32
+0x00008000
+Bit 0 is 0 that means GPIO0 value is 0
+Bit 0 is 1 that means GPIO0 value is 1
+
+Get GPIO0 Input pin value by GPnDIN register
+devmem 0xf0010004 32
+0x00000001
+Bit 0 is 0 that means GPIO0 value is 0
+Bit 0 is 1 that means GPIO0 value is 1
+```
 
 ### U-boot test
 - dts
