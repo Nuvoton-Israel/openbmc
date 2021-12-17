@@ -2,6 +2,7 @@
 Description=Intel BMC SMBIOS MDR V2
 Requires=mapper-wait@-xyz-openbmc_project-inventory.service
 After=mapper-wait@-xyz-openbmc_project-inventory.service
+After=default-smbios.service
 
 [Service]
 Restart=always
@@ -11,4 +12,4 @@ ExecStartPre=/bin/mkdir -p /var/lib/smbios
 ExecStart=/usr/bin/env smbiosmdrv2app
 
 [Install]
-WantedBy={SYSTEMD_DEFAULT_TARGET}
+WantedBy=multi-user.target
