@@ -16,7 +16,7 @@ minor=`echo $version | awk '{print$1}'`
 version="V`echo $((major))`.`echo $((minor))`"
 
 if [ $version != "V0.0" ]; then
-   echo "VERSION_ID=$version" > /usr/share/phosphor-bmc-code-mgmt/mcu-release
+   echo "VERSION_ID=$version" > /var/lib/phosphor-bmc-code-mgmt/mcu-release
 else
-   echo "VERSION_ID=N/A" > /usr/share/phosphor-bmc-code-mgmt/mcu-release
+   echo "VERSION_ID=N/A" > /var/lib/phosphor-bmc-code-mgmt/mcu-release
 fi
