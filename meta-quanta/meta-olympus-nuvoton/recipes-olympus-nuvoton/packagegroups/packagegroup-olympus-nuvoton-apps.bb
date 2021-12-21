@@ -61,7 +61,7 @@ RDEPENDS:${PN}-system = " \
         adm1278-hotswap-power-cycle \
         google-ipmi-sys \
         mac-address \
-        smbios-mdrv2 \
+        smbios-mdr \
         loadmcu \
         usb-network \
         nuvoton-ipmi-oem \
