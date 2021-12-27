@@ -1,10 +1,10 @@
-BmcBooted:
+bmc_booted:
     heartbeat:
         Action: 'Blink'
         DutyOn: 50
-        Period: 0
-PowerOn:
-    power:
+        Period: 1000
+power_on:
+    identify:
         Action: 'On'
         DutyOn: 50
         Period: 0
@@ -16,5 +16,5 @@ EnclosureFault:
 EnclosureIdentify:
     identify:
         Action: 'Blink'
-        DutyOn: 50
+        DutyOn: 10
         Period: 1000
