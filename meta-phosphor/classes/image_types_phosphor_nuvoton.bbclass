@@ -101,7 +101,7 @@ do_generate_ext4_tar:npcm7xx() {
     make_tar_of_images ext4.mmc MANIFEST publickey ${signature_files}
 
     cd ${DEPLOY_DIR_IMAGE}
-    #ln -sf ${UBOOT_BINARY}.${MERGED_SUFFIX} image-u-boot
+    ln -sf ${UBOOT_BINARY}.${MERGED_SUFFIX} image-u-boot
     ln -sf ${DEPLOY_DIR_IMAGE}/${FLASH_KERNEL_IMAGE} image-kernel
     ln -sf ${S}/ext4/${IMAGE_LINK_NAME}.${FLASH_EXT4_BASETYPE}.zst image-rofs
     ln -sf ${IMGDEPLOYDIR}/${IMAGE_LINK_NAME}.rwfs.${FLASH_EXT4_OVERLAY_BASETYPE} image-rwfs

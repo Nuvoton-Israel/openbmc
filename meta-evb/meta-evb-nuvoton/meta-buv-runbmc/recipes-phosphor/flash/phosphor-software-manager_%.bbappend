@@ -6,5 +6,5 @@ SRC_URI:append:buv-runbmc = " \
     file://report_same_version.patch \
     "
 
-PACKAGECONFIG:buv-runbmc += "verify_signature flash_bios"
+PACKAGECONFIG:append:buv-runbmc = " verify_signature flash_bios"
 EXTRA_OEMESON:append:buv-runbmc = " -Doptional-images=image-bios"

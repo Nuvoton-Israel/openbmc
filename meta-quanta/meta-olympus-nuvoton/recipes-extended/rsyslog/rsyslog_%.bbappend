@@ -9,7 +9,7 @@ SRC_URI:append:olympus-nuvoton = " \
     file://server.conf \
 "
 
-FILES:${PN} += "${systemd_system_unitdir}/rsyslog.service.d/rsyslog-override.conf"
+FILES:${PN}:append:olympus-nuvoton = " ${systemd_system_unitdir}/rsyslog.service.d/rsyslog-override.conf"
 
 PACKAGECONFIG:append:olympus-nuvoton = " imjournal"
 
@@ -25,4 +25,4 @@ do_install:append:olympus-nuvoton() {
         ${D}${sysconfdir}/rsyslog.d/server.conf 
 }
 
-SYSTEMD_SERVICE:${PN} += " rotate-event-logs.service"
+SYSTEMD_SERVICE:${PN}:append:olympus-nuvoton = " rotate-event-logs.service"

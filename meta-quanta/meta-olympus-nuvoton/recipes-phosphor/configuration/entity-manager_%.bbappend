@@ -5,7 +5,7 @@ SRC_URI:append:olympus-nuvoton = " file://F0B_BMC_MB.json"
 SRC_URI:append:olympus-nuvoton = " file://xyz.openbmc_project.EntityManager.service"
 SRC_URI:append:olympus-nuvoton = " file://xyz.openbmc_project.FruDevice.service"
 
-FILES:${PN} += "${datadir}/entity-manager/F0B_BMC_MB.json"
+FILES:${PN}:append:olympus-nuvoton = " ${datadir}/entity-manager/F0B_BMC_MB.json"
 
 # reload sensor service files
 SRC_URI:append:olympus-nuvoton = " \
@@ -20,12 +20,12 @@ SYSTEMD_SERVICE:${PN}:append:olympus-nuvoton = " \
 SENSOR_ON_TMPL = "olympus-reload-sensor-on.service"
 CHASSIS_POWERON_TGTFMT = "obmc-chassis-poweron.target"
 ENABLE_POWER_FMT = "../${SENSOR_ON_TMPL}:${CHASSIS_POWERON_TGTFMT}.wants/${SENSOR_ON_TMPL}"
-SYSTEMD_LINK:${PN} += "${@compose_list(d, 'ENABLE_POWER_FMT', 'OBMC_CHASSIS_INSTANCES')}"
+SYSTEMD_LINK:${PN}:append:olympus-nuvoton = " ${@compose_list(d, 'ENABLE_POWER_FMT', 'OBMC_CHASSIS_INSTANCES')}"
 
 SENSOR_OFF_TMPL = "olympus-reload-sensor-off.service"
 CHASSIS_POWEROFF_TGTFMT = "obmc-chassis-poweroff.target"
 DISABLE_POWER_FMT = "../${SENSOR_OFF_TMPL}:${CHASSIS_POWEROFF_TGTFMT}.wants/${SENSOR_OFF_TMPL}"
-SYSTEMD_LINK:${PN} += "${@compose_list(d, 'DISABLE_POWER_FMT', 'OBMC_CHASSIS_INSTANCES')}"
+SYSTEMD_LINK:${PN}:append:olympus-nuvoton = " ${@compose_list(d, 'DISABLE_POWER_FMT', 'OBMC_CHASSIS_INSTANCES')}"
 
 do_install:append:olympus-nuvoton() {
     install -d ${D}${datadir}/entity-manager

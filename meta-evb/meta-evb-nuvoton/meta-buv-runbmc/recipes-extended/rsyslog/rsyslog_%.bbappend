@@ -8,7 +8,7 @@ SRC_URI:append:buv-runbmc = " \
         file://rsyslog-override.conf \
 "
 
-FILES:${PN} += "${systemd_system_unitdir}/rsyslog.service.d/rsyslog-override.conf"
+FILES:${PN}:append:buv-runbmc = " ${systemd_system_unitdir}/rsyslog.service.d/rsyslog-override.conf"
 
 PACKAGECONFIG:append:buv-runbmc = " imjournal"
 
@@ -21,4 +21,4 @@ do_install:append:buv-runbmc() {
         install -m 0755 ${WORKDIR}/rotate-event-logs.sh ${D}/${bindir}/rotate-event-logs.sh
 }
 
-SYSTEMD_SERVICE:${PN} += " rotate-event-logs.service"
+SYSTEMD_SERVICE:${PN}:append:buv-runbmc = " rotate-event-logs.service"

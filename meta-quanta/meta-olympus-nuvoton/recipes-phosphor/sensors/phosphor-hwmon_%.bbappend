@@ -49,17 +49,17 @@ PECIITEMS = "${@compose_list(d, 'PECIITEMSFMT', 'PECINAMES')}"
 PECIENVS = "obmc/hwmon/{0}"
 SYSTEMD_ENVIRONMENT_FILE:${PN}:append:olympus-nuvoton = " ${@compose_list(d, 'PECIENVS', 'PECIITEMS')}"
 
-EXTRA_OEMESON:append:olympus-nuvoton  = " -Dupdate-functional-on-fail=true"
+EXTRA_OEMESON:append:olympus-nuvoton = " -Dupdate-functional-on-fail=true"
 
 SENSOR_ON_TMPL = "olympus-reload-sensor-on.service"
 CHASSIS_POWERON_TGTFMT = "obmc-chassis-poweron.target"
 ENABLE_POWER_FMT = "../${SENSOR_ON_TMPL}:${CHASSIS_POWERON_TGTFMT}.wants/${SENSOR_ON_TMPL}"
-SYSTEMD_LINK:${PN} += "${@compose_list(d, 'ENABLE_POWER_FMT', 'OBMC_CHASSIS_INSTANCES')}"
+SYSTEMD_LINK:${PN}:append:olympus-nuvoton = " ${@compose_list(d, 'ENABLE_POWER_FMT', 'OBMC_CHASSIS_INSTANCES')}"
 
 SENSOR_OFF_TMPL = "olympus-reload-sensor-off.service"
 CHASSIS_POWEROFF_TGTFMT = "obmc-chassis-poweroff.target"
 DISABLE_POWER_FMT = "../${SENSOR_OFF_TMPL}:${CHASSIS_POWEROFF_TGTFMT}.wants/${SENSOR_OFF_TMPL}"
-SYSTEMD_LINK:${PN} += "${@compose_list(d, 'DISABLE_POWER_FMT', 'OBMC_CHASSIS_INSTANCES')}"
+SYSTEMD_LINK:${PN}:append:olympus-nuvoton = " ${@compose_list(d, 'DISABLE_POWER_FMT', 'OBMC_CHASSIS_INSTANCES')}"
 
 
 do_install:append:olympus-nuvoton() {
