@@ -2,8 +2,7 @@ FILESEXTRAPATHS:prepend:olympus-nuvoton := "${THISDIR}/${PN}:"
 
 SRC_URI:append:olympus-nuvoton = " file://0003-Redfish-Add-power-metrics-support.patch"
 SRC_URI:append:olympus-nuvoton = " file://0005-bmcweb-chassis-add-indicatorLED-support.patch"
-# TODO:remove for build pass, need to fix
-#SRC_URI:append:olympus-nuvoton = " file://0018-redfish-log_services-fix-createDump-functionality.patch"
+SRC_URI:append:olympus-nuvoton = " file://0018-redfish-log_services-fix-createDump-functionality.patch"
 SRC_URI:append:olympus-nuvoton = " file://0001-redfish-update_service-fix-fwUpdateErrorMatcher-cann.patch"
 
 # Enable CPU Log support
