@@ -5,7 +5,6 @@ SRC_URI:append:olympus-nuvoton = " file://0001-support-host-boot-progress.patch"
 SRC_URI:append:olympus-nuvoton = " file://0002-add-support-chassis-on-off-target-files.patch"
 SRC_URI:append:olympus-nuvoton = " file://obmc-chassis-poweroff.target"
 SRC_URI:append:olympus-nuvoton = " file://obmc-chassis-poweron.target"
-SRC_URI:append:olympus-nuvoton = " file://0003-workaround-for-fixing-unexpected-post-complete-deass.patch"
 
 SYSTEMD_SERVICE:${PN}:append:olympus-nuvoton = " obmc-chassis-poweroff.target"
 SYSTEMD_SERVICE:${PN}:append:olympus-nuvoton = " obmc-chassis-poweron.target"
