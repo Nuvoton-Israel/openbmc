@@ -44,6 +44,8 @@ RDEPENDS:${PN}-system = " \
     memtester \
     usb-emmc-storage \
     loadmcu \
+    openssl-bin \
+    openssl-engines \
     "
 
 SUMMARY:${PN}-entity = "BUV RunBMC entity"
