@@ -1,7 +1,7 @@
 SUMMARY = "pldmsensors"
 DESCRIPTION = "PLDM Sensor Services Configured from D-Bus"
 
-SRC_URI = "git://github.com/Nuvoton-Israel/pldmsensors.git;protocol=ssh;branch=main;"
+SRC_URI = "git://github.com/Nuvoton-Israel/pldmsensors.git;protocol=https;branch=main;"
 
 SRCREV = "c0bac1546c0f4c5c38eaf0ab6b0cc473a6823ec2"
 

@@ -1,6 +1,6 @@
 DESCRIPTION = "Intel at-scale-debug"
 
-SRC_URI = "git://github.com/Intel-BMC/asd.git"
+SRC_URI = "git://github.com/Intel-BMC/asd.git;protocol=https"
 SRCREV = "1.4.4"
 PV = "0.1+git${SRCPV}"
 

@@ -13,11 +13,11 @@ DEPENDS += "systemd"
 DEPENDS += "autoconf-archive-native"
 RDEPENDS_${PN} += "bash"
 
-SRC_URI += " git://github.com/Nuvoton-Israel/loadmcu.git \
-             file://mcu-update.service \
-             file://mcu-version.sh \
-             file://mcu-version@.service \
-           "
+SRC_URI = "git://github.com/Nuvoton-Israel/loadmcu.git;protocol=https \
+           file://mcu-update.service \
+           file://mcu-version.sh \
+           file://mcu-version@.service \
+          "
 SRCREV = "12fed94b53f6fa0fe1c96bee264c7e363f2ed7d8"
 S = "${WORKDIR}/git"
 

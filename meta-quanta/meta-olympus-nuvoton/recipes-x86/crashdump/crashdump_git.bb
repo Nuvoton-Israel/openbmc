@@ -12,7 +12,7 @@ EXTRA_OECMAKE = "-DYOCTO_DEPENDENCIES=ON -DCRASHDUMP_BUILD_UT=OFF"
 LICENSE = "Proprietary"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=43c09494f6b77f344027eea0a1c22830"
 
-SRC_URI = "git://git@github.com/Intel-BMC/crashdump;protocol=ssh;nobranch=1"
+SRC_URI = "git://git@github.com/Intel-BMC/crashdump;protocol=https;nobranch=1"
 SRCREV = "wht-1.0.6"
 
 S = "${WORKDIR}/git"
