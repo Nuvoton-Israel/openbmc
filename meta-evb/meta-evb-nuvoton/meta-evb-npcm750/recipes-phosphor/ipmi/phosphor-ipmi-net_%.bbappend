@@ -1,1 +1,1 @@
-RMCPP_IFACE = "eth1"
+RMCPP_IFACE = "eth2"

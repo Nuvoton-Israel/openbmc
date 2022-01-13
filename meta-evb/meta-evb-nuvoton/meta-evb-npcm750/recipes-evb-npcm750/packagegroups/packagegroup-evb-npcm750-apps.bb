@@ -49,4 +49,5 @@ RDEPENDS_${PN}-system = " \
         rsyslog \
         phosphor-sel-logger \
         iperf2 \
+        obmc-console \
         "
