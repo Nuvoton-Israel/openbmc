@@ -1,0 +1,542 @@
+From a0bfed8dc58c51f7a7140d61944cf288062fe6cf Mon Sep 17 00:00:00 2001
+From: Brian Ma <chma0@nuvoton.com>
+Date: Thu, 27 Jan 2022 14:41:34 +0800
+Subject: [PATCH] Add support OEM command get and set PWM value
+
+ref: https://github.com/openbmc/phosphor-pid-control/blob/master/ipmi.md
+byte      1       2       3    4    5     6        7             8
+comment   netfn  command  OEM num         sub-cmd  id(zone/fan)  set value
+data      2e     0x04     0xcf 0xc2 0x00  0x0~0x4
+
+sub-commands:  see ipmi/manual_messages.hpp
+    getControlState = 0
+    setControlState = 1
+    getFailsafeState = 2
+    getPwmValue = 3
+    setPwmValue = 4
+
+Test:
+set pid control to manual mode
+~# ipmitool raw 0x2e 0x04 0xcf 0xc2 0x0 0x1 0x0 0x1
+ cf c2 00 00 00 00
+read PWM value
+~# ipmitool raw 0x2e 0x04 0xcf 0xc2 0x0 0x3 0x0
+ cf c2 00 64
+set PWM value to 0xff
+~# ipmitool raw 0x2e 0x04 0xcf 0xc2 0x0 0x4 0x0 0xff
+ cf c2 00 00 00 00
+read PWM value again
+~# ipmitool raw 0x2e 0x04 0xcf 0xc2 0x0 0x3 0x0
+ cf c2 00 ff
+verify PWM value via sysfs
+~# cat /sys/class/hwmon/hwmon4/pwm1
+255
+---
+ Makefile.am              |   3 +-
+ ipmi/ipmi_pwm.cpp        | 263 +++++++++++++++++++++++++++++++++++++++
+ ipmi/ipmi_pwm.hpp        |  39 ++++++
+ ipmi/main_ipmi.cpp       |   3 +-
+ ipmi/manual_messages.hpp |   2 +
+ ipmi/manualcmds.cpp      |  52 +++++++-
+ ipmi/manualcmds.hpp      |  14 ++-
+ 7 files changed, 371 insertions(+), 5 deletions(-)
+ create mode 100644 ipmi/ipmi_pwm.cpp
+ create mode 100644 ipmi/ipmi_pwm.hpp
+
+diff --git a/Makefile.am b/Makefile.am
+index 7465a72..b2d8da7 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -118,7 +118,8 @@ libmanualcmds_LTLIBRARIES = libmanualcmds.la
+ libmanualcmds_la_SOURCES = \
+ 	ipmi/main_ipmi.cpp \
+ 	ipmi/manualcmds.cpp \
+-	ipmi/dbus_mode.cpp
++	ipmi/dbus_mode.cpp \
++	ipmi/ipmi_pwm.cpp
+ libmanualcmds_la_LDFLAGS = \
+ 	$(SYSTEMD_LIBS) \
+ 	$(PHOSPHOR_DBUS_INTERFACES_LIBS) \
+diff --git a/ipmi/ipmi_pwm.cpp b/ipmi/ipmi_pwm.cpp
+new file mode 100644
+index 0000000..bb3d639
+--- /dev/null
++++ b/ipmi/ipmi_pwm.cpp
+@@ -0,0 +1,263 @@
++#include "ipmi_pwm.hpp"
++
++#include <ipmid/api.h>
++
++#include <ipmid/api.hpp>
++
++namespace IPMID = ipmi;
++namespace pid_control
++{
++namespace ipmi
++{
++using namespace phosphor::logging;
++// The command object path both hwmon and dbus sensor contains
++constexpr auto FAN_COMMON_OBJ_PATH = "/xyz/openbmc_project/sensors/fan_tach";
++// PWM fan sensor object path
++// constexpr auto FAN_PWM_PATH = "/xyz/openbmc_project/sensors/fan_pwm/Pwm_";
++// Dbus sensor PWM object path which implement control interface
++constexpr auto FAN_PWM_CTRL_PATH = "/xyz/openbmc_project/control/fanpwm/Pwm_";
++// TODO: check the object FanX is fixed or setting by conf?
++// Hwmon PWM object path
++constexpr auto FAN_TACH_PATH = "/xyz/openbmc_project/sensors/fan_tach/Fan";
++// Fan Pwm control interface
++constexpr auto FAN_CTRL_PWM_INTF = "xyz.openbmc_project.Control.FanPwm";
++constexpr auto FAN_PWM_PROPERTY = "Target";
++// constexpr auto SENSOR_INTF = "xyz.openbmc_project.Sensor.Value";
++
++/**
++ * @brief get the fan sensor service, which create by hwmon or dbus sensor
++ *
++ *  _fan_service:
++ *   Hwmon       => xyz.openbmc_project.Hwmon-[377141964.Hwmon1]
++ *   Dbus sensor => xyz.openbmc_project.FanSensor
++ * @return std::string the fan sensor service
++ */
++std::string IpmiPwmcontrol::getFanService()
++{
++    log<level::INFO>("IpmiPwmcontrol getFanService");
++    std::string msg, fan_service;
++    try
++    {
++        fan_service = IPMID::getService(*getSdBus(), IPMID::PROP_INTF,
++                                        FAN_COMMON_OBJ_PATH);
++        msg = "fan service: " + fan_service;
++    }
++    catch (const std::exception& e)
++    {
++        msg = "Cannot get fan tach sensor service, " + std::string(e.what());
++    }
++    log<level::INFO>(msg.c_str());
++    return fan_service;
++}
++
++uint8_t IpmiPwmcontrol::getFanServiceType()
++{
++    std::string msg;
++    log<level::INFO>("IpmiPwmcontrol getFanServiceType");
++    // check fan service is valid first
++    if (_fan_service.empty())
++    {
++        log<level::INFO>("fan service is not valid, try to get it");
++        _fan_service = getFanService();
++    }
++    else
++    {
++        msg = "fan service already exist, " + _fan_service;
++        log<level::INFO>(msg.c_str());
++    }
++    if (_fan_service.find("xyz.openbmc_project.Hwmon") != std::string::npos)
++    {
++        return fanServiceHwmon;
++    }
++    else if (_fan_service.find("xyz.openbmc_project.FanSensor") !=
++             std::string::npos)
++    {
++        return fanServiceDbusSensor;
++    }
++    log<level::ERR>("Cannot get valid fan service");
++    return fanServiceInvalid;
++}
++
++/**
++ * @brief simple util for convert double to uint8_t safe
++ *
++ * @param input the double data from sensor reading
++ * @return uint8_t the true value with type uint8_t
++ */
++uint8_t double_to_uint8(double input)
++{
++    log<level::INFO>("double to uint8");
++    uint8_t output;
++    char temp[8];
++
++    std::snprintf(temp, 8, "%.0f", input);
++    temp[7] = 0x00;
++    log<level::INFO>(temp);
++    std::sscanf(temp, "%hhu", &output);
++    return output;
++}
++
++uint8_t IpmiPwmcontrol::setPwmProperty(const std::string& path,
++                                       const std::string& interface,
++                                       const std::string& property,
++                                       IPMID::Value value)
++{
++    std::string msg;
++    try
++    {
++        IPMID::setDbusProperty(*getSdBus(), _fan_service, path, interface,
++                               property, value);
++    }
++    catch (const sdbusplus::exception::exception& e)
++    {
++        msg = "Cannot get fan property, path:" + path + ", " +
++              std::string(e.what());
++        log<level::ERR>(msg.c_str());
++        return IPMI_CC_UNSPECIFIED_ERROR;
++    }
++    return IPMI_CC_OK;
++}
++
++uint8_t IpmiPwmcontrol::getPwmValue(uint8_t instance, uint8_t* value)
++{
++    log<level::INFO>("getPwmValue");
++    switch (getFanServiceType())
++    {
++        case fanServiceHwmon:
++            log<level::INFO>("hwmonGetPwm");
++            return hwmonGetPwm(instance, value);
++        case fanServiceDbusSensor:
++            log<level::INFO>("dbusGetPwm");
++            return dbusGetPwm(instance, value);
++        default:
++            return IPMI_CC_UNSPECIFIED_ERROR;
++    }
++}
++
++uint8_t IpmiPwmcontrol::setPwmValue(uint8_t instance, uint8_t value)
++{
++    log<level::INFO>("setPwmValue");
++    switch (getFanServiceType())
++    {
++        case fanServiceHwmon:
++            log<level::INFO>("hwmonSetPwm");
++            return hwmonSetPwm(instance, value);
++        case fanServiceDbusSensor:
++            log<level::INFO>("dbusSetPwm");
++            return dbusSetPwm(instance, value);
++        default:
++            return IPMI_CC_UNSPECIFIED_ERROR;
++    }
++}
++
++uint8_t IpmiPwmcontrol::dbusGetPwm(uint8_t instance, uint8_t* value)
++{
++    std::string fullPath = FAN_PWM_CTRL_PATH + std::to_string(instance + 1);
++    std::string msg =
++        "full path: " + fullPath + ", instance:" + std::to_string(instance);
++    log<level::INFO>(msg.c_str());
++    double reading = 0;
++    try
++    {
++        log<level::INFO>("dbusGetPwm: get property.");
++        auto propValue =
++            IPMID::getDbusProperty(*getSdBus(), _fan_service, fullPath,
++                                   FAN_CTRL_PWM_INTF, FAN_PWM_PROPERTY);
++        reading = std::get<uint64_t>(propValue);
++    }
++    catch (const sdbusplus::exception::exception& ex)
++    {
++        msg = "Cannot get PWM from " + fullPath + ", " + std::string(ex.what());
++        log<level::ERR>(msg.c_str());
++        return IPMI_CC_INVALID;
++    }
++    msg = "reading: " + std::to_string(reading);
++    log<level::INFO>(msg.c_str());
++    *value = (uint8_t)reading;
++    return IPMI_CC_OK;
++}
++
++/**
++ * @brief set PWM by dbus pwm sensor dbus object property
++ * use the PWM control object path
++ * ex: /xyz/openbmc_project/control/fanpwm/Pwm_1
++ * xyz.openbmc_project.Control.FanPwm  interface -   -
++ * .Target                             property  t   255
++ *
++ * Note: the PWM sensor /xyz/openbmc_project/sensors/fan_pwm/Pwm_x
++ * is also good to get sensor reading, but it present value as percentage
++ * @param instance the PWM controller instance
++ * @param value PWM value we want to set
++ * @return uint8_t IPMI status code
++ */
++uint8_t IpmiPwmcontrol::dbusSetPwm(uint8_t instance, uint8_t value)
++{
++    std::string fullPath = FAN_PWM_CTRL_PATH + std::to_string(instance + 1);
++    std::string msg =
++        "full path: " + fullPath + ", instance:" + std::to_string(instance);
++    log<level::INFO>(msg.c_str());
++    uint8_t rc;
++    msg = "dbusSetPwm: set PWM target property: " + std::to_string(value);
++    log<level::INFO>(msg.c_str());
++    rc = setPwmProperty(fullPath, FAN_CTRL_PWM_INTF, FAN_PWM_PROPERTY,
++                        (uint64_t)value);
++
++    return rc;
++}
++
++/**
++ * @brief Get PWM value from Hwmon sensor service
++ * We use the FanPwm target as value, we also need take care
++ * 1. TARGET_MODE= "PWM" must set in sensor conf environment
++ * 2. return data type is uint64
++ * xyz.openbmc_project.Control.FanPwm    interface -     -
++ * .Target                               property  t     100
++ *
++ * @param instance the fan id
++ * @param value the value reference, the PWM data will set here
++ * @return uint8_t IPMI status code
++ */
++uint8_t IpmiPwmcontrol::hwmonGetPwm(uint8_t instance, uint8_t* value)
++{
++    std::string fullPath = FAN_TACH_PATH + std::to_string(instance + 1);
++    std::string msg =
++        "full path: " + fullPath + ", instance:" + std::to_string(instance);
++    log<level::INFO>(msg.c_str());
++    uint64_t reading = 0;
++    try
++    {
++        log<level::INFO>("hwmonGetPwm: get property.");
++        auto propValue =
++            IPMID::getDbusProperty(*getSdBus(), _fan_service, fullPath,
++                                   FAN_CTRL_PWM_INTF, FAN_PWM_PROPERTY);
++        reading = std::get<uint64_t>(propValue);
++    }
++    catch (const sdbusplus::exception::exception& ex)
++    {
++        msg = "Cannot get PWM from " + fullPath + ", " + std::string(ex.what());
++        log<level::ERR>(msg.c_str());
++        return IPMI_CC_INVALID;
++    }
++    msg = "reading: " + std::to_string(reading);
++    log<level::INFO>(msg.c_str());
++    *value = (uint8_t)reading;
++    return IPMI_CC_OK;
++}
++
++uint8_t IpmiPwmcontrol::hwmonSetPwm(uint8_t instance, uint8_t value)
++{
++    std::string fullPath = FAN_TACH_PATH + std::to_string(instance + 1);
++    std::string msg =
++        "full path: " + fullPath + ", instance:" + std::to_string(instance);
++    log<level::INFO>(msg.c_str());
++    uint8_t rc;
++    msg = "hwmonSetPwm: set PWM target property: " + std::to_string(value);
++    log<level::INFO>(msg.c_str());
++    rc = setPwmProperty(fullPath, FAN_CTRL_PWM_INTF, FAN_PWM_PROPERTY,
++                        (uint64_t)value);
++
++    return rc;
++}
++
++} // namespace ipmi
++} // namespace pid_control
+diff --git a/ipmi/ipmi_pwm.hpp b/ipmi/ipmi_pwm.hpp
+new file mode 100644
+index 0000000..48bb46b
+--- /dev/null
++++ b/ipmi/ipmi_pwm.hpp
+@@ -0,0 +1,39 @@
++#include <ipmid/utils.hpp>
++#include <phosphor-logging/log.hpp>
++
++namespace IPMID = ipmi;
++namespace pid_control
++{
++namespace ipmi
++{
++enum FanServiceType
++{
++    fanServiceInvalid = 0,
++    fanServiceHwmon = 1,
++    fanServiceDbusSensor = 2,
++};
++
++class IpmiPwmcontrol
++{
++  public:
++    IpmiPwmcontrol() {};
++    ~IpmiPwmcontrol() = default;
++
++    uint8_t getFanServiceType();
++    uint8_t getPwmValue(uint8_t instance, uint8_t* value);
++    uint8_t setPwmValue(uint8_t instance, uint8_t value);
++    uint8_t setPwmProperty(const std::string& path,
++                           const std::string& interface,
++                           const std::string& property, IPMID::Value value);
++
++  private:
++    std::string _fan_service = "";
++    uint8_t dbusGetPwm(uint8_t instance, uint8_t* value);
++    uint8_t dbusSetPwm(uint8_t instance, uint8_t value);
++    uint8_t hwmonGetPwm(uint8_t instance, uint8_t* value);
++    uint8_t hwmonSetPwm(uint8_t instance, uint8_t value);
++    std::string getFanService();
++};
++
++} // namespace ipmi
++} // namespace pid_control
+diff --git a/ipmi/main_ipmi.cpp b/ipmi/main_ipmi.cpp
+index 8e58b25..7ecd4cb 100644
+--- a/ipmi/main_ipmi.cpp
++++ b/ipmi/main_ipmi.cpp
+@@ -31,7 +31,8 @@ namespace pid_control
+ namespace ipmi
+ {
+ 
+-ZoneControlIpmiHandler handler(std::make_unique<DbusZoneControl>());
++ZoneControlIpmiHandler handler(std::make_unique<DbusZoneControl>(),
++                               std::make_unique<IpmiPwmcontrol>());
+ 
+ }
+ } // namespace pid_control
+diff --git a/ipmi/manual_messages.hpp b/ipmi/manual_messages.hpp
+index 5418d60..60536a0 100644
+--- a/ipmi/manual_messages.hpp
++++ b/ipmi/manual_messages.hpp
+@@ -12,6 +12,8 @@ enum ManualSubCmd
+     getControlState = 0,
+     setControlState = 1,
+     getFailsafeState = 2,
++    getPwmValue = 3,
++    setPwmValue = 4,
+ };
+ 
+ struct FanCtrlRequest
+diff --git a/ipmi/manualcmds.cpp b/ipmi/manualcmds.cpp
+index 0ff0c0a..9f0cccf 100644
+--- a/ipmi/manualcmds.cpp
++++ b/ipmi/manualcmds.cpp
+@@ -24,6 +24,7 @@
+ 
+ #include <sdbusplus/bus.hpp>
+ #include <sdbusplus/message.hpp>
++#include <phosphor-logging/log.hpp>
+ 
+ #include <map>
+ #include <memory>
+@@ -35,7 +36,7 @@ namespace pid_control
+ {
+ namespace ipmi
+ {
+-
++using namespace phosphor::logging;
+ static constexpr auto manualProperty = "Manual";
+ static constexpr auto failsafeProperty = "FailSafe";
+ 
+@@ -122,6 +123,47 @@ ipmi_ret_t ZoneControlIpmiHandler::setManualModeState(const uint8_t* reqBuf,
+     return rc;
+ }
+ 
++ipmi_ret_t ZoneControlIpmiHandler::getIpmiPwm(const uint8_t* reqBuf,
++                                                      uint8_t* replyBuf,
++                                                      size_t* dataLen)
++{
++    uint8_t current = 0xff;
++    if (*dataLen < sizeof(struct FanCtrlRequest))
++    {
++        return IPMI_CC_INVALID;
++    }
++
++    const auto request =
++        reinterpret_cast<const struct FanCtrlRequest*>(&reqBuf[0]);
++
++    // Note: request->zone means fan instance id here
++    ipmi_ret_t rc = _pwm_control->getPwmValue(request->zone, &current);
++    if (rc)
++    {
++        return rc;
++    }
++    *replyBuf = current;
++    *dataLen = sizeof(uint8_t);
++    return IPMI_CC_OK;
++}
++
++ipmi_ret_t ZoneControlIpmiHandler::setIpmiPwm(const uint8_t* reqBuf,
++                                                      uint8_t* replyBuf,
++                                                      size_t* dataLen)
++{
++    if (*dataLen < sizeof(struct FanCtrlRequestSet))
++    {
++        return IPMI_CC_INVALID;
++    }
++
++    const auto request =
++        reinterpret_cast<const struct FanCtrlRequestSet*>(&reqBuf[0]);
++
++    // Note: request->zone means fan instance id here
++    ipmi_ret_t rc = _pwm_control->setPwmValue(request->zone, request->value);
++    return rc;
++}
++
+ /* Three command packages: get, set true, set false */
+ ipmi_ret_t manualModeControl(ZoneControlIpmiHandler* handler, ipmi_cmd_t cmd,
+                              const uint8_t* reqBuf, uint8_t* replyCmdBuf,
+@@ -130,6 +172,7 @@ ipmi_ret_t manualModeControl(ZoneControlIpmiHandler* handler, ipmi_cmd_t cmd,
+     // FanCtrlRequest is the smaller of the requests, so it's at a minimum.
+     if (*dataLen < sizeof(struct FanCtrlRequest))
+     {
++        log<level::ERR>("manualModeControl: data length error");
+         return IPMI_CC_INVALID;
+     }
+ 
+@@ -137,6 +180,9 @@ ipmi_ret_t manualModeControl(ZoneControlIpmiHandler* handler, ipmi_cmd_t cmd,
+         reinterpret_cast<const struct FanCtrlRequest*>(&reqBuf[0]);
+ 
+     ipmi_ret_t rc = IPMI_CC_OK;
++    std::string msg = "manualModeControl command: " + std::to_string(request->command) +
++      ", length: " + std::to_string(*dataLen);
++    log<level::INFO>(msg.c_str());
+ 
+     switch (request->command)
+     {
+@@ -146,6 +192,10 @@ ipmi_ret_t manualModeControl(ZoneControlIpmiHandler* handler, ipmi_cmd_t cmd,
+             return handler->setManualModeState(reqBuf, replyCmdBuf, dataLen);
+         case getFailsafeState:
+             return handler->getFailsafeModeState(reqBuf, replyCmdBuf, dataLen);
++        case getPwmValue:
++            return handler->getIpmiPwm(reqBuf, replyCmdBuf, dataLen);
++        case setPwmValue:
++            return handler->setIpmiPwm(reqBuf, replyCmdBuf, dataLen);
+         default:
+             rc = IPMI_CC_INVALID;
+     }
+diff --git a/ipmi/manualcmds.hpp b/ipmi/manualcmds.hpp
+index 4e11662..59c28e3 100644
+--- a/ipmi/manualcmds.hpp
++++ b/ipmi/manualcmds.hpp
+@@ -1,6 +1,7 @@
+ #pragma once
+ 
+ #include "control.hpp"
++#include "ipmi_pwm.hpp"
+ 
+ #include <ipmid/api.h>
+ 
+@@ -17,8 +18,10 @@ namespace ipmi
+ class ZoneControlIpmiHandler
+ {
+   public:
+-    ZoneControlIpmiHandler(std::unique_ptr<ZoneControlInterface> control) :
+-        _control(std::move(control))
++    ZoneControlIpmiHandler(std::unique_ptr<ZoneControlInterface> control,
++                           std::unique_ptr<IpmiPwmcontrol> pwm_control) :
++        _control(std::move(control)),
++        _pwm_control(std::move(pwm_control))
+     {}
+ 
+     ipmi_ret_t getFailsafeModeState(const uint8_t* reqBuf, uint8_t* replyBuf,
+@@ -30,8 +33,15 @@ class ZoneControlIpmiHandler
+     ipmi_ret_t setManualModeState(const uint8_t* reqBuf, uint8_t* replyBuf,
+                                   size_t* dataLen);
+ 
++    ipmi_ret_t getIpmiPwm(const uint8_t* reqBuf, uint8_t* replyBuf,
++                          size_t* dataLen);
++
++    ipmi_ret_t setIpmiPwm(const uint8_t* reqBuf, uint8_t* replyBuf,
++                          size_t* dataLen);
++
+   private:
+     std::unique_ptr<ZoneControlInterface> _control;
++    std::unique_ptr<IpmiPwmcontrol> _pwm_control;
+ };
+ 
+ ipmi_ret_t manualModeControl(ZoneControlIpmiHandler* handler, ipmi_cmd_t cmd,
+-- 
+2.17.1
+

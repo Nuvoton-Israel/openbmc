@@ -1,6 +1,7 @@
 FILESEXTRAPATHS:prepend:buv-runbmc := "${THISDIR}/${PN}:"
 
 inherit buv-entity-utils
+SRC_URI:append:buv-runbmc = " file://0001-Add-support-OEM-command-get-and-set-PWM-value.patch"
 SRC_URI:append:buv-runbmc = " file://config-buv-nuvoton.json"
 SRC_URI:append:buv-runbmc = " \
     file://fan-default-speed.sh \

@@ -1,0 +1,9 @@
+diff --git a/ipmi-whitelist.conf b/ipmi-whitelist.conf
+index 4be1de3..11fe0c8 100644
+--- a/ipmi-whitelist.conf
++++ b/ipmi-whitelist.conf
+@@ -349,3 +349,4 @@
+ 0x3e:0x73:0x7f7f   //<Intel Managed Data Region>:<SDR Configuration File Management>
+ 0x3e:0x75:0xff7f   //<Intel Managed Data Region>:<Get Remote Log IP>
+ 0x3e:0x76:0x7f7f   //<Intel Managed Data Region>:<Get/Set Password Mode>
++0x2e:0x04:0xffff   //<OpenBMC OEM>:<Fan command>
