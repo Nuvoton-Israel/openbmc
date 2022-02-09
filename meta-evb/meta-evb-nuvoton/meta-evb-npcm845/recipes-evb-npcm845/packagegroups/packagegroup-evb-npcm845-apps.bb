@@ -28,6 +28,7 @@ RDEPENDS_${PN}-fans = " \
 
 SUMMARY_${PN}-flash = "EVB NPCM845 Flash"
 RDEPENDS_${PN}-flash = " \
+        phosphor-ipmi-flash \
         "
 
 SUMMARY_${PN}-system = "EVB NPCM845 System"
@@ -56,4 +57,6 @@ RDEPENDS_${PN}-system = " \
         loadmcu \
         phosphor-ecc \
         i3c-tools \
+        phosphor-ipmi-blobs \
+        phosphor-image-signing \
         "
