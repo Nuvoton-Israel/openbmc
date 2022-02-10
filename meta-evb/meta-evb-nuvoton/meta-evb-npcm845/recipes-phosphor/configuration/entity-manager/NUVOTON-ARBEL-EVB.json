@@ -6,7 +6,7 @@
             "EntityInstance": 1,
             "Name": "ADC1",
             "PowerState": "Always",
-            "ScaleFactor": 22.222,
+            "ScaleFactor": 0.045,
             "Thresholds": [
                 {
                     "Direction": "greater than",
@@ -41,7 +41,7 @@
             "EntityInstance": 2,
             "Name": "ADC2",
             "PowerState": "Always",
-            "ScaleFactor": 10.909,
+            "ScaleFactor": 0.092,
             "Thresholds": [
                 {
                     "Direction": "greater than",
@@ -76,7 +76,7 @@
             "EntityInstance": 3,
             "Name": "ADC3",
             "PowerState": "Always",
-            "ScaleFactor": 6,
+            "ScaleFactor": 0.166,
             "Thresholds": [
                 {
                     "Direction": "greater than",
@@ -111,7 +111,7 @@
             "EntityInstance": 4,
             "Name": "ADC4",
             "PowerState": "Always",
-            "ScaleFactor": 3.125,
+            "ScaleFactor": 0.32,
             "Thresholds": [
                 {
                     "Direction": "greater than",
@@ -146,7 +146,7 @@
             "EntityInstance": 5,
             "Name": "ADC5",
             "PowerState": "Always",
-            "ScaleFactor": 1.470,
+            "ScaleFactor": 0.68,
             "Thresholds": [
                 {
                     "Direction": "greater than",
@@ -181,7 +181,7 @@
             "EntityInstance": 6,
             "Name": "ADC6",
             "PowerState": "Always",
-            "ScaleFactor": 1.2,
+            "ScaleFactor": 0.833,
             "Thresholds": [
                 {
                     "Direction": "greater than",
@@ -216,7 +216,7 @@
             "EntityInstance": 7,
             "Name": "ADC7",
             "PowerState": "Always",
-            "ScaleFactor": 1.100,
+            "ScaleFactor": 0.91,
             "Thresholds": [
                 {
                     "Direction": "greater than",
@@ -251,7 +251,7 @@
             "EntityInstance": 8,
             "Name": "ADC8",
             "PowerState": "Always",
-            "ScaleFactor": 1.047,
+            "ScaleFactor": 0.955,
             "Thresholds": [
                 {
                     "Direction": "greater than",
