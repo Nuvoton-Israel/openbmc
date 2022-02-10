@@ -4,7 +4,7 @@
             "name": "Fan1",
             "type": "fan",
             "readPath": "/xyz/openbmc_project/sensors/fan_tach/Fan1",
-            "writePath": "/sys/devices/platform/ahb/ahb:apb/f0103000.pwm-fan-controller/hwmon/**/pwm1",
+            "writePath": "/xyz/openbmc_project/sensors/fan_tach/Fan1",
             "min": 0,
             "max": 255
         },
@@ -12,7 +12,7 @@
             "name": "Fan2",
             "type": "fan",
             "readPath": "/xyz/openbmc_project/sensors/fan_tach/Fan2",
-            "writePath": "/sys/devices/platform/ahb/ahb:apb/f0103000.pwm-fan-controller/hwmon/**/pwm2",
+            "writePath": "/xyz/openbmc_project/sensors/fan_tach/Fan2",
             "min": 0,
             "max": 255
         },
@@ -20,7 +20,7 @@
             "name": "Fan3",
             "type": "fan",
             "readPath": "/xyz/openbmc_project/sensors/fan_tach/Fan3",
-            "writePath": "/sys/devices/platform/ahb/ahb:apb/f0103000.pwm-fan-controller/hwmon/**/pwm3",
+            "writePath": "/xyz/openbmc_project/sensors/fan_tach/Fan3",
             "min": 0,
             "max": 255
         },
@@ -28,7 +28,7 @@
             "name": "Fan4",
             "type": "fan",
             "readPath": "/xyz/openbmc_project/sensors/fan_tach/Fan4",
-            "writePath": "/sys/devices/platform/ahb/ahb:apb/f0103000.pwm-fan-controller/hwmon/**/pwm4",
+            "writePath": "/xyz/openbmc_project/sensors/fan_tach/Fan4",
             "min": 0,
             "max": 255
         },

@@ -7,7 +7,6 @@ LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=ce3556061e8d4b01638d497053a82dfd"
 
 inherit autotools pkgconfig
-inherit systemd
 inherit obmc-phosphor-ipmiprovider-symlink
 
 DEPENDS += "autoconf-archive-native"
@@ -17,8 +16,9 @@ DEPENDS += "phosphor-ipmi-host"
 DEPENDS += "nlohmann-json"
 
 S = "${WORKDIR}/git"
-SRC_URI = "git://github.com/Nuvoton-Israel/nuvoton-ipmi-oem;branch=legacy;protocol=https"
-SRCREV = "fe6a355c1e8ac1eb334a40e11ae0e9ff52eda062"
+SRCBRANCH = "master"
+SRC_URI = "git://github.com/Nuvoton-Israel/nuvoton-ipmi-oem;protocol=https;branch=${SRCBRANCH}"
+SRCREV = "50d80e64a01d933c10484da63b447d6a27b8b702"
 
 FILES:${PN}:append = " ${libdir}/ipmid-providers/lib*${SOLIBS}"
 FILES:${PN}:append = " ${libdir}/host-ipmid/lib*${SOLIBS}"

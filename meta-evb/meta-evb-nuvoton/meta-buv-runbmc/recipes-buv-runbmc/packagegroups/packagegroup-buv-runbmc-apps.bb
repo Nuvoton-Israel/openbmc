@@ -46,6 +46,7 @@ RDEPENDS:${PN}-system = " \
     loadmcu \
     openssl-bin \
     openssl-engines \
+    nuvoton-ipmi-oem \
     "
 
 SUMMARY:${PN}-entity = "BUV RunBMC entity"
