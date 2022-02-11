@@ -457,6 +457,74 @@
                 }
             ],
             "Type": "TMP100"
+        },
+        {
+            "Address": "0",
+            "Bus": "0",
+            "EntityId": 7,
+            "EntityInstance": 4,
+            "Name": "BMC_CPU_Temp0",
+            "Thresholds": [
+                {
+                    "Direction": "greater than",
+                    "Name": "upper critical",
+                    "Severity": 1,
+                    "Value": 75.000
+                },
+                {
+                    "Direction": "greater than",
+                    "Name": "upper non critical",
+                    "Severity": 0,
+                    "Value": 60.000
+                },
+                {
+                    "Direction": "less than",
+                    "Name": "lower non critical",
+                    "Severity": 0,
+                    "Value": 15.000
+                },
+                {
+                    "Direction": "less than",
+                    "Name": "lower critical",
+                    "Severity": 1,
+                    "Value": 0
+                }
+            ],
+            "Type": "THERMALZONE"
+        },
+        {
+            "Address": "1",
+            "Bus": "0",
+            "EntityId": 7,
+            "EntityInstance": 5,
+            "Name": "BMC_CPU_Temp1",
+            "Thresholds": [
+                {
+                    "Direction": "greater than",
+                    "Name": "upper critical",
+                    "Severity": 1,
+                    "Value": 75.000
+                },
+                {
+                    "Direction": "greater than",
+                    "Name": "upper non critical",
+                    "Severity": 0,
+                    "Value": 60.000
+                },
+                {
+                    "Direction": "less than",
+                    "Name": "lower non critical",
+                    "Severity": 0,
+                    "Value": 15.000
+                },
+                {
+                    "Direction": "less than",
+                    "Name": "lower critical",
+                    "Severity": 1,
+                    "Value": 0
+                }
+            ],
+            "Type": "THERMALZONE"
         }
     ],
     "Name": "EVB_ARBEL_NUVOTON",
