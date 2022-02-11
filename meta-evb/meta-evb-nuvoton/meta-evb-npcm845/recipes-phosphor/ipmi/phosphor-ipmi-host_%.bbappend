@@ -19,3 +19,5 @@ SRC_URI:append:evb-npcm845 = " file://0002-Support-bridging-commands.patch"
 # Get sel events from journal logs, the build opetion should with "--with-journal-sel"
 # EXTRA_OECONF:append:evb-npcm845 = " --with-journal-sel"
 # SRC_URI:append:evb-npcm845 = " file://0004-Add-option-for-SEL-commands-for-Journal-based-SEL-en.patch"
+
+EXTRA_OECONF:append:evb-npcm845 = " --disable-i2c-whitelist-check"
