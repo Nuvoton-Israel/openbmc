@@ -11,7 +11,7 @@ SRC_URI = "git://github.com/Nuvoton-Israel/u-boot.git;branch=${UBRANCH}"
 SRCREV = "c11d9a81eadfb9b3c4e53acba1a97a13924b6d88"
 
 UBRANCH:npcm8xx = "npcm-v2021.04"
-SRCREV:npcm8xx = "be078ee12f591a4dab8776bb021f7c22704fa73c"
+SRCREV:npcm8xx = "5adc64c7d8f919637a5be92749bcdbba4770ee5c"
 
 SRC_URI = "git://github.com/Nuvoton-Israel/u-boot.git;branch=${UBRANCH}"
 
