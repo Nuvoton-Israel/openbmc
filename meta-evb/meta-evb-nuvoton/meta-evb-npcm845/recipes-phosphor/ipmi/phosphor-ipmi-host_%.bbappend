@@ -14,7 +14,7 @@ SRC_URI:append:evb-npcm845 = " file://0001-phosphor-ipmi-host-Do-not-use-size_t-
 SRC_URI:append:evb-npcm845 = " file://0002-Support-bridging-commands.patch"
 
 # Add oem command to get bios post code
-SRC_URI:append:evb-npcm845 = " file://0003-add-oem-command-get-bios-post-code.patch"
+#SRC_URI:append:evb-npcm845 = " file://0003-add-oem-command-get-bios-post-code.patch"
 
 # Get sel events from journal logs, the build opetion should with "--with-journal-sel"
 # EXTRA_OECONF:append:evb-npcm845 = " --with-journal-sel"
