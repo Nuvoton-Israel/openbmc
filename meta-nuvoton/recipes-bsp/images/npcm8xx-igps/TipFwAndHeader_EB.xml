@@ -1,0 +1,132 @@
+<!-- SPDX-License-Identifier: GPL-2.0
+#
+# Nuvoton IGPS: Image Generation And Programming Scripts For Poleg BMC
+#
+# Copyright (C) 2020 Nuvoton Technologies, All Rights Reserved
+#--------------------------------------------------------------------------->
+
+<?xml version="1.0" encoding="UTF-8"?>
+
+<Bin_Ecc_Map>
+
+	<!-- BMC mandatory fields -->
+	<ImageProperties>
+		<BinSize>0</BinSize> <!-- If 0 the binary size will be calculated by the tool -->
+		<PadValue>0xFF</PadValue>	<!-- Byte value to pad the empty areas, default is 0 -->
+	</ImageProperties>
+
+	<BinField>
+		<name>Anchor</name> <!-- name of field -->
+		<config>
+			<offset>0</offset>
+			<size>4</size>
+		</config>
+		<content format='bytes'>0x5E 0x4D 0x7A 0x9B</content>  <!-- content the user should fill -->
+	</BinField>
+
+	<BinField>
+		<!-- CRC Enabled  (0x1E 0xAB 0xF2 0x57) or
+		     CRC Disabled (0xE1 0x54 0xF2 0x57) -->
+		<name>ExendedAnchor_CrcEn</name>         <!-- name of field -->
+		<config>
+			<offset>4</offset>
+			<size>4</size>
+		</config>
+		<content format='bytes'>0x1E 0xAB 0xF2 0x57</content>  <!-- content the user should fill -->
+	</BinField>
+
+	<BinField>
+		<name>FWCrc</name>  <!-- name of field -->
+		<config>
+			<offset>12</offset>
+			<size>4</size>
+		</config>
+		<content format='bytes'>0x00 0x00 0x00 0x00</content>     <!-- will be calculated by IGPS -->
+	</BinField>
+
+	<BinField>
+		<!-- Code size -->
+		<name>FwLength</name>         <!-- name of field -->
+		<config>
+			<offset>132</offset>
+			<size>4</size>
+		</config>
+		<content format='FileSize'>arbel_tip_fw.bin</content>	<!-- content the user should fill -->
+	</BinField>
+
+	<BinField>
+		<name>KeyIndex</name>  <!-- name of field -->
+		<config>
+			<offset>140</offset>
+			<size>4</size>
+		</config>
+		<content format='32bit'>0x0</content>               <!-- content the user should fill -->
+	</BinField>
+
+	<BinField>
+		<name>OtpFwVersion</name>  <!-- name of field -->
+		<config>
+			<offset>152</offset>
+			<size>2</size>
+		</config>
+		<content format='bytes'>0x00 0x00</content>               <!-- content the user should fill -->
+	</BinField>
+
+<!-- BootBlock Code pointer to flash . Note: TIP FW search for it. Option to override?
+	<BinField>
+		
+		<name>BB_CodePointer</name>         
+		<config>
+			<offset>0x7C</offset>       
+			<size>0x4</size> 
+		</config>
+		<content format='32bit'>0x80016000</content>
+	</BinField>
+-->
+	<BinField>
+		<!-- BootBlock Code size -->
+		<name>BB_CodeSize</name>         
+		<config>
+			<offset>0x80</offset>       
+			<size>0x4</size> 
+		</config>
+		<content format='FileSize'>arbel_a35_bootblock.bin</content>	<!-- content the user should fill -->
+	</BinField>
+	
+	
+	
+	
+		
+	<BinField>
+		<!-- UBoot Code pointer in DRAM -->
+		<name>UBoot_CodePointerDRAM</name>         
+		<config>
+			<offset>176</offset>       
+			<size>0x4</size> 
+		</config>
+		<content format='32bit'>0x8000</content>	<!-- content the user should fill -->
+	</BinField>
+	
+	<BinField>
+		<!-- UBoot Code size -->
+		<name>UBoot_CodeSize</name>         
+		<config>
+			<offset>180</offset>       
+			<size>0x4</size> 
+		</config>
+		<content format='FileSize'>u-boot.bin</content>	<!-- content the user should fill -->
+	</BinField>
+	
+	
+	
+
+	<BinField>
+		<name>TipFW</name>             <!-- name of field -->
+		<config>
+			<offset>256</offset>
+			<size format='FileSize'>arbel_tip_fw.bin</size>                 <!-- size in the header calculated by tool-->
+		</config>
+		<content format='FileContent'>arbel_tip_fw.bin</content>  <!-- content the user should fill -->
+	</BinField>
+
+</Bin_Ecc_Map>
