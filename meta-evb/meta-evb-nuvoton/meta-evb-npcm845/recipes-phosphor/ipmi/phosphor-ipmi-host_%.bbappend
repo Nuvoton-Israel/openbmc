@@ -22,3 +22,6 @@ SRC_URI_append_evb-npcm845 = " file://0004-Add-option-for-SEL-commands-for-Journ
 
 PACKAGECONFIG_append_evb-npcm845 = " ${@entity_enabled(d, 'dynamic-sensors', '')}"
 SRC_URI_append_evb-npcm845 = " file://0005-dbus-sdr-prevent-handler-registration-if-dbus-sdr-is.patch"
+
+# avoid build error after remove ipmi-fru
+WHITELIST_CONF_evb-npcm845 = "${S}/host-ipmid-whitelist.conf"
