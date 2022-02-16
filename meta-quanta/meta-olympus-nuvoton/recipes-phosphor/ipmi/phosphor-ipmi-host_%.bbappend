@@ -8,6 +8,7 @@ SRC_URI:append:olympus-nuvoton = " \
     file://0001-Add-Set-BIOS-version-support.patch \
     file://0002-Add-option-for-SEL-commands-for-Journal-based-SEL-en.patch \
     file://0003-Add-support-for-enabling-disabling-network-IPMI.patch \
+    file://0001-Correct-IPMI-firmware-revision-report.patch \
     "
 
 DEPENDS:append:olympus-nuvoton = " \
