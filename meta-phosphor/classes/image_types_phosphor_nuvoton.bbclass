@@ -105,6 +105,13 @@ do_generate_ext4_tar:npcm7xx() {
     ln -sf ${DEPLOY_DIR_IMAGE}/${FLASH_KERNEL_IMAGE} image-kernel
     ln -sf ${S}/ext4/${IMAGE_LINK_NAME}.${FLASH_EXT4_BASETYPE}.zst image-rofs
     ln -sf ${IMGDEPLOYDIR}/${IMAGE_LINK_NAME}.rwfs.${FLASH_EXT4_OVERLAY_BASETYPE} image-rwfs
+    # if "wic.gz" in d.getVar('IMAGE_FSTYPES')
+    wic_gz="${@bb.utils.contains('IMAGE_FSTYPES', 'wic.gz', 'yes', '', d)}"
+    if [ -n "$wic_gz" ];then
+        ln -sf ${IMAGE_NAME}.rootfs.wic.gz image-emmc.gz
+    elif [ -h image-emmc.gz ];then
+        rm -f image-emmc.gz
+    fi
 }
 
 do_make_ubi[depends] += "${PN}:do_prepare_bootloaders"

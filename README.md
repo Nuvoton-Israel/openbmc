@@ -152,23 +152,37 @@ $ bitbake obmc-phosphor-image  # the image will be at build/olympus-nuvoton-spi/
 #### Build eMMC image
 ```
 $ exit  # exit the bash for build SPI image
-$  source setup  olympus-nuvoton
+$ source setup  olympus-nuvoton
 $ bitbake obmc-phosphor-image  # the image will be at build/olympus-nuvoton-spi/tmp/deploy/images/olympus-nuvoton/
 ```
 
-#### Flash eMMC image (first time, update partition layout)
+#### Flash eMMC image in OpenBMC with SPI image(first time, update partition layout)
 ```
 # update SPI image with newest codebase
 
 # boot to Openbmc
 
-# cp eMMC WIC image *obmc-phosphor-image-buv-runbmc.wic.xz* to BMC, like scp, usb, …ect
+# cp eMMC WIC image *obmc-phosphor-image-olympus-nuvoton-xxx.rootfs.wic.xz* to BMC, like scp, usb, …ect
 
 # assume we put the WIC image in /tmp
-$ xz --decompress --stdout /tmp/obmc-phosphor-image-olympus-nuvoton.wic.xz | dd of=/dev/mmcblk0 bs=1M
+$ xz --decompress --stdout /tmp/obmc-phosphor-image-olympus-nuvoton-xxx.rootfs.wic.xz | dd of=/dev/mmcblk0 bs=1M
 
 # reboot to uboot
+```
 
+#### Flash eMMC image in U-Boot
+Flash eMMC image in U-Boot need build image type as wic.gz. User can add *IMAGE_FSTYPES += "wic.gz"* in local.conf, then build image.
+After add wic.gz in IMAGE_FSTYPES, the output image will add new one named obmc-phosphor-image-olympus-nuvoton-xxx.rootfs.wic.gz, and add a symbolic link named image-emmc.gz. User do not need update eMMC image both in SPI image and U-boot, just choose one easy way.
+
+Here are example commands to update eMMC image in U-Boot via tftp:
+```
+> tftp 10000000 image-emmc.gz
+> mmc dev 1
+> gzwrite mmc 1 10000000 ${filesize}
+```
+
+#### Set up U-Boot bootargs for boot from eMMC
+```
 # set up uboot environment as following commands: 
 setenv bootcmd 'setenv origbootargs ${bootargs}; run mmc_bootargs; run bootsidecmd'
 setenv setmmcargs 'setenv bootargs ${bootargs} rootwait root=PARTLABEL=${rootfs}'
