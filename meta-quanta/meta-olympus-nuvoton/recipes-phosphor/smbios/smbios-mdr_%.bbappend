@@ -1,4 +1,5 @@
 FILESEXTRAPATHS:prepend:olympus-nuvoton := "${THISDIR}/${PN}:"
+SRCREV:olympus-nuvoton = "bc924d0f9f590d7d420b9f7bc98bdb9b8688618e"
 
 SRC_URI:append:olympus-nuvoton = " file://smbios2"
 SRC_URI:append:olympus-nuvoton = " file://smbios-mdrv2.service"
