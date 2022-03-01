@@ -3,11 +3,11 @@ DESCRIPTION = "The Node Manager Proxy provides a simple interface for communicat
 with Management Engine via IPMB"
 
 SRC_URI = "git://git@github.com/Intel-BMC/node-manager;protocol=https;branch=master"
-SRCREV = "de212d839bb515939bd089c66072e4fcf33b8653"
+SRCREV = "403434f80e6a6c476516848dde2512b37f7ec5d8"
 PV = "0.1+git${SRCPV}"
 
 FILESEXTRAPATHS:prepend:olympus-nuvoton := "${THISDIR}/${PN}:"
-SRC_URI += "file://0001-add-scale-and-change-the-number-from-uint16-to-int64.patch \
+SRC_URI += " \
             file://0003-watch-for-propery-change-of-PowerCap.patch \
             file://0004-add-force-recovery-functions.patch \
             file://0002-fixed-sensors-name.patch \
