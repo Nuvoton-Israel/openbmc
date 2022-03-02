@@ -60,5 +60,7 @@ RDEPENDS:${PN}-dev = " \
     dhrystone \
     rw-perf \
     htop \
+    gptfdisk \
+    parted \
     "
 
