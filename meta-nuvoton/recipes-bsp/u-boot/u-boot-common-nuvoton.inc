@@ -3,11 +3,12 @@ SECTION = "bootloaders"
 DEPENDS += "flex-native bison-native"
 
 LICENSE = "GPLv2+"
-LIC_FILES_CHKSUM = "file://Licenses/README;md5=30503fd321432fc713238f582193b78e"
+LIC_FILES_CHKSUM = "file://Licenses/README;md5=5a7450c57ffe5ae63fd732446b988025"
 
-UBRANCH = "npcm7xx-v2019.01"
+UBRANCH = "npcm-v2021.04"
+SRCREV = "6276a5d430d0287a05a5e978fdd03010463c5d92"
+
 SRC_URI = "git://github.com/Nuvoton-Israel/u-boot.git;branch=${UBRANCH};protocol=https"
-SRCREV = "ab1fb4143ee08c16dea8ffa6d491c82d7b10a194"
 
 S = "${WORKDIR}/git"
 
