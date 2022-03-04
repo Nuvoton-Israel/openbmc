@@ -1,19 +1,19 @@
-From 8e9cc4221d998cf9840696920d8bb76b1f53000d Mon Sep 17 00:00:00 2001
+From b30a24259cb98919508b46d7b2d808396c839087 Mon Sep 17 00:00:00 2001
 From: Tim Lee <timlee660101@gmail.com>
-Date: Thu, 28 Oct 2021 16:59:47 +0800
-Subject: [PATCH 5/5] bmcweb chassis add indicatorLED support
+Date: Fri, 4 Mar 2022 11:59:39 +0800
+Subject: [PATCH 5/5] bmcweb: chassis: add indicatorLED support
 
 Signed-off-by: Tim Lee <timlee660101@gmail.com>
 ---
- redfish-core/lib/chassis.hpp | 106 +++++++++++++++++++++++++++++++++--
- 1 file changed, 101 insertions(+), 5 deletions(-)
+ redfish-core/lib/chassis.hpp | 107 +++++++++++++++++++++++++++++++++--
+ 1 file changed, 102 insertions(+), 5 deletions(-)
 
 diff --git a/redfish-core/lib/chassis.hpp b/redfish-core/lib/chassis.hpp
-index 5a837936e..4bdf908a7 100644
+index 7b673806f..0f2c38468 100644
 --- a/redfish-core/lib/chassis.hpp
 +++ b/redfish-core/lib/chassis.hpp
-@@ -119,6 +119,73 @@ inline void getIntrusionByService(std::shared_ptr<bmcweb::AsyncResp> aResp,
-         "xyz.openbmc_project.Chassis.Intrusion", "Status");
+@@ -142,6 +142,73 @@ inline void getPhysicalSecurityData(std::shared_ptr<bmcweb::AsyncResp> aResp)
+         std::array<const char*, 1>{"xyz.openbmc_project.Chassis.Intrusion"});
  }
  
 +/**
@@ -84,9 +84,9 @@ index 5a837936e..4bdf908a7 100644
 +}
 +
  /**
-  * Retrieves physical security properties over dbus
-  */
-@@ -225,8 +292,39 @@ inline void requestRoutesChassis(App& app)
+  * ChassisCollection derived class for delivering Chassis Collection Schema
+  *  Functions triggers appropriate requests on DBus
+@@ -254,21 +321,51 @@ inline void requestRoutesChassis(App& app)
                          auto health =
                              std::make_shared<HealthPopulate>(asyncResp);
  
@@ -121,30 +121,28 @@ index 5a837936e..4bdf908a7 100644
 +
 +                        health->populate();
 +
-                         crow::connections::systemBus->async_method_call(
--                            [health](
-+                            [asyncResp](
-                                 const boost::system::error_code ec2,
-                                 std::variant<std::vector<std::string>>& resp) {
-                                 if (ec2)
-@@ -240,15 +338,13 @@ inline void requestRoutesChassis(App& app)
-                                 {
-                                     return;
-                                 }
--                                health->inventory = std::move(*data);
-+                                getPhysicalLedData(asyncResp, std::move((*data)[0]));
-                             },
+                         sdbusplus::asio::getProperty<std::vector<std::string>>(
+                             *crow::connections::systemBus,
                              "xyz.openbmc_project.ObjectMapper",
 -                            path + "/all_sensors",
 +                            path + "/leds",
-                             "org.freedesktop.DBus.Properties", "Get",
-                             "xyz.openbmc_project.Association", "endpoints");
+                             "xyz.openbmc_project.Association", "endpoints",
+-                            [health](const boost::system::error_code ec2,
++                            [asyncResp](const boost::system::error_code ec2,
+                                      const std::vector<std::string>& resp) {
+                                 if (ec2)
+                                 {
+                                     return; // no sensors = no failures
+                                 }
+-                                health->inventory = resp;
+-                            });
  
 -                        health->populate();
--
-                         if (connectionNames.size() < 1)
++                                getPhysicalLedData(asyncResp, resp[0]);
++                            });
+ 
+                         if (connectionNames.empty())
                          {
-                             BMCWEB_LOG_ERROR << "Got 0 Connection names";
 -- 
 2.17.1
 
