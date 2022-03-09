@@ -1,15 +1,15 @@
-From 9a36ae951631b3ac79ab20b18e5910d9d66bc4ed Mon Sep 17 00:00:00 2001
+From 7825ae5d764dbb5bdf05e874eac2822042f6fe1a Mon Sep 17 00:00:00 2001
 From: Brian Ma <chma0@nuvoton.com>
 Date: Thu, 17 Feb 2022 08:50:52 +0800
-Subject: [PATCH 1/3] Support update uboot with emmc image
+Subject: [PATCH] Support update uboot with emmc image
 
 Signed-off-by: Brian Ma <chma0@nuvoton.com>
 ---
- obmc-flash-bmc | 37 ++++++++++++++++++++++++++++++-------
- 1 file changed, 30 insertions(+), 7 deletions(-)
+ obmc-flash-bmc | 40 ++++++++++++++++++++++++++++++++--------
+ 1 file changed, 32 insertions(+), 8 deletions(-)
 
 diff --git a/obmc-flash-bmc b/obmc-flash-bmc
-index 30c3fcd..f8bd835 100644
+index 30c3fcd..32e51af 100644
 --- a/obmc-flash-bmc
 +++ b/obmc-flash-bmc
 @@ -1,6 +1,8 @@
@@ -21,20 +21,7 @@ index 30c3fcd..f8bd835 100644
  # Get the root mtd device number (mtdX) from "/dev/ubiblockX_Y on /"
  findrootmtd() {
    rootmatch=" on / "
-@@ -181,6 +183,12 @@ ubi_ro() {
-   fi
- 
-   set_flashid "${version}"
-+  # handle the ipmi flash bmc update
-+  if [ "${version}" == "bmc-image" ]; then
-+      echo "directly update bootside for ipmi flash bmc" >> "${ulog}"
-+      fw_setenv bootside "${label}"
-+  fi
-+  echo "end of mmc update" >> "${ulog}"
- }
- 
- # Squashfs images need a ubi block
-@@ -370,7 +378,7 @@ ubi_setenv() {
+@@ -370,7 +372,7 @@ ubi_setenv() {
  mtd_write() {
    flashmtd="$(findmtd "${reqmtd}")"
    img="/tmp/images/${version}/${imgfile}"
@@ -43,7 +30,7 @@ index 30c3fcd..f8bd835 100644
  }
  
  backup_env_vars() {
-@@ -474,6 +482,12 @@ cmp_uboot() {
+@@ -474,6 +476,12 @@ cmp_uboot() {
    device="$1"
    image="$2"
  
@@ -56,7 +43,7 @@ index 30c3fcd..f8bd835 100644
    # Since the image file can be smaller than the device, copy the device to a
    # tmp file and write the image file on top, then compare the sum of each.
    # Use cat / redirection since busybox does not have the conv=notrunc option.
-@@ -484,6 +498,8 @@ cmp_uboot() {
+@@ -484,6 +492,8 @@ cmp_uboot() {
    imgSum="$(sha256sum ${tmpFile})"
    rm -f "${tmpFile}"
  
@@ -65,7 +52,7 @@ index 30c3fcd..f8bd835 100644
    if [ "${imgSum}" == "${devSum}" ]; then
      echo "0";
    else
-@@ -537,14 +553,16 @@ mmc_mount() {
+@@ -537,14 +547,16 @@ mmc_mount() {
  }
  
  mmc_update() {
@@ -87,7 +74,7 @@ index 30c3fcd..f8bd835 100644
    fi
  
    # Update the secondary (non-running) boot and rofs partitions.
-@@ -552,20 +570,25 @@ mmc_update() {
+@@ -552,20 +564,25 @@ mmc_update() {
  
    # Update the boot and rootfs partitions, restore their labels after the update
    # by getting the partition number mmcblk0pX from their label.
@@ -114,6 +101,22 @@ index 30c3fcd..f8bd835 100644
    if [ -f ${imgpath}/${version}/image-hostfw ]; then
      # Remove patches
      patchdir="/usr/local/share/hostfw/alternate"
+@@ -578,7 +595,14 @@ mmc_update() {
+     mount ${hostfwdir}/hostfw-${label} ${hostfwdir}/alternate -o ro
+   fi
+ 
+-  set_flashid "${label}"
++  # handle the ipmi flash bmc update
++  if [ "${version}" == "bmc-image" ]; then
++      echo "directly update bootside for ipmi flash bmc" >> "${ulog}"
++      fw_setenv bootside "${label}"
++  else
++    set_flashid "${label}"
++  fi
++  echo "end of mmc update" >> "${ulog}"
+ }
+ 
+ mmc_remove() {
 -- 
 2.17.1
 
