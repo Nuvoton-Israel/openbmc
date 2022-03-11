@@ -60,4 +60,5 @@ RDEPENDS_${PN}-system = " \
         i3c-tools \
         phosphor-ipmi-blobs \
         phosphor-image-signing \
+        nuvoton-mkimage \
         "

@@ -6,9 +6,8 @@ LIC_FILES_CHKSUM = "file://${S}/LICENSE;md5=c1f21c4f72f372ef38a5a4aee55ec173"
 
 PV="1.0.0+git${SRCPV}"
 
-DEPENDS += " python3-pyelftools-native python3-cryptography python3-native python3-pycrypto-native python3-pycryptodome"
-
-inherit deploy
+inherit deploy python3native
+DEPENDS = "python3-pyelftools-native python3-pycryptodome-native python3-cryptography-native"
 
 S = "${WORKDIR}/git"
 BRANCH ?= "nuvoton"
@@ -21,13 +20,14 @@ SRCREV = "6b716e224f6162ea37d549ef42aaf3b165423716"
 
 COMPATIBLE_MACHINE = "(evb-npcm845)"
 OPTEEMACHINE ?= "nuvoton"
-MACHINE ?= "npcm8xx"
+#MACHINE ?= "npcm8xx"
+MACHINE_SOC ?= "npcm8xx"
 
 # Some versions of u-boot use .bin and others use .img.  By default use .bin
 # but enable individual recipes to change this value.
 OPTEE_SUFFIX ?= "bin"
-OPTEE_IMAGE ?= "tee-${MACHINE}-${PV}-${PR}.${OPTEE_SUFFIX}"
-OPTEE_SYMLINK ?= "tee-${MACHINE}.${OPTEE_SUFFIX}"
+OPTEE_IMAGE ?= "tee-${MACHINE_SOC}-${PV}-${PR}.${OPTEE_SUFFIX}"
+OPTEE_SYMLINK ?= "tee-${MACHINE_SOC}.${OPTEE_SUFFIX}"
 CFG_TEE_TA_LOG_LEVEL ?= "1"
 CFG_TEE_CORE_LOG_LEVEL ?= "1"
 
@@ -50,7 +50,7 @@ do_compile() {
 # do_install() nothing
 do_install[noexec] = "1"
 
-PACKAGE_ARCH = "${MACHINE_ARCH}"
+#PACKAGE_ARCH = "${MACHINE_ARCH}"
 
 do_deploy() {
     install -d ${DEPLOYDIR}

@@ -185,8 +185,7 @@ do_prepare_bootloaders[depends] += " \
     npcm8xx-tipfw-l0:do_deploy \
     npcm8xx-tipfw-l1:do_deploy \
     npcm8xx-bootblock:do_deploy \
-    arm-trusted-firmware:do_deploy \
-    optee-os:do_deploy \
+    nuvoton-mkimage:do_install \
     npcm8xx-bingo-native:do_populate_sysroot \
     npcm8xx-igps-native:do_populate_sysroot \
     "

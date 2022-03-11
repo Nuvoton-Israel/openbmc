@@ -18,15 +18,15 @@ inherit image-artifact-names
 
 
 COMPATIBLE_MACHINE = "(evb-npcm845)"
-MACHINE ?= "npcm8xx"
+MACHINE_SOC ?= "npcm8xx"
 PLATFORM = "npcm845x"
 
 # requires CROSS_COMPILE set by hand as there is no configure script
 # Some versions of u-boot use .bin and others use .img.  By default use .bin
 # but enable individual recipes to change this value.
 ATF_SUFFIX ?= "bin"
-ATF_IMAGE ?= "bl31-${MACHINE}-${PV}-${PR}.${ATF_SUFFIX}"
-ATF_SYMLINK ?= "bl31-${MACHINE}.${ATF_SUFFIX}"
+ATF_IMAGE ?= "bl31-${MACHINE_SOC}-${PV}-${PR}.${ATF_SUFFIX}"
+ATF_SYMLINK ?= "bl31-${MACHINE_SOC}.${ATF_SUFFIX}"
 
 export CROSS_COMPILE="${TARGET_PREFIX}"
 
