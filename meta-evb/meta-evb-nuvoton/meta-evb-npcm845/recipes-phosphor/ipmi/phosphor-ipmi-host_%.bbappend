@@ -1,12 +1,15 @@
 inherit entity-utils
 
 FILESEXTRAPATHS:append:evb-npcm845 := "${THISDIR}/${PN}:"
+# move ipmid forward for support sel_logger_clears_sel
+SRCREV:evb-npcm845 = "3ab2c2b2f3248317d28d717e56b29f19e36fc510"
 
 DEPENDS:append:evb-npcm845 = " ${@entity_enabled(d, '', ' evb-npcm845-yaml-config')}"
 EXTRA_OECONF:append:evb-npcm845 = " ${@entity_enabled(d, '', 'SENSOR_YAML_GEN=${STAGING_DIR_HOST}${datadir}/evb-npcm845-yaml-config/ipmi-sensors.yaml')}"
 EXTRA_OECONF:append:evb-npcm845 = " ${@entity_enabled(d, '', 'FRU_YAML_GEN=${STAGING_DIR_HOST}${datadir}/evb-npcm845-yaml-config/ipmi-fru-read.yaml')}"
 EXTRA_OECONF:append:evb-npcm845 = " ${@entity_enabled(d, '', 'INVSENSOR_YAML_GEN=${STAGING_DIR_HOST}${datadir}/evb-npcm845-yaml-config/ipmi-inventory-sensors.yaml')}"
 EXTRA_OECONF:append:evb-npcm845 = " --disable-i2c-whitelist-check"
+EXTRA_OECONF:append:evb-npcm845 = " --enable-sel_logger_clears_sel"
 
 # Fixed ipmid crashing in 64bit system, an alternative solution is still in upstream reviewing
 # https://gerrit.openbmc-project.xyz/c/openbmc/phosphor-host-ipmid/+/44260
@@ -25,4 +28,3 @@ PACKAGECONFIG:append:evb-npcm845 = " ${@entity_enabled(d, 'dynamic-sensors', '')
 # avoid build error after remove ipmi-fru
 WHITELIST_CONF:evb-npcm845 = "${S}/host-ipmid-whitelist.conf"
 
-SRC_URI:append:evb-npcm845 = " file://0006-Correct-IPMI-firmware-revision-report.patch"
