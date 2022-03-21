@@ -177,8 +177,8 @@ After add wic.gz in IMAGE_FSTYPES, the output image will add new one named obmc-
 Here are example commands to update eMMC image in U-Boot via tftp:
 ```
 > tftp 10000000 image-emmc.gz
-> mmc dev 1
-> gzwrite mmc 1 10000000 ${filesize}
+> mmc dev 0
+> gzwrite mmc 0 10000000 ${filesize}
 ```
 
 #### Set up U-Boot bootargs for boot from eMMC
@@ -189,7 +189,7 @@ setenv setmmcargs 'setenv bootargs ${bootargs} rootwait root=PARTLABEL=${rootfs}
 setenv mmc_bootargs 'setenv bootargs earlycon=${earlycon} console=${console} mem=${mem}'
 setenv boota 'setenv bootpart 2; setenv rootfs rofs-a; run bootmmc'
 setenv bootb 'setenv bootpart 3; setenv rootfs rofs-b; run bootmmc'
-setenv bootmmc 'run setmmcargs; ext4load mmc 1:${bootpart} ${loadaddr} fitImage && bootm; echo Error loading kernel FIT image'
+setenv bootmmc 'run setmmcargs; ext4load mmc 0:${bootpart} ${loadaddr} fitImage && bootm; echo Error loading kernel FIT image'
 setenv bootsidecmd 'if test "${bootside}" = b; then run bootb; run boota; else run boota; run bootb; fi'
 setenv bootside 'a'
 setenv loadaddr '0x1200000'
