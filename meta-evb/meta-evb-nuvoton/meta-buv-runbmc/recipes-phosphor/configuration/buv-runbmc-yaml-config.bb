@@ -9,6 +9,7 @@ SRC_URI:buv-runbmc = " \
     file://buv-runbmc-ipmi-fru.yaml \
     file://buv-runbmc-ipmi-fru-properties.yaml \
     file://buv-runbmc-ipmi-sensors.yaml \
+    file://buv-runbmc-ipmi-inventory-sensors.yaml \
     "
 
 S = "${WORKDIR}"
@@ -20,12 +21,15 @@ do_install:buv-runbmc() {
         ${D}${datadir}/${BPN}/ipmi-fru-read.yaml
     install -m 0644 -D buv-runbmc-ipmi-sensors.yaml \
         ${D}${datadir}/${BPN}/ipmi-sensors.yaml
+    install -m 0644 -D buv-runbmc-ipmi-inventory-sensors.yaml \
+        ${D}${datadir}/${BPN}/ipmi-inventory-sensors.yaml
 }
 
 FILES:${PN}-dev = " \
     ${datadir}/${BPN}/ipmi-extra-properties.yaml \
     ${datadir}/${BPN}/ipmi-fru-read.yaml \
     ${datadir}/${BPN}/ipmi-sensors.yaml \
+    ${datadir}/${BPN}/ipmi-inventory-sensors.yaml \
     "
 
 ALLOW_EMPTY:${PN} = "1"

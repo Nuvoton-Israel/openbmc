@@ -11,6 +11,7 @@ EXTRA_OECONF:buv-runbmc = " \
     --enable-boot-flag-safe-mode-support \
     ${@entity_enabled(d, '', ' SENSOR_YAML_GEN=${STAGING_DIR_HOST}${datadir}/buv-runbmc-yaml-config/ipmi-sensors.yaml')} \
     ${@entity_enabled(d, '', ' FRU_YAML_GEN=${STAGING_DIR_HOST}${datadir}/buv-runbmc-yaml-config/ipmi-fru-read.yaml')} \
+    ${@entity_enabled(d, '', ' INVSENSOR_YAML_GEN=${STAGING_DIR_HOST}${datadir}/buv-runbmc-yaml-config/ipmi-inventory-sensors.yaml')} \
     ${@entity_enabled(d, '', ' --disable-dynamic_sensors')} \
     "
 
