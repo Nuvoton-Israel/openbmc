@@ -64,6 +64,7 @@ Please submit any patches against the meta-evb-npcm845 layer to the maintainer o
   * [ECC](#ecc)
   * [Host Serial Port](#host-serial-port)
   * [PECI](#peci)
+- [QEMU](#qemu)
 - [Troubleshooting](#troubleshooting)
   * [Failed to probe SPI0 CS0 in u-boot](#failed-to-probe-SPI0-CS0-in-u-boot)
 
@@ -1934,6 +1935,58 @@ The client address under test is 0x30.
   root@evb-npcm845:~# peci_cmds raw 0x30 0x5 0x9 0xb1
    0x40 0x65 0x7a 0xc4 0x3f 0x65 0x7a 0xc4 0x3f
   ```
+
+
+# QEMU
+
+## Run Nuvoton BMC emulator on QEMU
+
+- Download the latest QEMU source code.
+  - NPCM7XX emulator is supported.  
+     Please use the machine id "npcm750-evb".
+  - NPCM8XX emulator is supported.  
+     If the machine id "npcm845-evb" is not in default machine list supported by QEMU by the time you are reading this article, please apply NPCM8XX patches first.
+
+- Configure QEMU.  
+  Please open a terminal and navigate to the QEMU folder path.  
+  Please input the following command in the terminal.
+  ```
+  ./configure --target-list="aarch64-softmmu,arm-softmmu,x86_64-softmmu,i386-softmmu, \
+  aarch64-linux-user,arm-linux-user,i386-linux-user,x86_64-linux-user" \
+  --enable-debug --enable-gtk --enable-vnc --enable-sdl --enable-kvm --enable-curl \
+  --enable-snappy --enable-tools --enable-curses
+  ```
+  > _The subdirectory "build" is used as the directory for build output._
+- Build and install QEMU.  
+  Please input the following commands in the terminal.
+  ```
+  make
+  make install
+  ```
+- Run NPCM7XX emulator.  
+  Please input the following command in the terminal just opened.
+  ```
+  build/qemu-system-arm -machine npcm750-evb -nographic \
+  -bios "./pc-bios/npcm7xx_bootrom.bin" \
+  -drive file="./image-bmc,if=mtd,bus=0,unit=0,format=raw,snapshot=on"
+  ```
+- Run NPCM8XX emulator.  
+  Please input the following command in the terminal just opened.
+  ```
+  build/qemu-system-aarch64 qemu-system-aarch64 -machine npcm845-evb -nographic \
+  -bios "./pc-bios/npcm8xx_bootrom.bin" \
+  -drive file="./image-bmc,if=mtd,bus=0,unit=0,format=raw,snapshot=on"
+  ```
+  > _image-bmc is located under the QEMU source code folder._  
+  > _If the image size is 64MB for NPCM8XX, please ensure that a 64MB flash device is used for NPCM8XX emulator._  
+  > _If you don't see the kernel message/openbmc login prompt output by NPCM8XX emulator, the following sample instruction is for your reference._
+  ```
+  build/qemu-system-aarch64 -machine npcm845-evb -nographic \
+  -bios "./pc-bios/npcm8xx_bootrom.bin" -drive file="./image-bmc,if=mtd,bus=0,unit=0,format=raw,snapshot=on" \
+  -m 512M -kernel ./Image -dtb ./nuvoton-npcm845-evb.dtb \
+  --append "earlycon=uart8250,mmio32,0xf0001000 console=ttyS0,115200n8 root=/dev/mtdblock4 mem=464M"
+  ```
+  > _Image is the NPCM8XX kernel file._
 
 # Troubleshooting
 
