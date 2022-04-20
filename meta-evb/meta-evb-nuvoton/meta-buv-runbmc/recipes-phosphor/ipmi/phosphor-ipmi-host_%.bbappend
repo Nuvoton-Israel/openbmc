@@ -2,7 +2,6 @@ inherit buv-entity-utils
 
 FILESEXTRAPATHS:append:buv-runbmc := "${THISDIR}/${PN}:"
 SRC_URI:append:buv-runbmc = " file://Add-Set-BIOS-version-support.patch"
-SRC_URI:append:buv-runbmc = " file://0001-Correct-IPMI-firmware-revision-report.patch"
 SRC_URI:append:buv-runbmc = " file://0002-Add-option-for-SEL-commands-for-Journal-based-SEL-en.patch"
 
 DEPENDS:append:buv-runbmc= " \

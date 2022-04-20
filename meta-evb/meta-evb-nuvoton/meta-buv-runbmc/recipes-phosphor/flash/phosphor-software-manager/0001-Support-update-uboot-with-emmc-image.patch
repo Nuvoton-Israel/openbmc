@@ -5,11 +5,11 @@ Subject: [PATCH] Support update uboot with emmc image
 
 Signed-off-by: Brian Ma <chma0@nuvoton.com>
 ---
- obmc-flash-bmc | 40 ++++++++++++++++++++++++++++++++--------
- 1 file changed, 32 insertions(+), 8 deletions(-)
+ obmc-flash-bmc | 41 +++++++++++++++++++++++++++++++++--------
+ 1 file changed, 33 insertions(+), 8 deletions(-)
 
 diff --git a/obmc-flash-bmc b/obmc-flash-bmc
-index 30c3fcd..32e51af 100644
+index 54dfbc9..727a716 100644
 --- a/obmc-flash-bmc
 +++ b/obmc-flash-bmc
 @@ -1,6 +1,8 @@
@@ -21,16 +21,16 @@ index 30c3fcd..32e51af 100644
  # Get the root mtd device number (mtdX) from "/dev/ubiblockX_Y on /"
  findrootmtd() {
    rootmatch=" on / "
-@@ -370,7 +372,7 @@ ubi_setenv() {
+@@ -387,7 +389,7 @@ ubi_setenv() {
  mtd_write() {
    flashmtd="$(findmtd "${reqmtd}")"
    img="/tmp/images/${version}/${imgfile}"
--  flashcp -v ${img} /dev/${flashmtd}
+-  flashcp -v "${img}" /dev/"${flashmtd}"
 +  flashcp -v ${img} /dev/${flashmtd} >> "${ulog}"
  }
  
  backup_env_vars() {
-@@ -474,6 +476,12 @@ cmp_uboot() {
+@@ -491,6 +493,12 @@ cmp_uboot() {
    device="$1"
    image="$2"
  
@@ -43,16 +43,17 @@ index 30c3fcd..32e51af 100644
    # Since the image file can be smaller than the device, copy the device to a
    # tmp file and write the image file on top, then compare the sum of each.
    # Use cat / redirection since busybox does not have the conv=notrunc option.
-@@ -484,6 +492,8 @@ cmp_uboot() {
-   imgSum="$(sha256sum ${tmpFile})"
+@@ -501,6 +509,9 @@ cmp_uboot() {
+   imgSum="$(sha256sum "${tmpFile}")"
    rm -f "${tmpFile}"
  
 +  echo "image checksum: ${imgSum}" >> "${ulog}"
 +  echo "mtd device checksum: ${devSum}" >> "${ulog}"
++
    if [ "${imgSum}" == "${devSum}" ]; then
      echo "0";
    else
-@@ -537,14 +547,16 @@ mmc_mount() {
+@@ -554,14 +565,16 @@ mmc_mount() {
  }
  
  mmc_update() {
@@ -74,21 +75,21 @@ index 30c3fcd..32e51af 100644
    fi
  
    # Update the secondary (non-running) boot and rofs partitions.
-@@ -552,20 +564,25 @@ mmc_update() {
+@@ -569,20 +582,25 @@ mmc_update() {
  
    # Update the boot and rootfs partitions, restore their labels after the update
    # by getting the partition number mmcblk0pX from their label.
 +  echo "start update kernel: boot-${label}" >> "${ulog}"
-   zstd -d -c ${imgpath}/${version}/image-kernel | dd of="/dev/disk/by-partlabel/boot-${label}"
-   number="$(readlink -f /dev/disk/by-partlabel/boot-${label})"
+   zstd -d -c "${imgpath}"/"${version}"/image-kernel | dd of="/dev/disk/by-partlabel/boot-${label}"
+   number="$(readlink -f /dev/disk/by-partlabel/boot-"${label}")"
    number="${number##*mmcblk0p}"
-   sgdisk --change-name=${number}:boot-${label} /dev/mmcblk0 1>/dev/null
+   sgdisk --change-name="${number}":boot-"${label}" /dev/mmcblk0 1>/dev/null
  
 +  echo "start update rofs: rofs-${label}" >> "${ulog}"
-   zstd -d -c ${imgpath}/${version}/image-rofs | dd of="/dev/disk/by-partlabel/rofs-${label}"
-   number="$(readlink -f /dev/disk/by-partlabel/rofs-${label})"
+   zstd -d -c "${imgpath}"/"${version}"/image-rofs | dd of="/dev/disk/by-partlabel/rofs-${label}"
+   number="$(readlink -f /dev/disk/by-partlabel/rofs-"${label}")"
    number="${number##*mmcblk0p}"
-   sgdisk --change-name=${number}:rofs-${label} /dev/mmcblk0 1>/dev/null
+   sgdisk --change-name="${number}":rofs-"${label}" /dev/mmcblk0 1>/dev/null
  
    # Run this after sgdisk for labels to take effect.
 -  partprobe
@@ -98,11 +99,11 @@ index 30c3fcd..32e51af 100644
  
    # Update hostfw
 +  echo "start try to update hostfw" >> "${ulog}"
-   if [ -f ${imgpath}/${version}/image-hostfw ]; then
+   if [ -f "${imgpath}"/"${version}"/image-hostfw ]; then
      # Remove patches
      patchdir="/usr/local/share/hostfw/alternate"
-@@ -578,7 +595,14 @@ mmc_update() {
-     mount ${hostfwdir}/hostfw-${label} ${hostfwdir}/alternate -o ro
+@@ -595,7 +613,14 @@ mmc_update() {
+     mount "${hostfwdir}"/hostfw-"${label}" "${hostfwdir}"/alternate -o ro
    fi
  
 -  set_flashid "${label}"
