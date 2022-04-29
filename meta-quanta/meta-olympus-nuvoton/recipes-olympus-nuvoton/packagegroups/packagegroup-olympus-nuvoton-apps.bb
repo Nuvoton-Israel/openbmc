@@ -52,6 +52,7 @@ RDEPENDS:${PN}-system = " \
         phosphor-node-manager-proxy \
         phosphor-image-signing \
         openssl-bin \
+        openssl-engines \
         loadsvf \
         asd \
         iptables \
@@ -66,6 +67,7 @@ RDEPENDS:${PN}-system = " \
         nuvoton-ipmi-oem \
         olympus-nuvoton-iptable-restore \
         srvcfg-manager \
+        iperf3 \
         "
 RDEPENDS:${PN}-system:append = " \
         ${@entity_enabled(d, '', 'first-boot-set-psu')} \
