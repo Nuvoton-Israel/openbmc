@@ -8,6 +8,8 @@ EXTRA_OECONF:append:evb-npcm845 = " ${@entity_enabled(d, '', 'FRU_YAML_GEN=${STA
 EXTRA_OECONF:append:evb-npcm845 = " ${@entity_enabled(d, '', 'INVSENSOR_YAML_GEN=${STAGING_DIR_HOST}${datadir}/evb-npcm845-yaml-config/ipmi-inventory-sensors.yaml')}"
 EXTRA_OECONF:append:evb-npcm845 = " --disable-i2c-whitelist-check"
 
+SRC_URI:append:evb-npcm845 = " file://0001-Add-Set-BIOS-version-support.patch"
+
 # Fixed ipmid crashing in 64bit system, an alternative solution is still in upstream reviewing
 # https://gerrit.openbmc-project.xyz/c/openbmc/phosphor-host-ipmid/+/44260
 SRC_URI:append:evb-npcm845 = " file://0001-phosphor-ipmi-host-Do-not-use-size_t-in-struct-MetaP.patch"
