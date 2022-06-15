@@ -9,6 +9,8 @@ EXTRA_OECONF:append:scm-npcm845 = " ${@entity_enabled(d, '', 'INVSENSOR_YAML_GEN
 EXTRA_OECONF:append:scm-npcm845 = " --disable-i2c-whitelist-check"
 EXTRA_OECONF:append:scm-npcm845 = " --enable-sel_logger_clears_sel"
 
+SRC_URI:append:scm-npcm845 = " file://0001-Add-set-BIOS-version-support.patch"
+
 # Fixed ipmid crashing in 64bit system, an alternative solution is still in upstream reviewing
 # https://gerrit.openbmc-project.xyz/c/openbmc/phosphor-host-ipmid/+/44260
 SRC_URI:append:scm-npcm845 = " file://0001-phosphor-ipmi-host-Do-not-use-size_t-in-struct-MetaP.patch"
