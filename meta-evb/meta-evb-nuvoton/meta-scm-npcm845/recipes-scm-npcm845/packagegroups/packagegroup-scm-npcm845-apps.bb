@@ -33,6 +33,8 @@ RDEPENDS:${PN}-fans = " \
 SUMMARY:${PN}-flash = "EVB NPCM845 Flash"
 RDEPENDS:${PN}-flash = " \
         phosphor-ipmi-flash \
+        ipmi-bios-update \
+        ipmi-bmc-update \
         "
 
 SUMMARY:${PN}-system = "EVB NPCM845 System"

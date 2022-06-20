@@ -234,7 +234,7 @@ index 000000000000..dcec76e77e27
 +				};
 +			};
 +		};
-+#if 0
++
 +		fiu3: spi@c0000000 {
 +			status = "okay";
 +			pinctrl-0 = <>;
@@ -271,7 +271,7 @@ index 000000000000..dcec76e77e27
 +				};
 +			};
 +		};
-+#endif
++
 +		fiux: spi@fb001000 {
 +			spix-mode;
 +		};
