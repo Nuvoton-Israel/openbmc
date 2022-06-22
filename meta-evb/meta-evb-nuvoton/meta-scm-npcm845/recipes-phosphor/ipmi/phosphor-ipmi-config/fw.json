@@ -1,0 +1,17 @@
+{
+  "PSU":
+  {
+    "bus" : "7",
+    "address" : "0x58"
+  },
+  "CPLD":
+  {
+    "bus" : "5",
+    "address" : "0x40"
+  },
+  "DC-SCM CPLD":
+  {
+    "bus" : "15",
+    "address" : "0x60"
+  }
+}

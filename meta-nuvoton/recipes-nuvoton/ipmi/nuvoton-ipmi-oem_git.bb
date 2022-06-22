@@ -18,7 +18,7 @@ DEPENDS += "nlohmann-json"
 S = "${WORKDIR}/git"
 SRCBRANCH = "master"
 SRC_URI = "git://github.com/Nuvoton-Israel/nuvoton-ipmi-oem;protocol=https;branch=${SRCBRANCH}"
-SRCREV = "1fb53bf3e71ae0347d5381961f5d51da1aeaab73"
+SRCREV = "473db90c057b384bdf930683e459459d52257867"
 
 FILES:${PN}:append = " ${libdir}/ipmid-providers/lib*${SOLIBS}"
 FILES:${PN}:append = " ${libdir}/host-ipmid/lib*${SOLIBS}"
