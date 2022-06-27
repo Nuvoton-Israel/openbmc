@@ -1,17 +1,32 @@
 {
   "PSU":
   {
-    "bus" : "7",
-    "address" : "0x58"
+    "bus":"7",
+    "address":"0x58"
   },
   "CPLD":
   {
-    "bus" : "5",
-    "address" : "0x40"
+    "bus":"5",
+    "address":"0x40",
+    "write_length":4,
+    "read_lngth":4,
+    "//":"[0xc0, 0x0, 0x0, 0x0]",
+    "command":[
+      192,
+      0,
+      0,
+      0
+    ]
   },
   "DC-SCM CPLD":
   {
-    "bus" : "15",
-    "address" : "0x60"
+    "bus":"15",
+    "address":"0x60",
+    "write_length":1,
+    "read_lngth":1,
+    "//":"[0x0]",
+    "command":[
+      0
+    ]
   }
 }
