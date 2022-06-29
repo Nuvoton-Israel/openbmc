@@ -1,4 +1,4 @@
-From 818bea1f2aef6c5298f8b59490916c7250814747 Mon Sep 17 00:00:00 2001
+From a7d27c3ca2b6e3da1ea65a44db467a61962ddf29 Mon Sep 17 00:00:00 2001
 From: Charles Boyer <Charles.Boyer@fii-usa.com>
 Date: Mon, 20 Sep 2021 16:56:36 -0500
 Subject: [PATCH] dbus-sdr:storagecommands: Add option to use Clear method
@@ -34,11 +34,11 @@ Change-Id: I4461b4ba7449c12e276b1b0e0e7d54ace611643f
  2 files changed, 34 insertions(+)
 
 diff --git a/configure.ac b/configure.ac
-index 2c05fdda..4902c2bd 100644
+index 0fbf5375..dda5de8f 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -320,6 +320,24 @@ AS_IF([test x$sensors_cache = xtrue],
-     AC_MSG_WARN([Disabling sensors cache feature])
+@@ -302,6 +302,24 @@ AS_IF([test x$hybrid_sensors = xtrue],
+     AC_MSG_WARN([Disabling hybrid sensors feature])
  )
  
 +# Clearing SEL through sel-logger is disabled by default; offer a way to enable it
@@ -63,7 +63,7 @@ index 2c05fdda..4902c2bd 100644
  AC_CONFIG_FILES([
      Makefile
 diff --git a/dbus-sdr/storagecommands.cpp b/dbus-sdr/storagecommands.cpp
-index b76aa5e3..09d71d0b 100644
+index 4910aaea..99c3d6f5 100644
 --- a/dbus-sdr/storagecommands.cpp
 +++ b/dbus-sdr/storagecommands.cpp
 @@ -97,6 +97,8 @@ using ManagedObjectType =
@@ -75,7 +75,7 @@ index b76aa5e3..09d71d0b 100644
  constexpr static const char* fruDeviceServiceName =
      "xyz.openbmc_project.FruDevice";
  constexpr static const char* entityManagerServiceName =
-@@ -1128,6 +1130,7 @@ ipmi::RspType<uint8_t> ipmiStorageClearSEL(ipmi::Context::ptr ctx,
+@@ -1127,6 +1129,7 @@ ipmi::RspType<uint8_t> ipmiStorageClearSEL(ipmi::Context::ptr ctx,
      // cleared
      cancelSELReservation();
  
@@ -83,7 +83,7 @@ index b76aa5e3..09d71d0b 100644
      // Save the erase time
      dynamic_sensors::ipmi::sel::erase_time::save();
  
-@@ -1156,7 +1159,20 @@ ipmi::RspType<uint8_t> ipmiStorageClearSEL(ipmi::Context::ptr ctx,
+@@ -1155,7 +1158,20 @@ ipmi::RspType<uint8_t> ipmiStorageClearSEL(ipmi::Context::ptr ctx,
      {
          phosphor::logging::log<phosphor::logging::level::ERR>(e.what());
      }
@@ -105,5 +105,5 @@ index b76aa5e3..09d71d0b 100644
  }
  
 -- 
-2.25.1
+2.17.1
 

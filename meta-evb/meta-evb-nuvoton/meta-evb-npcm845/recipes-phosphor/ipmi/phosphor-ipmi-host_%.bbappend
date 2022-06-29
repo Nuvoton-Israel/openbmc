@@ -31,3 +31,5 @@ SRC_URI:append:evb-npcm845 = " file://0006-Correct-IPMI-firmware-revision-report
 
 SRC_URI:append:evb-npcm845 = " file://0007-dbus-sdr-storagecommands-Add-option-to-use-Clear-met.patch"
 EXTRA_OECONF:append:evb-npcm845 = " --enable-sel_logger_clears_sel"
+
+SRC_URI:append:evb-npcm845 = " file://0001-dbus-sdr-Support-NaN-thresholds.patch"
