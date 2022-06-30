@@ -424,7 +424,8 @@
             "Address": "0x11",
             "Bus": 7,
             "Name": "HSC0",
-            "EntityId": "0xa",
+            "EntityId": 10,
+            "EntityInstance": 16,
             "PowerState": "Off",
             "pin_Name": "HSC0 Input Power",
             "vin_Name": "HSC0 Input Volt",
@@ -902,6 +903,8 @@
             "pout2_Name": "VR_SOC_PWR",
             "iout1_Name": "VR_CORE_0_CUR",
             "iout2_Name": "VR_SOC_CUR",
+            "EntityId": 3,
+            "EntityInstance": 0,
             "Name": "vrm",
             "Type": "pmbus"
         },
@@ -1046,6 +1049,8 @@
             "pout2_Name": "VR_VDDIO_PWR",
             "iout1_Name": "VR_CORE_1_CUR",
             "iout2_Name": "VR_VDDIO_CUR",
+            "EntityId": 3,
+            "EntityInstance": 1,
             "Name": "vrm1",
             "Type": "pmbus"
         },
@@ -1119,6 +1124,8 @@
             "vout1_Name": "P0_11_SUS",
             "pout1_Name": "VR_SUS_PWR",
             "iout1_Name": "VR_SUS_CUR",
+            "EntityId": 3,
+            "EntityInstance": 4,
             "Name": "vrm2",
             "Type": "pmbus"
         },
@@ -1140,6 +1147,8 @@
             "temp1_Name": "Temp_PSU_HOTSPOT",
             "temp2_Name": "Temp_PSU_INLET",
             "temp3_Name": "Temp_PSU_OUTLET",
+            "EntityId": "0x1D",
+            "EntityInstance": 1,
             "Name": "PSU",
             "Type": "p2011"
         },
