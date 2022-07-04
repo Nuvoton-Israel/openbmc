@@ -10,6 +10,7 @@ EXTRA_OECONF:append:evb-npcm845 = " --disable-i2c-whitelist-check"
 
 SRC_URI:append:evb-npcm845 = " file://0001-Add-Set-BIOS-version-support.patch"
 SRC_URI:append:evb-npcm845 = " file://0001-dbus-sdr-Support-NaN-thresholds.patch"
+SRC_URI:append:evb-npcm845 = " file://0004-Add-SEL-add-command.patch"
 SRC_URI:append:evb-npcm845 = " file://0006-Correct-IPMI-firmware-revision-report.patch"
 SRC_URI:append:evb-npcm845 = " file://0007-dbus-sdr-storagecommands-Add-option-to-use-Clear-met.patch"
 SRC_URI:append:evb-npcm845 = " file://0008-Add-sensor-type-command.patch"
