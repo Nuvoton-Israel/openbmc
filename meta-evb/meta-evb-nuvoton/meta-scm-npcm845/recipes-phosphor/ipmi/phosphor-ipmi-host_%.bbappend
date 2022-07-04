@@ -13,6 +13,7 @@ SRC_URI:append:scm-npcm845 = " file://0001-Add-set-BIOS-version-support.patch"
 SRC_URI:append:scm-npcm845 = " file://0001-dbus-sdr-Support-NaN-thresholds.patch"
 SRC_URI:append:scm-npcm845 = " file://0006-Correct-IPMI-firmware-revision-report.patch"
 SRC_URI:append:scm-npcm845 = " file://0007-dbus-sdr-storagecommands-Add-option-to-use-Clear-met.patch"
+SRC_URI:append:scm-npcm845 = " file://0008-Add-sensor-type-command.patch"
 
 # Fixed ipmid crashing in 64bit system, an alternative solution is still in upstream reviewing
 # https://gerrit.openbmc-project.xyz/c/openbmc/phosphor-host-ipmid/+/44260
