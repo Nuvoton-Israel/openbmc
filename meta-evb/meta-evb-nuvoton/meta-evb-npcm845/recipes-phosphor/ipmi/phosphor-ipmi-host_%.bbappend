@@ -14,6 +14,7 @@ SRC_URI:append:evb-npcm845 = " file://0004-Add-SEL-add-command.patch"
 SRC_URI:append:evb-npcm845 = " file://0006-Correct-IPMI-firmware-revision-report.patch"
 SRC_URI:append:evb-npcm845 = " file://0007-dbus-sdr-storagecommands-Add-option-to-use-Clear-met.patch"
 SRC_URI:append:evb-npcm845 = " file://0008-Add-sensor-type-command.patch"
+SRC_URI:append:evb-npcm845 = " file://0011-Add-SEL-time-set-command.patch"
 
 # Add send/get message support
 # ipmid <-> ipmb <-> i2c
