@@ -18,6 +18,7 @@ SRC_URI:append:scm-npcm845 = " file://0008-Add-sensor-type-command.patch"
 SRC_URI:append:scm-npcm845 = " file://0009-implement-warm-reset-command.patch"
 SRC_URI:append:scm-npcm845 = " file://0010-get-system-guid-command.patch"
 SRC_URI:append:scm-npcm845 = " file://0011-Add-SEL-time-set-command.patch"
+SRC_URI:append:scm-npcm845 = " file://0012-Force-self-test-OK.patch"
 
 # Add send/get message support
 # ipmid <-> ipmb <-> i2c

@@ -1,0 +1,16 @@
+diff --git a/apphandler.cpp b/apphandler.cpp
+index a20d61a..7a7bfcc 100644
+--- a/apphandler.cpp
++++ b/apphandler.cpp
+@@ -695,9 +695,9 @@ auto ipmiAppGetSelfTestResults() -> ipmi::RspType<uint8_t, uint8_t>
+     //      [2] 1b = Internal Use Area of BMC FRU corrupted.
+     //      [1] 1b = controller update 'boot block' firmware corrupted.
+     //      [0] 1b = controller operational firmware corrupted.
+-    constexpr uint8_t notImplemented = 0x56;
++    //constexpr uint8_t notImplemented = 0x56;
+     constexpr uint8_t zero = 0;
+-    return ipmi::responseSuccess(notImplemented, zero);
++    return ipmi::responseSuccess(0x55, zero);
+ }
+ 
+ static constexpr size_t uuidBinaryLength = 16;
