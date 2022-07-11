@@ -15,11 +15,14 @@ SRC_URI:append:evb-npcm845 = " file://0004-Add-SEL-add-command.patch"
 SRC_URI:append:evb-npcm845 = " file://0006-Correct-IPMI-firmware-revision-report.patch"
 SRC_URI:append:evb-npcm845 = " file://0007-dbus-sdr-storagecommands-Add-option-to-use-Clear-met.patch"
 SRC_URI:append:evb-npcm845 = " file://0008-Add-sensor-type-command.patch"
+# warm reset command may not work, but function can sync with SCM
+SRC_URI:append:evb-npcm845 = " file://0009-implement-warm-reset-command.patch"
 SRC_URI:append:evb-npcm845 = " file://0011-Add-SEL-time-set-command.patch"
 SRC_URI:append:evb-npcm845 = " file://0012-Force-self-test-OK.patch"
 SRC_URI:append:evb-npcm845 = " file://0013-Set-is-from-system-interface-return-false.patch"
 SRC_URI:append:evb-npcm845 = " file://0014-Add-SEL-event-after-SEL-clear.patch"
 SRC_URI:append:evb-npcm845 = " file://0015-Fix-seesion-handle-duplicated.patch"
+SRC_URI:append:evb-npcm845 = " file://0016-Add-reset-SEL.patch"
 
 # Add send/get message support
 # ipmid <-> ipmb <-> i2c

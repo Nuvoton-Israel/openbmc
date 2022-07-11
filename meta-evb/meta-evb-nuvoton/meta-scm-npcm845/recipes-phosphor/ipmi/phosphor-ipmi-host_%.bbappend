@@ -22,6 +22,7 @@ SRC_URI:append:scm-npcm845 = " file://0012-Force-self-test-OK.patch"
 SRC_URI:append:scm-npcm845 = " file://0013-Set-is-from-system-interface-return-false.patch"
 SRC_URI:append:scm-npcm845 = " file://0014-Add-SEL-event-after-SEL-clear.patch"
 SRC_URI:append:scm-npcm845 = " file://0015-Fix-seesion-handle-duplicated.patch"
+SRC_URI:append:scm-npcm845 = " file://0016-Add-reset-SEL.patch"
 
 # Add send/get message support
 # ipmid <-> ipmb <-> i2c
