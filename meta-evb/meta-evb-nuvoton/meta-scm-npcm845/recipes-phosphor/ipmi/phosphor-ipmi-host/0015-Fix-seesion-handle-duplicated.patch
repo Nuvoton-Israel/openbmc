@@ -1,0 +1,12 @@
+diff --git a/apphandler.cpp b/apphandler.cpp
+index 7a7bfcc..45c73fb 100644
+--- a/apphandler.cpp
++++ b/apphandler.cpp
+@@ -1220,6 +1220,7 @@ ipmi::RspType<uint8_t, // session handle,
+             return ipmi::response(completionCode);
+         }
+         maybeDetails = std::move(details);
++        break;
+     }
+ 
+     if (state == static_cast<uint8_t>(session::State::active) ||
