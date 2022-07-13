@@ -24,6 +24,7 @@ SRC_URI:append:scm-npcm845 = " file://0014-Add-SEL-event-after-SEL-clear.patch"
 SRC_URI:append:scm-npcm845 = " file://0015-Fix-seesion-handle-duplicated.patch"
 SRC_URI:append:scm-npcm845 = " file://0016-Add-reset-SEL.patch"
 SRC_URI:append:scm-npcm845 = " file://0017-dbus-sdr-do-not-replace-_-for-sensor-name.patch"
+SRC_URI:append:scm-npcm845 = " file://0018-Add-session-RemoteMACAddress-support.patch"
 
 # Add send/get message support
 # ipmid <-> ipmb <-> i2c
