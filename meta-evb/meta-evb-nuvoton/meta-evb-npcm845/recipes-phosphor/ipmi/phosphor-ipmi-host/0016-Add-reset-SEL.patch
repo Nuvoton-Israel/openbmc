@@ -38,7 +38,7 @@ index 394274f..028a7d3 100644
 +{
 +    // MS spec 18.2.5 BMC health status, BMC reset SEL
 +    static const std::string ipmiSELAddMessage = "BMC reset SEL";
-+    static const std::vector<uint8_t> eventData = {0x8, resetType, 0};
++    static const std::vector<uint8_t> eventData = {0xA8, resetType, 0};
 +    uint16_t genId = 0x2000; // byte 1 0x20 BMC
 +    sdbusplus::bus::bus bus{ipmid_get_sd_bus_connection()};
 +    sdbusplus::message::message writeSEL = bus.new_method_call(
