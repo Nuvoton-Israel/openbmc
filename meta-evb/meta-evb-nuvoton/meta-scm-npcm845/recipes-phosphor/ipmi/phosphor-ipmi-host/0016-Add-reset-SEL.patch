@@ -8,7 +8,7 @@ index 3df0dc1..d6b469d 100644
      }
 +    if (path.find("oem_health") != std::string::npos)
 +    {
-+        return 0x00FF;
++        return 0x00EF;
 +    }
  
      try

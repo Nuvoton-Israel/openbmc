@@ -73,4 +73,5 @@ RDEPENDS:${PN}-system = " \
         dhcp-check \
         phosphor-virtual-sensor \
         esmi-oob-tool \
+        boot-health \
         "

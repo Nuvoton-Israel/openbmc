@@ -68,4 +68,6 @@ RDEPENDS:${PN}-system = " \
         program-vbios \
         optee-client \
         optee-test \
+        net-tools \
+        boot-health \
         "

@@ -1,0 +1,13 @@
+diff --git a/dbus-sdr/sensorcommands.cpp b/dbus-sdr/sensorcommands.cpp
+index 9075966..c10d4d5 100644
+--- a/dbus-sdr/sensorcommands.cpp
++++ b/dbus-sdr/sensorcommands.cpp
+@@ -838,7 +838,7 @@ ipmi::RspType<uint8_t, uint8_t, uint8_t, std::optional<uint8_t>>
+     }
+ 
+     // no discrete as of today so optional byte is never returned
+-    return ipmi::responseSuccess(value, operation, thresholds, std::nullopt);
++    return ipmi::responseSuccess(value, operation, thresholds, (uint8_t)0);
+ }
+ 
+ /** @brief implements the Set Sensor threshold command
