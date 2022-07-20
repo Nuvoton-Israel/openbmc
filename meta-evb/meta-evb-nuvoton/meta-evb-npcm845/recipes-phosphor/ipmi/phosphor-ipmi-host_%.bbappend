@@ -36,3 +36,4 @@ PACKAGECONFIG:append:evb-npcm845 = " ${@entity_enabled(d, 'dynamic-sensors', '')
 # avoid build error after remove ipmi-fru
 WHITELIST_CONF:evb-npcm845 = "${S}/host-ipmid-whitelist.conf"
 
+SYSTEMD_SERVICE:${PN}:append:evb-npcm845 = " phosphor-ipmi-warm-reset.target"
