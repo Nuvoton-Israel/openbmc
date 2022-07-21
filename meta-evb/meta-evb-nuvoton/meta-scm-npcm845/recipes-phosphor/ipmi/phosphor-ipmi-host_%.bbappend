@@ -28,6 +28,7 @@ SRC_URI:append:scm-npcm845 = " file://0018-Add-session-RemoteMACAddress-support.
 SRC_URI:append:scm-npcm845 = " file://0019-add-server-type-and-oem-id-to-meet-MS-spec.patch"
 SRC_URI:append:scm-npcm845 = " file://0020-fix-percentage-type-show.patch"
 SRC_URI:append:scm-npcm845 = " file://0021-sensor-reading-optional-zero.patch"
+SRC_URI:append:scm-npcm845 = " file://0022-add-sensor-reading-factory-support.patch"
 
 # Add send/get message support
 # ipmid <-> ipmb <-> i2c
