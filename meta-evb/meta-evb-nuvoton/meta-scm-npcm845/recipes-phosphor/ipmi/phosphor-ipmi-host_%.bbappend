@@ -31,6 +31,7 @@ SRC_URI:append:scm-npcm845 = " file://0021-sensor-reading-optional-zero.patch"
 SRC_URI:append:scm-npcm845 = " file://0022-add-sensor-reading-factory-support.patch"
 SRC_URI:append:scm-npcm845 = " file://0023-add-oem-sel-support.patch"
 SRC_URI:append:scm-npcm845 = " file://0024-update-chassishandler-from-intel-oem-ipmi.patch"
+SRC_URI:append:scm-npcm845 = " file://0025-save-no-supported-boot-options.patch"
 
 # Add send/get message support
 # ipmid <-> ipmb <-> i2c
