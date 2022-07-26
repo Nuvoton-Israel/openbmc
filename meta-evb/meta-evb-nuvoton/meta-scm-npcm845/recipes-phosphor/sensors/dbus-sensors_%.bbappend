@@ -9,6 +9,7 @@ SRC_URI:append:scm-npcm845 = " \
     file://0005-hwmontemp-add-adm-stbsi-support.patch \
     file://0006-add-dimm-sensor.patch \
     file://0007-add-nic-temp-sensor.patch \
+    file://0008-increase-adc-max-reading.patch \
     file://xyz.openbmc_project.dimmsensor.service \
     "
 
