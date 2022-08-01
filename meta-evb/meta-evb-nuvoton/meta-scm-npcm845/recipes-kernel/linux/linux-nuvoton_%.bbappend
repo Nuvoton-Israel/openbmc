@@ -9,6 +9,7 @@ SRC_URI:append:scm-npcm845 = " file://0005-p2011-skip-status-check.patch"
 SRC_URI:append:scm-npcm845 = " file://0007-hwmon-sbtsi-Add-basic-support-for-SB-TSI-sensors.patch"
 SRC_URI:append:scm-npcm845 = " file://0008-dts-scm-npcm845-add-gpio-name-P3V_BAT_EN.patch"
 SRC_URI:append:scm-npcm845 = " file://0009-dts-add-bu4-bu5-pinctrl.patch"
+SRC_URI:append:scm-npcm845 = " file://0010-DTS-Add-sensor-TMP461.patch"
 SRC_URI:append:scm-npcm845 = " file://0001-updaye-amd-apml-dirver.patch"
 
 SRC_URI:append:scm-npcm845 = " file://enable-legacy-kvm.cfg"

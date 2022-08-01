@@ -796,6 +796,30 @@
             "Type": "TMP75"
         },
         {
+            "Address": "0x4C",
+            "Bus": 33,
+            "EntityId": 11,
+            "EntityInstance": 2,
+            "Name": "CP_S2_AMB_TEMP",
+            "Name1": "CP_S2_FPGA_TEMP",
+            "PowerState": "Off",
+            "Thresholds": [
+                {
+                    "Direction": "greater than",
+                    "Name": "upper critical",
+                    "Severity": 1,
+                    "Value": 90.000
+                },
+                {
+                    "Direction": "greater than",
+                    "Name": "upper non critical",
+                    "Severity": 0,
+                    "Value": 70.000
+                }
+            ],
+            "Type": "TMP421"
+        },
+        {
             "Address": "0x1F",
             "Bus": 34,
             "EntityId": 11,

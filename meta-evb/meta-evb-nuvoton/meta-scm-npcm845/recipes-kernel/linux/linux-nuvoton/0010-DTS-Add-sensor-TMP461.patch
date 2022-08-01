@@ -1,0 +1,32 @@
+From 0eb350b9ad462789d01654685a149f0b030ed7fc Mon Sep 17 00:00:00 2001
+From: invalid_git config <unknown@unknown>
+Date: Mon, 1 Aug 2022 03:53:35 +0000
+Subject: [PATCH] DTS: Add sensor TMP461
+
+---
+ arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-scm.dts | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-scm.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-scm.dts
+index 2931bc4cc7c7..3883eef7cc5c 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-scm.dts
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-scm.dts
+@@ -871,6 +871,15 @@
+ 	i2c-switch@71 {
+ 		compatible = "nxp,pca9548";
+ 		reg = <0x71>;
++		bus10_mux33: i2c@5 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <5>;
++			tmp461@4c {
++				compatible = "ti,tmp461";
++				reg = <0x4c>;
++			};
++		};
+ 	};
+ };
+ 
+-- 
+2.17.1
+
