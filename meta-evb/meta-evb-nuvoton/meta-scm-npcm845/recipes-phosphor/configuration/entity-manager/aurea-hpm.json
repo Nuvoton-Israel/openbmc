@@ -802,7 +802,7 @@
             "EntityInstance": 2,
             "Name": "CP_S2_AMB_TEMP",
             "Name1": "CP_S2_FPGA_TEMP",
-            "PowerState": "Off",
+            "PowerState": "On",
             "Thresholds": [
                 {
                     "Direction": "greater than",
@@ -818,6 +818,21 @@
                 }
             ],
             "Type": "TMP421"
+        },
+        {
+            "Address": "0x42",
+            "Bus": 33,
+            "Labels": [
+                "temp1",
+                "pin"
+            ],
+            "PowerState": "On",
+            "temp1_Name": "CP_S2_HSC_TEMP",
+            "pin_Name": "CP_S2_POWER",
+            "EntityId": 8,
+            "EntityInstance": 13,
+            "Name": "CP_S2_HSC",
+            "Type": "pmbus"
         },
         {
             "Address": "0x1F",

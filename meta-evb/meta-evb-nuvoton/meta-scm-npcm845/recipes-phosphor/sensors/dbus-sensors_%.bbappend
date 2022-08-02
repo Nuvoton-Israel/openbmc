@@ -5,11 +5,12 @@ SRC_URI:append:scm-npcm845 = " \
     file://0002-Fansensor-get-pwm-from-other-hwmon-path.patch \
     file://0003-psu-sensor-add-fan3-support.patch \
     file://0004-psu-sensor-support-p2011-psu.patch \
-    file://0004-change-psu-sensor-name.patch \
     file://0005-hwmontemp-add-adm-stbsi-support.patch \
     file://0006-add-dimm-sensor.patch \
     file://0007-add-nic-temp-sensor.patch \
     file://0008-increase-adc-max-reading.patch \
+    file://0009-change-psu-sensor-name.patch \
+    file://0010-add-sesnor-max16550.patch \
     file://xyz.openbmc_project.dimmsensor.service \
     "
 
