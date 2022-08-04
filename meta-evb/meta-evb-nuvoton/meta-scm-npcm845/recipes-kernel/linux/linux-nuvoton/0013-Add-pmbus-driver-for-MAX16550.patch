@@ -150,7 +150,7 @@ index 000000000000..72c4256c49ef
 +	.R[PSC_POWER] = -3,
 +
 +	.format[PSC_POWER] = direct,
-+	.m[PSC_POWER] = 8055,
++	.m[PSC_POWER] = 13425,
 +	.b[PSC_POWER] = -9100,
 +	.R[PSC_POWER] = -2,
 +
