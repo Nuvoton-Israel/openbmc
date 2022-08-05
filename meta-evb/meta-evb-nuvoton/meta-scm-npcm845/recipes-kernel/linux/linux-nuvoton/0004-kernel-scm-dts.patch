@@ -177,7 +177,7 @@ index 000000000000..398b3de69e6e
 +			pinctrl-0 = <&r1_pins
 +					&r1oen_pins>;
 +
-+			status = "okay";
++			status = "disabled";
 +			use-ncsi;
 +		};
 +

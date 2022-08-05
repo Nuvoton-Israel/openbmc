@@ -14,6 +14,7 @@ SRC_URI:append:scm-npcm845 = " file://0011-updaye-amd-apml-dirver.patch"
 SRC_URI:append:scm-npcm845 = " file://0012-rtl8211f-customized-led.patch"
 SRC_URI:append:scm-npcm845 = " file://0013-Add-pmbus-driver-for-MAX16550.patch"
 SRC_URI:append:scm-npcm845 = " file://0014-driver-i2c-npcm7xx-don-t-check-sda-scl-status-in-dri.patch"
+SRC_URI:append:scm-npcm845 = " file://0015-device-tree-optee-enable.patch"
 
 SRC_URI:append:scm-npcm845 = " file://enable-legacy-kvm.cfg"
 SRC_URI:append:scm-npcm845 = " file://1111-dts-enable-legacy-kvm.patch"

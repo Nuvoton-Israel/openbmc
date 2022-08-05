@@ -1,0 +1,30 @@
+From 33ee64dfea24b8ff2e4d7e4ce5bc9d907adafbe2 Mon Sep 17 00:00:00 2001
+From: Brian Ma <chma0@nuvoton.com>
+Date: Fri, 5 Aug 2022 17:05:36 +0800
+Subject: [PATCH] DTS: enable optee
+
+---
+ arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-scm.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-scm.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-scm.dts
+index 763c1dcefb06..eee4d23e5e55 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-scm.dts
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-scm.dts
+@@ -141,6 +141,13 @@
+ 		};
+ 	};
+ 
++	firmware {
++		optee {
++			compatible = "linaro,optee-tz";
++			method = "smc";
++		};
++	};
++
+ 	ahb {
+ 		mc: memory-controller@f0824000 {
+ 			compatible = "nuvoton,npcm8xx-sdram-edac";
+-- 
+2.17.1
+
