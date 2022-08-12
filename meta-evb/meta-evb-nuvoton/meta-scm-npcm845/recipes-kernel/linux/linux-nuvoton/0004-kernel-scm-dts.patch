@@ -1,4 +1,4 @@
-From e5bb50ffe453334192d21a4f5e664973faf20941 Mon Sep 17 00:00:00 2001
+From 42e01317d48ca627e31b568ed3eeefc07b4794c0 Mon Sep 17 00:00:00 2001
 From: Joseph Liu <kwliu@nuvoton.com>
 Date: Mon, 7 Mar 2022 16:26:54 +0800
 Subject: [PATCH] kernel: scm dts
@@ -6,8 +6,8 @@ Subject: [PATCH] kernel: scm dts
 Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
 ---
  arch/arm64/boot/dts/nuvoton/Makefile          |   1 +
- .../boot/dts/nuvoton/nuvoton-npcm845-scm.dts  | 894 ++++++++++++++++++
- 2 files changed, 895 insertions(+)
+ .../boot/dts/nuvoton/nuvoton-npcm845-scm.dts  | 895 ++++++++++++++++++
+ 2 files changed, 896 insertions(+)
  create mode 100644 arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-scm.dts
 
 diff --git a/arch/arm64/boot/dts/nuvoton/Makefile b/arch/arm64/boot/dts/nuvoton/Makefile
@@ -21,10 +21,10 @@ index a99dab90472a..94e0a37c994c 100644
 \ No newline at end of file
 diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-scm.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-scm.dts
 new file mode 100644
-index 000000000000..398b3de69e6e
+index 000000000000..c4455dd4d2fe
 --- /dev/null
 +++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-scm.dts
-@@ -0,0 +1,894 @@
+@@ -0,0 +1,895 @@
 +// SPDX-License-Identifier: GPL-2.0
 +// Copyright (c) 2018 Nuvoton Technology tomer.maimon@nuvoton.com
 +// Copyright 2018 Google, Inc.
@@ -555,6 +555,7 @@ index 000000000000..398b3de69e6e
 +		pinctrl-names = "default";
 +		pinctrl-0 = <
 +				&espi_pins
++				&mmcrst_pins
 +				&pin240_slew
 +				&pin241_slew
 +				&pin242_slew
