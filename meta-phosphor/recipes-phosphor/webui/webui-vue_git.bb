@@ -6,10 +6,10 @@ LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=e3fc50a88d0a364313df4b21ef20c29e"
 
 SRC_URI = "git://github.com/openbmc/webui-vue.git;branch=master;protocol=https"
-SRCREV = "12dc20c3701fe58b7d827ed44d65ac67cee8a4a6"
+SRCREV = "f763cd2e39ffce9b10191402243e8704794f08ff"
 S = "${WORKDIR}/git"
 
-DEPENDS:prepend = "nodejs-native nlf-native "
+DEPENDS:prepend = "nodejs-native "
 
 # allarch is required because the files this recipe produces (html and
 # javascript) are valid for any target, regardless of architecture.  The allarch
@@ -32,6 +32,11 @@ FILES:${PN} += "${datadir}/www/*"
 
 EXTRA_OENPM ?= ""
 
+# Workaround
+# Network access from task are disabled by default on Yocto 3.5
+# https://git.yoctoproject.org/poky/tree/documentation/migration-guides/migration-3.5.rst#n25
+do_compile[network] = "1"
+
 do_compile () {
     cd ${S}
     rm -rf node_modules
@@ -47,9 +52,3 @@ do_install () {
    find ${D}${datadir}/www -type d -exec chmod a=rx,u+w '{}' +
 }
 
-do_find_node_licenses() {
-    cd ${S}
-    nlf -s detail > ${LICENSE_DIRECTORY}/${PN}/node-licenses
-}
-
-addtask find_node_licenses after do_compile before do_build
