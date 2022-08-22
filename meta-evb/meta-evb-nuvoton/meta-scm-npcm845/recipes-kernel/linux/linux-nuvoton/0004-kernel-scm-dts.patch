@@ -412,7 +412,7 @@ index 000000000000..c4455dd4d2fe
 +				nuvoton,reset-priority = <155>;
 +				nuvoton,card-reset-type = "porst";
 +				nuvoton,ext1-reset-type = "wd1";
-+				nuvoton,ext2-reset-type = "sw2";
++				nuvoton,ext2-reset-type = "sw1";
 +				status = "okay";
 +			};
 +
