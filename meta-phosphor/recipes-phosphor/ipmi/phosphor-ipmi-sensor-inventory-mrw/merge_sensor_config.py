@@ -1,1 +1,0 @@
-../phosphor-ipmi-host/merge_yamls.py

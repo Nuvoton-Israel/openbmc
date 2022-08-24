@@ -1,8 +1,0 @@
-{
-    "b":{
-        "cipher":17,
-        "authentication":3,
-        "integrity":4,
-        "confidentiality":1
-    }
-}
