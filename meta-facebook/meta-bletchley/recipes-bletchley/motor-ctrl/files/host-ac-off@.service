@@ -1,8 +1,0 @@
-[Unit]
-Description=Turn off AC at Sled%i
-Conflicts=host-ac-on@%i.service
-
-[Service]
-Type=oneshot
-ExecStart=/usr/sbin/power-ctrl sled%i ac-off
-SyslogIdentifier=power-ctrl
