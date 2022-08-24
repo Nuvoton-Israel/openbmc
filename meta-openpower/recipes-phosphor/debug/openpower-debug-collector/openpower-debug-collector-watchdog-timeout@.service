@@ -1,8 +1,0 @@
-[Unit]
-Description=OpenPOWER debug data collector for host %I watchdog timeout
-Before=obmc-host-quiesce@%i.target
-
-[Service]
-ExecStart=/usr/bin/openpower-proc-control collectSBEHBData
-Type=oneshot
-Restart=no
