@@ -1,2 +1,0 @@
-DEBUG_TRIGGER_OPTIONS=--sink-actions=dbus
-DEBUG_TRIGGER_SINK=

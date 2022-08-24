@@ -1,8 +1,0 @@
-owners:
-- geissonator@yahoo.com
-- anoo@us.ibm.com
-
-matchers:
-- exact: recipes-kernel
-  reviewers:
-  - joel@jms.id.au
