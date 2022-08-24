@@ -1,1 +1,0 @@
-inherit buv-image
