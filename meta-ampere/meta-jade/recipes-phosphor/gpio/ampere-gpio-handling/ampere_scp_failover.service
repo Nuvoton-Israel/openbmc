@@ -1,6 +1,0 @@
-[Unit]
-Description=Ampere Computing LLC Ampere failover event service
-
-[Service]
-Restart=no
-ExecStart=/usr/bin/env ampere_scp_failover.sh
