@@ -1,3 +1,0 @@
-# Set this to "yes" to start the server, after you configure it, of
-# course.
-SAMHAIN_SERVER_START="no"

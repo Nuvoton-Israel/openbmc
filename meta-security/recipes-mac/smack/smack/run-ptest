@@ -1,3 +1,0 @@
-#!/bin/sh
-./tests/make_policies.bash ./tests/generator
-./tests/make_policies.bash ./tests/generator labels
