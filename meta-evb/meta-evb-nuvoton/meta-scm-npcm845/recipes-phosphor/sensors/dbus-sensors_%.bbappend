@@ -10,6 +10,7 @@ SRC_URI:append:scm-npcm845 = " \
     file://0007-change-psu-sensor-name.patch \
     file://0008-add-sesnor-max16550.patch \
     file://0009-add-dimm-sensor.patch \
+    file://xyz.openbmc_project.dimmsensor.service \
     "
 
 PACKAGECONFIG:scm-npcm845 = "\
@@ -29,7 +30,6 @@ SYSTEMD_SERVICE:${PN}:append:scm-npcm845 = "${@bb.utils.contains('PACKAGECONFIG'
                                                '', d)}"
 
 SYSTEMD_SERVICE:${PN} += "xyz.openbmc_project.nvmesensor.service"
-SYSTEMD_SERVICE:${PN} += "xyz.openbmc_project.dimmsensor.service"
 
 do_install:append:scm-npcm845() {
     install -d ${D}${systemd_system_unitdir}

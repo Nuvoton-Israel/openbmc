@@ -4,12 +4,8 @@ SRC_URI:append:scm-npcm845 = " file://80-scm-npcm845-sol.rules"
 
 # Remove what installed by common recipe
 OBMC_CONSOLE_HOST_TTY = ""
-SYSTEMD_SUBSTITUTIONS:remove += "OBMC_CONSOLE_HOST_TTY:${OBMC_CONSOLE_HOST_TTY}:${PN}-ssh@.service"
-SYSTEMD_SUBSTITUTIONS:remove += "OBMC_CONSOLE_HOST_TTY:${OBMC_CONSOLE_HOST_TTY}:${PN}-ssh.socket"
-SYSTEMD_SERVICE:${PN}:remove = " \
-    ${PN}-ssh.socket \
-    ${PN}-ssh@.service \
-    "
+SYSTEMD_SUBSTITUTIONS:remove:scm-npcm845 = "OBMC_CONSOLE_HOST_TTY:${OBMC_CONSOLE_HOST_TTY}:${PN}-ssh@.service"
+SYSTEMD_SUBSTITUTIONS:remove:scm-npcm845 = "OBMC_CONSOLE_HOST_TTY:${OBMC_CONSOLE_HOST_TTY}:${PN}-ssh.socket"
 
 # Declare port spcific conf and service files
 HOST_CONSOLE_TTY = "ttyS2 ttyS5"
