@@ -1,0 +1,60 @@
+diff --git a/dbus-sdr/storagecommands.cpp b/dbus-sdr/storagecommands.cpp
+index 64c07d5..4c20a82 100644
+--- a/dbus-sdr/storagecommands.cpp
++++ b/dbus-sdr/storagecommands.cpp
+@@ -1092,6 +1092,27 @@ ipmi::RspType<uint16_t, // Next Record ID
+             systemEventType{timestamp, generatorID, evmRev, sensorType,
+                             sensorNum, eventType, eventDir, eventData});
+     }
++    else if (recordType >= dynamic_sensors::ipmi::sel::oemTsEventFirst &&
++             recordType <= dynamic_sensors::ipmi::sel::oemEventLast)
++    {
++        phosphor::logging::log<phosphor::logging::level::INFO>("Get OEM SEL");
++        // Get the timestamp
++        std::tm timeStruct = {};
++        std::istringstream entryStream(entryTimestamp);
++
++        uint32_t timestamp = ipmi::sel::invalidTimeStamp;
++        if (entryStream >> std::get_time(&timeStruct, "%Y-%m-%dT%H:%M:%S"))
++        {
++            timestamp = std::mktime(&timeStruct);
++        }
++        std::array<uint8_t, dynamic_sensors::ipmi::sel::oemTsEventSize>
++            eventData{};
++        std::copy_n(eventDataBytes.begin(),
++                    std::min(eventDataBytes.size(), eventData.size()),
++                    eventData.begin());
++        return ipmi::responseSuccess(nextRecordID, recordID, recordType,
++                                     oemTsEventType{timestamp, eventData});
++    }
+ 
+     return ipmi::responseUnspecifiedError();
+ }
+@@ -1176,7 +1197,7 @@ ipmi::RspType<uint16_t> ipmiStorageAddSELEntry(
+         "IPMI SEL entry logged using IPMI Add SEL Entry command.";
+ 
+     sdbusplus::bus::bus bus{ipmid_get_sd_bus_connection()};
+-    std::vector<uint8_t> eventData = {eventData1, eventData1, eventData2};
++    std::vector<uint8_t> eventData = {eventData1, eventData2, eventData3};
+ 
+     if (recordType == dynamic_sensors::ipmi::sel::systemEvent)
+     {
+@@ -1208,6 +1229,18 @@ ipmi::RspType<uint16_t> ipmiStorageAddSELEntry(
+     else if (recordType >= dynamic_sensors::ipmi::sel::oemTsEventFirst &&
+              recordType <= dynamic_sensors::ipmi::sel::oemEventLast)
+     {
++        eventData.clear();
++        uint24_t mfgId = 40092;
++        eventData.push_back((uint8_t)mfgId & 0xff);
++        eventData.push_back((uint8_t)(mfgId >> 8) & 0xff);
++        eventData.push_back((uint8_t)(mfgId >> 16) & 0xff);
++        eventData.push_back((uint8_t)generatorID & 0xff);
++        eventData.push_back((uint8_t)(generatorID > 8) & 0xff);
++        eventData.push_back(sensorType);
++        eventData.push_back(sensorNum);
++        eventData.push_back(eventType);
++        eventData.push_back(eventData1);
++
+         sdbusplus::message::message writeSEL = bus.new_method_call(
+             ipmiSELObject, ipmiSELPath, ipmiSELAddInterface, "IpmiSelAddOem");
+         writeSEL.append(ipmiSELAddMessage, eventData, recordType);

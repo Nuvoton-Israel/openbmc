@@ -1,0 +1,60 @@
+diff --git a/apphandler.cpp b/apphandler.cpp
+index 45c73fb..a39121c 100644
+--- a/apphandler.cpp
++++ b/apphandler.cpp
+@@ -695,7 +695,7 @@ auto ipmiAppGetSelfTestResults() -> ipmi::RspType<uint8_t, uint8_t>
+     //      [2] 1b = Internal Use Area of BMC FRU corrupted.
+     //      [1] 1b = controller update 'boot block' firmware corrupted.
+     //      [0] 1b = controller operational firmware corrupted.
+-    //constexpr uint8_t notImplemented = 0x56;
++    // constexpr uint8_t notImplemented = 0x56;
+     constexpr uint8_t zero = 0;
+     return ipmi::responseSuccess(0x55, zero);
+ }
+@@ -1064,7 +1064,6 @@ uint8_t getSessionState(ipmi::Context::ptr ctx, const std::string& service,
+     return ipmi::ccSuccess;
+ }
+ 
+-static constexpr uint8_t macAddrLen = 6;
+ /** Alias SessionDetails - contain the optional information about an
+  *        RMCP+ session.
+  *
+@@ -1080,7 +1079,7 @@ static constexpr uint8_t macAddrLen = 6;
+  */
+ using SessionDetails =
+     std::tuple<uint2_t, uint6_t, uint4_t, uint4_t, uint4_t, uint4_t, uint32_t,
+-               std::array<uint8_t, macAddrLen>, uint16_t>;
++               std::vector<uint8_t>, uint16_t>;
+ 
+ /** @brief get session details for a given session
+  *
+@@ -1129,7 +1128,10 @@ ipmi::Cc getSessionDetails(ipmi::Context::ptr ctx, const std::string& service,
+         std::get<5>(details) = rmcpPlusProtocol;
+         std::get<6>(details) =
+             ipmi::mappedVariant<uint32_t>(sessionProps, "RemoteIPAddr", 0);
+-        // std::get<7>(details) = {{0}}; // default constructed to all 0
++        std::get<7>(details) =
++            ipmi::mappedVariant<std::vector<uint8_t>>(
++                sessionProps, "RemoteMACAddress",
++                std::vector<uint8_t>(6, 0));
+         std::get<8>(details) =
+             ipmi::mappedVariant<uint16_t>(sessionProps, "RemotePort", 0);
+     }
+diff --git a/include/ipmid/types.hpp b/include/ipmid/types.hpp
+index 9c59ea0..aae0ed4 100644
+--- a/include/ipmid/types.hpp
++++ b/include/ipmid/types.hpp
+@@ -19,9 +19,10 @@ using DbusProperty = std::string;
+ 
+ using Association = std::tuple<std::string, std::string, std::string>;
+ 
+-using Value = std::variant<bool, uint8_t, int16_t, uint16_t, int32_t, uint32_t,
+-                           int64_t, uint64_t, double, std::string,
+-                           std::vector<std::string>, std::vector<Association>>;
++using Value =
++    std::variant<bool, uint8_t, int16_t, uint16_t, int32_t, uint32_t, int64_t,
++                 uint64_t, double, std::string, std::vector<uint8_t>,
++                 std::vector<std::string>, std::vector<Association>>;
+ 
+ using PropertyMap = std::map<DbusProperty, Value>;
+ 

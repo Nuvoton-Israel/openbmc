@@ -1,0 +1,64 @@
+From 76f4ecc4f6530a5b21136662cf64a0cf9277d0fd Mon Sep 17 00:00:00 2001
+From: Brian Ma <chma0@nuvoton.com>
+Date: Fri, 8 Jul 2022 17:49:30 +0800
+Subject: [PATCH] Add SEL event after SEL clear
+
+---
+ dbus-sdr/storagecommands.cpp | 27 +++++++++++++++++++++------
+ 1 file changed, 21 insertions(+), 6 deletions(-)
+
+diff --git a/dbus-sdr/storagecommands.cpp b/dbus-sdr/storagecommands.cpp
+index d0ae456..64c07d5 100644
+--- a/dbus-sdr/storagecommands.cpp
++++ b/dbus-sdr/storagecommands.cpp
+@@ -119,6 +119,10 @@ constexpr auto TIME_SYNC_PATH = "/xyz/openbmc_project/time/sync_method";
+ constexpr auto TIME_SYNC_PROPERTIE = "TimeSyncMethod";
+ constexpr auto TIME_SYNC_MANUAL =
+     "xyz.openbmc_project.Time.Synchronization.Method.Manual";
++static constexpr char const* ipmiSELObject = "xyz.openbmc_project.Logging.IPMI";
++static constexpr char const* ipmiSELPath = "/xyz/openbmc_project/Logging/IPMI";
++static constexpr char const* ipmiSELAddInterface =
++    "xyz.openbmc_project.Logging.IPMI";
+ 
+ static std::vector<uint8_t> fruCache;
+ static uint8_t cacheBus = 0xFF;
+@@ -1168,12 +1172,6 @@ ipmi::RspType<uint16_t> ipmiStorageAddSELEntry(
+     defaultMessageHook(recordID, recordType, timestamp, generatorID, evmRev,
+                        sensorType, sensorNum, eventType, eventData);
+ #endif
+-    static constexpr char const* ipmiSELObject =
+-        "xyz.openbmc_project.Logging.IPMI";
+-    static constexpr char const* ipmiSELPath =
+-        "/xyz/openbmc_project/Logging/IPMI";
+-    static constexpr char const* ipmiSELAddInterface =
+-        "xyz.openbmc_project.Logging.IPMI";
+     static const std::string ipmiSELAddMessage =
+         "IPMI SEL entry logged using IPMI Add SEL Entry command.";
+ 
+@@ -1310,6 +1308,23 @@ ipmi::RspType<uint8_t> ipmiStorageClearSEL(ipmi::Context::ptr ctx,
+ 
+     // Save the erase time
+     dynamic_sensors::ipmi::sel::erase_time::save();
++    // MS spec 4.1.37, add an event after clear SEL immediately
++    static const std::string ipmiSELAddMessage = "IPMI clear SEL";
++    static const std::vector<uint8_t> eventData = {0, 0, 0};
++    sdbusplus::bus::bus bus{ipmid_get_sd_bus_connection()};
++    sdbusplus::message::message writeSEL = bus.new_method_call(
++        ipmiSELObject, ipmiSELPath, ipmiSELAddInterface, "IpmiSelAdd");
++    writeSEL.append(ipmiSELAddMessage, ipmiSELPath, eventData, true,
++                    (uint16_t)0);
++    try
++    {
++        bus.call(writeSEL);
++    }
++    catch (sdbusplus::exception_t& e)
++    {
++        phosphor::logging::log<phosphor::logging::level::ERR>(e.what());
++        return ipmi::responseUnspecifiedError();
++    }
+ #endif
+     return ipmi::responseSuccess(ipmi::sel::eraseComplete);
+ }
+-- 
+2.17.1
+

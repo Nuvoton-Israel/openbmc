@@ -1,0 +1,143 @@
+diff --git a/dbus-sdr/sdrutils.cpp b/dbus-sdr/sdrutils.cpp
+index 3df0dc1..d6b469d 100644
+--- a/dbus-sdr/sdrutils.cpp
++++ b/dbus-sdr/sdrutils.cpp
+@@ -261,6 +261,10 @@ uint16_t getSensorNumberFromPath(const std::string& path)
+     {
+         return invalidSensorNumber;
+     }
++    if (path.find("oem_health") != std::string::npos)
++    {
++        return 0x00EF;
++    }
+ 
+     try
+     {
+diff --git a/globalhandler.cpp b/globalhandler.cpp
+index 394274f..028a7d3 100644
+--- a/globalhandler.cpp
++++ b/globalhandler.cpp
+@@ -27,9 +27,44 @@ constexpr auto SYSTEMD_SERVICE = "org.freedesktop.systemd1";
+ constexpr auto SYSTEMD_OBJ_PATH = "/org/freedesktop/systemd1";
+ constexpr auto SYSTEMD_INTERFACE = "org.freedesktop.systemd1.Manager";
+ constexpr auto SYSTEMD_WARM_RESET_TARGET = "phosphor-ipmi-warm-reset.target";
++static constexpr char const* ipmiSELObject = "xyz.openbmc_project.Logging.IPMI";
++static constexpr char const* ipmiSELPath = "/xyz/openbmc_project/Logging/IPMI";
++static constexpr char const* ipmiSELAddInterface =
++    "xyz.openbmc_project.Logging.IPMI";
++static constexpr char const* oemHealthSensor =
++    "/xyz/openbmc_project/sensors/oem_health/bmc_reset";
++
++enum reset_type
++{
++    COLD_RESET = 0x1,
++    WARM_RESET = 0x2,
++};
++
++ipmi::RspType<> resetSEL(uint8_t resetType)
++{
++    // MS spec 18.2.5 BMC health status, BMC reset SEL
++    static const std::string ipmiSELAddMessage = "BMC reset SEL";
++    static const std::vector<uint8_t> eventData = {0xA8, resetType, 0};
++    uint16_t genId = 0x2000; // byte 1 0x20 BMC
++    sdbusplus::bus::bus bus{ipmid_get_sd_bus_connection()};
++    sdbusplus::message::message writeSEL = bus.new_method_call(
++        ipmiSELObject, ipmiSELPath, ipmiSELAddInterface, "IpmiSelAdd");
++    writeSEL.append(ipmiSELAddMessage, oemHealthSensor, eventData, true, genId);
++    try
++    {
++        bus.call(writeSEL);
++    }
++    catch (sdbusplus::exception_t& e)
++    {
++        phosphor::logging::log<phosphor::logging::level::ERR>(e.what());
++        return ipmi::responseUnspecifiedError();
++    }
++    return ipmi::responseSuccess();
++}
+ 
+ void resetBMC()
+ {
++    resetSEL(COLD_RESET);
+     sdbusplus::bus::bus bus{ipmid_get_sd_bus_connection()};
+ 
+     auto bmcStateObj =
+@@ -44,17 +79,21 @@ void resetBMC()
+ 
+ void warmResetBMC()
+ {
++    resetSEL(WARM_RESET);
+     try
+     {
+         std::this_thread::sleep_for(std::chrono::milliseconds(100));
+-        //sdbusplus::bus::bus bus{ipmid_get_sd_bus_connection()};
++        // sdbusplus::bus::bus bus{ipmid_get_sd_bus_connection()};
+         auto bus = sdbusplus::bus::new_default();
+-        // Reset the failed units so we don't end up having systemd not properly restart if the command is spammed.
+-        auto reset = bus.new_method_call(SYSTEMD_SERVICE, SYSTEMD_OBJ_PATH, SYSTEMD_INTERFACE, "ResetFailed");
++        // Reset the failed units so we don't end up having systemd not properly
++        // restart if the command is spammed.
++        auto reset = bus.new_method_call(SYSTEMD_SERVICE, SYSTEMD_OBJ_PATH,
++                                         SYSTEMD_INTERFACE, "ResetFailed");
+         bus.call_noreply(reset);
+         std::this_thread::sleep_for(std::chrono::milliseconds(100));
+         // Restart the target (restart will propagate to units).
+-        auto restart = bus.new_method_call(SYSTEMD_SERVICE, SYSTEMD_OBJ_PATH, SYSTEMD_INTERFACE, "RestartUnit");
++        auto restart = bus.new_method_call(SYSTEMD_SERVICE, SYSTEMD_OBJ_PATH,
++                                           SYSTEMD_INTERFACE, "RestartUnit");
+         restart.append(SYSTEMD_WARM_RESET_TARGET, "replace");
+         bus.call_noreply(restart);
+     }
+@@ -85,7 +124,6 @@ ipmi::RspType<> ipmiGlobalReset()
+     return ipmi::responseSuccess();
+ }
+ 
+-
+ /** @brief implements warm reset command
+  *  @param - None
+  *  @returns IPMI completion code.
+@@ -94,8 +132,10 @@ ipmi::RspType<> ipmiWarmReset()
+ {
+     try
+     {
+-        if (!reset_queued.test_and_set()) {
+-            // Do this asynchronously so that we can properly return this command.
++        if (!reset_queued.test_and_set())
++        {
++            // Do this asynchronously so that we can properly return this
++            // command.
+             std::thread t(warmResetBMC);
+             t.detach();
+         }
+diff --git a/include/dbus-sdr/sdrutils.hpp b/include/dbus-sdr/sdrutils.hpp
+index cfd76b3..c099419 100644
+--- a/include/dbus-sdr/sdrutils.hpp
++++ b/include/dbus-sdr/sdrutils.hpp
+@@ -311,13 +311,15 @@ enum class SensorTypeCodes : uint8_t
+     power_unit = 0x09,
+     buttons = 0x14,
+     watchdog2 = 0x23,
++    subsystem_health = 0xE0,
+ };
+ 
+ enum class SensorEventTypeCodes : uint8_t
+ {
+     unspecified = 0x00,
+     threshold = 0x01,
+-    sensorSpecified = 0x6f
++    sensorSpecified = 0x6f,
++    oem = 0x70,
+ };
+ 
+ const static boost::container::flat_map<
+@@ -342,7 +344,9 @@ const static boost::container::flat_map<
+          {"buttons", std::make_pair(SensorTypeCodes::buttons,
+                                     SensorEventTypeCodes::sensorSpecified)},
+          {"watchdog", std::make_pair(SensorTypeCodes::watchdog2,
+-                                     SensorEventTypeCodes::sensorSpecified)}}};
++                                     SensorEventTypeCodes::sensorSpecified)},
++         {"oem_health", std::make_pair(SensorTypeCodes::subsystem_health,
++                                       SensorEventTypeCodes::oem)}}};
+ 
+ std::string getSensorTypeStringFromPath(const std::string& path);
+ 
