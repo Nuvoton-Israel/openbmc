@@ -1,0 +1,25 @@
+From 699b6c0a47005bb5b549e7f0fbe8c1eeca6ea67d Mon Sep 17 00:00:00 2001
+From: Mia Lin <mimi05633@gmail.com>
+Date: Thu, 1 Sep 2022 17:21:42 +0800
+Subject: [PATCH 1/1] hwmon temp: add lm75 support
+
+Signed-off-by: Mia Lin <mimi05633@gmail.com>
+---
+ src/HwmonTempMain.cpp | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/HwmonTempMain.cpp b/src/HwmonTempMain.cpp
+index 3a3248da..0ebe3f89 100644
+--- a/src/HwmonTempMain.cpp
++++ b/src/HwmonTempMain.cpp
+@@ -56,6 +56,7 @@ static auto sensorTypes{
+                                 "xyz.openbmc_project.Configuration.TMP421",
+                                 "xyz.openbmc_project.Configuration.TMP441",
+                                 "xyz.openbmc_project.Configuration.LM75A",
++                                "xyz.openbmc_project.Configuration.LM75",
+                                 "xyz.openbmc_project.Configuration.TMP75",
+                                 "xyz.openbmc_project.Configuration.W83773G",
+                                 "xyz.openbmc_project.Configuration.JC42"})};
+-- 
+2.17.1
+

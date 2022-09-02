@@ -1,0 +1,17 @@
+diff --git a/src/HwmonTempMain.cpp b/src/HwmonTempMain.cpp
+index 3a3248da..c1215a1b 100644
+--- a/src/HwmonTempMain.cpp
++++ b/src/HwmonTempMain.cpp
+@@ -40,7 +40,8 @@ static constexpr float pollRateDefault = 0.5;
+ 
+ namespace fs = std::filesystem;
+ static auto sensorTypes{
+-    std::to_array<const char*>({"xyz.openbmc_project.Configuration.EMC1412",
++    std::to_array<const char*>({"xyz.openbmc_project.Configuration.STBSI",
++		                "xyz.openbmc_project.Configuration.EMC1412",
+                                 "xyz.openbmc_project.Configuration.EMC1413",
+                                 "xyz.openbmc_project.Configuration.EMC1414",
+                                 "xyz.openbmc_project.Configuration.MAX31725",
+-- 
+2.34.1
+

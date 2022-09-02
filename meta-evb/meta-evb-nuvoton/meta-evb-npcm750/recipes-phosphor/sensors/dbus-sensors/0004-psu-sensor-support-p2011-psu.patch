@@ -1,0 +1,35 @@
+From 99f98cc76156caf46785242e5a8c66e6e49b5178 Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Fri, 24 Jun 2022 19:49:05 +0800
+Subject: [PATCH] psu sensor: support p2011 psu
+
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ src/PSUSensorMain.cpp | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/src/PSUSensorMain.cpp b/src/PSUSensorMain.cpp
+index 0e6e25af..d9d05692 100644
+--- a/src/PSUSensorMain.cpp
++++ b/src/PSUSensorMain.cpp
+@@ -67,14 +67,15 @@ static constexpr auto sensorTypes{std::to_array<const char*>(
+      "xyz.openbmc_project.Configuration.RAA228228",
+      "xyz.openbmc_project.Configuration.RAA229004",
+      "xyz.openbmc_project.Configuration.TPS546D24",
+-     "xyz.openbmc_project.Configuration.XDPE12284"})};
++     "xyz.openbmc_project.Configuration.XDPE12284",
++     "xyz.openbmc_project.Configuration.p2011"})};
+ 
+ static std::vector<std::string> pmbusNames = {
+     "adm1266",   "adm1272",   "adm1275",  "adm1278",  "dps800",    "ina219",
+     "ina230",    "ipsps1",    "isl68137", "isl68220", "isl68223",  "isl69243",
+     "isl69260",  "lm25066",   "max16601", "max20710", "max20730",  "max20734",
+     "max20796",  "max34451",  "pmbus",    "pxe1610",  "raa228000", "raa228228",
+-    "raa229004", "tps546d24", "xdpe12284"};
++    "raa229004", "tps546d24", "xdpe12284", "p2011"};
+ 
+ namespace fs = std::filesystem;
+ 
+-- 
+2.34.1
+

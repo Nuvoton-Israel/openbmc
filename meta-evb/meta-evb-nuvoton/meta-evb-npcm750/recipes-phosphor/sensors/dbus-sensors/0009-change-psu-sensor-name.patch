@@ -1,0 +1,26 @@
+From ddb5e443c8827db473c0a5be9cf8d4c1f263468a Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Wed, 13 Jul 2022 17:30:32 +0800
+Subject: [PATCH] change PSU sensor name to meet customer requirement
+
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ src/PSUSensorMain.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/PSUSensorMain.cpp b/src/PSUSensorMain.cpp
+index d9d05692..40dab6ce 100644
+--- a/src/PSUSensorMain.cpp
++++ b/src/PSUSensorMain.cpp
+@@ -245,7 +245,7 @@ static void
+         }
+ 
+         pwmSensors[psuName + labelHead] = std::make_unique<PwmSensor>(
+-            "Pwm_" + psuName + "_" + pwmName.second, pwmPathStr, dbusConnection,
++            psuName + "_PWM_" + pwmName.second, pwmPathStr, dbusConnection,
+             objectServer, interfacePath + "_" + pwmName.second, "PSU");
+     }
+ }
+-- 
+2.17.1
+
