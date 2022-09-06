@@ -481,8 +481,8 @@
             "Type": "TMP100"
         }
     ],
-    "Name": "EVB_ARBEL_NUVOTON",
-    "Probe": "xyz.openbmc_project.FruDevice({'BOARD_PRODUCT_NAME': 'NUVOTON-ARBEL-EVB'})",
+    "Name": "EVB_POLEG_NUVOTON",
+    "Probe": "xyz.openbmc_project.FruDevice({'BOARD_PRODUCT_NAME': 'NUVOTON-POLEG-EVB'})",
     "Type": "Board",
     "xyz.openbmc_project.Inventory.Decorator.Ipmi": {
         "EntityId": "0x10",
