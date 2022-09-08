@@ -33,6 +33,7 @@ RDEPENDS:${PN}-fans = " \
 SUMMARY:${PN}-flash = "EVB NPCM750 Flash"
 RDEPENDS:${PN}-flash = " \
         phosphor-ipmi-flash \
+        ipmi-bmc-update \
         "
 
 SUMMARY:${PN}-system = "EVB NPCM750 System"
