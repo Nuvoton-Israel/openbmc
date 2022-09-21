@@ -67,4 +67,7 @@ RDEPENDS:${PN}-system = " \
         esmi-oob-tool \
         boot-health \
         reload-sensors \
+        tpm2-tools \
+        tpm2-tss \
+        tpm2-abrmd \
         "

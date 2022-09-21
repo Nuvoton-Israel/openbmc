@@ -9,6 +9,9 @@ PV="1.0.0+git${SRCPV}"
 inherit deploy python3native
 DEPENDS = "python3-pycryptodome-native python3-pyelftools-native python3-pycryptodomex-native python3-cryptography-native"
 
+do_compile[depends] += "ftpm-ta:do_install"
+EXTRA_OEMAKE:append:task-compile = " EARLY_TA_PATHS=${TMPDIR}/optee/bc50d971-d4c9-42c4-82cb-343fb7f37896.stripped.elf "
+
 S = "${WORKDIR}/git"
 BRANCH ?= "nuvoton"
 REPO ?= "git://github.com/Nuvoton-Israel/optee_os.git;branch=nuvoton;protocol=https"
@@ -29,6 +32,9 @@ OPTEE_SYMLINK ?= "tee-${MACHINE_SOC}.${OPTEE_SUFFIX}"
 CFG_TEE_TA_LOG_LEVEL ?= "1"
 CFG_TEE_CORE_LOG_LEVEL ?= "1"
 
+EXPORT_TA_PATH = "${TMPDIR}/optee"
+OPTEEOUT_DIR = "${B}/out/arm-plat-nuvoton/export-ta_arm64"
+
 EXTRA_OEMAKE = "PLATFORM=${OPTEEMACHINE} CFG_ARM64_core=y \
                 CROSS_COMPILE_core=${HOST_PREFIX} \
                 CROSS_COMPILE_ta_arm64=${HOST_PREFIX} \
@@ -36,6 +42,13 @@ EXTRA_OEMAKE = "PLATFORM=${OPTEEMACHINE} CFG_ARM64_core=y \
                 ta-targets=ta_arm64 \
                 LDFLAGS= \
                 LIBGCC_LOCATE_CFLAGS=--sysroot=${STAGING_DIR_HOST} \
+                CFG_REE_FS=n \
+                CFG_REE_FS_TA=n \
+                CFG_RPMB_FS=y \
+                CFG_RPMB_TESTKEY=n \
+                CFG_RPMB_WRITE_KEY=n \
+                CFG_CORE_HEAP_SIZE=524288 \
+                CFG_TEE_RAM_VA_SIZE=3145728 \
         "
 
 OPTEE_ARCH_aarch64 = "arm64"
@@ -45,7 +58,7 @@ do_compile() {
     oe_runmake CFG_TEE_LOGLEVEL=0 CFG_TEE_CORE_LOG_LEVEL=0
 }
 
-do_install () {
+do_install() {
     # Install the TA devkit
     install -d ${D}/usr/include/optee/export-user_ta/
 
@@ -62,7 +75,20 @@ do_deploy() {
     ln -sf tee.bin ${OPTEE_IMAGE}
 }
 
+do_export_kit() {
+    unset LDFLAGS
+    oe_runmake --directory=${S} ${PARALLEL_MAKE}
+    #Wipe the old directory
+    rm -rf ${EXPORT_TA_PATH}
+    mkdir ${EXPORT_TA_PATH}
+    #Copy the export directory to a fixed location
+    cp -r ${OPTEEOUT_DIR} ${EXPORT_TA_PATH}/export-dev_kit
+    #Wipe the directory again to return to previous state
+    oe_runmake --directory=${S} clean
+}
+
 addtask deploy before do_build after do_compile
+addtask do_export_kit before do_compile after do_configure
 
 FILES:${PN} = "${nonarch_base_libdir}/firmware/ ${nonarch_base_libdir}/optee_armtz/"
 FILES:${PN}-staticdev = "/usr/include/optee/"

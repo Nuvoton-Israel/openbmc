@@ -1,0 +1,30 @@
+From 8cb7240085d01b678daab375bea6a36ed12b36f7 Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Fri, 23 Sep 2022 09:31:38 +0800
+Subject: [PATCH] dts-nuvoton-scm-npcm845-support-fTPM
+
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-scm.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-scm.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-scm.dts
+index 09baa88492cf..c924ae76e3fa 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-scm.dts
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-scm.dts
+@@ -131,6 +131,12 @@ cpu-err {
+ 		};
+ 	};
+ 
++	tpm@0 {
++		/*compatible = "microsoft,ftpm";
++		linux,sml-base = <0x0 0x35F00000>;
++		linux,sml-size = <0x10000>;*/
++	};
++
+ 	firmware {
+ 		optee {
+ 			compatible = "linaro,optee-tz";
+-- 
+2.34.1
+

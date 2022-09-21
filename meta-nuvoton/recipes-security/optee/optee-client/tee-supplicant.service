@@ -5,6 +5,7 @@ Description=TEE Supplicant
 User=root
 EnvironmentFile=-/etc/default/tee-supplicant
 ExecStart=/usr/bin/tee-supplicant $OPTARGS /dev/teepriv0
+ExecStop=sh -c "echo -n 'optee-ta-bc50d971-d4c9-42c4-82cb-343fb7f37896' > /sys/bus/tee/drivers/optee-ftpm/unbind"
 
 [Install]
 WantedBy=basic.target

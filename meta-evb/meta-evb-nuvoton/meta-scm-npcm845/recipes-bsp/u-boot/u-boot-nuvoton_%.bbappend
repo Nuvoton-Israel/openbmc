@@ -13,3 +13,6 @@ SRC_URI:append:scm-npcm845 = " file://0007-set-fiu0-drd_cfg-4-byte-addr.patch"
 SRC_URI:append:scm-npcm845 = " file://0008-Move-flash-layout.patch"
 SRC_URI:append:scm-npcm845 = " \
 	${@emmc_enabled(d, 'file://1111-boot-openbmc-form-emmc.patch')}"
+
+SRC_URI:append:scm-npcm845 = " file://0001-add-fTPM-changes-in-u-boot.patch"
+SRC_URI:append:scm-npcm845 = " file://0002-u-boot_rpmb_mmc_init.patch"

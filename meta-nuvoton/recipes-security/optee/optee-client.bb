@@ -16,6 +16,7 @@ SRCREV = "06db73b3f3fdb8d23eceaedbc46c49c0b45fd1e2"
 S = "${WORKDIR}/git"
 
 EXTRA_OEMAKE = "CFG_TEE_FS_PARENT_PATH=/var/tee \
+                RPMB_EMU=0 \
         "
 
 do_install() {
