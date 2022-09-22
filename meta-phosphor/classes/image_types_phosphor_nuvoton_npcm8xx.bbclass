@@ -9,7 +9,6 @@ KMT_TIPFW_BB_BL31_TEE_BINARY = "Kmt_TipFw_BootBlock_BL31_Tee.bin"
 KMT_TIPFW_BB_UBOOT_BINARY = "u-boot.bin.merged"
 FULL_SUFFIX = "full"
 MERGED_SUFFIX = "merged"
-UBOOT_SUFFIX:append = ".${MERGED_SUFFIX}"
 
 IGPS_DIR = "${STAGING_DIR_NATIVE}/${datadir}/npcm8xx-igps"
 inherit logging
@@ -104,7 +103,7 @@ do_prepare_bootloaders[depends] += " \
 # link images for we only need to flash partial image with idea name
 do_generate_ext4_tar:append() {
     cd ${DEPLOY_DIR_IMAGE}
-    ln -sf ${UBOOT_BINARY} image-u-boot
+    ln -sf ${UBOOT_BINARY}.${MERGED_SUFFIX} image-u-boot
     ln -sf ${DEPLOY_DIR_IMAGE}/${FLASH_KERNEL_IMAGE} image-kernel
     ln -sf ${S}/ext4/${IMAGE_LINK_NAME}.${FLASH_EXT4_BASETYPE}.zst image-rofs
     ln -sf ${IMGDEPLOYDIR}/${IMAGE_LINK_NAME}.rwfs.${FLASH_EXT4_OVERLAY_BASETYPE} image-rwfs
