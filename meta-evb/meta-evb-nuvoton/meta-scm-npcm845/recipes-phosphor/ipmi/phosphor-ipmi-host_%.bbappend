@@ -3,6 +3,7 @@ inherit entity-utils
 FILESEXTRAPATHS:append:scm-npcm845 := "${THISDIR}/${PN}:"
 
 DEPENDS:append:scm-npcm845 = " ${@entity_enabled(d, '', ' scm-npcm845-yaml-config')}"
+RDEPENDS:${PN}:remove:scm-npcm845 = "clear-once"
 EXTRA_OECONF:append:scm-npcm845 = " ${@entity_enabled(d, '', 'SENSOR_YAML_GEN=${STAGING_DIR_HOST}${datadir}/scm-npcm845-yaml-config/ipmi-sensors.yaml')}"
 EXTRA_OECONF:append:scm-npcm845 = " ${@entity_enabled(d, '', 'FRU_YAML_GEN=${STAGING_DIR_HOST}${datadir}/scm-npcm845-yaml-config/ipmi-fru-read.yaml')}"
 EXTRA_OECONF:append:scm-npcm845 = " ${@entity_enabled(d, '', 'INVSENSOR_YAML_GEN=${STAGING_DIR_HOST}${datadir}/scm-npcm845-yaml-config/ipmi-inventory-sensors.yaml')}"
