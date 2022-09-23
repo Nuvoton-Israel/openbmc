@@ -33,7 +33,7 @@ EXTRA_OEMAKE = "PLATFORM=${OPTEEMACHINE} CFG_ARM64_core=y \
                 CROSS_COMPILE_ta_arm64=${HOST_PREFIX} \
                 NOWERROR=1 \
                 ta-targets=ta_arm64 \
-                LDFLAGS= \
+                LDFLAGS='--no-warn-rwx-segments' \
                 LIBGCC_LOCATE_CFLAGS=--sysroot=${STAGING_DIR_HOST} \
         "
 

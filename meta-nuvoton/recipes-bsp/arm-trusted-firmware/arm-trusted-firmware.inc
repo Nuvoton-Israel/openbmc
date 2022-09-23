@@ -33,6 +33,8 @@ LDFLAGS[unexport] = "1"
 AS[unexport] = "1"
 LD[unexport] = "1"
 
+EXTRA_OEMAKE = "LDFLAGS='--no-warn-rwx-segments'"
+
 do_configure() {
 	oe_runmake clean -C ${S} PLAT=${PLATFORM}
 }
