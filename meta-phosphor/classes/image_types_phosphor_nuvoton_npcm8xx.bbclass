@@ -9,6 +9,7 @@ KMT_TIPFW_BB_BL31_TEE_BINARY = "Kmt_TipFw_BootBlock_BL31_Tee.bin"
 KMT_TIPFW_BB_UBOOT_BINARY = "u-boot.bin.merged"
 FULL_SUFFIX = "full"
 MERGED_SUFFIX = "merged"
+UBOOT_SUFFIX:append = ".${MERGED_SUFFIX}"
 
 IGPS_DIR = "${STAGING_DIR_NATIVE}/${datadir}/npcm8xx-igps"
 inherit logging
@@ -98,6 +99,7 @@ prepare_secureos = "${@ "arm-trusted-firmware:do_deploy optee-os:do_deploy" if b
 do_prepare_bootloaders[depends] += " \
     npcm8xx-tip-fw:do_deploy \
     npcm8xx-bootblock:do_deploy \
+    u-boot-nuvoton:do_deploy \
     ${prepare_secureos} \
     npcm7xx-bingo-native:do_populate_sysroot \
     npcm8xx-igps-native:do_populate_sysroot \
