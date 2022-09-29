@@ -54,4 +54,5 @@ RDEPENDS:${PN}-system = " \
         loadsvf \
         phosphor-image-signing \
         obmc-console \
+        phosphor-post-code-manager \
         "
