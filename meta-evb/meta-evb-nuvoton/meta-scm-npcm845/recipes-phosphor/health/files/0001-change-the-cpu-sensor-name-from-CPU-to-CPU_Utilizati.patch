@@ -1,26 +1,31 @@
-From 0c66a7f348692507b5e4e0683a557c768fca1f67 Mon Sep 17 00:00:00 2001
+From c0ac6d275cc7322047ad22d26b85fbea0d41ccab Mon Sep 17 00:00:00 2001
 From: Joseph Liu <kwliu@nuvoton.com>
 Date: Tue, 12 Jul 2022 15:17:49 +0800
 Subject: [PATCH] change the cpu sensor name from CPU to CPU_Utilization
 
 Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
 ---
- healthMonitor.cpp | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ healthMonitor.cpp | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/healthMonitor.cpp b/healthMonitor.cpp
-index be62c3a..9d56e1d 100644
+index aaa27ee..9a92b58 100644
 --- a/healthMonitor.cpp
 +++ b/healthMonitor.cpp
-@@ -235,7 +235,7 @@ constexpr auto storage = "Storage";
- constexpr auto inode = "Inode";
- /** Map of read function for each health sensors supported */
- const std::map<std::string, std::function<double(std::string path)>>
--    readSensors = {{"CPU", readCPUUtilization},
-+    readSensors = {{"CPU_Utilization", readCPUUtilization},
-                    {"Memory", readMemoryUtilization},
-                    {storage, readStorageUtilization},
-                    {inode, readInodeUtilization}};
+@@ -481,11 +481,12 @@ void printConfig(HealthConfig& cfg)
+ }
+ 
+ /* Create dbus utilization sensor object for each configured sensors */
++constexpr auto util_path = "_Utilization";
+ void HealthMon::createHealthSensors(const std::vector<std::string>& chassisIds)
+ {
+     for (auto& cfg : sensorConfigs)
+     {
+-        std::string objPath = std::string(HEALTH_SENSOR_PATH) + cfg.name;
++        std::string objPath = std::string(HEALTH_SENSOR_PATH) + cfg.name + util_path;
+         auto healthSensor = std::make_shared<HealthSensor>(bus, objPath.c_str(),
+                                                            cfg, chassisIds);
+         healthSensors.emplace(cfg.name, healthSensor);
 -- 
-2.34.1
+2.17.1
 
