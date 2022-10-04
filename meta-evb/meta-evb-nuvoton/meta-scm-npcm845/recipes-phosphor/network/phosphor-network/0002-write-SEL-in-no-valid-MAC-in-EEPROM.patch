@@ -1,0 +1,60 @@
+From 40e39654f56c1a05d7010cdd8d20891e94d5e0c8 Mon Sep 17 00:00:00 2001
+From: Brian Ma <chma0@nuvoton.com>
+Date: Mon, 3 Oct 2022 17:43:09 +0800
+Subject: [PATCH] write SEL in no valid MAC in EEPROM
+
+---
+ src/network_config.cpp | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+
+diff --git a/src/network_config.cpp b/src/network_config.cpp
+index 7012321..dac1a71 100644
+--- a/src/network_config.cpp
++++ b/src/network_config.cpp
+@@ -103,6 +103,32 @@ ether_addr getMACfromEEPROM(void)
+     return addr;
+ }
+ 
++static constexpr char const* ipmiSELObject = "xyz.openbmc_project.Logging.IPMI";
++static constexpr char const* ipmiSELPath = "/xyz/openbmc_project/Logging/IPMI";
++static constexpr char const* ipmiSELAddInterface =
++    "xyz.openbmc_project.Logging.IPMI";
++static constexpr char const* oemHealthSensor =
++    "/xyz/openbmc_project/sensors/oem_health/no_mac_eeprom";
++void noMACinEEPROM()
++{
++    // MS spec 18.2.5 BMC health status, No MAC address programmed
++    static const std::string ipmiSELAddMessage = "No MAC address programmed";
++    static const std::vector<uint8_t> eventData = {0xac, 0, 0};
++    uint16_t genId = 0x2000; // byte 1 0x20 BMC
++    auto bus = sdbusplus::bus::new_default();
++    sdbusplus::message::message writeSEL = bus.new_method_call(
++        ipmiSELObject, ipmiSELPath, ipmiSELAddInterface, "IpmiSelAdd");
++    writeSEL.append(ipmiSELAddMessage, oemHealthSensor, eventData, true, genId);
++    try
++    {
++        bus.call(writeSEL);
++    }
++    catch (sdbusplus::exception_t& e)
++    {
++        phosphor::logging::log<phosphor::logging::level::ERR>(e.what());
++    }
++}
++
+ void writeDHCPDefault(const std::string& filename, const std::string& interface)
+ {
+     std::ofstream filestream;
+@@ -136,6 +162,10 @@ void writeDHCPDefault(const std::string& filename, const std::string& interface)
+         std::string MACAddrStr = phosphor::network::mac_address::toString(mac_addr);
+         filestream << "[Link]\nMACAddress=" << MACAddrStr << "\n";
+     }
++    else
++    {
++        noMACinEEPROM();
++    }
+ #endif
+     filestream.close();
+ }
+-- 
+2.17.1
+

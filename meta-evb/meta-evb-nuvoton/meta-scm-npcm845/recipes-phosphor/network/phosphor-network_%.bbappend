@@ -1,6 +1,7 @@
 FILESEXTRAPATHS:prepend:scm-npcm845 := "${THISDIR}/${PN}:"
 
 SRC_URI:append:scm-npcm845 = " file://0001-suuport-sync-mac-from-eeprom.patch"
+SRC_URI:append:scm-npcm845 = " file://0002-write-SEL-in-no-valid-MAC-in-EEPROM.patch"
 SRC_URI:append:scm-npcm845 = " file://config.json"
 
 PACKAGECONFIG:append:scm-npcm845 = " nic-ethtool"
