@@ -1,0 +1,43 @@
+From 97d446b887dae3731ce609ada419243485c3586e Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Thu, 28 Jul 2022 12:38:08 +0800
+Subject: [PATCH] set channel security keys
+
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ command/rakp34.cpp | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/command/rakp34.cpp b/command/rakp34.cpp
+index cfa2363..ee3c7a4 100644
+--- a/command/rakp34.cpp
++++ b/command/rakp34.cpp
+@@ -9,7 +9,9 @@
+ #include <algorithm>
+ #include <cstring>
+ #include <phosphor-logging/log.hpp>
+-
++#define NULLSTR "00000000000000000000"
++#define KEYSIZE 20
++#define ID_KG 1
+ using namespace phosphor::logging;
+ 
+ namespace command
+@@ -213,6 +215,14 @@ std::vector<uint8_t> RAKP34(const std::vector<uint8_t>& inPayload,
+ 
+     std::copy_n(session->userName.data(), userLength, iter);
+ 
++    std::string chsecuritykeys = ipmi::ipmiGetChannelSecurityKeys(ID_KG);
++    if(strncmp(chsecuritykeys.c_str(),NULLSTR,KEYSIZE))
++    {
++    	std::fill(authAlgo->userKey.data(),
++              authAlgo->userKey.data() + authAlgo->userKey.size(), 0);
++    	std::copy_n(chsecuritykeys.c_str(), chsecuritykeys.size() , authAlgo->userKey.data());
++    }
++
+     // Generate Session Integrity Key
+     auto sikOutput = authAlgo->generateHMAC(input);
+ 
+-- 
+2.17.1
+

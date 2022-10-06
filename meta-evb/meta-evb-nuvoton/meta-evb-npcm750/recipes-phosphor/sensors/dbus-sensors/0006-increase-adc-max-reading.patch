@@ -1,0 +1,26 @@
+From d32e5cc6c0a08ac6c80168f482d4bcc05e19efce Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Mon, 15 Aug 2022 14:46:11 +0800
+Subject: [PATCH 6/8] increase adc max reading
+
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ src/ADCSensor.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/ADCSensor.cpp b/src/ADCSensor.cpp
+index a8287b46..4d3062d2 100644
+--- a/src/ADCSensor.cpp
++++ b/src/ADCSensor.cpp
+@@ -37,7 +37,7 @@
+ static constexpr unsigned int sensorScaleFactor = 1000;
+ 
+ static constexpr double roundFactor = 10000;     // 3 decimal places
+-static constexpr double maxVoltageReading = 1.8; // pre sensor scaling
++static constexpr double maxVoltageReading = 2.0; // pre sensor scaling
+ static constexpr double minVoltageReading = 0;
+ 
+ ADCSensor::ADCSensor(const std::string& path,
+-- 
+2.17.1
+

@@ -1,2 +1,11 @@
-Common targets are:
-     obmc-phosphor-image
+Make inventory-manager target
+     bitbake obmc-phosphor-image
+
+Make entity-manager target
+     DISTRO=poleg-evb-entity bitbake obmc-phosphor-image
+
+Make emmc image with inventory-manager (boot linux/openbmc from emmc)
+     DISTRO=poleg-evb-emmc bitbake obmc-phosphor-image
+
+Make emmc image with entity-manager (boot linux/openbmc from emmc)
+     DISTRO=poleg-evb-emmc-entity bitbake obmc-phosphor-image

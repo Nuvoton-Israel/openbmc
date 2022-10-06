@@ -1,0 +1,37 @@
+From 8366a534a1da1c975bd10317dbb29a8f11f9fcd8 Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Mon, 15 Aug 2022 14:58:46 +0800
+Subject: [PATCH 8/8] add sesnor max16550
+
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ src/PSUSensorMain.cpp | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/src/PSUSensorMain.cpp b/src/PSUSensorMain.cpp
+index 923a93e8..dc6abbc4 100644
+--- a/src/PSUSensorMain.cpp
++++ b/src/PSUSensorMain.cpp
+@@ -74,7 +74,8 @@ static constexpr auto sensorTypes{std::to_array<const char*>(
+      "xyz.openbmc_project.Configuration.RAA229126",
+      "xyz.openbmc_project.Configuration.TPS546D24",
+      "xyz.openbmc_project.Configuration.XDPE12284",
+-     "xyz.openbmc_project.Configuration.p2011"})};
++     "xyz.openbmc_project.Configuration.p2011",
++     "xyz.openbmc_project.Configuration.MAX1655"})};
+ 
+ // clang-format off
+ static constexpr auto pmbusNames{std::to_array<const char*>({
+@@ -111,7 +112,8 @@ static constexpr auto pmbusNames{std::to_array<const char*>({
+     "raa229126",
+     "tps546d24",
+     "xdpe12284",
+-    "p2011"
++    "p2011",
++    "max16550"
+ })};
+ //clang-format on
+ 
+-- 
+2.17.1
+

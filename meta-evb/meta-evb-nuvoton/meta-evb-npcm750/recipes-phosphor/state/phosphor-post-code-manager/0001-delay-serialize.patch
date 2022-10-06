@@ -1,0 +1,135 @@
+From a02f56949f5f5abbc521ff9ce733200b8018c832 Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Mon, 15 Aug 2022 13:31:08 +0800
+Subject: [PATCH] fix post code hang issue
+
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ inc/post_code.hpp | 38 ++++++++++++++++++++++++++++++++++++++
+ src/post_code.cpp | 24 +++++++++++++++++++++++-
+ 2 files changed, 61 insertions(+), 1 deletion(-)
+
+diff --git a/inc/post_code.hpp b/inc/post_code.hpp
+index 3e82ab5..2a9b081 100644
+--- a/inc/post_code.hpp
++++ b/inc/post_code.hpp
+@@ -33,6 +33,7 @@
+ #include <xyz/openbmc_project/Common/error.hpp>
+ #include <xyz/openbmc_project/State/Boot/PostCode/server.hpp>
+ #include <xyz/openbmc_project/State/Host/server.hpp>
++#include <xyz/openbmc_project/State/OperatingSystem/Status/server.hpp>
+ 
+ const static constexpr char *CurrentBootCycleCountName =
+     "CurrentBootCycleCount";
+@@ -64,6 +65,7 @@ class PostCodeDataHolder
+         "/var/lib/phosphor-post-code-manager/host";
+     const static constexpr char *HostStatePathPrefix =
+         "/xyz/openbmc_project/state/host";
++    const static constexpr char *OsStatePath = "/xyz/openbmc_project/state/os";
+ };
+ 
+ struct EventDeleter
+@@ -79,6 +81,8 @@ using secondarycode_t = std::vector<uint8_t>;
+ using postcode_t = std::tuple<primarycode_t, secondarycode_t>;
+ namespace fs = std::filesystem;
+ namespace StateServer = sdbusplus::xyz::openbmc_project::State::server;
++namespace OsServer =
++    sdbusplus::xyz::openbmc_project::State::OperatingSystem::server;
+ 
+ using post_code =
+     sdbusplus::xyz::openbmc_project::State::Boot::server::PostCode;
+@@ -153,6 +157,39 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
+                         }
+                     }
+                 }
++            }),
++        propertiesChangedSignalOsState(
++            bus,
++            sdbusplus::bus::match::rules::type::signal() +
++                sdbusplus::bus::match::rules::member("PropertiesChanged") +
++                sdbusplus::bus::match::rules::path(
++                    postcodeDataHolderObj.OsStatePath) +
++                sdbusplus::bus::match::rules::interface(
++                    postcodeDataHolderObj.PropertiesIntf),
++            [this](sdbusplus::message::message &msg) {
++                std::string objectName;
++                std::map<std::string, std::variant<std::string>> msgData;
++                msg.read(objectName, msgData);
++                // Check if it was the Value property that changed.
++                auto valPropMap = msgData.find("OperatingSystemState");
++                {
++                    if (valPropMap != msgData.end())
++                    {
++                        // The X86 power control not set full string
++                        // OsServer::Status::OSStatus OsStatus =
++                        //     OsServer::Status::convertOSStatusFromString(
++                        //         std::get<std::string>(valPropMap->second));
++                        std::string OsStatus =
++                            std::get<std::string>(valPropMap->second);
++                        if (OsStatus == "Standby")
++                        {
++                            this->serialize(fs::path(strPostCodeListPath));
++                            phosphor::logging::log<
++                                phosphor::logging::level::INFO>(
++                                "final serialize");
++                        }
++                    }
++                }
+             })
+     {
+         phosphor::logging::log<phosphor::logging::level::INFO>(
+@@ -200,6 +237,7 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
+     void savePostCodes(postcode_t code);
+     sdbusplus::bus::match_t propertiesChangedSignalRaw;
+     sdbusplus::bus::match_t propertiesChangedSignalCurrentHostState;
++    sdbusplus::bus::match_t propertiesChangedSignalOsState;
+     fs::path serialize(const std::string &path);
+     bool deserialize(const fs::path &path, uint16_t &index);
+     bool deserializePostCodes(const fs::path &path,
+diff --git a/src/post_code.cpp b/src/post_code.cpp
+index b1ffab8..25bdbf5 100644
+--- a/src/post_code.cpp
++++ b/src/post_code.cpp
+@@ -69,8 +69,12 @@ std::map<uint64_t, postcode_t>
+     return codes;
+ }
+ 
++// Test solution, just for debug, if the last two post comes very close, the
++// final post code would no be saved. So do not use this patch to real project
++const static uint64_t SAVE_THREDSHOLD = 500 * 1000;
+ void PostCode::savePostCodes(postcode_t code)
+ {
++    static uint64_t lastTsUs = 0;
+     // steady_clock is a monotonic clock that is guaranteed to never be adjusted
+     auto postCodeTimeSteady = std::chrono::steady_clock::now();
+     uint64_t tsUS = std::chrono::duration_cast<std::chrono::microseconds>(
+@@ -93,7 +97,25 @@ void PostCode::savePostCodes(postcode_t code)
+     }
+ 
+     postCodes.insert(std::make_pair(tsUS, code));
+-    serialize(fs::path(strPostCodeListPath));
++    if (lastTsUs == 0)
++    {
++        serialize(fs::path(strPostCodeListPath));
++        lastTsUs = tsUS;
++    }
++    else if (tsUS - lastTsUs > SAVE_THREDSHOLD)
++    {
++        std::string msg = "serialize start, ts: " + std::to_string(tsUS);
++        phosphor::logging::log<phosphor::logging::level::INFO>(msg.c_str());
++        serialize(fs::path(strPostCodeListPath));
++        phosphor::logging::log<phosphor::logging::level::INFO>("serialize end");
++        lastTsUs = tsUS;
++    }
++    else
++    {
++        std::string msg = "serialize skipped, ts:" + std::to_string(tsUS) +
++                          ", code:" + std::to_string(std::get<0>(code));
++        phosphor::logging::log<phosphor::logging::level::INFO>(msg.c_str());
++    }
+ 
+ #ifdef ENABLE_BIOS_POST_CODE_LOG
+     uint64_t usTimeOffset = tsUS - firstPostCodeUsSinceEpoch;
+-- 
+2.17.1
+

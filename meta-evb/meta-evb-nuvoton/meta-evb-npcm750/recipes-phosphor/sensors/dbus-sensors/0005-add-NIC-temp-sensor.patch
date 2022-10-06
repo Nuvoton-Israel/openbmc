@@ -1,0 +1,204 @@
+From 5c3f0ba299dcf786aff63ab4e2d69b403ce39784 Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Mon, 15 Aug 2022 14:42:20 +0800
+Subject: [PATCH 5/8] add NIC temp sensor
+
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ include/MCUTempSensor.hpp |   6 +-
+ src/MCUTempSensor.cpp     | 118 ++++++++++++++++++++++++++++++++------
+ 2 files changed, 106 insertions(+), 18 deletions(-)
+
+diff --git a/include/MCUTempSensor.hpp b/include/MCUTempSensor.hpp
+index deb7102c..6655aff2 100644
+--- a/include/MCUTempSensor.hpp
++++ b/include/MCUTempSensor.hpp
+@@ -16,7 +16,8 @@ struct MCUTempSensor : public Sensor
+                   const std::string& sensorConfiguration,
+                   sdbusplus::asio::object_server& objectServer,
+                   std::vector<thresholds::Threshold>&& thresholds,
+-                  uint8_t busId, uint8_t mcuAddress, uint8_t tempReg);
++                  uint8_t busId, uint8_t mcuAddress, uint8_t tempReg,
++                  uint8_t tempRegWidth, uint16_t scale);
+     ~MCUTempSensor() override;
+ 
+     void checkThresholds(void) override;
+@@ -26,9 +27,12 @@ struct MCUTempSensor : public Sensor
+     uint8_t busId;
+     uint8_t mcuAddress;
+     uint8_t tempReg;
++    uint8_t tempRegWidth;
++    uint16_t scale;
+ 
+   private:
+     int getMCURegsInfoWord(uint8_t regs, int16_t* pu16data);
++    int getMCURegsInfoByte(uint8_t regs, uint8_t* pu8data);
+     sdbusplus::asio::object_server& objectServer;
+     boost::asio::deadline_timer waitTimer;
+ };
+diff --git a/src/MCUTempSensor.cpp b/src/MCUTempSensor.cpp
+index 4653bc86..bbe9ac9d 100644
+--- a/src/MCUTempSensor.cpp
++++ b/src/MCUTempSensor.cpp
+@@ -54,11 +54,11 @@ MCUTempSensor::MCUTempSensor(std::shared_ptr<sdbusplus::asio::connection>& conn,
+                              sdbusplus::asio::object_server& objectServer,
+                              std::vector<thresholds::Threshold>&& thresholdData,
+                              uint8_t busId, uint8_t mcuAddress,
+-                             uint8_t tempReg) :
++                             uint8_t tempReg, uint8_t tempRegWidth, uint16_t scale) :
+     Sensor(escapeName(sensorName), std::move(thresholdData),
+            sensorConfiguration, "xyz.openbmc_project.Configuration.ExitAirTemp",
+            false, false, mcuTempMaxReading, mcuTempMinReading, conn),
+-    busId(busId), mcuAddress(mcuAddress), tempReg(tempReg),
++    busId(busId), mcuAddress(mcuAddress), tempReg(tempReg), tempRegWidth(tempRegWidth), scale(scale),
+     objectServer(objectServer), waitTimer(io)
+ {
+     sensorInterface = objectServer.add_interface(
+@@ -99,6 +99,55 @@ void MCUTempSensor::checkThresholds(void)
+     thresholds::checkThresholds(this);
+ }
+ 
++int MCUTempSensor::getMCURegsInfoByte(uint8_t regs, uint8_t* pu8data)
++{
++    std::string i2cBus = "/dev/i2c-" + std::to_string(busId);
++    int fd = open(i2cBus.c_str(), O_RDWR);
++    int ret;
++
++    if (fd < 0)
++    {
++        std::cerr << " unable to open i2c device" << i2cBus << "  err=" << fd
++                  << "\n";
++        return -1;
++    }
++
++    if (ioctl(fd, I2C_SLAVE_FORCE, mcuAddress) < 0)
++    {
++        std::cerr << " unable to set device address\n";
++        close(fd);
++        return -1;
++    }
++
++    unsigned long funcs = 0;
++    if (ioctl(fd, I2C_FUNCS, &funcs) < 0)
++    {
++        std::cerr << " not support I2C_FUNCS\n";
++        close(fd);
++        return -1;
++    }
++
++    if (!(funcs & I2C_FUNC_SMBUS_READ_BYTE_DATA))
++    {
++        std::cerr << " not support I2C_FUNC_SMBUS_READ_BYTE_DATA\n";
++        close(fd);
++        return -1;
++    }
++
++    ret = i2c_smbus_read_byte_data(fd, regs);
++    close(fd);
++
++    if (ret < 0)
++    {
++        std::cerr << " read word data failed at " << static_cast<int>(regs)
++                  << "\n";
++        return -1;
++    }
++    *pu8data = (uint8_t)ret;
++
++    return 0;
++}
++
+ int MCUTempSensor::getMCURegsInfoWord(uint8_t regs, int16_t* pu16data)
+ {
+     std::string i2cBus = "/dev/i2c-" + std::to_string(busId);
+@@ -165,23 +214,46 @@ void MCUTempSensor::read(void)
+             std::cerr << "timer error\n";
+             return;
+         }
+-        int16_t temp = 0;
+-        int ret = getMCURegsInfoWord(tempReg, &temp);
+-        if (ret >= 0)
+-        {
+-            double v = static_cast<double>(temp) / 1000;
+-            if constexpr (debug)
++	if (tempRegWidth == 1)
++	{
++            uint8_t temp;
++            int ret = getMCURegsInfoByte(tempReg, &temp);
++            if (ret >= 0)
+             {
+-                std::cerr << "Value update to " << v << "raw reading "
++                double v = static_cast<double>(temp) / scale;
++                if constexpr (debug)
++                {
++                    std::cerr << "Value update to " << v << "raw reading "
+                           << static_cast<int>(temp) << "\n";
++                }
++                updateValue(v);
+             }
+-            updateValue(v);
+-        }
+-        else
+-        {
+-            std::cerr << "Invalid read getMCURegsInfoWord\n";
+-            incrementError();
+-        }
++            else
++            {
++                std::cerr << "Invalid read getMCURegsInfoByte\n";
++                incrementError();
++   	    }
++	}
++	else
++	{
++            int16_t temp;
++            int ret = getMCURegsInfoWord(tempReg, &temp);
++            if (ret >= 0)
++            {
++                double v = static_cast<double>(temp) / scale;
++                if constexpr (debug)
++                {
++                    std::cerr << "Value update to " << v << "raw reading "
++                          << static_cast<int>(temp) << "\n";
++                }
++                updateValue(v);
++            }
++            else
++            {
++                std::cerr << "Invalid read getMCURegsInfoWord\n";
++                incrementError();
++   	    }
++	}
+         read();
+     });
+ }
+@@ -231,6 +303,18 @@ void createSensors(
+                         loadVariant<uint8_t>(entry.second, "Address");
+ 
+                     uint8_t tempReg = loadVariant<uint8_t>(entry.second, "Reg");
++                    uint8_t tempRegWidth = 2;
++     	            uint16_t scale = 1000;
++                    auto findType1 = entry.second.find("RegWidth");
++                    if (findType1 != entry.second.end())
++                    {
++                        tempRegWidth = loadVariant<uint8_t>(entry.second, "RegWidth");
++                    }
++                    auto findType2 = entry.second.find("Scale");
++                    if (findType2 != entry.second.end())
++                    {
++                        scale = loadVariant<uint16_t>(entry.second, "Scale");
++                    }
+ 
+                     std::string sensorClass =
+                         loadVariant<std::string>(entry.second, "Class");
+@@ -254,7 +338,7 @@ void createSensors(
+                     sensor = std::make_unique<MCUTempSensor>(
+                         dbusConnection, io, name, pathPair.first, objectServer,
+                         std::move(sensorThresholds), busId, mcuAddress,
+-                        tempReg);
++                        tempReg, tempRegWidth, scale);
+ 
+                     sensor->init();
+                 }
+-- 
+2.17.1
+
