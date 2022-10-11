@@ -1,0 +1,26 @@
+From 83c74721110be405f25dedfe5ad13c06bfde989d Mon Sep 17 00:00:00 2001
+From: Medad CChien <ctcchien@nuvoton.com>
+Date: Tue, 15 Feb 2022 15:14:55 +0800
+Subject: [PATCH 1/1] Fix wrong type of TRANSACTION_ID metadata
+
+Signed-off-by: Medad CChien <ctcchien@nuvoton.com>
+---
+ lib/include/phosphor-logging/log.hpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/lib/include/phosphor-logging/log.hpp b/lib/include/phosphor-logging/log.hpp
+index 14c0faa7..4c826ac0 100644
+--- a/lib/include/phosphor-logging/log.hpp
++++ b/lib/include/phosphor-logging/log.hpp
+@@ -163,7 +163,7 @@ void log(Msg msg, Entry... e)
+     constexpr const char* msg_str = "MESSAGE=%s";
+     const auto msg_tuple = std::make_tuple(msg_str, std::forward<Msg>(msg));
+ 
+-    constexpr auto transactionStr = "TRANSACTION_ID=%lld";
++    constexpr auto transactionStr = "TRANSACTION_ID=%llu";
+     auto transactionId = sdbusplus::server::transaction::get_id();
+ 
+     auto log_tuple = std::tuple_cat(details::prio<L>(), msg_tuple,
+-- 
+2.17.1
+
