@@ -1,0 +1,25 @@
+From b9695c2d41fd1d4226d25ebceab8aa6066c354fc Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Tue, 16 Aug 2022 15:49:22 +0800
+Subject: [PATCH 10/21] Fix duplicated seesion handle
+
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ apphandler.cpp | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/apphandler.cpp b/apphandler.cpp
+index 87281cac..4bc17382 100644
+--- a/apphandler.cpp
++++ b/apphandler.cpp
+@@ -1271,6 +1271,7 @@ ipmi::RspType<uint8_t, // session handle,
+             return ipmi::response(completionCode);
+         }
+         maybeDetails = std::move(details);
++        break;
+     }
+ 
+     if (state == static_cast<uint8_t>(session::State::active) ||
+-- 
+2.17.1
+
