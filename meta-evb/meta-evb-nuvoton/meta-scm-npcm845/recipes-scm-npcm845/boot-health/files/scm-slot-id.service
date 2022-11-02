@@ -1,0 +1,18 @@
+[Unit]
+Description=BMC health slot ID mismatch SEL add service
+Requires=xyz.openbmc_project.Logging.IPMI.service
+Wants=mapper-wait@-xyz-openbmc_project-Logging-IPMI.service
+After=xyz.openbmc_project.Network.service
+StartLimitInterval=200
+StartLimitBurst=5
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh /usr/bin/slot_id.sh
+# IP may not ready when system boot, we need retry
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
