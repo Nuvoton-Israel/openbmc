@@ -1,8 +1,6 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/linux-nuvoton:"
 
 SRC_URI:append:scm-npcm845 = " file://scm-npcm845.cfg"
-#SRC_URI:append:scm-npcm845 = " file://0001-dts-npcm8xx-add-psci-smp-method-tz.patch"
-#SRC_URI:append:scm-npcm845 = " file://0002-pinctrl-npcm8xx-correct-gpio190-setting.patch"
 SRC_URI:append:scm-npcm845 = " file://0003-net-phy-realtek-add-soft_reset.patch"
 SRC_URI:append:scm-npcm845 = " file://0004-kernel-scm-dts.patch"
 SRC_URI:append:scm-npcm845 = " file://0005-p2011-skip-status-check.patch"
@@ -12,9 +10,7 @@ SRC_URI:append:scm-npcm845 = " file://0010-DTS-Add-sensor-TMP461.patch"
 SRC_URI:append:scm-npcm845 = " file://0011-updaye-amd-apml-dirver.patch"
 SRC_URI:append:scm-npcm845 = " file://0012-rtl8211f-customized-led.patch"
 SRC_URI:append:scm-npcm845 = " file://0013-Add-pmbus-driver-for-MAX16550.patch"
-#SRC_URI:append:scm-npcm845 = " file://0014-driver-i2c-npcm7xx-don-t-check-sda-scl-status-in-dri.patch"
 SRC_URI:append:scm-npcm845 = " file://0015-device-tree-optee-enable.patch"
-#SRC_URI:append:scm-npcm845 = " file://0016-WA-fix-watchdog-bootstatus-incorrect.patch"
 SRC_URI:append:scm-npcm845 = " file://0017-dts-scm-npcm845-add-tip-mailbox-support.patch"
 
 SRC_URI:append:scm-npcm845 = " file://enable-v4l2-kvm.cfg"
