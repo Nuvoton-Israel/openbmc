@@ -21,6 +21,11 @@ RPROVIDES:${PN}-fans += "virtual-obmc-fan-mgmt"
 RPROVIDES:${PN}-flash += "virtual-obmc-flash-mgmt"
 RPROVIDES:${PN}-system += "virtual-obmc-system-mgmt"
 
+SUMMARY:${PN}-chassis = "OLYMPUS NUVOTON Chassis"
+RDEPENDS:${PN}-chassis = " \
+        x86-power-control \
+        "
+
 SUMMARY:${PN}-fans = "OLYMPUS NUVOTON Fans"
 RDEPENDS:${PN}-fans = " \
         phosphor-pid-control \
@@ -28,7 +33,7 @@ RDEPENDS:${PN}-fans = " \
 
 SUMMARY:${PN}-system = "OLYMPUS NUVOTON System"
 RDEPENDS:${PN}-system = " \
-        phosphor-webui \
+        webui-vue \
         obmc-ikvm \
         obmc-console \
         dhcpcd \
