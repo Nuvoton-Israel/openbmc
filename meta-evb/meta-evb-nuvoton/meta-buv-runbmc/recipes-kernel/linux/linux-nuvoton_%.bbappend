@@ -7,4 +7,6 @@ SRC_URI:append:buv-runbmc = " \
   file://0007-Ampere-Altra-MAX-SSIF-IPMI-driver.patch \
   file://0008-driver-misc-seven-segment-display-gpio-driver.patch \
   file://0009-Add-buv-runbmc-PSU-driver-inspur-ipsps.c.patch \
+  file://0010-dts-add-two-test-PSUs-settings.patch \
+  file://0011-drivers-hwmon-pmbus-remove-fan-func-in-inspur-ipsps..patch \
   "

@@ -1,0 +1,30 @@
+From cd9abe5b5be599cb69d12a26786c7011be71e6e8 Mon Sep 17 00:00:00 2001
+From: Allen Kang <jhkang@nuvoton.com>
+Date: Mon, 10 Apr 2023 11:08:30 +0800
+Subject: [PATCH] drivers: hwmon: pmbus: remove fan func in inspur-ipsps.c
+
+Signed-off-by: Allen Kang <jhkang@nuvoton.com>
+---
+ drivers/hwmon/pmbus/inspur-ipsps.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/hwmon/pmbus/inspur-ipsps.c b/drivers/hwmon/pmbus/inspur-ipsps.c
+index 0f614e8d95f6..12d8d2cfb337 100644
+--- a/drivers/hwmon/pmbus/inspur-ipsps.c
++++ b/drivers/hwmon/pmbus/inspur-ipsps.c
+@@ -179,10 +179,10 @@ static struct pmbus_driver_info ipsps_info = {
+ 	.pages = 1,
+ 	.func[0] = PMBUS_HAVE_VIN | PMBUS_HAVE_VOUT | PMBUS_HAVE_IOUT |
+ 		PMBUS_HAVE_IIN | PMBUS_HAVE_POUT | PMBUS_HAVE_PIN |
+-		PMBUS_HAVE_FAN12 | PMBUS_HAVE_TEMP | PMBUS_HAVE_TEMP2 |
++		PMBUS_HAVE_TEMP | PMBUS_HAVE_TEMP2 |
+ 		PMBUS_HAVE_TEMP3 | PMBUS_HAVE_STATUS_VOUT |
+ 		PMBUS_HAVE_STATUS_IOUT | PMBUS_HAVE_STATUS_INPUT |
+-		PMBUS_HAVE_STATUS_TEMP | PMBUS_HAVE_STATUS_FAN12,
++		PMBUS_HAVE_STATUS_TEMP,
+ 	.groups = ipsps_groups,
+ };
+ 
+-- 
+2.34.1
+
