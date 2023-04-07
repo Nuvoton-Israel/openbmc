@@ -16,6 +16,8 @@ EXTRA_OEMESON:append:buv-runbmc = " \
     "
 PACKAGECONFIG:append:buv-entity = " dynamic-sensors"
 
+EXTRA_OEMESON:append:buv-runbmc = " -Di2c-whitelist-check=disabled"
+
 do_install:append:buv-entity(){
     install -d ${D}${includedir}/phosphor-ipmi-host
     install -m 0644 -D ${S}/sensorhandler.hpp ${D}${includedir}/phosphor-ipmi-host
