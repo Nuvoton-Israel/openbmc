@@ -18,6 +18,8 @@ EXTRA_OEMESON:append:olympus-nuvoton = " \
     "
 PACKAGECONFIG:append:olympus-entity = " dynamic-sensors"
 
+EXTRA_OEMESON:append:buv-runbmc = " -Di2c-whitelist-check=disabled"
+
 # for intel ipmi oem
 do_install:append:olympus-nuvoton(){
     install -d ${D}${includedir}/phosphor-ipmi-host
