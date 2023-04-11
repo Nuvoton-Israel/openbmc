@@ -28,20 +28,6 @@ index 40ff9042f9..ced4709bbb 100644
  
  dtb-$(CONFIG_ARCH_NPCM7xx) += \
  		nuvoton-npcm750-buv.dtb \
-diff --git a/arch/arm/dts/nuvoton-common-npcm8xx.dtsi b/arch/arm/dts/nuvoton-common-npcm8xx.dtsi
-index 126a34e27c..6dfea9750a 100644
---- a/arch/arm/dts/nuvoton-common-npcm8xx.dtsi
-+++ b/arch/arm/dts/nuvoton-common-npcm8xx.dtsi
-@@ -1481,5 +1481,9 @@
- 			groups = "jtag2";
- 			function = "jtag2";
- 		};
-+		fm0_pins: fm0-pins {
-+			groups = "fm0";
-+			function = "fm0";
-+		};
- 	};
- };
 diff --git a/arch/arm/dts/nuvoton-npcm845-scm-pincfg.dtsi b/arch/arm/dts/nuvoton-npcm845-scm-pincfg.dtsi
 new file mode 100644
 index 0000000000..ec53016dc5
