@@ -1,0 +1,1325 @@
+From 4fe2833995c0a1690a5e9c7cc67e8c833a46d90b Mon Sep 17 00:00:00 2001
+From: Ban Feng <kcfeng0@nuvoton.com>
+Date: Tue, 11 Apr 2023 11:03:28 +0800
+Subject: [PATCH] bmcweb: add Server-Sent-Events support
+
+This patch refers below commits:
+
+From: AppaRao Puli <apparao.puli@linux.intel.com>
+Date: Fri, 12 Mar 2021 18:53:25 +0000
+Subject: [PATCH] Add Server-Sent-Events support
+
+From: AppaRao Puli <apparao.puli@linux.intel.com>
+Date: Tue, 16 Mar 2021 15:37:24 +0000
+Subject: [PATCH] Add SSE style subscription support to eventservice
+
+From: AppaRao Puli <apparao.puli@linux.intel.com>
+Date: Wed, 17 Mar 2021 01:16:50 +0000
+Subject: [PATCH] Add EventService SSE filter support
+
+Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
+---
+ http/http_connection.hpp                      |  10 +-
+ http/http_response.hpp                        |   5 +
+ http/routing.hpp                              |  74 +++++
+ http/server_sent_event.hpp                    | 294 ++++++++++++++++++
+ include/eventservice_sse.hpp                  | 213 +++++++++++++
+ redfish-core/include/error_messages.hpp       |   9 +
+ .../include/event_service_manager.hpp         | 123 ++++++--
+ redfish-core/include/server_sent_events.hpp   | 293 -----------------
+ redfish-core/lib/event_service.hpp            |   8 +-
+ redfish-core/src/error_messages.cpp           |  26 ++
+ src/webserver_main.cpp                        |   2 +
+ 11 files changed, 722 insertions(+), 335 deletions(-)
+ create mode 100644 http/server_sent_event.hpp
+ create mode 100644 include/eventservice_sse.hpp
+ delete mode 100644 redfish-core/include/server_sent_events.hpp
+
+diff --git a/http/http_connection.hpp b/http/http_connection.hpp
+index d5d02e545..63bbcc1ff 100644
+--- a/http/http_connection.hpp
++++ b/http/http_connection.hpp
+@@ -244,11 +244,13 @@ class Connection :
+             self->completeRequest(thisRes);
+         });
+ 
+-        if (thisReq.isUpgrade() &&
+-            boost::iequals(
+-                thisReq.getHeaderValue(boost::beast::http::field::upgrade),
+-                "websocket"))
++        if ((thisReq.isUpgrade() &&
++             boost::iequals(
++                 thisReq.getHeaderValue(boost::beast::http::field::upgrade),
++                 "websocket")) ||
++            (req->url().encoded_path() == "/redfish/v1/EventService/Subscriptions/SSE"))
+         {
++            BMCWEB_LOG_DEBUG << "Request: " << this << " is getting upgraded";
+             asyncResp->res.setCompleteRequestHandler(
+                 [self(shared_from_this())](crow::Response& thisRes) {
+                 if (thisRes.result() != boost::beast::http::status::ok)
+diff --git a/http/http_response.hpp b/http/http_response.hpp
+index 5cbdb28eb..8d6d92094 100644
+--- a/http/http_response.hpp
++++ b/http/http_response.hpp
+@@ -16,10 +16,15 @@ namespace crow
+ template <typename Adaptor, typename Handler>
+ class Connection;
+ 
++template <typename Adaptor>
++class SseConnectionImpl;
++
+ struct Response
+ {
+     template <typename Adaptor, typename Handler>
+     friend class crow::Connection;
++    template <typename Adaptor>
++    friend class crow::SseConnectionImpl;
+     using response_type =
+         boost::beast::http::response<boost::beast::http::string_body>;
+ 
+diff --git a/http/routing.hpp b/http/routing.hpp
+index 613b54dc7..9d0831c60 100644
+--- a/http/routing.hpp
++++ b/http/routing.hpp
+@@ -8,6 +8,7 @@
+ #include "http_response.hpp"
+ #include "logging.hpp"
+ #include "privileges.hpp"
++#include "server_sent_event.hpp"
+ #include "sessions.hpp"
+ #include "utility.hpp"
+ #include "utils/dbus_utils.hpp"
+@@ -428,6 +429,71 @@ class WebSocketRule : public BaseRule
+     std::function<void(crow::websocket::Connection&)> errorHandler;
+ };
+ 
++class SseSocketRule : public BaseRule
++{
++    using self_t = SseSocketRule;
++
++  public:
++    SseSocketRule(const std::string& ruleIn) : BaseRule(ruleIn)
++    {}
++
++    void validate() override
++    {}
++
++    void handle(const Request&,
++                const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
++                const RoutingParams&) override
++    {
++        asyncResp->res.result(boost::beast::http::status::not_found);
++    }
++
++#ifndef BMCWEB_ENABLE_SSL
++    void handleUpgrade(const Request& req,
++                       const std::shared_ptr<bmcweb::AsyncResp>& /*asyncResp*/,
++                       boost::asio::ip::tcp::socket&& adaptor) override
++    {
++        std::shared_ptr<crow::SseConnectionImpl<boost::asio::ip::tcp::socket>>
++            myConnection = std::make_shared<
++                crow::SseConnectionImpl<boost::asio::ip::tcp::socket>>(
++                req, std::move(adaptor), openHandler, closeHandler);
++        myConnection->start();
++    }
++#else
++    void handleUpgrade(const Request& req,
++                       const std::shared_ptr<bmcweb::AsyncResp>& /*asyncResp*/,
++                       boost::beast::ssl_stream<boost::asio::ip::tcp::socket>&&
++                           adaptor) override
++    {
++        std::shared_ptr<crow::SseConnectionImpl<
++            boost::beast::ssl_stream<boost::asio::ip::tcp::socket>>>
++            myConnection = std::make_shared<crow::SseConnectionImpl<
++                boost::beast::ssl_stream<boost::asio::ip::tcp::socket>>>(
++                req, std::move(adaptor), openHandler, closeHandler);
++        myConnection->start();
++    }
++#endif
++
++    template <typename Func>
++    self_t& onopen(Func f)
++    {
++        openHandler = f;
++        return *this;
++    }
++
++    template <typename Func>
++    self_t& onclose(Func f)
++    {
++        closeHandler = f;
++        return *this;
++    }
++
++  private:
++    std::function<void(std::shared_ptr<crow::SseConnection>&,
++                       const crow::Request&, crow::Response&)>
++        openHandler;
++    std::function<void(std::shared_ptr<crow::SseConnection>&)> closeHandler;
++};
++
+ template <typename T>
+ struct RuleParameterTraits
+ {
+@@ -440,6 +506,14 @@ struct RuleParameterTraits
+         return *p;
+     }
+ 
++    SseSocketRule& serverSentEvent()
++    {
++        self_t* self = static_cast<self_t*>(this);
++        SseSocketRule* p = new SseSocketRule(self->rule);
++        self->ruleToUpgrade.reset(p);
++        return *p;
++    }
++
+     self_t& name(std::string_view name) noexcept
+     {
+         self_t* self = static_cast<self_t*>(this);
+diff --git a/http/server_sent_event.hpp b/http/server_sent_event.hpp
+new file mode 100644
+index 000000000..83884a00a
+--- /dev/null
++++ b/http/server_sent_event.hpp
+@@ -0,0 +1,294 @@
++#pragma once
++#include "http_request.hpp"
++
++#include <boost/algorithm/string/predicate.hpp>
++#include <boost/asio/buffer.hpp>
++#include <boost/beast/http/buffer_body.hpp>
++#include <boost/beast/websocket.hpp>
++
++#include <array>
++#include <functional>
++
++#ifdef BMCWEB_ENABLE_SSL
++#include <boost/beast/websocket/ssl.hpp>
++#endif
++
++namespace crow
++{
++constexpr auto inputBufferSize = 1024U * 64U;
++constexpr uint8_t maxFailCount = 5;
++
++struct SseConnection : std::enable_shared_from_this<SseConnection>
++{
++  public:
++    SseConnection(const crow::Request& reqIn) : req(reqIn)
++    {}
++    virtual ~SseConnection() = default;
++
++    virtual boost::asio::io_context& getIoContext() = 0;
++    virtual void sendSSEHeader() = 0;
++    virtual void completeRequest() = 0;
++    virtual void close(const std::string_view msg = "quit") = 0;
++    virtual void sendEvent(const std::string_view id,
++                           const std::string_view msg) = 0;
++
++    crow::Request req;
++    crow::Response res;
++};
++
++template <typename Adaptor>
++class SseConnectionImpl : public SseConnection
++{
++  public:
++    SseConnectionImpl(
++        const crow::Request& reqIn, Adaptor adaptorIn,
++        std::function<void(std::shared_ptr<SseConnection>&,
++                           const crow::Request&, crow::Response&)>
++            openHandlerIn,
++        std::function<void(std::shared_ptr<SseConnection>&)> closeHandlerIn) :
++        SseConnection(reqIn),
++        adaptor(std::move(adaptorIn)), openHandler(std::move(openHandlerIn)),
++        closeHandler(std::move(closeHandlerIn))
++    {
++        BMCWEB_LOG_DEBUG << "SseConnectionImpl: SSE constructor " << this;
++    }
++
++    ~SseConnectionImpl() override
++    {
++        res.setCompleteRequestHandler(nullptr);
++        BMCWEB_LOG_DEBUG << "SseConnectionImpl: SSE destructor " << this;
++    }
++
++    boost::asio::io_context& getIoContext() override
++    {
++        return static_cast<boost::asio::io_context&>(
++            adaptor.get_executor().context());
++    }
++
++    void start()
++    {
++        // FIXME: Register for completion callback.
++
++        if (openHandler)
++        {
++            std::shared_ptr<SseConnection> self = this->shared_from_this();
++            openHandler(self, req, res);
++        }
++    }
++
++    void close(const std::string_view msg) override
++    {
++        BMCWEB_LOG_DEBUG << "Closing SSE connection " << this << " - " << msg;
++        boost::beast::get_lowest_layer(adaptor).close();
++
++        // send notification to handler for cleanup
++        if (closeHandler)
++        {
++            std::shared_ptr<SseConnection> self = this->shared_from_this();
++            closeHandler(self);
++        }
++    }
++
++    void sendSSEHeader() override
++    {
++        BMCWEB_LOG_DEBUG << "Starting SSE connection";
++        using BodyType = boost::beast::http::buffer_body;
++        auto response =
++            std::make_shared<boost::beast::http::response<BodyType>>(
++                boost::beast::http::status::ok, 11);
++        auto serializer =
++            std::make_shared<boost::beast::http::response_serializer<BodyType>>(
++                *response);
++
++        response->set(boost::beast::http::field::server, "bmcweb");
++        response->set(boost::beast::http::field::content_type,
++                      "text/event-stream");
++        response->body().data = nullptr;
++        response->body().size = 0;
++        response->body().more = true;
++
++        boost::beast::http::async_write_header(
++            adaptor, *serializer,
++            [this, self(shared_from_this()), response, serializer](
++                const boost::beast::error_code& ec, const std::size_t&) {
++                if (ec)
++                {
++                    BMCWEB_LOG_DEBUG << "Error sending header" << ec;
++                    close("async_write_header failed");
++                    return;
++                }
++                BMCWEB_LOG_DEBUG << "SSE header sent - Connection established";
++
++                // SSE stream header sent, So lets setup monitor.
++                // Any read data on this stream will be error in case of SSE.
++                setupRead();
++            });
++    }
++
++    void setupRead()
++    {
++        adaptor.async_read_some(
++            outputBuffer.prepare(outputBuffer.capacity() - outputBuffer.size()),
++            [this](const boost::system::error_code& ec, std::size_t bytesRead) {
++                BMCWEB_LOG_DEBUG << "async_read_some: Read " << bytesRead
++                                 << " bytes";
++                if (ec)
++                {
++                    BMCWEB_LOG_DEBUG << "Read error: " << ec;
++                }
++                outputBuffer.commit(bytesRead);
++                outputBuffer.consume(bytesRead);
++
++                // After establishing SSE stream, Reading data on this
++                // stream means client is disobeys the SSE protocol.
++                // Read the data to avoid buffer attacks and close connection.
++                close("Close SSE connection");
++                return;
++            });
++    }
++
++    void doWrite()
++    {
++        if (doingWrite)
++        {
++            return;
++        }
++        if (inputBuffer.size() == 0)
++        {
++            BMCWEB_LOG_DEBUG << "inputBuffer is empty... Bailing out";
++            return;
++        }
++        doingWrite = true;
++
++        adaptor.async_write_some(
++            inputBuffer.data(), [this, self(shared_from_this())](
++                                    boost::beast::error_code ec,
++                                    const std::size_t& bytesTransferred) {
++                doingWrite = false;
++                inputBuffer.consume(bytesTransferred);
++
++                if (ec == boost::asio::error::eof)
++                {
++                    BMCWEB_LOG_DEBUG << "async_write_some() SSE stream closed";
++                    close("SSE stream closed");
++                    return;
++                }
++
++                if (ec)
++                {
++                    BMCWEB_LOG_DEBUG << "async_write_some() failed: "
++                                     << ec.message();
++                    close("async_write_some failed");
++                    return;
++                }
++                BMCWEB_LOG_DEBUG << "async_write_some() bytes transferred: "
++                                 << bytesTransferred;
++
++                doWrite();
++            });
++    }
++
++    void completeRequest() override
++    {
++        BMCWEB_LOG_DEBUG << "SSE completeRequest() handler";
++        if (res.body().empty() && !res.jsonValue.empty())
++        {
++            res.addHeader("Content-Type", "application/json");
++            res.body() = res.jsonValue.dump(
++                2, ' ', true, nlohmann::json::error_handler_t::replace);
++        }
++
++        res.preparePayload();
++        auto serializer =
++            std::make_shared<boost::beast::http::response_serializer<
++                boost::beast::http::string_body>>(*res.stringResponse);
++
++        boost::beast::http::async_write(
++            adaptor, *serializer,
++            [this, self(shared_from_this()),
++             serializer](const boost::system::error_code& ec,
++                         std::size_t bytesTransferred) {
++                BMCWEB_LOG_DEBUG << this << " async_write " << bytesTransferred
++                                 << " bytes";
++                if (ec)
++                {
++                    BMCWEB_LOG_DEBUG << this << " from async_write failed";
++                    return;
++                }
++                res.clear();
++
++                BMCWEB_LOG_DEBUG << this
++                                 << " Closing SSE connection - Request invalid";
++                close("Request invalid");
++            });
++
++        // delete lambda with self shared_ptr
++        // to enable connection destruction
++        res.setCompleteRequestHandler(nullptr);
++    }
++
++    void sendEvent(const std::string_view id,
++                   const std::string_view msg) override
++    {
++        if (msg.empty())
++        {
++            BMCWEB_LOG_DEBUG << "Empty data, bailing out.";
++            return;
++        }
++
++        std::string rawData;
++        if (!id.empty())
++        {
++            rawData += "id: ";
++            rawData.append(id.begin(), id.end());
++            rawData += "\n";
++        }
++
++        rawData += "data: ";
++        for (char character : msg)
++        {
++            rawData += character;
++            if (character == '\n')
++            {
++                rawData += "data: ";
++            }
++        }
++        rawData += "\n\n";
++
++        if (rawData.size() > inputBufferSize)
++        {
++            BMCWEB_LOG_DEBUG
++                << "Skipping Send Event/Report to SSE Subscription as Buffer Size Exceeded. Size:  "
++                << rawData.size();
++            failCount++;
++            if (failCount > maxFailCount)
++            {
++                BMCWEB_LOG_DEBUG
++                    << "Fail Count Threshold reached. Closing SSE Connection";
++                close("max buffer size not suported");
++            }
++            return;
++        }
++        failCount = 0;
++
++        boost::asio::buffer_copy(inputBuffer.prepare(rawData.size()),
++                                 boost::asio::buffer(rawData));
++        inputBuffer.commit(rawData.size());
++
++        doWrite();
++    }
++
++  private:
++    Adaptor adaptor;
++
++    boost::beast::flat_static_buffer<1024U * 8U> outputBuffer;
++    boost::beast::flat_static_buffer<inputBufferSize> inputBuffer;
++    bool doingWrite = false;
++    uint8_t failCount = 0;
++
++    std::function<void(std::shared_ptr<SseConnection>&, const crow::Request&,
++                       crow::Response&)>
++        openHandler;
++    std::function<void(std::shared_ptr<SseConnection>&)> closeHandler;
++};
++} // namespace crow
+diff --git a/include/eventservice_sse.hpp b/include/eventservice_sse.hpp
+new file mode 100644
+index 000000000..5fb65e81b
+--- /dev/null
++++ b/include/eventservice_sse.hpp
+@@ -0,0 +1,213 @@
++#pragma once
++
++#include <app.hpp>
++#include <event_service_manager.hpp>
++
++namespace redfish
++{
++namespace eventservice_sse
++{
++
++static bool createSubscription(std::shared_ptr<crow::SseConnection>& conn,
++                               const crow::Request& req, crow::Response& res)
++{
++    if ((EventServiceManager::getInstance().getNumberOfSubscriptions() >=
++         maxNoOfSubscriptions) ||
++        EventServiceManager::getInstance().getNumberOfSSESubscriptions() >=
++            maxNoOfSSESubscriptions)
++    {
++        BMCWEB_LOG_DEBUG << "Max SSE subscriptions reached";
++        messages::eventSubscriptionLimitExceeded(res);
++        res.end();
++        return false;
++    }
++    BMCWEB_LOG_DEBUG << "Request query url: " << req.url().encoded_path();
++
++    // EventService SSE supports only "$filter" query param.
++    if (req.url().params().size() > 1)
++    {
++        messages::invalidQueryFilter(res);
++        res.end();
++        return false;
++    }
++    std::string eventFormatType;
++    std::string queryFilters;
++    if (req.url().params().size())
++    {
++        boost::urls::params_view::iterator it =
++            req.url().params().find("$filter");
++        if (it == req.url().params().end())
++        {
++            messages::invalidQueryFilter(res);
++            res.end();
++            return false;
++        }
++        queryFilters = (*it).value.data();
++    }
++    else
++    {
++        eventFormatType = "Event";
++    }
++
++    std::vector<std::string> msgIds;
++    std::vector<std::string> regPrefixes;
++    std::vector<std::string> mrdsArray;
++    if (!queryFilters.empty())
++    {
++        // Reading from query params.
++        bool status = readSSEQueryParams(queryFilters, eventFormatType, msgIds,
++                                         regPrefixes, mrdsArray);
++        if (!status)
++        {
++            messages::internalError(res);
++            res.end();
++            return false;
++        }
++
++        // RegsitryPrefix and messageIds are mutuly exclusive as per redfish
++        // specification.
++        if (regPrefixes.size() && msgIds.size())
++        {
++            messages::propertyValueConflict(res, "RegistryPrefix",
++                                            "MessageId");
++            res.end();
++            return false;
++        }
++
++        if (!eventFormatType.empty())
++        {
++            if (std::find(supportedEvtFormatTypes.begin(),
++                          supportedEvtFormatTypes.end(),
++                          eventFormatType) == supportedEvtFormatTypes.end())
++            {
++                messages::propertyValueNotInList(res, eventFormatType,
++                                                 "EventFormatType");
++                res.end();
++                return false;
++            }
++        }
++        else
++        {
++            // If nothing specified, using default "Event"
++            eventFormatType = "Event";
++        }
++
++        if (!regPrefixes.empty())
++        {
++            for (const std::string& it : regPrefixes)
++            {
++                if (std::find(supportedRegPrefixes.begin(),
++                              supportedRegPrefixes.end(),
++                              it) == supportedRegPrefixes.end())
++                {
++                    messages::propertyValueNotInList(res, it, "RegistryPrefix");
++                    res.end();
++                    return false;
++                }
++            }
++        }
++
++        if (!msgIds.empty())
++        {
++            std::vector<std::string> registryPrefix;
++
++            // If no registry prefixes are mentioned, consider all supported
++            // prefixes to validate message ID
++            if (regPrefixes.empty())
++            {
++                registryPrefix.assign(supportedRegPrefixes.begin(),
++                                      supportedRegPrefixes.end());
++            }
++            else
++            {
++                registryPrefix = regPrefixes;
++            }
++
++            for (const std::string& id : msgIds)
++            {
++                bool validId = false;
++
++                // Check for Message ID in each of the selected Registry
++                for (const std::string& it : registryPrefix)
++                {
++                    const std::span<
++                        const redfish::registries::MessageEntry>
++                        registry =
++                            redfish::registries::getRegistryFromPrefix(
++                                it);
++
++                    if (std::any_of(
++                            registry.begin(), registry.end(),
++                            [&id](
++                                const redfish::registries::MessageEntry&
++                                    messageEntry) {
++                                return !id.compare(messageEntry.first);
++                            }))
++                    {
++                        validId = true;
++                        break;
++                    }
++                }
++
++                if (!validId)
++                {
++                    messages::propertyValueNotInList(res, id, "MessageIds");
++                    res.end();
++                    return false;
++                }
++            }
++        }
++    }
++
++    std::shared_ptr<redfish::Subscription> subValue =
++        std::make_shared<redfish::Subscription>(std::move(conn));
++
++    // GET on this URI means, Its SSE subscriptionType.
++    subValue->subscriptionType = subscriptionTypeSSE;
++    subValue->protocol = "Redfish";
++    subValue->retryPolicy = "TerminateAfterRetries";
++    subValue->eventFormatType = eventFormatType;
++    subValue->registryMsgIds = msgIds;
++    subValue->registryPrefixes = regPrefixes;
++    subValue->metricReportDefinitions = mrdsArray;
++    //subValue->subscriptionOwner = req.session->username;
++
++    std::string id =
++        redfish::EventServiceManager::getInstance().addSubscription(subValue,
++                                                                    false);
++    if (id.empty())
++    {
++        messages::internalError(res);
++        res.end();
++        return false;
++    }
++
++    return true;
++}
++
++static void deleteSubscription(std::shared_ptr<crow::SseConnection>& conn)
++{
++    redfish::EventServiceManager::getInstance().deleteSubscription(conn);
++}
++
++inline void requestRoutes(App& app)
++{
++    BMCWEB_ROUTE(app, "/redfish/v1/EventService/Subscriptions/SSE")
++        .privileges({{"ConfigureComponents", "ConfigureManager"}})
++        .serverSentEvent()
++        .onopen([](std::shared_ptr<crow::SseConnection>& conn,
++                   const crow::Request& req, crow::Response& res) {
++            BMCWEB_LOG_DEBUG << "Connection " << conn << " opened.";
++            if (createSubscription(conn, req, res))
++            {
++                // All success, lets send SSE haader
++                conn->sendSSEHeader();
++            }
++        })
++        .onclose([](std::shared_ptr<crow::SseConnection>& conn) {
++            BMCWEB_LOG_DEBUG << "Connection " << conn << " closed";
++            deleteSubscription(conn);
++        });
++}
++} // namespace eventservice_sse
++} // namespace redfish
+diff --git a/redfish-core/include/error_messages.hpp b/redfish-core/include/error_messages.hpp
+index e45ea4570..db70ce275 100644
+--- a/redfish-core/include/error_messages.hpp
++++ b/redfish-core/include/error_messages.hpp
+@@ -1070,6 +1070,15 @@ nlohmann::json operationNotAllowed();
+ 
+ void operationNotAllowed(crow::Response& res);
+ 
++/**
++ * @brief Formats InvalidQueryFilter message into JSON
++ * Message body: "The requested URL contains the invalid query filters"
++ *
++ * @returns Message InvalidQueryFilter formatted to JSON */
++nlohmann::json invalidQueryFilter();
++
++void invalidQueryFilter(crow::Response& res);
++
+ } // namespace messages
+ 
+ } // namespace redfish
+diff --git a/redfish-core/include/event_service_manager.hpp b/redfish-core/include/event_service_manager.hpp
+index 0b87555ec..e1b0a21d5 100644
+--- a/redfish-core/include/event_service_manager.hpp
++++ b/redfish-core/include/event_service_manager.hpp
+@@ -25,7 +25,7 @@
+ #include "registries/base_message_registry.hpp"
+ #include "registries/openbmc_message_registry.hpp"
+ #include "registries/task_event_message_registry.hpp"
+-#include "server_sent_events.hpp"
++#include <server_sent_event.hpp>
+ #include "str_utility.hpp"
+ #include "utility.hpp"
+ #include "utils/json_utils.hpp"
+@@ -34,9 +34,11 @@
+ 
+ #include <boost/algorithm/string/classification.hpp>
+ #include <boost/asio/io_context.hpp>
++#include <boost/beast/core/span.hpp>
+ #include <boost/container/flat_map.hpp>
+ #include <sdbusplus/bus/match.hpp>
+ 
++#include <algorithm>
+ #include <cstdlib>
+ #include <ctime>
+ #include <fstream>
+@@ -52,9 +54,32 @@ using ReadingsObjType =
+ static constexpr const char* eventFormatType = "Event";
+ static constexpr const char* metricReportFormatType = "MetricReport";
+ 
++static constexpr const char* subscriptionTypeSSE = "SSE";
+ static constexpr const char* eventServiceFile =
+     "/var/lib/bmcweb/eventservice_config.json";
+ 
++static constexpr const uint8_t maxNoOfSubscriptions = 20;
++static constexpr const uint8_t maxNoOfSSESubscriptions = 10;
++
++static constexpr const std::array<const char*, 2> supportedEvtFormatTypes = {
++    eventFormatType, metricReportFormatType};
++static constexpr const std::array<const char*, 2> supportedRegPrefixes = {
++    "OpenBMC", "TaskEvent"};
++
++#ifndef BMCWEB_ENABLE_REDFISH_DBUS_LOG_ENTRIES
++static std::optional<boost::asio::posix::stream_descriptor> inotifyConn;
++static constexpr const char* redfishEventLogDir = "/var/log";
++static constexpr const char* redfishEventLogFile = "/var/log/redfish";
++static constexpr const size_t iEventSize = sizeof(inotify_event);
++static int inotifyFd = -1;
++static int dirWatchDesc = -1;
++static int fileWatchDesc = -1;
++
++// <ID, timestamp, RedfishLogId, registryPrefix, MessageId, MessageArgs>
++using EventLogObjectsType =
++    std::tuple<std::string, std::string, std::string, std::string, std::string,
++               std::vector<std::string>>;
++
+ namespace registries
+ {
+ inline std::span<const MessageEntry>
+@@ -74,29 +99,6 @@ inline std::span<const MessageEntry>
+     }
+     return {openbmc::registry};
+ }
+-} // namespace registries
+-
+-#ifndef BMCWEB_ENABLE_REDFISH_DBUS_LOG_ENTRIES
+-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+-static std::optional<boost::asio::posix::stream_descriptor> inotifyConn;
+-static constexpr const char* redfishEventLogDir = "/var/log";
+-static constexpr const char* redfishEventLogFile = "/var/log/redfish";
+-static constexpr const size_t iEventSize = sizeof(inotify_event);
+-
+-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+-static int inotifyFd = -1;
+-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+-static int dirWatchDesc = -1;
+-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+-static int fileWatchDesc = -1;
+-
+-// <ID, timestamp, RedfishLogId, registryPrefix, MessageId, MessageArgs>
+-using EventLogObjectsType =
+-    std::tuple<std::string, std::string, std::string, std::string, std::string,
+-               std::vector<std::string>>;
+-
+-namespace registries
+-{
+ static const Message*
+     getMsgFromRegistry(const std::string& messageKey,
+                        const std::span<const MessageEntry>& registry)
+@@ -386,11 +388,11 @@ class Subscription : public persistent_data::UserSubscription
+         policy->invalidResp = retryRespHandler;
+     }
+ 
+-    explicit Subscription(
+-        const std::shared_ptr<boost::asio::ip::tcp::socket>& adaptor) :
++    Subscription(
++        const std::shared_ptr<crow::SseConnection>& adaptor) :
+         policy(std::make_shared<crow::ConnectionPolicy>()),
+         client(policy),
+-        sseConn(std::make_shared<crow::ServerSentEvents>(adaptor))
++        sseConn(adaptor)
+     {}
+ 
+     ~Subscription() = default;
+@@ -405,16 +407,17 @@ class Subscription : public persistent_data::UserSubscription
+             return false;
+         }
+ 
++        if (sseConn != nullptr)
++        {
++            sseConn->sendEvent(std::to_string(eventSeqNum), msg);
++        }
++
+         bool useSSL = (uriProto == "https");
+         // A connection pool will be created if one does not already exist
+         client.sendData(msg, host, port, path, useSSL, httpHeaders,
+                         boost::beast::http::verb::post);
+         eventSeqNum++;
+ 
+-        if (sseConn != nullptr)
+-        {
+-            sseConn->sendData(eventSeqNum, msg);
+-        }
+         return true;
+     }
+ 
+@@ -566,6 +569,30 @@ class Subscription : public persistent_data::UserSubscription
+         return eventSeqNum;
+     }
+ 
++    void setSubscriptionId(const std::string& idIn)
++    {
++        BMCWEB_LOG_DEBUG << "Subscription ID: " << idIn;
++        subId = idIn;
++    }
++
++    std::string getSubscriptionId()
++    {
++        return subId;
++    }
++
++    std::optional<std::string>
++        getSubscriptionId(const std::shared_ptr<crow::SseConnection>& connPtr)
++    {
++        if (sseConn != nullptr && connPtr == sseConn)
++        {
++            BMCWEB_LOG_DEBUG << __FUNCTION__
++                             << " conn matched, subId: " << subId;
++            return subId;
++        }
++
++        return std::nullopt;
++    }
++
+   private:
+     uint64_t eventSeqNum = 1;
+     std::string host;
+@@ -574,7 +601,8 @@ class Subscription : public persistent_data::UserSubscription
+     crow::HttpClient client;
+     std::string path;
+     std::string uriProto;
+-    std::shared_ptr<crow::ServerSentEvents> sseConn = nullptr;
++    std::shared_ptr<crow::SseConnection> sseConn = nullptr;
++    std::string subId;
+ 
+     // Check used to indicate what response codes are valid as part of our retry
+     // policy.  2XX is considered acceptable
+@@ -945,6 +973,8 @@ class EventServiceManager
+         // Update retry configuration.
+         subValue->updateRetryConfig(retryAttempts, retryTimeoutInterval);
+ 
++        // Set Subscription ID for back trace
++        subValue->setSubscriptionId(id);
+         return id;
+     }
+ 
+@@ -969,11 +999,40 @@ class EventServiceManager
+         }
+     }
+ 
++    void deleteSubscription(const std::shared_ptr<crow::SseConnection>& connPtr)
++    {
++        for (const auto& it : this->subscriptionsMap)
++        {
++            std::shared_ptr<Subscription> entry = it.second;
++            if (entry->subscriptionType == subscriptionTypeSSE)
++            {
++                std::optional<std::string> id =
++                    entry->getSubscriptionId(connPtr);
++                if (id)
++                {
++                    deleteSubscription(*id);
++                    return;
++                }
++            }
++        }
++    }
++
+     size_t getNumberOfSubscriptions()
+     {
+         return subscriptionsMap.size();
+     }
+ 
++    size_t getNumberOfSSESubscriptions() const
++    {
++        auto count = std::count_if(
++            subscriptionsMap.begin(), subscriptionsMap.end(),
++            [this](const std::pair<std::string, std::shared_ptr<Subscription>>&
++                       entry) {
++                return (entry.second->subscriptionType == subscriptionTypeSSE);
++            });
++        return static_cast<size_t>(count);
++    }
++
+     std::vector<std::string> getAllIDs()
+     {
+         std::vector<std::string> idList;
+diff --git a/redfish-core/include/server_sent_events.hpp b/redfish-core/include/server_sent_events.hpp
+deleted file mode 100644
+index fcc6531d9..000000000
+--- a/redfish-core/include/server_sent_events.hpp
++++ /dev/null
+@@ -1,293 +0,0 @@
+-
+-/*
+-// Copyright (c) 2020 Intel Corporation
+-//
+-// Licensed under the Apache License, Version 2.0 (the "License");
+-// you may not use this file except in compliance with the License.
+-// You may obtain a copy of the License at
+-//
+-//      http://www.apache.org/licenses/LICENSE-2.0
+-//
+-// Unless required by applicable law or agreed to in writing, software
+-// distributed under the License is distributed on an "AS IS" BASIS,
+-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-// See the License for the specific language governing permissions and
+-// limitations under the License.
+-*/
+-#pragma once
+-
+-#include "logging.hpp"
+-
+-#include <boost/asio/ip/tcp.hpp>
+-#include <boost/asio/strand.hpp>
+-#include <boost/beast/http/buffer_body.hpp>
+-#include <boost/beast/http/message.hpp>
+-#include <boost/beast/http/read.hpp>
+-#include <boost/beast/http/serializer.hpp>
+-#include <boost/beast/http/write.hpp>
+-#include <boost/beast/version.hpp>
+-
+-#include <cstdlib>
+-#include <functional>
+-#include <iostream>
+-#include <memory>
+-#include <queue>
+-#include <string>
+-
+-namespace crow
+-{
+-
+-static constexpr uint8_t maxReqQueueSize = 50;
+-
+-enum class SseConnState
+-{
+-    startInit,
+-    initInProgress,
+-    initialized,
+-    initFailed,
+-    sendInProgress,
+-    sendFailed,
+-    idle,
+-    suspended,
+-    closed
+-};
+-
+-class ServerSentEvents : public std::enable_shared_from_this<ServerSentEvents>
+-{
+-  private:
+-    std::shared_ptr<boost::asio::ip::tcp::socket> sseConn;
+-    std::queue<std::pair<uint64_t, std::string>> requestDataQueue;
+-    std::string outBuffer;
+-    SseConnState state{SseConnState::startInit};
+-    int retryCount{0};
+-    int maxRetryAttempts{5};
+-
+-    void sendEvent(const std::string& id, const std::string& msg)
+-    {
+-        if (msg.empty())
+-        {
+-            BMCWEB_LOG_DEBUG << "Empty data, bailing out.";
+-            return;
+-        }
+-
+-        if (state == SseConnState::sendInProgress)
+-        {
+-            return;
+-        }
+-        state = SseConnState::sendInProgress;
+-
+-        if (!id.empty())
+-        {
+-            outBuffer += "id: ";
+-            outBuffer.append(id.begin(), id.end());
+-            outBuffer += "\n";
+-        }
+-
+-        outBuffer += "data: ";
+-        for (char character : msg)
+-        {
+-            outBuffer += character;
+-            if (character == '\n')
+-            {
+-                outBuffer += "data: ";
+-            }
+-        }
+-        outBuffer += "\n\n";
+-
+-        doWrite();
+-    }
+-
+-    void doWrite()
+-    {
+-        if (outBuffer.empty())
+-        {
+-            BMCWEB_LOG_DEBUG << "All data sent successfully.";
+-            // Send is successful, Lets remove data from queue
+-            // check for next request data in queue.
+-            requestDataQueue.pop();
+-            state = SseConnState::idle;
+-            checkQueue();
+-            return;
+-        }
+-
+-        sseConn->async_write_some(
+-            boost::asio::buffer(outBuffer.data(), outBuffer.size()),
+-            [self(shared_from_this())](
+-                boost::beast::error_code ec,
+-                [[maybe_unused]] const std::size_t& bytesTransferred) {
+-            self->outBuffer.erase(0, bytesTransferred);
+-
+-            if (ec == boost::asio::error::eof)
+-            {
+-                // Send is successful, Lets remove data from queue
+-                // check for next request data in queue.
+-                self->requestDataQueue.pop();
+-                self->state = SseConnState::idle;
+-                self->checkQueue();
+-                return;
+-            }
+-
+-            if (ec)
+-            {
+-                BMCWEB_LOG_ERROR << "async_write_some() failed: "
+-                                 << ec.message();
+-                self->state = SseConnState::sendFailed;
+-                self->checkQueue();
+-                return;
+-            }
+-            BMCWEB_LOG_DEBUG << "async_write_some() bytes transferred: "
+-                             << bytesTransferred;
+-
+-            self->doWrite();
+-            });
+-    }
+-
+-    void startSSE()
+-    {
+-        if (state == SseConnState::initInProgress)
+-        {
+-            return;
+-        }
+-        state = SseConnState::initInProgress;
+-
+-        BMCWEB_LOG_DEBUG << "starting SSE connection ";
+-        using BodyType = boost::beast::http::buffer_body;
+-        auto response =
+-            std::make_shared<boost::beast::http::response<BodyType>>(
+-                boost::beast::http::status::ok, 11);
+-        auto serializer =
+-            std::make_shared<boost::beast::http::response_serializer<BodyType>>(
+-                *response);
+-
+-        // TODO: Add hostname in http header.
+-        response->set(boost::beast::http::field::server, "iBMC");
+-        response->set(boost::beast::http::field::content_type,
+-                      "text/event-stream");
+-        response->body().data = nullptr;
+-        response->body().size = 0;
+-        response->body().more = true;
+-
+-        boost::beast::http::async_write_header(
+-            *sseConn, *serializer,
+-            [this, response,
+-             serializer](const boost::beast::error_code& ec,
+-                         [[maybe_unused]] const std::size_t& bytesTransferred) {
+-            if (ec)
+-            {
+-                BMCWEB_LOG_ERROR << "Error sending header" << ec;
+-                state = SseConnState::initFailed;
+-                checkQueue();
+-                return;
+-            }
+-
+-            BMCWEB_LOG_DEBUG << "startSSE  Header sent.";
+-            state = SseConnState::initialized;
+-            checkQueue();
+-            });
+-    }
+-
+-    void checkQueue(const bool newRecord = false)
+-    {
+-        if (requestDataQueue.empty())
+-        {
+-            BMCWEB_LOG_DEBUG << "requestDataQueue is empty\n";
+-            return;
+-        }
+-
+-        if (retryCount >= maxRetryAttempts)
+-        {
+-            BMCWEB_LOG_ERROR << "Maximum number of retries is reached.";
+-
+-            // Clear queue.
+-            while (!requestDataQueue.empty())
+-            {
+-                requestDataQueue.pop();
+-            }
+-
+-            // TODO: Take 'DeliveryRetryPolicy' action.
+-            // For now, doing 'SuspendRetries' action.
+-            state = SseConnState::suspended;
+-            return;
+-        }
+-
+-        if ((state == SseConnState::initFailed) ||
+-            (state == SseConnState::sendFailed))
+-        {
+-            if (newRecord)
+-            {
+-                // We are already running async wait and retry.
+-                // Since record is added to queue, it gets the
+-                // turn in FIFO.
+-                return;
+-            }
+-
+-            retryCount++;
+-            // TODO: Perform async wait for retryTimeoutInterval before proceed.
+-        }
+-        else
+-        {
+-            // reset retry count.
+-            retryCount = 0;
+-        }
+-
+-        switch (state)
+-        {
+-            case SseConnState::initInProgress:
+-            case SseConnState::sendInProgress:
+-            case SseConnState::suspended:
+-            case SseConnState::startInit:
+-            case SseConnState::closed:
+-                // do nothing
+-                break;
+-            case SseConnState::initFailed:
+-            {
+-                startSSE();
+-                break;
+-            }
+-            case SseConnState::initialized:
+-            case SseConnState::idle:
+-            case SseConnState::sendFailed:
+-            {
+-                std::pair<uint64_t, std::string> reqData =
+-                    requestDataQueue.front();
+-                sendEvent(std::to_string(reqData.first), reqData.second);
+-                break;
+-            }
+-        }
+-    }
+-
+-  public:
+-    ServerSentEvents(const ServerSentEvents&) = delete;
+-    ServerSentEvents& operator=(const ServerSentEvents&) = delete;
+-    ServerSentEvents(ServerSentEvents&&) = delete;
+-    ServerSentEvents& operator=(ServerSentEvents&&) = delete;
+-
+-    explicit ServerSentEvents(
+-        const std::shared_ptr<boost::asio::ip::tcp::socket>& adaptor) :
+-        sseConn(adaptor)
+-    {
+-        startSSE();
+-    }
+-
+-    ~ServerSentEvents() = default;
+-
+-    void sendData(const uint64_t& id, const std::string& data)
+-    {
+-        if (state == SseConnState::suspended)
+-        {
+-            return;
+-        }
+-
+-        if (requestDataQueue.size() <= maxReqQueueSize)
+-        {
+-            requestDataQueue.push(std::pair(id, data));
+-            checkQueue(true);
+-        }
+-        else
+-        {
+-            BMCWEB_LOG_ERROR << "Request queue is full. So ignoring data.";
+-        }
+-    }
+-};
+-
+-} // namespace crow
+diff --git a/redfish-core/lib/event_service.hpp b/redfish-core/lib/event_service.hpp
+index c418504ee..eee3fd2cb 100644
+--- a/redfish-core/lib/event_service.hpp
++++ b/redfish-core/lib/event_service.hpp
+@@ -28,10 +28,6 @@
+ namespace redfish
+ {
+ 
+-static constexpr const std::array<const char*, 2> supportedEvtFormatTypes = {
+-    eventFormatType, metricReportFormatType};
+-static constexpr const std::array<const char*, 3> supportedRegPrefixes = {
+-    "Base", "OpenBMC", "TaskEvent"};
+ static constexpr const std::array<const char*, 3> supportedRetryPolicies = {
+     "TerminateAfterRetries", "SuspendRetries", "RetryForever"};
+ 
+@@ -43,8 +39,6 @@ static constexpr const std::array<const char*, 1> supportedResourceTypes = {
+     "Task"};
+ #endif
+ 
+-static constexpr const uint8_t maxNoOfSubscriptions = 20;
+-
+ inline void requestRoutesEventService(App& app)
+ {
+     BMCWEB_ROUTE(app, "/redfish/v1/EventService/")
+@@ -62,6 +56,8 @@ inline void requestRoutesEventService(App& app)
+             "#EventService.v1_5_0.EventService";
+         asyncResp->res.jsonValue["Id"] = "EventService";
+         asyncResp->res.jsonValue["Name"] = "Event Service";
++        asyncResp->res.jsonValue["ServerSentEventUri"] =
++            "/redfish/v1/EventService/Subscriptions/SSE";
+         asyncResp->res.jsonValue["Subscriptions"]["@odata.id"] =
+             "/redfish/v1/EventService/Subscriptions";
+         asyncResp->res
+diff --git a/redfish-core/src/error_messages.cpp b/redfish-core/src/error_messages.cpp
+index b4358295c..aeb81a58f 100644
+--- a/redfish-core/src/error_messages.cpp
++++ b/redfish-core/src/error_messages.cpp
+@@ -1776,6 +1776,32 @@ void invalidUpload(crow::Response& res, std::string_view arg1,
+     addMessageToErrorJson(res.jsonValue, invalidUpload(arg1, arg2));
+ }
+ 
++/**
++ * @internal
++ * @brief Formats InvalidQueryFilter into JSON
++ *
++ * See header file for more information
++ * @endinternal
++ */
++nlohmann::json invalidQueryFilter()
++{
++    return nlohmann::json{
++        {"@odata.type", "#Message.v1_0_0.Message"},
++        {"MessageId", "Base.1.5.0.InvalidQueryFilter"},
++        {"Message", "The requested url contains the invalid query filter."},
++        {"MessageArgs", nlohmann::json::array()},
++        {"Severity", "Warning"},
++        {"Resolution",
++         "Ensure the correct query filter is specified in requested url "
++         "and resubmit the request."}};
++}
++
++void invalidQueryFilter(crow::Response& res)
++{
++    res.result(boost::beast::http::status::bad_request);
++    addMessageToErrorJson(res.jsonValue, invalidQueryFilter());
++}
++
+ /**
+  * @internal
+  * @brief Formats Invalid File message into JSON
+diff --git a/src/webserver_main.cpp b/src/webserver_main.cpp
+index b13ab270e..5a4aae5f5 100644
+--- a/src/webserver_main.cpp
++++ b/src/webserver_main.cpp
+@@ -4,6 +4,7 @@
+ #include "cors_preflight.hpp"
+ #include "dbus_monitor.hpp"
+ #include "dbus_singleton.hpp"
++#include <eventservice_sse.hpp>
+ #include "hostname_monitor.hpp"
+ #include "ibm/management_console_rest.hpp"
+ #include "image_upload.hpp"
+@@ -84,6 +85,7 @@ static int run()
+ #endif
+ 
+ #ifdef BMCWEB_ENABLE_REDFISH
++    redfish::eventservice_sse::requestRoutes(app);
+     redfish::RedfishService redfish(app);
+ 
+     // Create EventServiceManager instance and initialize Config
+-- 
+2.34.1
+

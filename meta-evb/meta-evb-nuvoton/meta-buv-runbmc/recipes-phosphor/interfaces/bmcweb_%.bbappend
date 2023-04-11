@@ -2,6 +2,7 @@ inherit buv-entity-utils
 
 FILESEXTRAPATHS:prepend:buv-runbmc := "${THISDIR}/${PN}:"
 
+SRC_URI:append:buv-runbmc = " file://0001-bmcweb-add-Server-Sent-Events-support.patch"
 
 # Enable CPU Log and Raw PECI support
 #EXTRA_OEMESON:append:buv-runbmc = " -Dredfish-cpu-log=enabled"
