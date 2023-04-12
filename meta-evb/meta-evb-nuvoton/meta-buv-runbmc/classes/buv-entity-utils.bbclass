@@ -11,5 +11,5 @@ def distro_enabled(d, distro, truevalue, falsevalue=""):
         return falsevalue
 
 def entity_enabled(d, val, fval=""):
-    return distro_enabled(d, "buv-entity", val, fval)
-
+    return bb.utils.contains('DISTRO_FEATURES',
+        'entity-manager', val, fval, d)
