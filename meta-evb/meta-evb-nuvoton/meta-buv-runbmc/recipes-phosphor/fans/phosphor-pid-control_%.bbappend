@@ -23,15 +23,15 @@ SYSTEMD_SERVICE:${PN}:append:buv-runbmc = " fan-boot-control.service"
 do_install:append:buv-runbmc() {
     install -d ${D}/${bindir}
     install -m 0755 ${WORKDIR}/fan-default-speed.sh ${D}/${bindir}
+    is_entity="${@entity_enabled(d, 'yes', '')}"
 
-    if [ "${DISTRO}" != "buv-entity" ];then
-        install -d ${D}${datadir}/swampd
+    if [ -z "${is_entity}" ];then
         install -m 0644 -D ${WORKDIR}/config-buv-nuvoton.json \
             ${D}${datadir}/swampd/config.json
     fi
 
     install -d ${D}${systemd_unitdir}/system/
-    if [ "${DISTRO}" != "buv-entity" ];then
+    if [ -z "${is_entity}" ];then
         install -m 0644 ${WORKDIR}/phosphor-pid-control_buv.service \
             ${D}${systemd_unitdir}/system/phosphor-pid-control.service
     fi
