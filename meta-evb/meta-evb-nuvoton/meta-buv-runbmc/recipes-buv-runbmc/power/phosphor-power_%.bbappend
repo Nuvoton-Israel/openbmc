@@ -13,6 +13,7 @@ SRC_URI:append:buv-runbmc = " file://0006-Light-up-LED-when-fan-fault.patch"
 SRC_URI:append:buv-runbmc = " file://0007-Get-powersupplyName-from-config-setting.patch"
 SRC_URI:append:buv-runbmc = " file://0008-Support-Entity-Manager-for-power-supply-monitoring.patch"
 SRC_URI:append:buv-runbmc = " file://0009-phosphor-power-support-bindUnbind-and-PSU-inserted-r.patch"
+SRC_URI:append:buv-runbmc = " file://0010-phosphor-power-support-PSU-hot-plug-DBus-property-an.patch"
 
 EXTRA_OEMESON:append:buv-runbmc = " \
     ${@entity_enabled(d, '-Dnuvoton-entity=true', '')} \

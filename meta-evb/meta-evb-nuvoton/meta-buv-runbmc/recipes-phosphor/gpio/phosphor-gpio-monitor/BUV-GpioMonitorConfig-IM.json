@@ -1,0 +1,19 @@
+[
+    {
+        "Name": "PSU1_PRESENT_N",
+        "GpioNum": 4,
+        "ChipId": "gpiochip0",
+        "EventMon": "BOTH",
+        "Targets":
+        {
+            "FALLING": [
+                "psu_hwmon_start.service"
+            ],
+            "RISING": [
+                "psu_hwmon_stop.service"
+            ]
+        },
+        "Continue": true,
+        "Inventory": "/system/chassis/motherboard/powersupply0"
+    }
+]

@@ -1,0 +1,7 @@
+[Unit]
+Description=hwmon stop
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c "psu_hotplug_action.sh 2"
+SyslogIdentifier=hwmon_stop

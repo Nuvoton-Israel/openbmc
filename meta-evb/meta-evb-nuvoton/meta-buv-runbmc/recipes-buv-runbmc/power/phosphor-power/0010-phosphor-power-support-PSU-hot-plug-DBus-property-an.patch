@@ -1,0 +1,294 @@
+From 9948066e00ef95006ecbe5cb4d7507f54d835a4e Mon Sep 17 00:00:00 2001
+From: Allen Kang <jhkang@nuvoton.com>
+Date: Tue, 18 Apr 2023 11:23:55 +0800
+Subject: [PATCH 10/10] phosphor-power: support PSU hot plug DBus property and
+ removed/installed log.
+
+Signed-off-by: Allen Kang <jhkang@nuvoton.com>
+---
+ elog-errors.hpp                               | 148 ++++++++++++++++++
+ org/open_power/Witherspoon/Fault.errors.yaml  |   6 +
+ .../Witherspoon/Fault.metadata.yaml           |  16 ++
+ power-supply/power_supply.cpp                 |  21 ++-
+ types.hpp                                     |   2 +-
+ 5 files changed, 189 insertions(+), 4 deletions(-)
+
+diff --git a/elog-errors.hpp b/elog-errors.hpp
+index 46797139..ea53f096 100644
+--- a/elog-errors.hpp
++++ b/elog-errors.hpp
+@@ -670,6 +670,46 @@ struct PowerSupplyFanFault;
+ } // namespace org
+ } // namespace sdbusplus
+ 
++namespace sdbusplus
++{
++namespace org
++{
++namespace open_power
++{
++namespace Witherspoon
++{
++namespace Fault
++{
++namespace Error
++{
++struct PowerSupplyRemoved;
++} // namespace Error
++} // namespace Fault
++} // namespace Witherspoon
++} // namespace open_power
++} // namespace org
++} // namespace sdbusplus
++
++namespace sdbusplus
++{
++namespace org
++{
++namespace open_power
++{
++namespace Witherspoon
++{
++namespace Fault
++{
++namespace Error
++{
++struct PowerSupplyInserted;
++} // namespace Error
++} // namespace Fault
++} // namespace Witherspoon
++} // namespace open_power
++} // namespace org
++} // namespace sdbusplus
++
+ namespace sdbusplus
+ {
+ namespace org
+@@ -3249,6 +3289,114 @@ struct map_exception_type<
+ 
+ } // namespace details
+ 
++namespace org
++{
++namespace open_power
++{
++namespace Witherspoon
++{
++namespace Fault
++{
++namespace _PowerSupplyRemoved
++{
++
++struct RAW_STATUS
++{
++    /*
++     * We can't use -fsanitize=undefined if we declare a
++     * 'static constexpr auto str' member, so don't. Instead, open-code the
++     * mako template lookups.
++     */
++    static constexpr auto str_short = "RAW_STATUS";
++    using type =
++        std::tuple<std::decay_t<decltype("RAW_STATUS=%s")>, const char*>;
++    explicit constexpr RAW_STATUS(const char* a) :
++        _entry(entry("RAW_STATUS=%s", a)){};
++    type _entry;
++};
++
++} // namespace _PowerSupplyRemoved
++
++struct PowerSupplyRemoved
++{
++    static constexpr auto L = level::ERR;
++    using RAW_STATUS = _PowerSupplyRemoved::RAW_STATUS;
++    using CALLOUT_INVENTORY_PATH = xyz::openbmc_project::Common::Callout::
++        Inventory::CALLOUT_INVENTORY_PATH;
++    using metadata_types = std::tuple<RAW_STATUS, CALLOUT_INVENTORY_PATH>;
++};
++
++} // namespace Fault
++} // namespace Witherspoon
++} // namespace open_power
++} // namespace org
++
++namespace details
++{
++
++template <>
++struct map_exception_type<
++    sdbusplus::org::open_power::Witherspoon::Fault::Error::PowerSupplyRemoved>
++{
++    using type = org::open_power::Witherspoon::Fault::PowerSupplyRemoved;
++};
++
++} // namespace details
++
++namespace org
++{
++namespace open_power
++{
++namespace Witherspoon
++{
++namespace Fault
++{
++namespace _PowerSupplyInserted
++{
++
++struct RAW_STATUS
++{
++    /*
++     * We can't use -fsanitize=undefined if we declare a
++     * 'static constexpr auto str' member, so don't. Instead, open-code the
++     * mako template lookups.
++     */
++    static constexpr auto str_short = "RAW_STATUS";
++    using type =
++        std::tuple<std::decay_t<decltype("RAW_STATUS=%s")>, const char*>;
++    explicit constexpr RAW_STATUS(const char* a) :
++        _entry(entry("RAW_STATUS=%s", a)){};
++    type _entry;
++};
++
++} // namespace _PowerSupplyInserted
++
++struct PowerSupplyInserted
++{
++    static constexpr auto L = level::ERR;
++    using RAW_STATUS = _PowerSupplyInserted::RAW_STATUS;
++    using CALLOUT_INVENTORY_PATH = xyz::openbmc_project::Common::Callout::
++        Inventory::CALLOUT_INVENTORY_PATH;
++    using metadata_types = std::tuple<RAW_STATUS, CALLOUT_INVENTORY_PATH>;
++};
++
++} // namespace Fault
++} // namespace Witherspoon
++} // namespace open_power
++} // namespace org
++
++namespace details
++{
++
++template <>
++struct map_exception_type<
++    sdbusplus::org::open_power::Witherspoon::Fault::Error::PowerSupplyInserted>
++{
++    using type = org::open_power::Witherspoon::Fault::PowerSupplyInserted;
++};
++
++} // namespace details
++
+ namespace org
+ {
+ namespace open_power
+diff --git a/org/open_power/Witherspoon/Fault.errors.yaml b/org/open_power/Witherspoon/Fault.errors.yaml
+index 02178eeb..1083ca1b 100644
+--- a/org/open_power/Witherspoon/Fault.errors.yaml
++++ b/org/open_power/Witherspoon/Fault.errors.yaml
+@@ -15,6 +15,12 @@
+ - name: PowerSupplyFanFault
+   description: The power supply detected bad fan operation.
+ 
++- name: PowerSupplyRemoved
++  description: The power supply was removed.
++
++- name: PowerSupplyInserted
++  description: The power supply was inserted.
++
+ - name: PowerSupplyTemperatureFault
+   description: The power supply has had an over temperature condition.
+ 
+diff --git a/org/open_power/Witherspoon/Fault.metadata.yaml b/org/open_power/Witherspoon/Fault.metadata.yaml
+index 4bdecf2b..321ae2bb 100644
+--- a/org/open_power/Witherspoon/Fault.metadata.yaml
++++ b/org/open_power/Witherspoon/Fault.metadata.yaml
+@@ -38,6 +38,22 @@
+   inherits:
+       - xyz.openbmc_project.Common.Callout.Inventory
+ 
++- name: PowerSupplyRemoved
++  level: ERR
++  meta:
++      - str: "RAW_STATUS=%s"
++        type: string
++  inherits:
++      - xyz.openbmc_project.Common.Callout.Inventory
++
++- name: PowerSupplyInserted
++  level: ERR
++  meta:
++      - str: "RAW_STATUS=%s"
++        type: string
++  inherits:
++      - xyz.openbmc_project.Common.Callout.Inventory
++
+ - name: PowerSupplyTemperatureFault
+   level: ERR
+   meta:
+diff --git a/power-supply/power_supply.cpp b/power-supply/power_supply.cpp
+index 9309ba8c..7ca025b3 100644
+--- a/power-supply/power_supply.cpp
++++ b/power-supply/power_supply.cpp
+@@ -227,6 +227,13 @@ void PowerSupply::inventoryChanged(sdbusplus::message_t& msg)
+             sd_journal_send("MESSAGE=%s", inventoryPath.c_str(),
+                             "REDFISH_MESSAGE_ID=%s", redfishMessageID.c_str(),
+                             "REDFISH_MESSAGE_ARGS=%s", inventoryPath.c_str(), NULL);
++#else
++            using metadata =
++                org::open_power::Witherspoon::Fault::PowerSupplyInserted;
++
++            report<PowerSupplyInserted>(
++                metadata::RAW_STATUS(inventoryPath.c_str()),
++                metadata::CALLOUT_INVENTORY_PATH(inventoryPath.c_str()));
+ #endif
+             clearFaults();
+             presentTimer.restartOnce(presentInterval);
+@@ -242,6 +249,13 @@ void PowerSupply::inventoryChanged(sdbusplus::message_t& msg)
+             sd_journal_send("MESSAGE=%s", inventoryPath.c_str(),
+                             "REDFISH_MESSAGE_ID=%s", redfishMessageID.c_str(),
+                             "REDFISH_MESSAGE_ARGS=%s", inventoryPath.c_str(), NULL);
++#else
++            using metadata =
++                org::open_power::Witherspoon::Fault::PowerSupplyRemoved;
++
++            report<PowerSupplyRemoved>(
++                metadata::RAW_STATUS(inventoryPath.c_str()),
++                metadata::CALLOUT_INVENTORY_PATH(inventoryPath.c_str()));
+ #endif
+             present = false;
+             presentTimer.setEnabled(false);
+@@ -768,7 +782,7 @@ void PowerSupply::createInventoryObj()
+     using Object = std::map<object_path, Interfaces>;
+     Properties assetProps;
+     Properties operProps;
+-    Properties fieldreplaceableProps;
++    Properties replaceableProps;
+     Properties cachedProps;
+     Properties presentProps ;
+     Properties itemProps ;
+@@ -782,8 +796,9 @@ void PowerSupply::createInventoryObj()
+     cachedProps.emplace(CACHED_PROP, true);
+     interfaces.emplace(DECOR_CACHEABLE_IFACE, std::move(cachedProps));
+ 
+-    fieldreplaceableProps.emplace(FIELDREPLACEABLE_PROP, true);
+-    interfaces.emplace(DECOR_REPLACEABLE_IFACE, std::move(fieldreplaceableProps));
++    replaceableProps.emplace(FIELDREPLACEABLE_PROP, true);
++    replaceableProps.emplace(HOTPLUGGABLE_PROP, true);
++    interfaces.emplace(DECOR_REPLACEABLE_IFACE, std::move(replaceableProps));
+ 
+     itemProps.emplace(PRESENT_PROP, true);
+     itemProps.emplace(PRETTYNAME_PROP, std::move(powersupplyName));
+diff --git a/types.hpp b/types.hpp
+index 247dc48d..f4cd9699 100644
+--- a/types.hpp
++++ b/types.hpp
+@@ -37,7 +37,7 @@ constexpr auto AVAILABLE_PROP = "Available";
+ constexpr auto ASSOC_PROP = "Associations";
+ constexpr auto CACHED_PROP = "Cached";
+ constexpr auto FIELDREPLACEABLE_PROP = "FieldReplaceable";
+-
++constexpr auto HOTPLUGGABLE_PROP = "HotPluggable";
+ 
+ constexpr auto INVENTORY_OBJ_PATH = "/xyz/openbmc_project/inventory";
+ constexpr auto POWER_OBJ_PATH = "/xyz/openbmc_project/state/chassis0";
+-- 
+2.34.1
+
