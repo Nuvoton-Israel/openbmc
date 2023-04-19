@@ -17,7 +17,7 @@ FILES:${PN}:append = " ${datadir}/phosphor-gpio-monitor/"
 do_install:append:buv-runbmc() {
     install -d ${D}${datadir}/phosphor-gpio-monitor
     rm -f ${D}${datadir}/phosphor-gpio-monitor/*.json
-    if [ "${DISTRO}" = "buv-entity" ];then
+    if [ "${DISTRO_FEATURES}" = "entity-manager" ];then
         install -m 0644 -D ${WORKDIR}/BUV-GpioMonitorConfig-EM.json \
             ${D}${datadir}/phosphor-gpio-monitor/BUV-GpioMonitorConfig.json
     else

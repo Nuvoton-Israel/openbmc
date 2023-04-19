@@ -5,7 +5,7 @@ RDEPENDS:${PN}-monitor = " \
 pkg_prerm:${PN}() {
         [ -z "${OBMC_POWER_SUPPLY_INSTANCES}" ] && echo "No power supply instance defined" && exit 1
         for inst in ${OBMC_POWER_SUPPLY_INSTANCES}; do
-                if [ "${DISTRO}" != "buv-entity" ];then
+                if [ "${DISTRO_FEATURES}" != "entity-manager" ];then
                         LINK="$D$systemd_system_unitdir/multi-user.target.requires/power-supply-monitor@$inst.service"
                         rm $LINK
                 else
@@ -18,7 +18,7 @@ pkg_postinst:${PN}() {
         mkdir -p $D$systemd_system_unitdir/multi-user.target.requires
         [ -z "${OBMC_POWER_SUPPLY_INSTANCES}" ] && echo "No power supply instance defined" && exit 1
         for inst in ${OBMC_POWER_SUPPLY_INSTANCES}; do
-                if [ "${DISTRO}" != "buv-entity" ];then
+                if [ "${DISTRO_FEATURES}" != "entity-manager" ];then
                         LINK="$D$systemd_system_unitdir/multi-user.target.requires/power-supply-monitor@$inst.service"
                         TARGET="../power-supply-monitor@.service"
                         ln -s $TARGET $LINK
