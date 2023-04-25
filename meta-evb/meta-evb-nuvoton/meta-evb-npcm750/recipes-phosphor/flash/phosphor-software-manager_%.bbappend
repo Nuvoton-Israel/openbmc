@@ -1,7 +1,7 @@
 FILESEXTRAPATHS:prepend:evb-npcm750 := "${THISDIR}/${PN}:"
 
 SRC_URI:append:evb-npcm750 = " \
-    file://0001-Support-update-uboot-with-emmc-image.patch \
+    file://0001-Support-ignore-update-uboot-with-eMMC-image.patch \
     file://0002-porting-bios-verify-feature.patch  \
     file://0003-Add-support-report-same-version-error.patch \
     "
