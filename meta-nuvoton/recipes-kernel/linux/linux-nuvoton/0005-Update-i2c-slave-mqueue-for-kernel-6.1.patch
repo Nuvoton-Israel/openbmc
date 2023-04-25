@@ -1,0 +1,37 @@
+From 1e3fe42693d465bac84d2888b6e4097f9c5d51b9 Mon Sep 17 00:00:00 2001
+From: Brian Ma <chma0@nuvoton.com>
+Date: Tue, 25 Apr 2023 14:00:10 +0800
+Subject: [PATCH] Update i2c slave mqueue for kernel 6.1
+
+Update i2c slave mqueue patch for i2c driver structure changed.
+
+Signed-off-by: Brian Ma <chma0@nuvoton.com>
+---
+ drivers/i2c/i2c-slave-mqueue.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/i2c/i2c-slave-mqueue.c b/drivers/i2c/i2c-slave-mqueue.c
+index c17c4911928f..5584078bb15b 100644
+--- a/drivers/i2c/i2c-slave-mqueue.c
++++ b/drivers/i2c/i2c-slave-mqueue.c
+@@ -171,7 +171,7 @@ static int i2c_slave_mqueue_probe(struct i2c_client *client,
+ 	return 0;
+ }
+ 
+-static int i2c_slave_mqueue_remove(struct i2c_client *client)
++static void i2c_slave_mqueue_remove(struct i2c_client *client)
+ {
+ 	struct mq_queue *mq = i2c_get_clientdata(client);
+ 
+@@ -180,7 +180,7 @@ static int i2c_slave_mqueue_remove(struct i2c_client *client)
+ 	kernfs_put(mq->kn);
+ 	sysfs_remove_bin_file(&client->dev.kobj, &mq->bin);
+ 
+-	return 0;
++	return;
+ }
+ 
+ static const struct i2c_device_id i2c_slave_mqueue_id[] = {
+-- 
+2.34.1
+
