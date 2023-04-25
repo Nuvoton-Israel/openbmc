@@ -1,4 +1,4 @@
-DESCRIPTION = "Linux kernel for Nuvoton NPCM7xx"
+DESCRIPTION = "Linux kernel for Nuvoton NPCM7xx/NPCM8xx"
 SECTION = "kernel"
 LICENSE = "GPL-2.0-only"
 
