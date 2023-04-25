@@ -1,6 +1,6 @@
 # [Setup Guide] Using Poleg Buv-Runbmc Board with phosphor-power to Monitor Power Supply Unit (PSU)
 
-#### Version 1.0 | 18 April 2023
+#### Version 1.0 | 25 April 2023
 
 # Table of Contents
 - [Introduction](#introduction)
@@ -17,7 +17,7 @@
 - [Inventory-Manager - Monitor & Test PSU](#inventory-manager-monitor-&-test-PSU)
   * [Start phosphor-power daemon](#start-phosphor-power-daemon)
   * [Check PSU DBus Object](#check-psu-dbus-object)
-  * [Check Basic PSU Status via WebUI and Redfish](#check-basic-psu-status-via-WebUI-and-Redfish)
+  * [Check Basic PSU Status via WebUI and Redfish](#check-basic-psu-status-via-webui-and-redfish)
   * [Check Dummy Fan Fault Status](#check-dummy-fan-fault-status)
 - [Entity-Manager - Monitor & Test PSU](#entity-manager-monitor-&-test-psu)
   * [Different files used in Entity-Manager](#different-files-used-in-entity-manager)
@@ -187,7 +187,7 @@ Redfish:
 
 <img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_12_redfish_psu.png">
 
-## Check Basic PSU Status via WebUI and Redfish
+## Check Dummy Fan Fault Status
 If you enable **[2.5 Add dummy Fan Fault]**, you are able to check these log as following:
 
 In inventory-manager image with phosphor-power, we use DBus event log creation, which will create a log entry, so that you could see this log via this entry.
