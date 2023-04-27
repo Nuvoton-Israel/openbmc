@@ -9,8 +9,8 @@ PACKAGES = " \
     ${PN}-chassis \
     ${PN}-fans \
     ${PN}-system \
-    ${@entity_enabled(d, '${PN}-entity')} \
-    ${@bb.utils.contains('DISTRO_FEATURES', 'buv-dev', '${PN}-dev', '', d)} \
+    ${PN}-entity \
+    ${PN}-devtools \
     "
 
 RPROVIDES:${PN}-chassis += "virtual-obmc-chassis-mgmt"
@@ -62,12 +62,14 @@ RDEPENDS:${PN}-system:append = " \
         "
 
 SUMMARY:${PN}-entity = "BUV RunBMC entity"
-#RDEPENDS:${PN}-entity = " \
-#    intel-ipmi-oem \
-#    "
+RDEPENDS:${PN}-entity = " \
+    entity-manager \
+    fru-device \
+    dbus-sensors \
+    "
 
-SUMMARY:${PN}-dev = "BUV RunBMC development tools"
-RDEPENDS:${PN}-dev = " \
+SUMMARY:${PN}-devtools = "BUV RunBMC development tools"
+RDEPENDS:${PN}-devtools = " \
     ent \
     dhrystone \
     rw-perf \
