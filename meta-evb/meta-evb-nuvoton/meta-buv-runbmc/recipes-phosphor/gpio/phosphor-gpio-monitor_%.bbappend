@@ -1,3 +1,5 @@
+inherit buv-entity-utils
+
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 
 SYSTEMD_SERVICE:${PN}-monitor += "phosphor-multi-gpio-monitor.service"
@@ -15,13 +17,14 @@ RDEPENDS:${PN} += "bash"
 FILES:${PN}:append = " ${datadir}/phosphor-gpio-monitor/"
 
 do_install:append:buv-runbmc() {
+    is_entity="${@entity_enabled(d, 'yes', '')}"
     install -d ${D}${datadir}/phosphor-gpio-monitor
     rm -f ${D}${datadir}/phosphor-gpio-monitor/*.json
-    if [ "${DISTRO_FEATURES}" = "entity-manager" ];then
-        install -m 0644 -D ${WORKDIR}/BUV-GpioMonitorConfig-EM.json \
+    if [ -z "${is_entity}" ];then
+        install -m 0644 -D ${WORKDIR}/BUV-GpioMonitorConfig-IM.json \
             ${D}${datadir}/phosphor-gpio-monitor/BUV-GpioMonitorConfig.json
     else
-        install -m 0644 -D ${WORKDIR}/BUV-GpioMonitorConfig-IM.json \
+        install -m 0644 -D ${WORKDIR}/BUV-GpioMonitorConfig-EM.json \
             ${D}${datadir}/phosphor-gpio-monitor/BUV-GpioMonitorConfig.json
     fi
 

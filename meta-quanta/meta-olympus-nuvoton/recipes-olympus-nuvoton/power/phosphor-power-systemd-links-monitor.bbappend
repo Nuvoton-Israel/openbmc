@@ -1,11 +1,15 @@
+inherit entity-utils
+
 RDEPENDS:${PN}-monitor = " \
     ${@entity_enabled(d, 'phosphor-power-monitor-em', 'phosphor-power-monitor')} \
     "
 
+is_entity="${@entity_enabled(d, 'yes', '')}"
+
 pkg_prerm:${PN}() {
         [ -z "${OBMC_POWER_SUPPLY_INSTANCES}" ] && echo "No power supply instance defined" && exit 1
         for inst in ${OBMC_POWER_SUPPLY_INSTANCES}; do
-                if [ "${DISTRO_FEATURES}" != "entity-manager" ];then
+                if [ -z "${is_entity}" ];then
                         LINK="$D$systemd_system_unitdir/multi-user.target.requires/power-supply-monitor@$inst.service"
                         rm $LINK
                 else
@@ -18,7 +22,7 @@ pkg_postinst:${PN}() {
         mkdir -p $D$systemd_system_unitdir/multi-user.target.requires
         [ -z "${OBMC_POWER_SUPPLY_INSTANCES}" ] && echo "No power supply instance defined" && exit 1
         for inst in ${OBMC_POWER_SUPPLY_INSTANCES}; do
-                if [ "${DISTRO_FEATURES}" != "entity-manager" ];then
+                if [ -z "${is_entity}" ];then
                         LINK="$D$systemd_system_unitdir/multi-user.target.requires/power-supply-monitor@$inst.service"
                         TARGET="../power-supply-monitor@.service"
                         ln -s $TARGET $LINK

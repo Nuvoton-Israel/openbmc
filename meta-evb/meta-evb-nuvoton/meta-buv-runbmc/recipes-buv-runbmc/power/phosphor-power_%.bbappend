@@ -45,8 +45,9 @@ FILES:${PN}-monitor-em = " \
     "
 
 do_install:append:buv-runbmc(){
+    is_entity="${@entity_enabled(d, 'yes', '')}"
     install -d ${D}${datadir}/phosphor-power
-    if [ "${DISTRO_FEATURES}" != "entity-manager" ];then
+    if [ -z "${is_entity}" ];then
         install -m 0644 -D ${WORKDIR}/psu.json \
             ${D}${datadir}/phosphor-power/psu.json
     else
