@@ -60,6 +60,9 @@ RDEPENDS:${PN}-system:append = " \
 RDEPENDS:${PN}-system:append = " \
         ${@entity_enabled(d, 'phosphor-power-monitor-em', 'phosphor-power-monitor')} \
         "
+RDEPENDS:${PN}-system:append = " \
+    ${@distro_enabled(d, 'kdump', 'kexec-tools vmcore-dmesg kdump makedumpfile')}"
+
 
 SUMMARY:${PN}-entity = "BUV RunBMC entity"
 RDEPENDS:${PN}-entity = " \

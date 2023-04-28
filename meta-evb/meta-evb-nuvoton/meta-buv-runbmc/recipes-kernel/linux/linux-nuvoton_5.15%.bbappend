@@ -1,4 +1,5 @@
 FILESEXTRAPATHS:prepend:buv-runbmc := "${THISDIR}/linux-nuvoton:"
+inherit buv-entity-utils
 
 SRC_URI:append:buv-runbmc = " \
   file://buv-runbmc.cfg \
@@ -10,3 +11,6 @@ SRC_URI:append:buv-runbmc = " \
   file://0010-dts-add-two-test-PSUs-settings.patch \
   file://0011-drivers-hwmon-pmbus-remove-fan-func-in-inspur-ipsps..patch \
   "
+
+SRC_URI:append:buv-runbmc = " \
+  ${@distro_enabled(d, 'kdump', 'file://kdump.cfg')}"
