@@ -41,15 +41,15 @@ Here is a quick setup guide which descripts more about BUV-Runbmc module hardwar
 
 * [HSBUV_Nuvoton_NPCM7XX_RunBMC_Setup_Guide.pdf](https://github.com/Nuvoton-Israel/openbmc/blob/npcm-master/meta-evb/meta-evb-nuvoton/meta-buv-runbmc/HSBUV_Nuvoton_NPCM7XX_RunBMC_Setup_Guide.pdf)
 
-If there are further questions about BUV-Runbmc or Poleg BMC, please consult your Nuvuton contact window.
+If there are further questions about BUV-Runbmc or Poleg BMC, please consult your Nuvoton contact window.
 
-Before you starting test the following step, we recommend you follow this quick setup guide to get one build pass result. The source code on Nuvuton Github is under build testing every day. If you get build fail result, it might be your build machine is not powerful enough or due to another reasons. You should solve it at the beginning.
+Before you starting test the following step, we recommend you follow this quick setup guide to get one build pass result. The source code on Nuvoton Github is under build testing every day. If you get build fail result, it might be your build machine is not powerful enough or due to another reasons. You should solve it at the beginning.
 
 ## phosphor-power
 
-The Nuvuton phosphor-power daemon is implemented base on IBM phosphor-power daemon.
+The Nuvoton phosphor-power daemon is implemented base on IBM phosphor-power daemon.
 
-Nuvuton divides this daemon to inventory-manager and entity-manager which means when you build inventory-manager image or entity-manager image, this phosphor-power daemon both works fine. In this setup guide, we will describe how to set phosphor-power related files, psu.json, service configuration,…,etc.
+Nuvoton divides this daemon to inventory-manager and entity-manager which means when you build inventory-manager image or entity-manager image, this phosphor-power daemon both works fine. In this setup guide, we will describe how to set phosphor-power related files, psu.json, service configuration,…,etc.
 
 The features of phosphor-power daemon:
 
@@ -127,7 +127,7 @@ Print string and variable(inventoryPath):
 
 Command:
 
-     $ journalctl | grep Nuvuton
+     $ journalctl | grep power_supply
 <img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_6_add_log3.png">
 
 ## Add dummy Fan Fault
@@ -278,17 +278,17 @@ PSU0, connect to i2c bus 1, address is 0x5a
 PSU1, connect to i2c bus 1, address is 0x5b  
   
 First, you need to modify the DTS to set PSU driver and PSU address on i2c bus 1 node.
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_52_two_psu_dts.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_52_two_psu_dts.png">
   
 Second, modify buv-runbmc.conf, the OBMC_POWER_SUPPLY_INSTANCES should be "0 1", means PSU0 and PSU1.  
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_51_two_psu_instance.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_51_two_psu_instance.png">
   
 Third, set sysfs path in psu.json for PSU0(powersupply0) and PSU1(powersupply1) in psu.json.
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_48_two_psu_json.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_48_two_psu_json.png">
   
 Forth, set PSU address in power-supply-monitor-*.conf.
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_49_psu0_conf.png">
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_50_psu1_conf.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_49_psu0_conf.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_50_psu1_conf.png">
   
 Then, the PSU0 and PSU1 should work fine, you are able to see these two PSUs on WebUI/Redfish/DBus.
   
@@ -311,9 +311,9 @@ Refer:
 
 In BUV-GpioMonitorConfig.json, we use GPIO pin 4 as dummy PSU0 present pin.   
 BUV-GpioMonitorConfig.json for entity-manager:  
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_33_BUV-GpioMonitorConfig.-EM_json.png">  
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_33_BUV-GpioMonitorConfig.-EM_json.png">  
 BUV-GpioMonitorConfig.json for inventory-manager:  
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_34_BUV-GpioMonitorConfig.-IM_json.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_34_BUV-GpioMonitorConfig.-IM_json.png">
 
 Basically, these two json files are the same, the difference is because of:
 1. The sensor services are different, so the "FALLING" and "RISING" call different services.
@@ -322,10 +322,10 @@ Basically, these two json files are the same, the difference is because of:
 ### psu_hotplug_action.sh
 When the "Targets" service is called, the script will execute corresponding  command to reload/start/stop sensor service.
 
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_46_psu_hotplug_action.sh.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_46_psu_hotplug_action.sh.png">
   
 This is psusensor_reload.service, it will call psu_hotplug_action.sh with a parameter.   
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_32_psusensor_reload.service.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_32_psusensor_reload.service.png">
 
 ## PSU Hot Plug Call flow
 As following flow chart, the PSU hot plug flow are:  
@@ -334,31 +334,31 @@ As following flow chart, the PSU hot plug flow are:
 3. phosphor-power detects the "Present" property is changed, bind/unbind PSU driver, record log
 4. If you are using entity-manager image, reload psusensor service.
 
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_31_EM_call_flow.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_31_EM_call_flow.png">
 
 # PSU Hot Plug Test
 Here we insert two PSUs and use PSU0 as PSU hot plug example.   
 For test, we use "MB P12V INA219*" as PSU0 sensors, "MB P3V3 INA219*" as PSU1 sensors.  
 If PSU is removed, the related sensor will disapear.
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_27_IM_webui_hot_plug_sensor_init.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_27_IM_webui_hot_plug_sensor_init.png">
 
 
 ## Initial state
  
 If you add two PSUs as example [Add two PSUs](#add-two-psus), you will see these two PSU on WebUI as following.  
 ID 0 is PSU0, ID 1 is PSU1.
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_26_IM_webui_psu_hot_plug_init.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_26_IM_webui_psu_hot_plug_init.png">
   
 You are able to see the powersupply0 and powersupply1 on Redfish.
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_28_IM_redfish_hot_plug_psu_init.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_28_IM_redfish_hot_plug_psu_init.png">
   
 Use Dbus command and you will see the "Present", "Functional" property is true.  
 
     busctl introspect xyz.openbmc_project.Inventory.Manager /xyz/openbmc_project/inventory/system/chassis/motherboard/powersupply0
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_29_IM_dbus_hot_plug_psu_init.png">  
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_29_IM_dbus_hot_plug_psu_init.png">  
   
 Move to "/sys/bus/i2c/driver/<your PSu driver>", you are able to see PSU0 (1-005a) and PSU1 (1-005b)  
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_30_IM_driver_hot_plug_psu_init.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_30_IM_driver_hot_plug_psu_init.png">
 
 ## GPIO Setting For Dummy PSU Present Pin
 1. Set gpio 5 as output pin.  
@@ -374,30 +374,30 @@ Use command "echo 1" to "/sys/class/gpio/gpio5/value", to simulate PSU0 present 
 ```echo 1 > /sys/class/gpio/gpio5/value```
 
 The PSU0 driver unbind (1-005a).  
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_38_IM_PSU0_driver_unbind.png">  
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_38_IM_PSU0_driver_unbind.png">  
 
 The "Present" and "Functional" property is set false.
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_39_IM_dbus_hot_plug_psu_removed.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_39_IM_dbus_hot_plug_psu_removed.png">
 
 You are able to see the PSU removed log in log file.
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_40_IM_psu_removed_log_file.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_40_IM_psu_removed_log_file.png">
 
 On WebUI, PSU 0 is disappear.
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_43_IM_psu_removed_webui_inventory.png">
+<img align="top" width="%" src=https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_43_IM_psu_removed_webui_inventory.png">
 
 On WebUI, you are able to see the PSU removed log.
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_42_IM_psu_removed_webui_log.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_42_IM_psu_removed_webui_log.png">
 
 On WebUI, PSU0 related sensors (MB P12V INA219*) are disappear.
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_41_IM_psu_removed_webui_sensor.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_41_IM_psu_removed_webui_sensor.png">
 
 On Redfish,  powersupply0 is disappear.  
 
      https://<BMC IP>/redfish/v1/Managers/bmc/LogServices/Journal/Entries
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_47_psu_removed_redfish.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_47_psu_removed_redfish.png">
 
 Also, you are able to see the PSU removed log on Redfish.  
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_44_IM_psu_removed_redfish_log.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_44_IM_psu_removed_redfish_log.png">
 
 ## PSU Insert test - Inventory-Manager
 Use command "echo 0" to "/sys/class/gpio/gpio5/value", to simulate PSU0 present pin falling, means PSU0 insert.  
@@ -405,11 +405,11 @@ Use command "echo 0" to "/sys/class/gpio/gpio5/value", to simulate PSU0 present 
 
 You will see the "Present" and "Functionl" is set to true in PSU0 DBus interface.  
 PSU0 driver bind and there is a PowerSupplyInsert log in log file.
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_45_IM_psu_installed.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_45_IM_psu_installed.png">
 
 On the WebUI, the PSU0 appear again, and also there is a PowerSupplyInserted log.  
 And same as Redfish.
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_45_IM_psu_installed_webui_redfish.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_45_IM_psu_installed_webui_redfish.png">
 
 ## PSU Initial - Entity-Manager
 The PSU hot plug test steps/result of entity-manager is the same as inventory-manager.  
@@ -417,13 +417,13 @@ Using commands to echo 0/1 to gpio5 value to simulate gpio5 falling/rising.
 ```echo 0 > /sys/class/gpio/gpio5/value```  
 ```echo 1 > /sys/class/gpio/gpio5/value```  
 
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_35_EM_initial_state.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_35_EM_initial_state.png">
 
 ## PSU Remove test - Entity-Manager
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_37_EM_PSU0_removed.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_37_EM_PSU0_removed.png">
 
 ## PSU Insert test - Entity-Manager
-<img align="top" width="%" src="https://raw.githubusercontent.com/a2577018/snapshots/master/openbmc/BUV_phosphor-power_36_EM_PSU0_installed.png">
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_36_EM_PSU0_installed.png">
 
 
 # Reference
