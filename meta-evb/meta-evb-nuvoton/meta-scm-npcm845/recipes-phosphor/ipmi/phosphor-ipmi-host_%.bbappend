@@ -22,10 +22,10 @@ SRC_URI:append:scm-npcm845 = " file://0014-fix-percentage-type-show.patch"
 SRC_URI:append:scm-npcm845 = " file://0015-sensor-reading-optional-zero.patch"
 SRC_URI:append:scm-npcm845 = " file://0016-add-sensor-reading-factory-support.patch"
 SRC_URI:append:scm-npcm845 = " file://0017-add-oem-sel-support.patch"
-#SRC_URI:append:scm-npcm845 = " file://0018-update-chassishandler-from-intel-oem-ipmi.patch"
-#SRC_URI:append:scm-npcm845 = " file://0019-save-no-supported-boot-options.patch"
+SRC_URI:append:scm-npcm845 = " file://0018-update-chassishandler-from-intel-oem-ipmi.patch"
+SRC_URI:append:scm-npcm845 = " file://0019-save-no-supported-boot-options.patch"
 SRC_URI:append:scm-npcm845 = " file://0020-set-channel-security-keys.patch"
-#SRC_URI:append:scm-npcm845 = " file://0021-implement-chassis-acfail-status.patch"
+SRC_URI:append:scm-npcm845 = " file://0021-implement-chassis-acfail-status.patch"
 
 PACKAGECONFIG:append:scm-npcm845 = " dynamic-sensors"
 
