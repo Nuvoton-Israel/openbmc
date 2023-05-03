@@ -3,8 +3,8 @@ FILESEXTRAPATHS:append:scm-npcm845 := "${THISDIR}/${PN}:"
 EXTRA_OEMESON:append:scm-npcm845 = " -Di2c-whitelist-check=disabled"
 EXTRA_OEMESON:append:scm-npcm845 = " -Dsel-logger-clears-sel=enabled"
 
-# Fix build error when enable dbus-sdr
-# SRC_URI:append:scm-npcm845 = " file://0001-dbus-sdr-fix-build-break.patch"
+# Fix ERROR opening IPMI provider when enable dbus-sdr
+SRC_URI:append:scm-npcm845 = " file://0001-move-depend-from-libipmi20-to-entity_map_json.patch"
 
 SRC_URI:append:scm-npcm845 = " file://0001-Add-set-BIOS-version-support.patch"
 SRC_URI:append:scm-npcm845 = " file://0002-Add-SEL-add-command.patch"
