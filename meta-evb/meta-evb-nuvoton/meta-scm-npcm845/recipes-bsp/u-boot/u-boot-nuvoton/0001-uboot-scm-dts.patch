@@ -1,4 +1,4 @@
-From d7041359ea0beca3b2f27b3ee4699103685872c2 Mon Sep 17 00:00:00 2001
+From a98b7ab99f91d24f160bf3008eb7c3cae8765458 Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Tue, 14 Feb 2023 11:42:49 +0800
 Subject: [PATCH] uboot scm dts
@@ -9,19 +9,19 @@ Signed-off-by: Stanley Chu <yschu@nuvoton.com>
  1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/dts/Makefile b/arch/arm/dts/Makefile
-index e64d162b20..3aba574f67 100644
+index 6dc59494dc..13618a99aa 100644
 --- a/arch/arm/dts/Makefile
 +++ b/arch/arm/dts/Makefile
-@@ -1033,7 +1033,8 @@ dtb-$(CONFIG_TARGET_DURIAN) += phytium-durian.dtb
- dtb-$(CONFIG_TARGET_PRESIDIO_ASIC) += ca-presidio-engboard.dtb
+@@ -1034,7 +1034,8 @@ dtb-$(CONFIG_TARGET_PRESIDIO_ASIC) += ca-presidio-engboard.dtb
  
  dtb-$(CONFIG_TARGET_ARBEL_EVB) += \
--	nuvoton-npcm845-evb.dtb
-+	nuvoton-npcm845-evb.dtb \
+ 	nuvoton-npcm845-evb.dtb \
+-	nuvoton-npcm845-meta-evb.dtb
++	nuvoton-npcm845-meta-evb.dtb \
 +	nuvoton-npcm845-scm.dtb
  
  dtb-$(CONFIG_ARCH_NPCM7xx) += \
  		nuvoton-npcm750-buv.dtb \
 -- 
-2.17.1
+2.34.1
 
