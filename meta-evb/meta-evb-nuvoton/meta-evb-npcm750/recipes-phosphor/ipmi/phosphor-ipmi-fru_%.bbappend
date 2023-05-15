@@ -20,7 +20,7 @@ EEPROMS_ESCAPED = "${@compose_list(d, 'EEPROM_ESCAPEDFMT', 'EEPROM_NAMES')}"
 
 ENVFMT = "obmc/eeproms/{0}"
 ENVF = "${@compose_list(d, 'ENVFMT', 'EEPROMS')}"
-SYSTEMD_ENVIRONMENT_FILE:${PN}:append_evb-npcm750 := " ${ENVF}"
+SYSTEMD_ENVIRONMENT_FILE:${PN}:append:evb-npcm750 := " ${ENVF}"
 
 TMPL = "obmc-read-eeprom@.service"
 TGT = "${SYSTEMD_DEFAULT_TARGET}"
