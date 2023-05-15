@@ -1,7 +1,7 @@
-From ea9bd2ac072ae327e8d998e88be5604e82114ea7 Mon Sep 17 00:00:00 2001
+From dc1d794eddab2af360800a68a1315f784992d7fa Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Tue, 16 Aug 2022 16:23:46 +0800
-Subject: [PATCH 15/21] sensor reading optional zero
+Subject: [PATCH 14/20] sensor reading optional zero
 
 Signed-off-by: Stanley Chu <yschu@nuvoton.com>
 ---
@@ -9,10 +9,10 @@ Signed-off-by: Stanley Chu <yschu@nuvoton.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/dbus-sdr/sensorcommands.cpp b/dbus-sdr/sensorcommands.cpp
-index d54873af..b86d96e8 100644
+index a34904e4..b974851d 100644
 --- a/dbus-sdr/sensorcommands.cpp
 +++ b/dbus-sdr/sensorcommands.cpp
-@@ -932,7 +932,7 @@ ipmi::RspType<uint8_t, uint8_t, uint8_t, std::optional<uint8_t>>
+@@ -951,7 +951,7 @@ ipmi::RspType<uint8_t, uint8_t, uint8_t, std::optional<uint8_t>>
      }
  
      // no discrete as of today so optional byte is never returned

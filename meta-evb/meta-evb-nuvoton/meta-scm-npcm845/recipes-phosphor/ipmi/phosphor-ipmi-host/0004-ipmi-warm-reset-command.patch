@@ -1,7 +1,7 @@
-From 47d7e5c0b2dd0b295578859b9a353651ac4d0c64 Mon Sep 17 00:00:00 2001
+From 6f40815c7e9ec75a3479c31f9d947d1f73ecb30f Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Tue, 5 Jul 2022 12:56:01 +0800
-Subject: [PATCH 04/21] ipmi warm reset command
+Subject: [PATCH 04/20] ipmi warm reset command
 
 Signed-off-by: Stanley Chu <yschu@nuvoton.com>
 ---
@@ -9,29 +9,23 @@ Signed-off-by: Stanley Chu <yschu@nuvoton.com>
  1 file changed, 63 insertions(+), 1 deletion(-)
 
 diff --git a/globalhandler.cpp b/globalhandler.cpp
-index 4012ce03..ac7fb0d5 100644
+index 81619880..cf6e01d3 100644
 --- a/globalhandler.cpp
 +++ b/globalhandler.cpp
-@@ -1,13 +1,18 @@
- #include "globalhandler.hpp"
- 
-+#include <atomic>
-+#include <chrono>
- #include <ipmid/api.hpp>
- #include <ipmid/utils.hpp>
- #include <phosphor-logging/elog-errors.hpp>
- #include <phosphor-logging/log.hpp>
- #include <string>
-+#include <thread>
+@@ -7,7 +7,12 @@
  #include <xyz/openbmc_project/Common/error.hpp>
  #include <xyz/openbmc_project/State/BMC/server.hpp>
  
-+static std::atomic_flag reset_queued = ATOMIC_FLAG_INIT;
++#include <atomic>
++#include <chrono>
+ #include <string>
++#include <thread>
 +
++static std::atomic_flag reset_queued = ATOMIC_FLAG_INIT;
+ 
  static constexpr auto bmcStateRoot = "/xyz/openbmc_project/state";
  static constexpr auto bmcStateIntf = "xyz.openbmc_project.State.BMC";
- static constexpr auto reqTransition = "RequestedBMCTransition";
-@@ -18,6 +23,11 @@ using BMC = sdbusplus::xyz::openbmc_project::State::server::BMC;
+@@ -19,6 +24,11 @@ using BMC = sdbusplus::xyz::openbmc_project::State::server::BMC;
  
  void register_netfn_global_functions() __attribute__((constructor));
  
@@ -43,7 +37,7 @@ index 4012ce03..ac7fb0d5 100644
  void resetBMC()
  {
      sdbusplus::bus_t bus{ipmid_get_sd_bus_connection()};
-@@ -32,7 +42,30 @@ void resetBMC()
+@@ -33,7 +43,30 @@ void resetBMC()
                            convertForMessage(BMC::Transition::Reboot));
  }
  
@@ -75,7 +69,7 @@ index 4012ce03..ac7fb0d5 100644
   *  @param - None
   *  @returns IPMI completion code.
   */
-@@ -52,6 +85,32 @@ ipmi::RspType<> ipmiGlobalReset()
+@@ -53,11 +86,40 @@ ipmi::RspType<> ipmiGlobalReset()
      return ipmi::responseSuccess();
  }
  
@@ -107,8 +101,7 @@ index 4012ce03..ac7fb0d5 100644
 +
  void register_netfn_global_functions()
  {
- 
-@@ -59,5 +118,8 @@ void register_netfn_global_functions()
+     // Cold Reset
      ipmi::registerHandler(ipmi::prioOpenBmcBase, ipmi::netFnApp,
                            ipmi::app::cmdColdReset, ipmi::Privilege::Admin,
                            ipmiGlobalReset);

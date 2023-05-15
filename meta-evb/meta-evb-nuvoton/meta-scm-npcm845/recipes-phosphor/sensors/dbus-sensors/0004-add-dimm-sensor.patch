@@ -1,4 +1,4 @@
-From 44616abc3e85e9f6bc663b828687fc5402ef28b0 Mon Sep 17 00:00:00 2001
+From 0807ccf23a9e65d56eeb108e49955e86a75f2d91 Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Mon, 15 Aug 2022 16:13:12 +0800
 Subject: [PATCH 4/5] add dimm sensor
@@ -153,7 +153,7 @@ index d6a8b966..c0ec6454 100644
 +option('dimm', type: 'feature', value: 'enabled', description: 'Enable DIMM sensor.',)
 diff --git a/src/DIMMSensor.cpp b/src/DIMMSensor.cpp
 new file mode 100644
-index 00000000..b9e6d6ae
+index 00000000..89303a64
 --- /dev/null
 +++ b/src/DIMMSensor.cpp
 @@ -0,0 +1,577 @@
@@ -736,7 +736,7 @@ index 00000000..b9e6d6ae
 +}
 diff --git a/src/DIMMSensor.hpp b/src/DIMMSensor.hpp
 new file mode 100644
-index 00000000..af2e4b96
+index 00000000..86888cf6
 --- /dev/null
 +++ b/src/DIMMSensor.hpp
 @@ -0,0 +1,51 @@
@@ -792,10 +792,10 @@ index 00000000..af2e4b96
 +    boost::asio::steady_timer waitTimer;
 +};
 diff --git a/src/meson.build b/src/meson.build
-index 6f47fb0a..ab881fae 100644
+index 0adbabca..eac16e5f 100644
 --- a/src/meson.build
 +++ b/src/meson.build
-@@ -231,3 +231,18 @@ if get_option('external').enabled()
+@@ -244,3 +244,18 @@ if get_option('external').enabled()
          install: true,
      )
  endif

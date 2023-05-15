@@ -1,4 +1,4 @@
-From 587b4a589db535f176ebb1b1af91ba5c1f3326c0 Mon Sep 17 00:00:00 2001
+From 7534e0ac1eda3b2d8b5b4b9cb5181da4faa0db68 Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Mon, 15 Aug 2022 14:46:11 +0800
 Subject: [PATCH 2/5] increase adc max reading
@@ -9,7 +9,7 @@ Signed-off-by: Stanley Chu <yschu@nuvoton.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/src/ADCSensor.cpp b/src/ADCSensor.cpp
-index 2fc35e0a..8d0602b4 100644
+index 3c95a41f..a734ddf9 100644
 --- a/src/ADCSensor.cpp
 +++ b/src/ADCSensor.cpp
 @@ -36,7 +36,7 @@

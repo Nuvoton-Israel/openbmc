@@ -1,7 +1,7 @@
-From 94581fca6b8653fb1f4d43bb4235efc2aba7c210 Mon Sep 17 00:00:00 2001
+From 010d7d706fa33cf25e9911c7f5e382dbbfd410c1 Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Tue, 16 Aug 2022 15:39:00 +0800
-Subject: [PATCH 06/21] Add SEL time set command
+Subject: [PATCH 06/20] Add SEL time set command
 
 Signed-off-by: Stanley Chu <yschu@nuvoton.com>
 ---
@@ -9,10 +9,10 @@ Signed-off-by: Stanley Chu <yschu@nuvoton.com>
  1 file changed, 53 insertions(+), 3 deletions(-)
 
 diff --git a/dbus-sdr/storagecommands.cpp b/dbus-sdr/storagecommands.cpp
-index d12458ab..651af7dc 100644
+index 53eaaaeb..11b567e1 100644
 --- a/dbus-sdr/storagecommands.cpp
 +++ b/dbus-sdr/storagecommands.cpp
-@@ -29,6 +29,7 @@
+@@ -25,6 +25,7 @@
  #include <ipmid/api.hpp>
  #include <ipmid/message.hpp>
  #include <ipmid/types.hpp>
@@ -20,7 +20,7 @@ index d12458ab..651af7dc 100644
  #include <phosphor-logging/log.hpp>
  #include <sdbusplus/message/types.hpp>
  #include <sdbusplus/timer.hpp>
-@@ -111,6 +112,14 @@ constexpr static const char* chassisTypeMainServer = "17";
+@@ -112,6 +113,14 @@ constexpr static const char* chassisTypeMainServer = "17";
  // event direction is bit[7] of eventType where 1b = Deassertion event
  constexpr static const uint8_t deassertionEvent = 0x80;
  
@@ -35,7 +35,7 @@ index d12458ab..651af7dc 100644
  static constexpr char const* ipmiSELObject = "xyz.openbmc_project.Logging.IPMI";
  static constexpr char const* ipmiSELPath = "/xyz/openbmc_project/Logging/IPMI";
  static constexpr char const* ipmiSELAddInterface =
-@@ -1284,10 +1293,51 @@ ipmi::RspType<uint32_t> ipmiStorageGetSELTime()
+@@ -1281,10 +1290,51 @@ ipmi::RspType<uint32_t> ipmiStorageGetSELTime()
      return ipmi::responseSuccess(selTime.tv_sec);
  }
  

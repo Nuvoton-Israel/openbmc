@@ -1,7 +1,7 @@
-From cea8aafe1fd89ec5138762daa14287d41b342bd5 Mon Sep 17 00:00:00 2001
+From 6485287e2312b1c846e60ae50c6763068d0e2d4d Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Tue, 16 Aug 2022 16:33:07 +0800
-Subject: [PATCH 16/21] add sensor reading factory support
+Subject: [PATCH 15/20] add sensor reading factory support
 
 Signed-off-by: Stanley Chu <yschu@nuvoton.com>
 ---
@@ -9,10 +9,10 @@ Signed-off-by: Stanley Chu <yschu@nuvoton.com>
  1 file changed, 113 insertions(+)
 
 diff --git a/dbus-sdr/sensorcommands.cpp b/dbus-sdr/sensorcommands.cpp
-index b86d96e8..d4f4ad56 100644
+index b974851d..b38ea074 100644
 --- a/dbus-sdr/sensorcommands.cpp
 +++ b/dbus-sdr/sensorcommands.cpp
-@@ -2555,6 +2555,115 @@ ipmi::RspType<uint8_t,              // No of instances for requested id
+@@ -2618,6 +2618,115 @@ ipmi::RspType<uint8_t,              // No of instances for requested id
  }
  } // namespace dcmi
  
@@ -128,7 +128,7 @@ index b86d96e8..d4f4ad56 100644
  /* end storage commands */
  
  void registerSensorFunctions()
-@@ -2642,5 +2751,9 @@ void registerSensorFunctions()
+@@ -2705,5 +2814,9 @@ void registerSensorFunctions()
      ipmi::registerHandler(ipmi::prioOpenBmcBase, ipmi::netFnSensor,
                            ipmi::sensor_event::cmdGetSensorType,
                            ipmi::Privilege::User, ipmiSenGetSensorType);

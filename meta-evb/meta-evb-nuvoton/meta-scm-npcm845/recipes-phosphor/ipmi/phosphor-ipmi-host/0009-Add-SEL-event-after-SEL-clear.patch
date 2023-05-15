@@ -1,7 +1,7 @@
-From b08696c3224d5f1c0b55fc3c8ea05e462ded7cf7 Mon Sep 17 00:00:00 2001
+From 4785ef53b203a2919ab39fda002c3f82757a9c68 Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Tue, 16 Aug 2022 15:48:21 +0800
-Subject: [PATCH 09/21] Add SEL event after SEL clear
+Subject: [PATCH 09/20] Add SEL event after SEL clear
 
 Signed-off-by: Stanley Chu <yschu@nuvoton.com>
 ---
@@ -9,10 +9,10 @@ Signed-off-by: Stanley Chu <yschu@nuvoton.com>
  1 file changed, 17 insertions(+)
 
 diff --git a/dbus-sdr/storagecommands.cpp b/dbus-sdr/storagecommands.cpp
-index 651af7dc..4929e230 100644
+index 11b567e1..5264c809 100644
 --- a/dbus-sdr/storagecommands.cpp
 +++ b/dbus-sdr/storagecommands.cpp
-@@ -1277,6 +1277,23 @@ ipmi::RspType<uint8_t> ipmiStorageClearSEL(ipmi::Context::ptr ctx,
+@@ -1274,6 +1274,23 @@ ipmi::RspType<uint8_t> ipmiStorageClearSEL(ipmi::Context::ptr ctx,
  
      // Save the erase time
      dynamic_sensors::ipmi::sel::erase_time::save();

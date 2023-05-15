@@ -1,7 +1,7 @@
-From 3f2663a004c391d5bbeb6aced45f2fd6c5b57411 Mon Sep 17 00:00:00 2001
+From 848407f25f3444d2a86958cdf1f8955a1dff41b7 Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Mon, 15 Aug 2022 16:46:21 +0800
-Subject: [PATCH 01/21] Add-set-BIOS-version-support
+Subject: [PATCH 01/20] Add-set-BIOS-version-support
 
 Signed-off-by: Stanley Chu <yschu@nuvoton.com>
 ---
@@ -9,10 +9,10 @@ Signed-off-by: Stanley Chu <yschu@nuvoton.com>
  1 file changed, 45 insertions(+)
 
 diff --git a/apphandler.cpp b/apphandler.cpp
-index d0d77f86..f6334e79 100644
+index 5628b351..d6508848 100644
 --- a/apphandler.cpp
 +++ b/apphandler.cpp
-@@ -52,6 +52,8 @@ static constexpr auto versionIntf = "xyz.openbmc_project.Software.Version";
+@@ -56,6 +56,8 @@ static constexpr auto versionIntf = "xyz.openbmc_project.Software.Version";
  static constexpr auto activationIntf =
      "xyz.openbmc_project.Software.Activation";
  static constexpr auto softwareRoot = "/xyz/openbmc_project/software";
@@ -21,7 +21,7 @@ index d0d77f86..f6334e79 100644
  
  void register_netfn_app_functions() __attribute__((constructor));
  
-@@ -1417,6 +1419,46 @@ ipmi::RspType<uint8_t,                // Parameter revision
+@@ -1407,6 +1409,46 @@ ipmi::RspType<uint8_t,                // Parameter revision
      return ipmi::responseSuccess(paramRevision, setSelector, configData);
  }
  
@@ -68,7 +68,7 @@ index d0d77f86..f6334e79 100644
  ipmi::RspType<> ipmiAppSetSystemInfo(uint8_t paramSelector, uint8_t data1,
                                       std::vector<uint8_t> configData)
  {
-@@ -1506,6 +1548,9 @@ ipmi::RspType<> ipmiAppSetSystemInfo(uint8_t paramSelector, uint8_t data1,
+@@ -1496,6 +1538,9 @@ ipmi::RspType<> ipmiAppSetSystemInfo(uint8_t paramSelector, uint8_t data1,
          std::copy_n(configData.begin(), count, paramString.begin() + offset);
      }
      sysInfoParamStore->update(paramSelector, paramString);

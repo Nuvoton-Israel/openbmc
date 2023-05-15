@@ -1,7 +1,7 @@
-From bebbd79e8b3d81030bfa19a97d682583c6967105 Mon Sep 17 00:00:00 2001
+From 7dd0e41405c9ade664ad37e222e1cedf908ff47b Mon Sep 17 00:00:00 2001
 From: Joseph Liu <kwliu@nuvoton.com>
 Date: Fri, 11 Nov 2022 15:55:51 +0800
-Subject: [PATCH 14/21] fix percentage type show
+Subject: [PATCH 13/20] fix percentage type show
 
 Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
 ---
@@ -9,10 +9,10 @@ Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
  1 file changed, 20 insertions(+), 1 deletion(-)
 
 diff --git a/dbus-sdr/sensorcommands.cpp b/dbus-sdr/sensorcommands.cpp
-index ca22c5c0..d54873af 100644
+index 96d3aac8..a34904e4 100644
 --- a/dbus-sdr/sensorcommands.cpp
 +++ b/dbus-sdr/sensorcommands.cpp
-@@ -1605,6 +1605,18 @@ void constructSensorSdrHeaderKey(uint16_t sensorNum, uint16_t recordID,
+@@ -1623,6 +1623,18 @@ void constructSensorSdrHeaderKey(uint16_t sensorNum, uint16_t recordID,
      record.key.owner_lun = lun;
      record.key.sensor_number = sensornumber;
  }
@@ -31,8 +31,8 @@ index ca22c5c0..d54873af 100644
  bool constructSensorSdr(
      ipmi::Context::ptr ctx,
      const std::unordered_set<std::string>& ipmiDecoratorPaths,
-@@ -1716,7 +1728,14 @@ bool constructSensorSdr(
-         (rExpSign << 7) | (rExpBits << 4) | (bExpSign << 3) | bExpBits;
+@@ -1734,7 +1746,14 @@ bool constructSensorSdr(
+                                 (bExpSign << 3) | bExpBits;
  
      // Set the analog reading byte interpretation accordingly
 -    record.body.sensor_units_1 = (bSigned ? 1 : 0) << 7;
