@@ -1,6 +1,6 @@
-From d04893747f46a865fc6774b19e8ab6ef4a4ac3db Mon Sep 17 00:00:00 2001
+From f602206021f0aff04ec171e6f2aa7d103d7b91e9 Mon Sep 17 00:00:00 2001
 From: Ban Feng <kcfeng0@nuvoton.com>
-Date: Tue, 11 Apr 2023 11:03:28 +0800
+Date: Tue, 16 May 2023 11:12:38 +0800
 Subject: [PATCH] bmcweb: add Server-Sent-Events support
 
 This patch refers below commits:
@@ -25,20 +25,20 @@ Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
  http/server_sent_event.hpp                    | 294 ++++++++++++++++++
  include/eventservice_sse.hpp                  | 213 +++++++++++++
  redfish-core/include/error_messages.hpp       |   9 +
- .../include/event_service_manager.hpp         | 123 ++++++--
+ .../include/event_service_manager.hpp         |  86 ++++-
  redfish-core/include/server_sent_events.hpp   | 293 -----------------
  redfish-core/lib/event_service.hpp            |   8 +-
  redfish-core/src/error_messages.cpp           |  26 ++
  src/webserver_main.cpp                        |   2 +
- 11 files changed, 722 insertions(+), 335 deletions(-)
+ 11 files changed, 708 insertions(+), 312 deletions(-)
  create mode 100644 http/server_sent_event.hpp
  create mode 100644 include/eventservice_sse.hpp
  delete mode 100644 redfish-core/include/server_sent_events.hpp
 
-Index: git/http/http_connection.hpp
-===================================================================
---- git.orig/http/http_connection.hpp
-+++ git/http/http_connection.hpp
+diff --git a/http/http_connection.hpp b/http/http_connection.hpp
+index d4428df5b..38b496a78 100644
+--- a/http/http_connection.hpp
++++ b/http/http_connection.hpp
 @@ -244,11 +244,13 @@ class Connection :
              self->completeRequest(thisRes);
          });
@@ -57,10 +57,10 @@ Index: git/http/http_connection.hpp
              asyncResp->res.setCompleteRequestHandler(
                  [self(shared_from_this())](crow::Response& thisRes) {
                  if (thisRes.result() != boost::beast::http::status::ok)
-Index: git/http/http_response.hpp
-===================================================================
---- git.orig/http/http_response.hpp
-+++ git/http/http_response.hpp
+diff --git a/http/http_response.hpp b/http/http_response.hpp
+index 2af12c9d0..ab5cc5f8f 100644
+--- a/http/http_response.hpp
++++ b/http/http_response.hpp
 @@ -16,10 +16,15 @@ namespace crow
  template <typename Adaptor, typename Handler>
  class Connection;
@@ -77,10 +77,10 @@ Index: git/http/http_response.hpp
      using response_type =
          boost::beast::http::response<boost::beast::http::string_body>;
  
-Index: git/http/routing.hpp
-===================================================================
---- git.orig/http/routing.hpp
-+++ git/http/routing.hpp
+diff --git a/http/routing.hpp b/http/routing.hpp
+index 5bf6902e9..89a77650f 100644
+--- a/http/routing.hpp
++++ b/http/routing.hpp
 @@ -8,6 +8,7 @@
  #include "http_response.hpp"
  #include "logging.hpp"
@@ -89,7 +89,7 @@ Index: git/http/routing.hpp
  #include "sessions.hpp"
  #include "utility.hpp"
  #include "utils/dbus_utils.hpp"
-@@ -376,6 +377,71 @@ class WebSocketRule : public BaseRule
+@@ -372,6 +373,71 @@ class WebSocketRule : public BaseRule
      std::function<void(crow::websocket::Connection&)> errorHandler;
  };
  
@@ -161,11 +161,10 @@ Index: git/http/routing.hpp
  template <typename T>
  struct RuleParameterTraits
  {
-@@ -388,6 +454,14 @@ struct RuleParameterTraits
-         self->ruleToUpgrade.reset(p);
+@@ -385,6 +451,14 @@ struct RuleParameterTraits
          return *p;
      }
-+
+ 
 +    SseSocketRule& serverSentEvent()
 +    {
 +        self_t* self = static_cast<self_t*>(this);
@@ -173,13 +172,15 @@ Index: git/http/routing.hpp
 +        self->ruleToUpgrade.reset(p);
 +        return *p;
 +    }
- 
++
      self_t& methods(boost::beast::http::verb method)
      {
-Index: git/http/server_sent_event.hpp
-===================================================================
+         self_t* self = static_cast<self_t*>(this);
+diff --git a/http/server_sent_event.hpp b/http/server_sent_event.hpp
+new file mode 100644
+index 000000000..83884a00a
 --- /dev/null
-+++ git/http/server_sent_event.hpp
++++ b/http/server_sent_event.hpp
 @@ -0,0 +1,294 @@
 +#pragma once
 +#include "http_request.hpp"
@@ -475,10 +476,11 @@ Index: git/http/server_sent_event.hpp
 +    std::function<void(std::shared_ptr<SseConnection>&)> closeHandler;
 +};
 +} // namespace crow
-Index: git/include/eventservice_sse.hpp
-===================================================================
+diff --git a/include/eventservice_sse.hpp b/include/eventservice_sse.hpp
+new file mode 100644
+index 000000000..5fb65e81b
 --- /dev/null
-+++ git/include/eventservice_sse.hpp
++++ b/include/eventservice_sse.hpp
 @@ -0,0 +1,213 @@
 +#pragma once
 +
@@ -693,10 +695,10 @@ Index: git/include/eventservice_sse.hpp
 +}
 +} // namespace eventservice_sse
 +} // namespace redfish
-Index: git/redfish-core/include/error_messages.hpp
-===================================================================
---- git.orig/redfish-core/include/error_messages.hpp
-+++ git/redfish-core/include/error_messages.hpp
+diff --git a/redfish-core/include/error_messages.hpp b/redfish-core/include/error_messages.hpp
+index e45ea4570..db70ce275 100644
+--- a/redfish-core/include/error_messages.hpp
++++ b/redfish-core/include/error_messages.hpp
 @@ -1070,6 +1070,15 @@ nlohmann::json operationNotAllowed();
  
  void operationNotAllowed(crow::Response& res);
@@ -713,10 +715,10 @@ Index: git/redfish-core/include/error_messages.hpp
  } // namespace messages
  
  } // namespace redfish
-Index: git/redfish-core/include/event_service_manager.hpp
-===================================================================
---- git.orig/redfish-core/include/event_service_manager.hpp
-+++ git/redfish-core/include/event_service_manager.hpp
+diff --git a/redfish-core/include/event_service_manager.hpp b/redfish-core/include/event_service_manager.hpp
+index 3fc4133e6..a296bf412 100644
+--- a/redfish-core/include/event_service_manager.hpp
++++ b/redfish-core/include/event_service_manager.hpp
 @@ -25,7 +25,7 @@
  #include "registries/base_message_registry.hpp"
  #include "registries/openbmc_message_registry.hpp"
@@ -738,7 +740,7 @@ Index: git/redfish-core/include/event_service_manager.hpp
  #include <cstdlib>
  #include <ctime>
  #include <fstream>
-@@ -52,9 +54,32 @@ using ReadingsObjType =
+@@ -52,9 +54,18 @@ using ReadingsObjType =
  static constexpr const char* eventFormatType = "Event";
  static constexpr const char* metricReportFormatType = "MetricReport";
  
@@ -754,54 +756,10 @@ Index: git/redfish-core/include/event_service_manager.hpp
 +static constexpr const std::array<const char*, 2> supportedRegPrefixes = {
 +    "OpenBMC", "TaskEvent"};
 +
-+#ifndef BMCWEB_ENABLE_REDFISH_DBUS_LOG_ENTRIES
-+static std::optional<boost::asio::posix::stream_descriptor> inotifyConn;
-+static constexpr const char* redfishEventLogDir = "/var/log";
-+static constexpr const char* redfishEventLogFile = "/var/log/redfish";
-+static constexpr const size_t iEventSize = sizeof(inotify_event);
-+static int inotifyFd = -1;
-+static int dirWatchDesc = -1;
-+static int fileWatchDesc = -1;
-+
-+// <ID, timestamp, RedfishLogId, registryPrefix, MessageId, MessageArgs>
-+using EventLogObjectsType =
-+    std::tuple<std::string, std::string, std::string, std::string, std::string,
-+               std::vector<std::string>>;
-+
  namespace registries
  {
  inline std::span<const MessageEntry>
-@@ -74,29 +99,6 @@ inline std::span<const MessageEntry>
-     }
-     return {openbmc::registry};
- }
--} // namespace registries
--
--#ifndef BMCWEB_ENABLE_REDFISH_DBUS_LOG_ENTRIES
--// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
--static std::optional<boost::asio::posix::stream_descriptor> inotifyConn;
--static constexpr const char* redfishEventLogDir = "/var/log";
--static constexpr const char* redfishEventLogFile = "/var/log/redfish";
--static constexpr const size_t iEventSize = sizeof(inotify_event);
--
--// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
--static int inotifyFd = -1;
--// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
--static int dirWatchDesc = -1;
--// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
--static int fileWatchDesc = -1;
--
--// <ID, timestamp, RedfishLogId, registryPrefix, MessageId, MessageArgs>
--using EventLogObjectsType =
--    std::tuple<std::string, std::string, std::string, std::string, std::string,
--               std::vector<std::string>>;
--
--namespace registries
--{
- static const Message*
-     getMsgFromRegistry(const std::string& messageKey,
-                        const std::span<const MessageEntry>& registry)
-@@ -386,11 +388,11 @@ class Subscription : public persistent_d
+@@ -386,11 +397,11 @@ class Subscription : public persistent_data::UserSubscription
          policy->invalidResp = retryRespHandler;
      }
  
@@ -816,7 +774,7 @@ Index: git/redfish-core/include/event_service_manager.hpp
      {}
  
      ~Subscription() = default;
-@@ -405,16 +407,17 @@ class Subscription : public persistent_d
+@@ -405,16 +416,17 @@ class Subscription : public persistent_data::UserSubscription
              return false;
          }
  
@@ -838,7 +796,7 @@ Index: git/redfish-core/include/event_service_manager.hpp
          return true;
      }
  
-@@ -566,6 +569,30 @@ class Subscription : public persistent_d
+@@ -566,6 +578,30 @@ class Subscription : public persistent_data::UserSubscription
          return eventSeqNum;
      }
  
@@ -869,7 +827,7 @@ Index: git/redfish-core/include/event_service_manager.hpp
    private:
      uint64_t eventSeqNum = 1;
      std::string host;
-@@ -574,7 +601,8 @@ class Subscription : public persistent_d
+@@ -574,7 +610,8 @@ class Subscription : public persistent_data::UserSubscription
      crow::HttpClient client;
      std::string path;
      std::string uriProto;
@@ -879,7 +837,7 @@ Index: git/redfish-core/include/event_service_manager.hpp
  
      // Check used to indicate what response codes are valid as part of our retry
      // policy.  2XX is considered acceptable
-@@ -945,6 +973,8 @@ class EventServiceManager
+@@ -944,6 +981,8 @@ class EventServiceManager
          // Update retry configuration.
          subValue->updateRetryConfig(retryAttempts, retryTimeoutInterval);
  
@@ -888,7 +846,7 @@ Index: git/redfish-core/include/event_service_manager.hpp
          return id;
      }
  
-@@ -969,11 +999,40 @@ class EventServiceManager
+@@ -968,11 +1007,40 @@ class EventServiceManager
          }
      }
  
@@ -929,9 +887,10 @@ Index: git/redfish-core/include/event_service_manager.hpp
      std::vector<std::string> getAllIDs()
      {
          std::vector<std::string> idList;
-Index: git/redfish-core/include/server_sent_events.hpp
-===================================================================
---- git.orig/redfish-core/include/server_sent_events.hpp
+diff --git a/redfish-core/include/server_sent_events.hpp b/redfish-core/include/server_sent_events.hpp
+deleted file mode 100644
+index 1592d507a..000000000
+--- a/redfish-core/include/server_sent_events.hpp
 +++ /dev/null
 @@ -1,293 +0,0 @@
 -
@@ -1216,7 +1175,7 @@ Index: git/redfish-core/include/server_sent_events.hpp
 -
 -        if (requestDataQueue.size() <= maxReqQueueSize)
 -        {
--            requestDataQueue.push(std::pair(id, data));
+-            requestDataQueue.emplace(id, data);
 -            checkQueue(true);
 -        }
 -        else
@@ -1227,10 +1186,10 @@ Index: git/redfish-core/include/server_sent_events.hpp
 -};
 -
 -} // namespace crow
-Index: git/redfish-core/lib/event_service.hpp
-===================================================================
---- git.orig/redfish-core/lib/event_service.hpp
-+++ git/redfish-core/lib/event_service.hpp
+diff --git a/redfish-core/lib/event_service.hpp b/redfish-core/lib/event_service.hpp
+index f74f21534..71b3b9885 100644
+--- a/redfish-core/lib/event_service.hpp
++++ b/redfish-core/lib/event_service.hpp
 @@ -28,10 +28,6 @@
  namespace redfish
  {
@@ -1242,7 +1201,7 @@ Index: git/redfish-core/lib/event_service.hpp
  static constexpr const std::array<const char*, 3> supportedRetryPolicies = {
      "TerminateAfterRetries", "SuspendRetries", "RetryForever"};
  
-@@ -43,8 +39,6 @@ static constexpr const std::array<const
+@@ -43,8 +39,6 @@ static constexpr const std::array<const char*, 1> supportedResourceTypes = {
      "Task"};
  #endif
  
@@ -1251,7 +1210,7 @@ Index: git/redfish-core/lib/event_service.hpp
  inline void requestRoutesEventService(App& app)
  {
      BMCWEB_ROUTE(app, "/redfish/v1/EventService/")
-@@ -62,6 +56,8 @@ inline void requestRoutesEventService(Ap
+@@ -62,6 +56,8 @@ inline void requestRoutesEventService(App& app)
              "#EventService.v1_5_0.EventService";
          asyncResp->res.jsonValue["Id"] = "EventService";
          asyncResp->res.jsonValue["Name"] = "Event Service";
@@ -1260,14 +1219,16 @@ Index: git/redfish-core/lib/event_service.hpp
          asyncResp->res.jsonValue["Subscriptions"]["@odata.id"] =
              "/redfish/v1/EventService/Subscriptions";
          asyncResp->res
-Index: git/redfish-core/src/error_messages.cpp
-===================================================================
---- git.orig/redfish-core/src/error_messages.cpp
-+++ git/redfish-core/src/error_messages.cpp
-@@ -1778,6 +1778,32 @@ void invalidUpload(crow::Response& res,
+diff --git a/redfish-core/src/error_messages.cpp b/redfish-core/src/error_messages.cpp
+index 5f802462e..d9de394a7 100644
+--- a/redfish-core/src/error_messages.cpp
++++ b/redfish-core/src/error_messages.cpp
+@@ -1776,6 +1776,32 @@ void invalidUpload(crow::Response& res, std::string_view arg1,
+     addMessageToErrorJson(res.jsonValue, invalidUpload(arg1, arg2));
+ }
  
- /**
-  * @internal
++/**
++ * @internal
 + * @brief Formats InvalidQueryFilter into JSON
 + *
 + * See header file for more information
@@ -1292,15 +1253,13 @@ Index: git/redfish-core/src/error_messages.cpp
 +    addMessageToErrorJson(res.jsonValue, invalidQueryFilter());
 +}
 +
-+/**
-+ * @internal
+ /**
+  * @internal
   * @brief Formats Invalid File message into JSON
-  *
-  * See header file for more information
-Index: git/src/webserver_main.cpp
-===================================================================
---- git.orig/src/webserver_main.cpp
-+++ git/src/webserver_main.cpp
+diff --git a/src/webserver_main.cpp b/src/webserver_main.cpp
+index a7f06b8e7..f4d41768b 100644
+--- a/src/webserver_main.cpp
++++ b/src/webserver_main.cpp
 @@ -4,6 +4,7 @@
  #include "cors_preflight.hpp"
  #include "dbus_monitor.hpp"
@@ -1309,7 +1268,7 @@ Index: git/src/webserver_main.cpp
  #include "hostname_monitor.hpp"
  #include "ibm/management_console_rest.hpp"
  #include "image_upload.hpp"
-@@ -84,6 +85,7 @@ static int run()
+@@ -82,6 +83,7 @@ static int run()
  #endif
  
  #ifdef BMCWEB_ENABLE_REDFISH
@@ -1317,3 +1276,6 @@ Index: git/src/webserver_main.cpp
      redfish::RedfishService redfish(app);
  
      // Create EventServiceManager instance and initialize Config
+-- 
+2.34.1
+
