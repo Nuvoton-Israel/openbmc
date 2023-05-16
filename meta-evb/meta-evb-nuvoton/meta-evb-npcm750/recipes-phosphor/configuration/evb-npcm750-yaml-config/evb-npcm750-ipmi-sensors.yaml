@@ -10,7 +10,7 @@
   entityID: 0x07
   entityInstance: 1
   sensorType: 0x01
-  path: /xyz/openbmc_project/sensors/temperature/lm75
+  path: /xyz/openbmc_project/sensors/temperature/LM75
   sensorReadingType: 0x01
   multiplierM: 1
   offsetB: 0
@@ -30,13 +30,13 @@
 2:
   <<: *temperature
   entityInstance: 2
-  path: /xyz/openbmc_project/sensors/temperature/tmp100
+  path: /xyz/openbmc_project/sensors/temperature/TMP100
 
 3: &voltage
   entityID: 0x07
   entityInstance: 3
   sensorType: 0x02
-  path: /xyz/openbmc_project/sensors/voltage/adc1
+  path: /xyz/openbmc_project/sensors/voltage/ADC1
   sensorReadingType: 0x01
   multiplierM: 157
   offsetB: 0
@@ -57,43 +57,43 @@
 4:
   <<: *voltage
   entityInstance: 4
-  path: /xyz/openbmc_project/sensors/voltage/adc2
+  path: /xyz/openbmc_project/sensors/voltage/ADC2
 
 5:
   <<: *voltage
   entityInstance: 5
-  path: /xyz/openbmc_project/sensors/voltage/adc3
+  path: /xyz/openbmc_project/sensors/voltage/ADC3
 
 6:
   <<: *voltage
   entityInstance: 6
-  path: /xyz/openbmc_project/sensors/voltage/adc4
+  path: /xyz/openbmc_project/sensors/voltage/ADC4
 
 7:
   <<: *voltage
   entityInstance: 7
-  path: /xyz/openbmc_project/sensors/voltage/adc5
+  path: /xyz/openbmc_project/sensors/voltage/ADC5
 
 8:
   <<: *voltage
   entityInstance: 8
-  path: /xyz/openbmc_project/sensors/voltage/adc6
+  path: /xyz/openbmc_project/sensors/voltage/ADC6
 
 9:
   <<: *voltage
   entityInstance: 9
-  path: /xyz/openbmc_project/sensors/voltage/adc7
+  path: /xyz/openbmc_project/sensors/voltage/ADC7
 
 10:
   <<: *voltage
   entityInstance: 10
-  path: /xyz/openbmc_project/sensors/voltage/adc8
+  path: /xyz/openbmc_project/sensors/voltage/ADC8
 
 11: &fan_tach
   entityID: 0x1D
   entityInstance: 1
   sensorType: 0x04
-  path: /xyz/openbmc_project/sensors/fan_tach/fan0
+  path: /xyz/openbmc_project/sensors/fan_tach/Fan1
   sensorReadingType: 0x01
   multiplierM: 80
   offsetB: 0
@@ -113,14 +113,14 @@
 12:
   <<: *fan_tach
   entityInstance: 2
-  path: /xyz/openbmc_project/sensors/fan_tach/fan1
+  path: /xyz/openbmc_project/sensors/fan_tach/Fan2
 
 13:
   <<: *fan_tach
   entityInstance: 3
-  path: /xyz/openbmc_project/sensors/fan_tach/fan2
+  path: /xyz/openbmc_project/sensors/fan_tach/Fan3
 
 14:
   <<: *fan_tach
   entityInstance: 4
-  path: /xyz/openbmc_project/sensors/fan_tach/fan3
+  path: /xyz/openbmc_project/sensors/fan_tach/Fan4

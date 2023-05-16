@@ -1,3 +1,5 @@
+inherit entity-utils
+
 FILESEXTRAPATHS:prepend:evb-npcm750 := "${THISDIR}/${PN}:"
 
 SRC_URI:append:evb-npcm750 = " \
@@ -6,6 +8,7 @@ SRC_URI:append:evb-npcm750 = " \
     file://fan-reboot-control.service \
     file://fan-boot-control.service \
     file://phosphor-pid-control_evb.service \
+    file://phosphor-pid-control_evb_entity.service \
     "
 
 FILES:${PN}:append:evb-npcm750 = " \
@@ -31,8 +34,16 @@ do_install:append:evb-npcm750() {
         ${D}${datadir}/swampd/config.json
 
     install -d ${D}${systemd_unitdir}/system/
-    install -m 0644 ${WORKDIR}/phosphor-pid-control_evb.service \
-        ${D}${systemd_unitdir}/system/phosphor-pid-control.service
+
+    ENTITY_MANAGER_ENABLE="${@entity_enabled(d, 'true', 'false')}"
+    if [ "${ENTITY_MANAGER_ENABLE}" = "true" ]; then
+        install -m 0644 ${WORKDIR}/phosphor-pid-control_evb_entity.service \
+            ${D}${systemd_unitdir}/system/phosphor-pid-control.service
+    else
+        install -m 0644 ${WORKDIR}/phosphor-pid-control_evb.service \
+            ${D}${systemd_unitdir}/system/phosphor-pid-control.service
+    fi
+
     install -m 0644 ${WORKDIR}/fan-reboot-control.service \
         ${D}${systemd_unitdir}/system
     install -m 0644 ${WORKDIR}/fan-boot-control.service \

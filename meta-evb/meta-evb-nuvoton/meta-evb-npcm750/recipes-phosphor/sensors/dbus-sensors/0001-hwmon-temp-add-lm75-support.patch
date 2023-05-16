@@ -1,0 +1,27 @@
+From 60bfdde81e7bbc96a9ee8f35ff2e01536894de57 Mon Sep 17 00:00:00 2001
+From: cpchiang <cpchiang1@nuvoton.com>
+Date: Tue, 16 May 2023 13:35:32 +0800
+Subject: [PATCH] hwmon temp: add lm75 support
+
+hwmon temp: add lm75 support.
+
+Signed-off-by: cpchiang <cpchiang1@nuvoton.com>
+---
+ src/HwmonTempMain.cpp | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/HwmonTempMain.cpp b/src/HwmonTempMain.cpp
+index 340bf11c..ec48ac2a 100644
+--- a/src/HwmonTempMain.cpp
++++ b/src/HwmonTempMain.cpp
+@@ -59,6 +59,7 @@ static const I2CDeviceTypeMap sensorTypes{
+     {"HDC1080", I2CDeviceType{"hdc1080", false}},
+     {"JC42", I2CDeviceType{"jc42", true}},
+     {"LM75A", I2CDeviceType{"lm75a", true}},
++    {"LM75", I2CDeviceType{"lm75", true}},
+     {"LM95234", I2CDeviceType{"lm95234", true}},
+     {"MAX31725", I2CDeviceType{"max31725", true}},
+     {"MAX31730", I2CDeviceType{"max31730", true}},
+-- 
+2.17.1
+

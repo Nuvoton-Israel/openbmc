@@ -1,4 +1,4 @@
-EXTRA_OECMAKE:append:evb-npcm750 = " -DSEL_LOGGER_MONITOR_THRESHOLD_EVENTS=ON"
-EXTRA_OECMAKE:append:evb-npcm750 = " -DSEL_LOGGER_MONITOR_THRESHOLD_ALARM_EVENTS=ON"
-EXTRA_OECMAKE:append:evb-npcm750 = " -DSEL_LOGGER_MONITOR_WATCHDOG_EVENTS=ON"
-EXTRA_OECMAKE:append:evb-npcm750 = " -DREDFISH_LOG_MONITOR_PULSE_EVENTS=ON"
+inherit entity-utils
+
+PACKAGECONFIG:append:evb-npcm750 = " log-watchdog clears-sel"
+PACKAGECONFIG:append:evb-npcm750 = " ${@entity_enabled(d, 'log-threshold', 'send-to-logger log-alarm')}"

@@ -48,6 +48,7 @@ RDEPENDS:${PN}-system = " \
         openssl-bin \
         openssl-engines \
         phosphor-host-postd \
+        phosphor-post-code-manager \
         phosphor-sel-logger \
         rsyslog \
         loadsvf \

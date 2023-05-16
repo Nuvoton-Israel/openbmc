@@ -1,1 +1,1 @@
-RMCPP_IFACE = "eth2"
+RMCPP_IFACE = "end2"

@@ -1,17 +1,17 @@
 {
     "sensors" : [
            {
-            "name": "fan0",
+            "name": "Fan1",
             "type": "fan",
-            "readPath": "/xyz/openbmc_project/sensors/fan_tach/fan0",
+            "readPath": "/xyz/openbmc_project/sensors/fan_tach/Fan1",
             "writePath": "/sys/devices/platform/ahb/ahb:apb/f0103000.pwm-fan-controller/hwmon/**/pwm1",
             "min": 0,
             "max": 255
         },
         {
-            "name": "lm75",
+            "name": "LM75",
             "type": "temp",
-            "readPath": "/xyz/openbmc_project/sensors/temperature/lm75",
+            "readPath": "/xyz/openbmc_project/sensors/temperature/LM75",
             "writePath": "",
             "min": 0,
             "max": 0,
@@ -26,9 +26,9 @@
             "failsafePercent": 100.0,
             "pids": [
                 {
-                    "name": "Fan0",
+                    "name": "Fan1",
                     "type": "fan",
-                    "inputs": ["fan0"],
+                    "inputs": ["Fan1"],
                     "setpoint": 40.0,
                     "pid": {
                         "samplePeriod": 1.0,
@@ -45,9 +45,9 @@
                     }
                 },
                 {
-                    "name": "lm75",
+                    "name": "LM75",
                     "type": "stepwise",
-                    "inputs": ["lm75"],
+                    "inputs": ["LM75"],
                     "setpoint": 30.0,
                     "pid": {
                         "samplePeriod": 1.0,

@@ -223,7 +223,7 @@ This is a secure flash update mechanism to update BMC firmware via WebUI.
 
     ```
       /* hwmon config file for LM75 temperature sensor on NPCM750 EVB. */
-      LABEL_temp1=lm75
+      LABEL_temp1=LM75
       WARNLO_temp1=10000
       WARNHI_temp1=40000
       CRITHI_temp1=70000
@@ -237,7 +237,7 @@ This is a secure flash update mechanism to update BMC firmware via WebUI.
       entityID: 0x07
       entityInstance: 1
       sensorType: 0x01
-      path: /xyz/openbmc_project/sensors/temperature/lm75
+      path: /xyz/openbmc_project/sensors/temperature/LM75
       sensorReadingType: 0x01
       multiplierM: 1
       offsetB: 0
@@ -269,20 +269,20 @@ This is a secure flash update mechanism to update BMC firmware via WebUI.
     Use IPMI utilities like **ipmitool** to send commands for getting SDR or SEL records.  
     ```
     root@evb-npcm750:~# ipmitool sdr list
-    lm75             | 37 degrees C    | ok
-    tmp100           | 37 degrees C    | ok
-    adc1             | 0 Volts         | ok
-    adc2             | 0 Volts         | ok
-    adc3             | 0 Volts         | ok
-    adc4             | 0 Volts         | ok
-    adc5             | 0 Volts         | ok
-    adc6             | 0 Volts         | ok
-    adc7             | 0 Volts         | ok
-    adc8             | 0 Volts         | ok
-    fan0             | 0 RPM           | ok
-    fan1             | 0 RPM           | ok
-    fan2             | 0 RPM           | ok
-    fan3             | 0 RPM           | ok
+    LM75             | 37 degrees C    | ok
+    TMP100           | 37 degrees C    | ok
+    ADC1             | 0 Volts         | ok
+    ADC2             | 0 Volts         | ok
+    ADC3             | 0 Volts         | ok
+    ADC4             | 0 Volts         | ok
+    ADC5             | 0 Volts         | ok
+    ADC6             | 0 Volts         | ok
+    ADC7             | 0 Volts         | ok
+    ADC8             | 0 Volts         | ok
+    Fan1             | 0 RPM           | ok
+    Fan2             | 0 RPM           | ok
+    Fan3             | 0 RPM           | ok
+    Fan4             | 0 RPM           | ok
     
     root@evb-npcm750:~# ipmitool sel list
     1 |  Pre-Init  |0000000089| Temperature #0x02 | Upper Non-critical going high | Asserted
@@ -382,17 +382,17 @@ In order to automatically apply accurate and responsive correction to a fan cont
     {
     "sensors" : [
            {
-            "name": "fan0",
+            "name": "Fan1",
             "type": "fan",
-            "readPath": "/xyz/openbmc_project/sensors/fan_tach/fan0",
+            "readPath": "/xyz/openbmc_project/sensors/fan_tach/Fan1",
             "writePath": "/sys/devices/platform/ahb/ahb:apb/f0103000.pwm-fan-controller/hwmon/**/pwm1",
             "min": 0,
             "max": 255
         },
         {
-            "name": "lm75",
+            "name": "LM75",
             "type": "temp",
-            "readPath": "/xyz/openbmc_project/sensors/temperature/lm75",
+            "readPath": "/xyz/openbmc_project/sensors/temperature/LM75",
             "writePath": "",
             "min": 0,
             "max": 0,
@@ -407,9 +407,9 @@ In order to automatically apply accurate and responsive correction to a fan cont
             "failsafePercent": 100.0,
             "pids": [
                 {
-                    "name": "Fan0",
+                    "name": "Fan1",
                     "type": "fan",
-                    "inputs": ["fan0"],
+                    "inputs": ["Fan1"],
                     "setpoint": 40.0,
                     "pid": {
                         "samplePeriod": 1.0,
@@ -426,9 +426,9 @@ In order to automatically apply accurate and responsive correction to a fan cont
                     }
                 },
                 {
-                    "name": "lm75",
+                    "name": "LM75",
                     "type": "stepwise",
-                    "inputs": ["lm75"],
+                    "inputs": ["LM75"],
                     "setpoint": 30.0,
                     "pid": {
                         "samplePeriod": 1.0,
