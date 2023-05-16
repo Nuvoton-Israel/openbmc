@@ -1,0 +1,13 @@
+diff --git a/include/obmc_console.hpp b/include/obmc_console.hpp
+index 3ab13ee4c..b6c93e2b8 100644
+--- a/include/obmc_console.hpp
++++ b/include/obmc_console.hpp
+@@ -130,7 +130,7 @@ inline void requestRoutes(App& app)
+         sessions.insert(&conn);
+         if (hostSocket == nullptr)
+         {
+-            const std::string consoleName("\0obmc-console", 13);
++            const std::string consoleName("\0obmc-console.default", 21);
+             boost::asio::local::stream_protocol::endpoint ep(consoleName);
+ 
+             hostSocket =

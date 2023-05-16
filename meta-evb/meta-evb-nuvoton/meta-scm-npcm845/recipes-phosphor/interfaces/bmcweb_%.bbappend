@@ -1,3 +1,6 @@
+FILESEXTRAPATHS:prepend:scm-npcm845 := "${THISDIR}/${PN}:"
+SRC_URI:append:scm-npcm845 = "file://workaround-set-bmcweb-default-serial-socket-name.patch"
+
 # Enable Redfish Journal support
 EXTRA_OEMESON:append:scm-npcm845 = " -Dredfish-bmc-journal=enabled"
 
