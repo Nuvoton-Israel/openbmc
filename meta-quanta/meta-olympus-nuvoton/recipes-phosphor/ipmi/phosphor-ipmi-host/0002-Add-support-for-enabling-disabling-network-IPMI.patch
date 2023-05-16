@@ -1,26 +1,18 @@
-From ea493a2cf9e7ed5d91645bf626c55ae9ad0a16cd Mon Sep 17 00:00:00 2001
+From 7a4a78415280e70214ae0ea085fd14c51852f344 Mon Sep 17 00:00:00 2001
 From: Tim Lee <timlee660101@gmail.com>
 Date: Fri, 13 Dec 2019 16:13:50 +0800
-Subject: [PATCH] Add support for enabling/disabling network IPMI
+Subject: [PATCH 2/2] Add support for enabling/disabling network IPMI
 
 Signed-off-by: Tim Lee <timlee660101@gmail.com>
 ---
- user_channel/channel_mgmt.cpp | 96 +++++++++++++++++++++++++++++++++++
- 1 file changed, 96 insertions(+)
+ user_channel/channel_mgmt.cpp | 95 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 95 insertions(+)
 
 diff --git a/user_channel/channel_mgmt.cpp b/user_channel/channel_mgmt.cpp
-index 7d3cf952..025c7a7a 100644
+index a179b37b..4d8d78d4 100644
 --- a/user_channel/channel_mgmt.cpp
 +++ b/user_channel/channel_mgmt.cpp
-@@ -25,6 +25,7 @@
- #include <unistd.h>
- 
- #include <boost/interprocess/sync/scoped_lock.hpp>
-+#include <boost/process/child.hpp>
- #include <cerrno>
- #include <exception>
- #include <filesystem>
-@@ -149,6 +150,91 @@ const std::array<std::string, PRIVILEGE_OEM + 1> privList = {
+@@ -150,6 +150,91 @@ const std::array<std::string, PRIVILEGE_OEM + 1> privList = {
      "priv-reserved", "priv-callback", "priv-user",
      "priv-operator", "priv-admin",    "priv-oem"};
  
@@ -112,7 +104,7 @@ index 7d3cf952..025c7a7a 100644
  std::string ChannelConfig::getChannelName(const uint8_t chNum)
  {
      if (!isValidChannel(chNum))
-@@ -615,6 +701,16 @@ Cc ChannelConfig::setChannelAccessPersistData(const uint8_t chNum,
+@@ -615,6 +700,16 @@ Cc ChannelConfig::setChannelAccessPersistData(const uint8_t chNum,
      {
          channelData[chNum].chAccess.chNonVolatileData.accessMode =
              chAccessData.accessMode;

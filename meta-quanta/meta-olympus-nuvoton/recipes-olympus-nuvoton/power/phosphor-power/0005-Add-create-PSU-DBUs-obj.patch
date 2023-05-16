@@ -1,7 +1,7 @@
-From 700d5fd994251f05058469ed1c9d8a597ecde7b3 Mon Sep 17 00:00:00 2001
+From 4ab9f4f85d3d37b968d70f5a12f3e5951632c955 Mon Sep 17 00:00:00 2001
 From: Allen Kang <jhkang@nuvoton.com>
 Date: Tue, 14 Feb 2023 14:39:21 +0800
-Subject: [PATCH] Allen add create PSU DBUs obj
+Subject: [PATCH 5/5] Add create PSU DBUs obj
 
 ---
  power-supply/power_supply.cpp | 73 +++++++++++++++++++++++++++++++++++
@@ -10,10 +10,10 @@ Subject: [PATCH] Allen add create PSU DBUs obj
  3 files changed, 81 insertions(+)
 
 diff --git a/power-supply/power_supply.cpp b/power-supply/power_supply.cpp
-index d2258b30..d4d8b67f 100644
+index 1bbeb4fd..f74c6791 100644
 --- a/power-supply/power_supply.cpp
 +++ b/power-supply/power_supply.cpp
-@@ -90,6 +90,10 @@ PowerSupply::PowerSupply(const std::string& name, size_t inst,
+@@ -86,6 +86,10 @@ PowerSupply::PowerSupply(const std::string& name, size_t inst,
      presentMatch = std::make_unique<match_t>(
          bus, match::rules::propertiesChanged(inventoryPath, INVENTORY_IFACE),
          [this](auto& msg) { this->inventoryChanged(msg); });
@@ -24,7 +24,7 @@ index d2258b30..d4d8b67f 100644
      // Get initial presence state.
      updatePresence();
  
-@@ -630,6 +634,75 @@ void PowerSupply::resolveError(const std::string& callout,
+@@ -606,6 +610,75 @@ void PowerSupply::resolveError(const std::string& callout,
      }
  }
  
@@ -114,7 +114,7 @@ index c87df39c..3da9f7f6 100644
       * @brief Adds properties to the inventory.
       *
 diff --git a/types.hpp b/types.hpp
-index 502c1347..fa9dc3a3 100644
+index b682d9bf..1f2cfe64 100644
 --- a/types.hpp
 +++ b/types.hpp
 @@ -16,6 +16,8 @@ constexpr auto VERSION_IFACE = "xyz.openbmc_project.Software.Version";
@@ -123,10 +123,10 @@ index 502c1347..fa9dc3a3 100644
  constexpr auto ASSOC_DEF_IFACE = "xyz.openbmc_project.Association.Definitions";
 +constexpr auto DECOR_CACHEABLE_IFACE = "xyz.openbmc_project.Inventory.Decorator.Cacheable";
 +constexpr auto DECOR_REPLACEABLE_IFACE = "xyz.openbmc_project.Inventory.Decorator.Replaceable";
+ constexpr auto CHASSIS_IFACE = "xyz.openbmc_project.Inventory.Item.Chassis";
  #ifdef IBM_VPD
  constexpr auto DINF_IFACE = "com.ibm.ipzvpd.DINF";
- constexpr auto VINI_IFACE = "com.ibm.ipzvpd.VINI";
-@@ -25,9 +27,13 @@ constexpr auto ENDPOINTS_PROP = "endpoints";
+@@ -26,9 +28,13 @@ constexpr auto ENDPOINTS_PROP = "endpoints";
  constexpr auto MESSAGE_PROP = "Message";
  constexpr auto RESOLVED_PROP = "Resolved";
  constexpr auto PRESENT_PROP = "Present";

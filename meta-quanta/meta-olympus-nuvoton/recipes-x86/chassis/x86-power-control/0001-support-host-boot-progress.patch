@@ -1,7 +1,7 @@
-From ddd9c93022197409540b4b007e3e3aa1d4688f4e Mon Sep 17 00:00:00 2001
+From 46a715533f1fdbfa3b1cc695a5ee425a4ba714ca Mon Sep 17 00:00:00 2001
 From: Joseph Liu <kwliu@nuvoton.com>
 Date: Mon, 11 Jan 2021 18:24:09 +0800
-Subject: [PATCH 1/2] support host boot progress
+Subject: [PATCH] support host boot progress
 
 Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
 ---
@@ -9,7 +9,7 @@ Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
  1 file changed, 97 insertions(+), 2 deletions(-)
 
 diff --git a/src/power_control.cpp b/src/power_control.cpp
-index 05aa45c..0371aa9 100644
+index 0dafd60..465aeab 100644
 --- a/src/power_control.cpp
 +++ b/src/power_control.cpp
 @@ -110,6 +110,7 @@ static std::string buttonDbusName = "xyz.openbmc_project.Chassis.Buttons";
@@ -20,7 +20,7 @@ index 05aa45c..0371aa9 100644
  static std::shared_ptr<sdbusplus::asio::dbus_interface> hostIface;
  static std::shared_ptr<sdbusplus::asio::dbus_interface> chassisIface;
  #ifdef CHASSIS_SYSTEM_RESET
-@@ -238,6 +239,16 @@ static void setOperatingSystemState(const OperatingSystemStateStage stage)
+@@ -251,6 +252,16 @@ static void setOperatingSystemState(const OperatingSystemStateStage stage)
                getOperatingSystemStateStage(stage));
  }
  
@@ -37,7 +37,7 @@ index 05aa45c..0371aa9 100644
  enum class PowerState
  {
      on,
-@@ -485,6 +496,40 @@ static uint64_t getCurrentTimeMs()
+@@ -498,6 +509,40 @@ static uint64_t getCurrentTimeMs()
      return currentTimeMs;
  }
  
@@ -78,7 +78,7 @@ index 05aa45c..0371aa9 100644
  static constexpr std::string_view getHostState(const PowerState state)
  {
      switch (state)
-@@ -1558,6 +1603,11 @@ static void currentHostStateMonitor()
+@@ -1575,6 +1620,11 @@ static void currentHostStateMonitor()
      else
      {
          pohCounterTimer.cancel();
@@ -90,16 +90,16 @@ index 05aa45c..0371aa9 100644
          // Set the restart cause set for this restart
          setRestartCause();
      }
-@@ -1621,6 +1671,8 @@ static void currentHostStateMonitor()
-                 // if HostState is trurned to OFF.
-                 setOperatingSystemState(OperatingSystemStateStage::Inactive);
+@@ -1637,6 +1687,8 @@ static void currentHostStateMonitor()
+             // if HostState is trurned to OFF.
+             setOperatingSystemState(OperatingSystemStateStage::Inactive);
  
-+                setBootProgress(BootProgressStage::Unspecified);
++            setBootProgress(BootProgressStage::Unspecified);
 +
-                 // Set the restart cause set for this restart
-                 setRestartCause();
+             // Set the restart cause set for this restart
+             setRestartCause();
  #ifdef USE_ACBOOT
-@@ -2238,11 +2290,13 @@ static void postCompleteHandler(bool state)
+@@ -2264,11 +2316,13 @@ static void postCompleteHandler(bool state)
      {
          sendPowerControlEvent(Event::postCompleteAssert);
          setOperatingSystemState(OperatingSystemStateStage::Standby);
@@ -113,7 +113,7 @@ index 05aa45c..0371aa9 100644
      }
  }
  
-@@ -2784,6 +2838,47 @@ int main(int argc, char* argv[])
+@@ -2811,6 +2865,47 @@ int main(int argc, char* argv[])
      lg2::info("Initializing power state.");
      logStateTransition(powerState);
  
@@ -161,7 +161,7 @@ index 05aa45c..0371aa9 100644
      // Power Control Service
      sdbusplus::asio::object_server hostServer =
          sdbusplus::asio::object_server(conn);
-@@ -3260,8 +3355,8 @@ int main(int argc, char* argv[])
+@@ -3279,8 +3374,8 @@ int main(int argc, char* argv[])
          sdbusplus::asio::object_server(conn);
  
      // OS State Interface
@@ -173,5 +173,5 @@ index 05aa45c..0371aa9 100644
  
      // Get the initial OS state based on POST complete
 -- 
-2.17.1
+2.34.1
 
