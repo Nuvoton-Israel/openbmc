@@ -1,0 +1,1097 @@
+From 0216d4cb417cb6e3ec003b0fb8ac9b0fb7e9cccd Mon Sep 17 00:00:00 2001
+From: Mia Lin <mimi05633@gmail.com>
+Date: Fri, 19 May 2023 14:11:07 +0800
+Subject: [PATCH 1/1] libmctp: add smbus binding
+
+Signed-off-by: Mia Lin <mimi05633@gmail.com>
+---
+ Makefile.am               |   5 +
+ configure.ac              |   1 +
+ libmctp-log.h             |   8 +
+ libmctp-smbus.h           |  74 +++++
+ libmctp.h                 |   1 +
+ linux/errno-base.h        |  40 +++
+ linux/i2c.h               | 156 +++++++++++
+ log.c                     |  35 +++
+ smbus.c                   | 569 ++++++++++++++++++++++++++++++++++++++
+ utils/mctp-demux-daemon.c |  69 +++++
+ 10 files changed, 958 insertions(+)
+ create mode 100644 libmctp-smbus.h
+ create mode 100644 linux/errno-base.h
+ create mode 100644 linux/i2c.h
+ create mode 100644 smbus.c
+
+diff --git a/Makefile.am b/Makefile.am
+index 7403541..0ba0824 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -21,6 +21,11 @@ libmctp_la_SOURCES += npcmi3c.c pec.c
+ include_HEADERS += libmctp-npcmi3c.h
+ endif
+ 
++if LIBMCTP_BINDING_smbus
++libmctp_la_SOURCES += smbus.c
++include_HEADERS += libmctp-smbus.h
++endif
++
+ if HAVE_SYSTEMD
+ systemdsystemunit_DATA = \
+ 	systemd/system/mctp-demux.service \
+diff --git a/configure.ac b/configure.ac
+index fadb8b0..034d1c3 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -158,6 +158,7 @@ free(malloc(4096));
+ AM_CONDITIONAL([LIBMCTP_BINDING_serial], [true])
+ AM_CONDITIONAL([LIBMCTP_BINDING_astlpc], [true])
+ AM_CONDITIONAL([LIBMCTP_BINDING_npcmi3c], [true])
++AM_CONDITIONAL([LIBMCTP_BINDING_smbus], [true])
+ 
+ # Check for valgrind
+ AS_IF([test "x$enable_tests" = "xno"], [enable_valgrind=no])
+diff --git a/libmctp-log.h b/libmctp-log.h
+index 1e574e5..6046c5c 100644
+--- a/libmctp-log.h
++++ b/libmctp-log.h
+@@ -8,6 +8,9 @@
+ void mctp_prlog(int level, const char *fmt, ...)
+ 	__attribute__((format(printf, 2, 3)));
+ 
++void mctp_trace_common(const char *tag, const void *const payload,
++                       const size_t len);
++
+ #ifndef pr_fmt
+ #define pr_fmt(x) x
+ #endif
+@@ -21,4 +24,9 @@ void mctp_prlog(int level, const char *fmt, ...)
+ #define mctp_prdebug(fmt, ...)                                                 \
+ 	mctp_prlog(MCTP_LOG_DEBUG, pr_fmt(fmt), ##__VA_ARGS__)
+ 
++#define mctp_trace_rx(payload, len)                                            \
++        mctp_trace_common(pr_fmt("<RX<"), (payload), (len))
++#define mctp_trace_tx(payload, len)                                            \
++        mctp_trace_common(pr_fmt(">TX>"), (payload), (len))
++
+ #endif /* _LIBMCTP_LOG_H */
+diff --git a/libmctp-smbus.h b/libmctp-smbus.h
+new file mode 100644
+index 0000000..4de4d08
+--- /dev/null
++++ b/libmctp-smbus.h
+@@ -0,0 +1,74 @@
++#ifndef LIBMCTP_SMBUS_H
++#define LIBMCTP_SMBUS_H
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#include "libmctp.h"
++
++#define MCTP_HEADER_SIZE 4
++#define MCTP_PAYLOAD_SIZE 64
++
++#define SMBUS_HEADER_SIZE 4
++#define SMBUS_PEC_BYTE_SIZE 1
++
++#define SMBUS_TX_BUFF_SIZE                                                     \
++	((MCTP_HEADER_SIZE) + (SMBUS_HEADER_SIZE) + (MCTP_PAYLOAD_SIZE) +      \
++	 (SMBUS_PEC_BYTE_SIZE))
++
++#define IS_MUX_PORT 0x80
++#define PULL_MODEL_HOLD 0x40
++#define CLOSE_AFTER_RESPONSE 0x20
++#define CLOSE_IMMEDIATE 0x10
++
++struct mctp_binding_smbus {
++	struct mctp_binding binding;
++	int in_fd;
++	int out_fd;
++
++	unsigned long bus_id;
++
++	/* receive buffer */
++	uint8_t rxbuf[1024];
++	struct mctp_pktbuf *rx_pkt;
++
++	/* temporary transmit buffer */
++	uint8_t txbuf[SMBUS_TX_BUFF_SIZE];
++
++	/* slave address */
++	uint8_t src_slave_addr;
++
++	/* destination slave address */
++	uint8_t dst_slave_addr;
++};
++
++struct mctp_smbus_pkt_private {
++	int fd;
++	uint32_t mux_hold_timeout;
++	uint8_t mux_flags;
++	uint8_t slave_addr;
++} __attribute__((packed));
++
++struct mctp_binding_smbus *mctp_smbus_init(const uint8_t dst_slave_addr);
++struct mctp_binding *mctp_binding_smbus_core(struct mctp_binding_smbus *b);
++int mctp_smbus_register_bus(struct mctp_binding_smbus *smbus, struct mctp *mctp,
++			    mctp_eid_t eid);
++/* file-based IO */
++int mctp_smbus_init_pollfd(struct mctp_binding_smbus *smbus,
++			    struct pollfd *pollfd);
++int mctp_smbus_read(struct mctp_binding_smbus *smbus);
++int mctp_smbus_init_pull_model(const struct mctp_smbus_pkt_private *prvt);
++int mctp_smbus_exit_pull_model(const struct mctp_smbus_pkt_private *prvt);
++void mctp_smbus_free(struct mctp_binding_smbus *smbus);
++int mctp_smbus_close_mux(const int fd, const int address);
++int mctp_smbus_open_in_bus(struct mctp_binding_smbus *smbus, int in_bus);
++int mctp_smbus_open_out_bus(struct mctp_binding_smbus *smbus, int out_bus);
++void mctp_smbus_set_in_fd(struct mctp_binding_smbus *smbus, int fd);
++void mctp_smbus_set_out_fd(struct mctp_binding_smbus *smbus, int fd);
++void mctp_smbus_set_src_slave_addr(struct mctp_binding_smbus *smbus,
++				   uint8_t slave_addr);
++#ifdef __cplusplus
++}
++#endif
++#endif /*LIBMCTP_SMBUS_H */
+diff --git a/libmctp.h b/libmctp.h
+index 76f8ec9..2abbd61 100644
+--- a/libmctp.h
++++ b/libmctp.h
+@@ -149,6 +149,7 @@ void mctp_set_alloc_ops(void *(*alloc)(size_t), void (*free)(void *),
+ void mctp_set_log_stdio(int level);
+ void mctp_set_log_syslog(void);
+ void mctp_set_log_custom(void (*fn)(int, const char *, va_list));
++void mctp_set_tracing_enabled(bool enable);
+ 
+ /* these should match the syslog-standard LOG_* definitions, for
+  * easier use with syslog */
+diff --git a/linux/errno-base.h b/linux/errno-base.h
+new file mode 100644
+index 0000000..9653140
+--- /dev/null
++++ b/linux/errno-base.h
+@@ -0,0 +1,40 @@
++/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
++#ifndef _ASM_GENERIC_ERRNO_BASE_H
++#define _ASM_GENERIC_ERRNO_BASE_H
++
++#define	EPERM		 1	/* Operation not permitted */
++#define	ENOENT		 2	/* No such file or directory */
++#define	ESRCH		 3	/* No such process */
++#define	EINTR		 4	/* Interrupted system call */
++#define	EIO		 5	/* I/O error */
++#define	ENXIO		 6	/* No such device or address */
++#define	E2BIG		 7	/* Argument list too long */
++#define	ENOEXEC		 8	/* Exec format error */
++#define	EBADF		 9	/* Bad file number */
++#define	ECHILD		10	/* No child processes */
++#define	EAGAIN		11	/* Try again */
++#define	ENOMEM		12	/* Out of memory */
++#define	EACCES		13	/* Permission denied */
++#define	EFAULT		14	/* Bad address */
++#define	ENOTBLK		15	/* Block device required */
++#define	EBUSY		16	/* Device or resource busy */
++#define	EEXIST		17	/* File exists */
++#define	EXDEV		18	/* Cross-device link */
++#define	ENODEV		19	/* No such device */
++#define	ENOTDIR		20	/* Not a directory */
++#define	EISDIR		21	/* Is a directory */
++#define	EINVAL		22	/* Invalid argument */
++#define	ENFILE		23	/* File table overflow */
++#define	EMFILE		24	/* Too many open files */
++#define	ENOTTY		25	/* Not a typewriter */
++#define	ETXTBSY		26	/* Text file busy */
++#define	EFBIG		27	/* File too large */
++#define	ENOSPC		28	/* No space left on device */
++#define	ESPIPE		29	/* Illegal seek */
++#define	EROFS		30	/* Read-only file system */
++#define	EMLINK		31	/* Too many links */
++#define	EPIPE		32	/* Broken pipe */
++#define	EDOM		33	/* Math argument out of domain of func */
++#define	ERANGE		34	/* Math result not representable */
++
++#endif
+diff --git a/linux/i2c.h b/linux/i2c.h
+new file mode 100644
+index 0000000..be5c01a
+--- /dev/null
++++ b/linux/i2c.h
+@@ -0,0 +1,156 @@
++/* SPDX-License-Identifier: GPL-2.0+ WITH Linux-syscall-note */
++/* ------------------------------------------------------------------------- */
++/*									     */
++/* i2c.h - definitions for the i2c-bus interface			     */
++/*									     */
++/* ------------------------------------------------------------------------- */
++/*   Copyright (C) 1995-2000 Simon G. Vogl
++
++    This program is free software; you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation; either version 2 of the License, or
++    (at your option) any later version.
++
++    This program is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with this program; if not, write to the Free Software
++    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++    MA 02110-1301 USA.							     */
++/* ------------------------------------------------------------------------- */
++
++/* With some changes from Kyösti Mälkki <kmalkki@cc.hut.fi> and
++   Frodo Looijaard <frodol@dds.nl> */
++
++#ifndef _UAPI_LINUX_I2C_H
++#define _UAPI_LINUX_I2C_H
++
++#include <linux/types.h>
++
++/**
++ * struct i2c_msg - an I2C transaction segment beginning with START
++ * @addr: Slave address, either seven or ten bits.  When this is a ten
++ *	bit address, I2C_M_TEN must be set in @flags and the adapter
++ *	must support I2C_FUNC_10BIT_ADDR.
++ * @flags: I2C_M_RD is handled by all adapters.  No other flags may be
++ *	provided unless the adapter exported the relevant I2C_FUNC_*
++ *	flags through i2c_check_functionality().
++ * @len: Number of data bytes in @buf being read from or written to the
++ *	I2C slave address.  For read transactions where I2C_M_RECV_LEN
++ *	is set, the caller guarantees that this buffer can hold up to
++ *	32 bytes in addition to the initial length byte sent by the
++ *	slave (plus, if used, the SMBus PEC); and this value will be
++ *	incremented by the number of block data bytes received.
++ * @buf: The buffer into which data is read, or from which it's written.
++ *
++ * An i2c_msg is the low level representation of one segment of an I2C
++ * transaction.  It is visible to drivers in the @i2c_transfer() procedure,
++ * to userspace from i2c-dev, and to I2C adapter drivers through the
++ * @i2c_adapter.@master_xfer() method.
++ *
++ * Except when I2C "protocol mangling" is used, all I2C adapters implement
++ * the standard rules for I2C transactions.  Each transaction begins with a
++ * START.  That is followed by the slave address, and a bit encoding read
++ * versus write.  Then follow all the data bytes, possibly including a byte
++ * with SMBus PEC.  The transfer terminates with a NAK, or when all those
++ * bytes have been transferred and ACKed.  If this is the last message in a
++ * group, it is followed by a STOP.  Otherwise it is followed by the next
++ * @i2c_msg transaction segment, beginning with a (repeated) START.
++ *
++ * Alternatively, when the adapter supports I2C_FUNC_PROTOCOL_MANGLING then
++ * passing certain @flags may have changed those standard protocol behaviors.
++ * Those flags are only for use with broken/nonconforming slaves, and with
++ * adapters which are known to support the specific mangling options they
++ * need (one or more of IGNORE_NAK, NO_RD_ACK, NOSTART, and REV_DIR_ADDR).
++ */
++struct i2c_msg {
++	__u16 addr; /* slave address			*/
++	__u16 flags;
++#define I2C_M_RD 0x0001 /* read data, from slave to master */
++	/* I2C_M_RD is guaranteed to be 0x0001! */
++#define I2C_M_TEN 0x0010 /* this is a ten bit chip address */
++#define I2C_M_HOLD 0x0100 /* for holding a mux path */
++#define I2C_M_DMA_SAFE 0x0200 /* the buffer of this message is DMA safe */
++	/* makes only sense in kernelspace */
++	/* userspace buffers are copied anyway */
++#define I2C_M_RECV_LEN 0x0400 /* length will be first received byte */
++#define I2C_M_NO_RD_ACK 0x0800 /* if I2C_FUNC_PROTOCOL_MANGLING */
++#define I2C_M_IGNORE_NAK 0x1000 /* if I2C_FUNC_PROTOCOL_MANGLING */
++#define I2C_M_REV_DIR_ADDR 0x2000 /* if I2C_FUNC_PROTOCOL_MANGLING */
++#define I2C_M_NOSTART 0x4000 /* if I2C_FUNC_NOSTART */
++#define I2C_M_STOP 0x8000 /* if I2C_FUNC_PROTOCOL_MANGLING */
++	__u16 len; /* msg length				*/
++	__u8 *buf; /* pointer to msg data			*/
++};
++
++/* To determine what functionality is present */
++
++#define I2C_FUNC_I2C 0x00000001
++#define I2C_FUNC_10BIT_ADDR 0x00000002
++#define I2C_FUNC_PROTOCOL_MANGLING 0x00000004 /* I2C_M_IGNORE_NAK etc. */
++#define I2C_FUNC_SMBUS_PEC 0x00000008
++#define I2C_FUNC_NOSTART 0x00000010 /* I2C_M_NOSTART */
++#define I2C_FUNC_SLAVE 0x00000020
++#define I2C_FUNC_SMBUS_BLOCK_PROC_CALL 0x00008000 /* SMBus 2.0 */
++#define I2C_FUNC_SMBUS_QUICK 0x00010000
++#define I2C_FUNC_SMBUS_READ_BYTE 0x00020000
++#define I2C_FUNC_SMBUS_WRITE_BYTE 0x00040000
++#define I2C_FUNC_SMBUS_READ_BYTE_DATA 0x00080000
++#define I2C_FUNC_SMBUS_WRITE_BYTE_DATA 0x00100000
++#define I2C_FUNC_SMBUS_READ_WORD_DATA 0x00200000
++#define I2C_FUNC_SMBUS_WRITE_WORD_DATA 0x00400000
++#define I2C_FUNC_SMBUS_PROC_CALL 0x00800000
++#define I2C_FUNC_SMBUS_READ_BLOCK_DATA 0x01000000
++#define I2C_FUNC_SMBUS_WRITE_BLOCK_DATA 0x02000000
++#define I2C_FUNC_SMBUS_READ_I2C_BLOCK 0x04000000 /* I2C-like block xfer  */
++#define I2C_FUNC_SMBUS_WRITE_I2C_BLOCK 0x08000000 /* w/ 1-byte reg. addr. */
++#define I2C_FUNC_SMBUS_HOST_NOTIFY 0x10000000
++
++#define I2C_FUNC_SMBUS_BYTE                                                    \
++	(I2C_FUNC_SMBUS_READ_BYTE | I2C_FUNC_SMBUS_WRITE_BYTE)
++#define I2C_FUNC_SMBUS_BYTE_DATA                                               \
++	(I2C_FUNC_SMBUS_READ_BYTE_DATA | I2C_FUNC_SMBUS_WRITE_BYTE_DATA)
++#define I2C_FUNC_SMBUS_WORD_DATA                                               \
++	(I2C_FUNC_SMBUS_READ_WORD_DATA | I2C_FUNC_SMBUS_WRITE_WORD_DATA)
++#define I2C_FUNC_SMBUS_BLOCK_DATA                                              \
++	(I2C_FUNC_SMBUS_READ_BLOCK_DATA | I2C_FUNC_SMBUS_WRITE_BLOCK_DATA)
++#define I2C_FUNC_SMBUS_I2C_BLOCK                                               \
++	(I2C_FUNC_SMBUS_READ_I2C_BLOCK | I2C_FUNC_SMBUS_WRITE_I2C_BLOCK)
++
++#define I2C_FUNC_SMBUS_EMUL                                                    \
++	(I2C_FUNC_SMBUS_QUICK | I2C_FUNC_SMBUS_BYTE |                          \
++	 I2C_FUNC_SMBUS_BYTE_DATA | I2C_FUNC_SMBUS_WORD_DATA |                 \
++	 I2C_FUNC_SMBUS_PROC_CALL | I2C_FUNC_SMBUS_WRITE_BLOCK_DATA |          \
++	 I2C_FUNC_SMBUS_I2C_BLOCK | I2C_FUNC_SMBUS_PEC)
++
++/*
++ * Data for SMBus Messages
++ */
++#define I2C_SMBUS_BLOCK_MAX 32 /* As specified in SMBus standard */
++union i2c_smbus_data {
++	__u8 byte;
++	__u16 word;
++	__u8 block[I2C_SMBUS_BLOCK_MAX + 2]; /* block[0] is used for length */
++	/* and one more for user-space compatibility */
++};
++
++/* i2c_smbus_xfer read or write markers */
++#define I2C_SMBUS_READ 1
++#define I2C_SMBUS_WRITE 0
++
++/* SMBus transaction types (size parameter in the above functions)
++   Note: these no longer correspond to the (arbitrary) PIIX4 internal codes! */
++#define I2C_SMBUS_QUICK 0
++#define I2C_SMBUS_BYTE 1
++#define I2C_SMBUS_BYTE_DATA 2
++#define I2C_SMBUS_WORD_DATA 3
++#define I2C_SMBUS_PROC_CALL 4
++#define I2C_SMBUS_BLOCK_DATA 5
++#define I2C_SMBUS_I2C_BLOCK_BROKEN 6
++#define I2C_SMBUS_BLOCK_PROC_CALL 7 /* SMBus 2.0 */
++#define I2C_SMBUS_I2C_BLOCK_DATA 8
++
++#endif /* _UAPI_LINUX_I2C_H */
+diff --git a/log.c b/log.c
+index cbdbbca..94ebefd 100644
+--- a/log.c
++++ b/log.c
+@@ -27,6 +27,12 @@ enum {
+ static int log_stdio_level;
+ static void (*log_custom_fn)(int, const char *, va_list);
+ 
++#define MAX_TRACE_BYTES 128
++#define TRACE_FORMAT "%02X "
++#define TRACE_FORMAT_SIZE 3
++
++static bool trace_enable;
++
+ void mctp_prlog(int level, const char *fmt, ...)
+ {
+ 	va_list ap;
+@@ -73,3 +79,32 @@ void mctp_set_log_custom(void (*fn)(int, const char *, va_list))
+ 	log_type = MCTP_LOG_CUSTOM;
+ 	log_custom_fn = fn;
+ }
++
++void mctp_set_tracing_enabled(bool enable)
++{
++        trace_enable = enable;
++}
++
++void mctp_trace_common(const char *tag, const void *const payload,
++                       const size_t len)
++{
++        char tracebuf[MAX_TRACE_BYTES * TRACE_FORMAT_SIZE + sizeof('\0')];
++        /* if len is bigger than ::MAX_TRACE_BYTES, loop will leave place for '..'
++         * at the end to indicate that whole payload didn't fit
++         */
++        const size_t limit = len > MAX_TRACE_BYTES ? MAX_TRACE_BYTES - 1 : len;
++        char *ptr = tracebuf;
++        unsigned int i;
++
++        if (!trace_enable || len == 0)
++                return;
++
++        for (i = 0; i < limit; i++)
++                ptr += sprintf(ptr, TRACE_FORMAT, ((uint8_t *)payload)[i]);
++
++        /* buffer saturated, probably need to increase the size */
++        if (limit < len)
++                sprintf(ptr, "..");
++
++        mctp_prlog(MCTP_LOG_DEBUG, "%s %s", tag, tracebuf);
++}
+diff --git a/smbus.c b/smbus.c
+new file mode 100644
+index 0000000..16cc5a8
+--- /dev/null
++++ b/smbus.c
+@@ -0,0 +1,569 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++
++#include <assert.h>
++#include <stdbool.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++#include <linux/errno-base.h>
++#include <fcntl.h>
++#include <poll.h>
++
++#define pr_fmt(x) "smbus: " x
++
++#include <i2c/smbus.h>
++#include <linux/i2c-dev.h>
++#include <linux/i2c.h>
++#include <sys/ioctl.h>
++
++#include "libmctp-alloc.h"
++#include "libmctp-log.h"
++#include "libmctp-smbus.h"
++#include "libmctp.h"
++
++#ifndef container_of
++#define container_of(ptr, type, member)                                        \
++	(type *)((char *)(ptr) - (char *)&((type *)0)->member)
++#endif
++
++#define binding_to_smbus(b) container_of(b, struct mctp_binding_smbus, binding)
++
++#define MCTP_COMMAND_CODE 0x0F
++#define MCTP_SLAVE_ADDR_INDEX 0
++#define DEFAULT_SLAVE_ADDRESS 0x21
++
++#define SMBUS_COMMAND_CODE_SIZE 1
++#define SMBUS_LENGTH_FIELD_SIZE 1
++#define SMBUS_ADDR_OFFSET_SLAVE 0x1000
++
++#ifdef I2C_M_HOLD
++static struct mctp_smbus_pkt_private active_mux_info = { .fd = -1,
++							 .mux_hold_timeout = 0,
++							 .mux_flags = 0,
++							 .slave_addr = 0 };
++static struct mctp_smbus_pkt_private reserve_mux_info = { .fd = -1,
++							  .mux_hold_timeout = 0,
++							  .mux_flags = 0,
++							  .slave_addr = 0 };
++#endif
++
++struct mctp_smbus_header_tx {
++	uint8_t command_code;
++	uint8_t byte_count;
++	uint8_t source_slave_address;
++};
++
++struct mctp_smbus_header_rx {
++	uint8_t destination_slave_address;
++	uint8_t command_code;
++	uint8_t byte_count;
++	uint8_t source_slave_address;
++};
++
++static uint8_t crc8_calculate(uint16_t d)
++{
++	const uint32_t poly_check = 0x1070 << 3;
++	int i;
++
++	for (i = 0; i < 8; i++) {
++		if (d & 0x8000) {
++			d = d ^ poly_check;
++		}
++		d = d << 1;
++	}
++
++	return (uint8_t)(d >> 8);
++}
++
++/* Incremental CRC8 over count bytes in the array pointed to by p */
++static uint8_t pec_calculate(uint8_t crc, uint8_t *p, size_t count)
++{
++	int i;
++
++	for (i = 0; i < count; i++) {
++		crc = crc8_calculate((crc ^ p[i]) << 8);
++	}
++	return crc;
++}
++
++static uint8_t calculate_pec_byte(uint8_t *buf, size_t len, uint8_t address,
++                                  uint16_t flags)
++{
++	uint8_t addr = (address << 1) | (flags & I2C_M_RD ? 1 : 0);
++	uint8_t pec = pec_calculate(0, &addr, 1);
++	pec = pec_calculate(pec, buf, len);
++
++	return pec;
++}
++
++#ifdef I2C_M_HOLD
++static void cleanup_reserve_mux_info(void)
++{
++	reserve_mux_info.fd = -1;
++	reserve_mux_info.mux_hold_timeout = 0;
++	reserve_mux_info.mux_flags = 0;
++	reserve_mux_info.slave_addr = 0;
++}
++
++static int smbus_model_mux(const uint16_t holdtimeout)
++{
++	struct i2c_msg holdmsg = { 0, I2C_M_HOLD, sizeof(holdtimeout),
++				   (uint8_t *)&holdtimeout };
++
++	struct i2c_rdwr_ioctl_data msgrdwr = { &holdmsg, 1 };
++
++	return ioctl(reserve_mux_info.fd, I2C_RDWR, &msgrdwr);
++}
++
++static int smbus_pull_model_hold_mux(void)
++{
++	/*taking max hold time as 0xFFFF seconds*/
++	return smbus_model_mux(0xFFFF);
++}
++
++static int smbus_pull_model_unhold_mux(void)
++{
++	return smbus_model_mux(0);
++}
++
++static bool pull_model_active;
++#endif
++
++int mctp_smbus_close_mux(const int fd, const int address)
++{
++#ifdef I2C_M_HOLD
++	uint8_t txbuf[2] = { 0 };
++	struct i2c_msg msg[1] = {
++		{ .addr = address, .flags = 0, .len = 2, .buf = txbuf }
++	};
++	struct i2c_rdwr_ioctl_data msgrdwr = { &msg[0], 1 };
++
++	return ioctl(fd, I2C_RDWR, &msgrdwr);
++#else
++	return 0;
++#endif
++}
++
++int mctp_smbus_init_pull_model(const struct mctp_smbus_pkt_private *prvt)
++{
++#ifdef I2C_M_HOLD
++	int rc = -1;
++
++	if (pull_model_active) {
++		mctp_prerr("%s: pull model is already active.", __func__);
++		return rc;
++	}
++	reserve_mux_info.fd = prvt->fd;
++	reserve_mux_info.mux_flags = prvt->mux_flags;
++	reserve_mux_info.slave_addr = prvt->slave_addr;
++	rc = smbus_pull_model_hold_mux();
++	if (rc < 0) {
++		cleanup_reserve_mux_info();
++		mctp_prerr(
++			"%s: Failed to hold the bus for device address: 0X%x",
++			__func__, prvt->slave_addr);
++		return rc;
++	}
++	pull_model_active = true;
++	return rc;
++#else
++	return 0;
++#endif
++}
++
++int mctp_smbus_exit_pull_model(const struct mctp_smbus_pkt_private *prvt)
++{
++#ifdef I2C_M_HOLD
++	int rc = -1;
++
++	if (!(pull_model_active &&
++	      reserve_mux_info.slave_addr == prvt->slave_addr &&
++	      reserve_mux_info.fd == prvt->fd)) {
++		mctp_prerr(
++			"%s: pull model is not active for device address: 0X%x.",
++			__func__, prvt->slave_addr);
++		return rc;
++	}
++	rc = smbus_pull_model_unhold_mux();
++	if (rc < 0) {
++		mctp_prerr(
++			"%s: Failed to unhold the bus for device address: 0X%x",
++			__func__, prvt->slave_addr);
++		return rc;
++	}
++	pull_model_active = false;
++	cleanup_reserve_mux_info();
++	return rc;
++#else
++	return 0;
++#endif
++}
++
++static int mctp_smbus_tx(struct mctp_binding_smbus *smbus, const uint8_t len,
++			 uint8_t mux_flags)
++{
++#ifdef I2C_M_HOLD
++	int rc;
++
++	if (pull_model_active) {
++		rc = smbus_pull_model_unhold_mux();
++		if (rc < 0) {
++			mctp_prerr("%s: Failed to unhold the bus.", __func__);
++			return rc;
++		}
++	}
++	if (mux_flags) {
++		uint16_t holdtimeout = 1000; /*timeout in ms. */
++		struct i2c_msg msg[2] = { { .addr = smbus->dst_slave_addr,
++					    .flags = 0,
++					    .len = len,
++					    .buf = smbus->txbuf },
++					  { .addr = 0,
++					    .flags = I2C_M_HOLD,
++					    .len = sizeof(holdtimeout),
++					    .buf = (uint8_t *)&holdtimeout } };
++
++		struct i2c_rdwr_ioctl_data msgrdwr = { &msg[0], 2 };
++		mctp_trace_tx(smbus->txbuf, len);
++		rc = ioctl(smbus->out_fd, I2C_RDWR, &msgrdwr);
++
++		/* Store active mux info */
++		active_mux_info.fd = smbus->out_fd;
++		active_mux_info.mux_flags = mux_flags;
++		active_mux_info.slave_addr = smbus->dst_slave_addr;
++
++		return rc;
++	}
++
++#endif
++	mctp_trace_tx(smbus->txbuf, len);
++
++	struct i2c_msg msg[1] = { { .addr = smbus->dst_slave_addr,
++				    .flags = 0,
++				    .len = len,
++				    .buf = smbus->txbuf } };
++	struct i2c_rdwr_ioctl_data msgrdwr = { &msg[0], 1 };
++	return ioctl(smbus->out_fd, I2C_RDWR, &msgrdwr);
++}
++
++#ifdef I2C_M_HOLD
++static int mctp_smbus_unhold_bus(const uint8_t source_addr)
++{
++	/* If we received a packet from a different slave, don't unhold mux */
++	if (active_mux_info.slave_addr != source_addr)
++		return 0;
++	/* Unhold message */
++	uint16_t holdtimeout = 0;
++	struct i2c_msg holdmsg = { 0, I2C_M_HOLD, sizeof(holdtimeout),
++				   (uint8_t *)&holdtimeout };
++
++	struct i2c_rdwr_ioctl_data msgrdwr = { &holdmsg, 1 };
++
++	return ioctl(active_mux_info.fd, I2C_RDWR, &msgrdwr);
++}
++#endif /* I2C_M_HOLD */
++
++static int mctp_binding_smbus_tx(struct mctp_binding *b,
++				 struct mctp_pktbuf *pkt)
++{
++	struct mctp_binding_smbus *smbus = binding_to_smbus(b);
++	struct mctp_smbus_header_tx *smbus_hdr_tx = (void *)smbus->txbuf;
++	uint8_t mux_flags = 0;
++
++#ifdef I2C_M_HOLD
++	struct mctp_hdr *mctp_hdr = (void *)(&pkt->data[pkt->start]);
++	/* Set mux_flags only for EOM packets */
++	if (!(mctp_hdr->flags_seq_tag & MCTP_HDR_FLAG_EOM)) {
++		mux_flags = 0;
++	}
++#endif
++
++	smbus_hdr_tx->command_code = MCTP_COMMAND_CODE;
++	/* the length field in the header excludes smbus framing
++	* and escape sequences.
++	*/
++	size_t pkt_length = mctp_pktbuf_size(pkt);
++	smbus_hdr_tx->byte_count = pkt_length + 1;
++	smbus_hdr_tx->source_slave_address = smbus->src_slave_addr;
++
++	size_t tx_buf_len = sizeof(*smbus_hdr_tx);
++	uint8_t i2c_message_len = tx_buf_len + pkt_length + SMBUS_PEC_BYTE_SIZE;
++	if (i2c_message_len > sizeof(smbus->txbuf)) {
++		mctp_prerr(
++			"tx message length exceeds max smbus message length");
++		return -EINVAL;
++	}
++
++	memcpy(smbus->txbuf + tx_buf_len, &pkt->data[pkt->start], pkt_length);
++	tx_buf_len += pkt_length;
++
++	smbus->txbuf[tx_buf_len] = calculate_pec_byte(smbus->txbuf, tx_buf_len,
++						      smbus->dst_slave_addr, 0);
++
++	int ret = mctp_smbus_tx(smbus, i2c_message_len, mux_flags);
++	if (ret == -EPERM) {
++		mctp_prdebug(
++			"Error in tx of smbus message; Operation not permitted");
++		return ret;
++	}
++	if (ret < 0) {
++		mctp_prerr("Error in tx of smbus message");
++		return ret;
++	}
++
++	return 0;
++}
++
++int mctp_smbus_read(struct mctp_binding_smbus *smbus)
++{
++	ssize_t len = 0;
++	struct mctp_smbus_header_rx *smbus_hdr_rx;
++	struct mctp_smbus_pkt_private pvt_data;
++	uint8_t rx_pec;
++#ifdef I2C_M_HOLD
++	struct mctp_hdr *mctp_hdr;
++	bool eom = false;
++#endif
++
++	smbus_hdr_rx = (void *)smbus->rxbuf;
++	int ret = lseek(smbus->in_fd, 0, SEEK_SET);
++	if (ret < 0) {
++		mctp_prerr("Failed to seek");
++		return -1;
++	}
++
++	len = read(smbus->in_fd, smbus->rxbuf, sizeof(smbus->rxbuf));
++
++	if (len < 0) {
++		mctp_prerr("Failed to read");
++		return -1;
++	}
++
++	mctp_trace_rx(smbus->rxbuf, len);
++
++	if (len < sizeof(*smbus_hdr_rx)) {
++		/* This condition hits from time to time, even with
++		 *  a properly written poll loop, although it's not clear
++		 *  why. Return an error so that the upper layer can
++		 *  retry.
++		 */
++		mctp_prerr("Invalid packet size");
++		return 0;
++	}
++
++	else if (smbus_hdr_rx->byte_count != (len - sizeof(*smbus_hdr_rx))) {
++		/* Got an incorrectly sized payload */
++		mctp_prerr("Got smbus payload sized %zu, expecting %hhu",
++			   len - sizeof(*smbus_hdr_rx),
++			   smbus_hdr_rx->byte_count);
++		return 0;
++	}
++
++	if (smbus_hdr_rx->destination_slave_address !=
++	    (smbus->src_slave_addr & ~1)) {
++		mctp_prerr("Got bad slave address %d",
++			   smbus_hdr_rx->destination_slave_address);
++		return 0;
++	}
++
++	if (smbus_hdr_rx->command_code != MCTP_COMMAND_CODE) {
++		mctp_prerr("Got bad command code %d",
++			   smbus_hdr_rx->command_code);
++		/* Not a payload intended for us */
++		return 0;
++	}
++
++	rx_pec = pec_calculate(0, smbus->rxbuf, len - 1);
++	if (rx_pec != smbus->rxbuf[len - 1]) {
++		mctp_prerr("Invalid PEC value: expected: 0x%02x, found 0x%02x",
++			   rx_pec, smbus->rxbuf[len - 1]);
++
++		return -1;
++	}
++
++	smbus->rx_pkt = mctp_pktbuf_alloc(&(smbus->binding), 0);
++	if (!smbus->rx_pkt) {
++		mctp_prerr("Cannot allocate memory");
++		return -1;
++	}
++
++	if (mctp_pktbuf_push(
++		    smbus->rx_pkt, &smbus->rxbuf[sizeof(*smbus_hdr_rx)],
++		    len - sizeof(*smbus_hdr_rx) - SMBUS_PEC_BYTE_SIZE) != 0) {
++		mctp_prerr("Can't push to pktbuf: %m");
++		mctp_pktbuf_free(smbus->rx_pkt);
++		return -1;
++	}
++
++#ifdef I2C_M_HOLD
++	mctp_hdr = mctp_pktbuf_hdr(smbus->rx_pkt);
++	if (mctp_hdr->flags_seq_tag & MCTP_HDR_FLAG_EOM) {
++		eom = true;
++	}
++#endif
++
++	memset(&pvt_data, 0, sizeof(struct mctp_smbus_pkt_private));
++
++	pvt_data.slave_addr = (smbus_hdr_rx->source_slave_address & ~1);
++
++	pvt_data.fd = smbus->out_fd;
++
++	//memcpy(smbus->rx_pkt->msg_binding_private, &pvt_data, sizeof(pvt_data));
++
++	mctp_bus_rx(&(smbus->binding), smbus->rx_pkt);
++
++#ifdef I2C_M_HOLD
++	/* Unhold mux only for packets with EOM */
++	if (eom && mctp_smbus_unhold_bus(pvt_data.slave_addr)) {
++		mctp_prerr("Can't hold mux");
++		return -1;
++	}
++#endif // I2C_M_HOLD
++
++	smbus->rx_pkt = NULL;
++	return 0;
++}
++
++void mctp_smbus_set_in_fd(struct mctp_binding_smbus *smbus, int fd)
++{
++	smbus->in_fd = fd;
++}
++
++void mctp_smbus_set_out_fd(struct mctp_binding_smbus *smbus, int fd)
++{
++	smbus->out_fd = fd;
++}
++
++int mctp_smbus_init_pollfd(struct mctp_binding_smbus *smbus,
++			    struct pollfd *pollfd)
++{
++	pollfd->fd = smbus->in_fd;
++	pollfd->events = POLLPRI;
++
++	return 0;
++}
++
++int mctp_smbus_open_in_bus(struct mctp_binding_smbus *smbus, int in_bus)
++{
++	char filename[60];
++	size_t filename_size = 0;
++	char slave_mqueue[20];
++	size_t mqueue_size = 0;
++	int fd = 0;
++	size_t size = sizeof(filename);
++	int address_7_bit = DEFAULT_SLAVE_ADDRESS >> 1;
++	int ret = -1;
++
++	snprintf(filename, size,
++		 "/sys/bus/i2c/devices/i2c-%d/%d-%04x/slave-mqueue", in_bus,
++		 in_bus, SMBUS_ADDR_OFFSET_SLAVE | address_7_bit);
++
++	ret = open(filename, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
++	if (ret >= 0) {
++		return ret;
++	}
++
++	// Device doesn't exist. Create it.
++	filename_size = sizeof(filename);
++	snprintf(filename, filename_size,
++		 "/sys/bus/i2c/devices/i2c-%d/new_device", in_bus);
++	filename[filename_size - 1] = '\0';
++
++	fd = open(filename, O_WRONLY);
++	if (fd < 0) {
++		mctp_prerr("can't open root device %s: %m", filename);
++		return -1;
++	}
++
++	mqueue_size = sizeof(slave_mqueue);
++	snprintf(slave_mqueue, mqueue_size, "slave-mqueue %#04x",
++		 SMBUS_ADDR_OFFSET_SLAVE | address_7_bit);
++
++	size = write(fd, slave_mqueue, mqueue_size);
++	close(fd);
++	if (size != mqueue_size) {
++		mctp_prerr("can't create mqueue device on %s: %m", filename);
++		return -1;
++	}
++
++	size = sizeof(filename);
++	snprintf(filename, size,
++		 "/sys/bus/i2c/devices/i2c-%d/%d-%04x/slave-mqueue", in_bus,
++		 in_bus, SMBUS_ADDR_OFFSET_SLAVE | address_7_bit);
++
++	return open(filename, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
++}
++
++int mctp_smbus_open_out_bus(struct mctp_binding_smbus *smbus, int out_bus)
++{
++	char filename[60];
++	size_t size = sizeof(filename);
++	snprintf(filename, size, "/dev/i2c-%d", out_bus);
++	filename[size - 1] = '\0';
++
++	return open(filename, O_RDWR | O_NONBLOCK);
++}
++
++int mctp_smbus_register_bus(struct mctp_binding_smbus *smbus, struct mctp *mctp,
++			    mctp_eid_t eid)
++{
++	int rc = mctp_register_bus(mctp, &smbus->binding, eid);
++
++	if (rc == 0) {
++		/* TODO: Can we drop bus_id from mctp_binding_smbus? */
++		smbus->bus_id = 0;
++		mctp_binding_set_tx_enabled(&smbus->binding, true);
++	}
++
++	return rc;
++}
++
++struct mctp_binding *mctp_binding_smbus_core(struct mctp_binding_smbus *b)
++{
++	return &b->binding;
++}
++
++struct mctp_binding_smbus *mctp_smbus_init(const uint8_t dst_slave_addr)
++{
++	struct mctp_binding_smbus *smbus;
++
++	smbus = __mctp_alloc(sizeof(*smbus));
++	memset(&(smbus->binding), 0, sizeof(smbus->binding));
++
++	smbus->in_fd = -1;
++	smbus->out_fd = -1;
++
++	smbus->rx_pkt = NULL;
++	smbus->binding.name = "smbus";
++	smbus->binding.version = 1;
++	smbus->binding.pkt_size = MCTP_PACKET_SIZE(MCTP_BTU);
++	smbus->binding.pkt_header = SMBUS_HEADER_SIZE;
++	smbus->binding.pkt_trailer = sizeof(struct mctp_smbus_pkt_private);
++
++	smbus->binding.tx = mctp_binding_smbus_tx;
++
++	/* Setting the default slave address */
++	smbus->src_slave_addr = DEFAULT_SLAVE_ADDRESS;
++	smbus->dst_slave_addr = dst_slave_addr;
++
++	return smbus;
++}
++
++void mctp_smbus_free(struct mctp_binding_smbus *smbus)
++{
++	if (!(smbus->in_fd < 0)) {
++		close(smbus->in_fd);
++	}
++	if (!(smbus->out_fd < 0)) {
++		close(smbus->out_fd);
++	}
++
++	__mctp_free(smbus);
++}
++
++void mctp_smbus_set_src_slave_addr(struct mctp_binding_smbus *smbus,
++				   uint8_t slave_addr)
++{
++	smbus->src_slave_addr = slave_addr;
++}
+diff --git a/utils/mctp-demux-daemon.c b/utils/mctp-demux-daemon.c
+index d07e141..19d8deb 100644
+--- a/utils/mctp-demux-daemon.c
++++ b/utils/mctp-demux-daemon.c
+@@ -10,6 +10,7 @@
+ #include "libmctp.h"
+ #include "libmctp-serial.h"
+ #include "libmctp-astlpc.h"
++#include "libmctp-smbus.h"
+ #include "utils/mctp-capture.h"
+ 
+ #include <assert.h>
+@@ -249,6 +250,67 @@ static int binding_astlpc_process(struct binding *binding)
+ 	return mctp_astlpc_poll(binding->data);
+ }
+ 
++static int binding_smbus_init(struct mctp *mctp, struct binding *binding,
++                               mctp_eid_t eid, int n_params,
++			       char *const *params)
++{
++	struct mctp_binding_smbus *smbus;
++	int busnum;
++	uint8_t dst_slave_addr;
++	int rc;
++	int out_fd,in_fd;
++
++	if (n_params != 2) {
++		warnx("smbus binding requires bus number and destination address");
++		return -1;
++	}
++
++	busnum = atoi(params[0]);
++	dst_slave_addr = atoi(params[1]);
++
++	smbus = mctp_smbus_init(dst_slave_addr);
++	if (!smbus) {
++		warnx("could not initialise smbus binding");
++		return -1;
++	}
++
++	out_fd = mctp_smbus_open_out_bus(smbus, busnum);
++	if (out_fd < 0)
++		return -1;
++	smbus->out_fd = out_fd;
++
++	in_fd = mctp_smbus_open_in_bus(smbus, busnum);
++	if (in_fd < 0)
++		return -1;
++	smbus->in_fd = in_fd;
++
++	rc = mctp_smbus_register_bus(smbus, mctp, eid);
++	assert(rc == 0);
++
++	binding->data = smbus;
++	return 0;
++}
++
++static void binding_smbus_destroy(struct mctp *mctp, struct binding *binding)
++{
++	struct mctp_binding_smbus *smbus = binding->data;
++
++	mctp_unregister_bus(mctp, mctp_binding_smbus_core(smbus));
++
++	mctp_smbus_free(smbus);
++}
++
++static int binding_smbus_init_pollfd(struct binding *binding,
++				      struct pollfd *pollfd)
++{
++	return mctp_smbus_init_pollfd(binding->data, pollfd);
++}
++
++static int binding_smbus_process(struct binding *binding)
++{
++	return mctp_smbus_read(binding->data);
++}
++
+ struct binding bindings[] = { {
+ 				      .name = "null",
+ 				      .init = binding_null_init,
+@@ -266,6 +328,13 @@ struct binding bindings[] = { {
+ 				      .destroy = binding_astlpc_destroy,
+ 				      .init_pollfd = binding_astlpc_init_pollfd,
+ 				      .process = binding_astlpc_process,
++			      },
++			      {
++				      .name = "smbus",
++				      .init = binding_smbus_init,
++				      .destroy = binding_smbus_destroy,
++				      .init_pollfd = binding_smbus_init_pollfd,
++				      .process = binding_smbus_process,
+ 			      } };
+ 
+ struct binding *binding_lookup(const char *name)
+-- 
+2.17.1
+
