@@ -75,5 +75,4 @@ RDEPENDS:${PN}-system = " \
         cryptsetup \
         systemd-analyze \
         libmctp \
-        npcm8xx-igps-key \
         "

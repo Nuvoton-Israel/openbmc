@@ -68,5 +68,4 @@ RDEPENDS:${PN}-system = " \
         boot-health \
         reload-sensors \
         cerberus-utility \
-        npcm8xx-igps-key \
         "

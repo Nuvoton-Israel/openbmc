@@ -32,3 +32,15 @@ do_install() {
 	install py_scripts/ImageGeneration/asn1.py ${DEST}
 	install py_scripts/ImageGeneration/BinarySignatureGenerator.py ${DEST}
 }
+
+inherit deploy
+
+do_deploy () {
+	# copy default keys to deploy folder
+	install -d ${DEPLOYDIR}/${SIGN_TYPE}
+	cp -vur py_scripts/ImageGeneration/keys/${SIGN_TYPE} ${DEPLOYDIR}/
+}
+
+inherit native
+
+addtask deploy before do_build after do_compile
