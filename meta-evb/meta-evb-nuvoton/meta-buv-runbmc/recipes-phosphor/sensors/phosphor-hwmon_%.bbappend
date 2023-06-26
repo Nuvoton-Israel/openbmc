@@ -2,6 +2,8 @@ FILESEXTRAPATHS:prepend:buv-runbmc := "${THISDIR}/${PN}:"
 
 
 NAMES = " \
+        i2c@81000/power-supply@5a \
+        i2c@81000/power-supply@5b \
         i2c@8d000/tmp75@4a \
         i2c@8c000/tmp75@48 \
         i2c@8b000/ina219@40 \

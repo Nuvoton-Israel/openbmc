@@ -129,9 +129,13 @@
                 },
                 "paths":
                 [
-                    "/xyz/openbmc_project/sensors/current/MB_P12V_INA219_Output_Current",
-                    "/xyz/openbmc_project/sensors/voltage/MB_P12V_INA219_Output_Voltage",
-                    "/xyz/openbmc_project/sensors/power/MB_P12V_INA219_Output_Power"
+                    "/xyz/openbmc_project/sensors/temperature/PSU0_Temperature",
+                    "/xyz/openbmc_project/sensors/current/PSU0_Input_Current",
+                    "/xyz/openbmc_project/sensors/voltage/PSU0_Input_Voltage",
+                    "/xyz/openbmc_project/sensors/power/PSU0_Input_Power",
+                    "/xyz/openbmc_project/sensors/current/PSU0_Output_Current",
+                    "/xyz/openbmc_project/sensors/voltage/PSU0_Output_Voltage",
+                    "/xyz/openbmc_project/sensors/power/PSU0_Output_Power"
                 ]
             },
             {
@@ -168,9 +172,13 @@
                 },
                 "paths":
                 [
-                    "/xyz/openbmc_project/sensors/current/MB_P3V3_INA219_Output_Current",
-                    "/xyz/openbmc_project/sensors/voltage/MB_P3V3_INA219_Output_Voltage",
-                    "/xyz/openbmc_project/sensors/power/MB_P3V3_INA219_Output_Power"
+                    "/xyz/openbmc_project/sensors/temperature/PSU1_Temperature",
+                    "/xyz/openbmc_project/sensors/current/PSU1_Input_Current",
+                    "/xyz/openbmc_project/sensors/voltage/PSU1_Input_Voltage",
+                    "/xyz/openbmc_project/sensors/power/PSU1_Input_Power",
+                    "/xyz/openbmc_project/sensors/current/PSU1_Output_Current",
+                    "/xyz/openbmc_project/sensors/voltage/PSU1_Output_Voltage",
+                    "/xyz/openbmc_project/sensors/power/PSU1_Output_Power"
                 ]
             },
             {
@@ -221,6 +229,20 @@
                     "/xyz/openbmc_project/sensors/voltage/ADC6",
                     "/xyz/openbmc_project/sensors/voltage/ADC7",
                     "/xyz/openbmc_project/sensors/voltage/ADC8",
+                    "/xyz/openbmc_project/sensors/temperature/PSU1_Temperature",
+                    "/xyz/openbmc_project/sensors/current/PSU1_Input_Current",
+                    "/xyz/openbmc_project/sensors/voltage/PSU1_Input_Voltage",
+                    "/xyz/openbmc_project/sensors/power/PSU1_Input_Power",
+                    "/xyz/openbmc_project/sensors/current/PSU1_Output_Current",
+                    "/xyz/openbmc_project/sensors/voltage/PSU1_Output_Voltage",
+                    "/xyz/openbmc_project/sensors/power/PSU1_Output_Power",
+                    "/xyz/openbmc_project/sensors/temperature/PSU0_Temperature",
+                    "/xyz/openbmc_project/sensors/current/PSU0_Input_Current",
+                    "/xyz/openbmc_project/sensors/voltage/PSU0_Input_Voltage",
+                    "/xyz/openbmc_project/sensors/power/PSU0_Input_Power",
+                    "/xyz/openbmc_project/sensors/current/PSU0_Output_Current",
+                    "/xyz/openbmc_project/sensors/voltage/PSU0_Output_Voltage",
+                    "/xyz/openbmc_project/sensors/power/PSU0_Output_Power",
                     "/xyz/openbmc_project/sensors/voltage/MB_P12V_INA219_Output_Voltage",
                     "/xyz/openbmc_project/sensors/voltage/MB_P3V3_INA219_Output_Voltage",
                     "/xyz/openbmc_project/sensors/power/MB_P12V_INA219_Output_Power",
