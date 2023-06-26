@@ -1,0 +1,53 @@
+From 3e400080e62c9e6620ff6cec8676dcbf5d535266 Mon Sep 17 00:00:00 2001
+From: Ban Feng <kcfeng0@nuvoton.com>
+Date: Tue, 6 Jun 2023 11:33:34 +0800
+Subject: [PATCH] Create Associations From Defined Property
+
+Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
+---
+ src/entity_manager.cpp | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+
+diff --git a/src/entity_manager.cpp b/src/entity_manager.cpp
+index f5e303a7..73129e3e 100644
+--- a/src/entity_manager.cpp
++++ b/src/entity_manager.cpp
+@@ -633,6 +633,35 @@ void postToDbus(const nlohmann::json& newConfiguration,
+             }
+         }
+ 
++        auto findAssociations = boardValues.find("Associations");
++        if (findAssociations != boardValues.end() &&
++            findAssociations->type() == nlohmann::json::value_t::array)
++        {
++            std::cerr << "create xyz.openbmc_project.Association.Definitions from json\n";
++            std::vector<Association> associations;
++            for (auto& association : *findAssociations)
++            {
++                auto findForward = association.find("Forward");
++                auto findReverse = association.find("Reverse");
++                auto findPath = association.find("Path");
++                if (findForward != association.end() &&
++                    findReverse != association.end() &&
++                    findPath != association.end())
++                {
++                    associations.emplace_back(
++                        findForward->get<std::string>(),
++                        findReverse->get<std::string>(),
++                        findPath->get<std::string>());
++                }
++            }
++
++            auto ifacePtr = objServer.add_interface(
++                boardName, "xyz.openbmc_project.Association.Definitions");
++
++            ifacePtr->register_property("Associations", associations);
++            ifacePtr->initialize();
++        }
++
+         auto exposes = boardValues.find("Exposes");
+         if (exposes == boardValues.end())
+         {
+-- 
+2.34.1
+

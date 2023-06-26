@@ -104,11 +104,30 @@
     "Name": "powersupply0",
     "Probe": "TRUE",
     "Type": "PowerSupply",
+    "Associations": [
+        {
+            "Forward" : "powering",
+            "Reverse" : "powered_by",
+            "Path" : "/xyz/openbmc_project/inventory/system/board/motherboard"
+        }
+    ],
     "xyz.openbmc_project.Inventory.Decorator.Asset": {
         "Manufacturer": "Nuvoton",
         "Model": "Nuvoton",
         "PartNumber": "X9F7K2T6Y3P8J4R5",
         "SerialNumber": "SN78594K3TQ2P7"
+    },
+    "xyz.openbmc_project.Inventory.Decorator.EfficiencyRatings": {
+        "EfficiencyPercentLow": 80,
+        "LoadPercentLow": 30,
+        "EfficiencyPercentMedium": 81,
+        "LoadPercentMedium": 50,
+        "EfficiencyPercentHigh": 82,
+        "LoadPercentHigh": 90
+    },
+    "xyz.openbmc_project.Inventory.Decorator.Replaceable": {
+        "FieldReplaceable": true,
+        "HotPluggable": true
     },
     "xyz.openbmc_project.Inventory.Item": {
         "Present": true,
