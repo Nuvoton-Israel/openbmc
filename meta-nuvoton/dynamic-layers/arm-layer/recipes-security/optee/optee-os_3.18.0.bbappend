@@ -1,12 +1,13 @@
 SRC_URI:remove:npcm8xx = "git://github.com/OP-TEE/optee_os.git;branch=master;protocol=https"
 
-SRC_URI:remove:npcm8xx = " \
-    file://0001-allow-setting-sysroot-for-libgcc-lookup.patch \
-   "
+SRC_URI:remove:npcm8xx = "file://0003-core-link-add-no-warn-rwx-segments.patch"
+SRC_URI:remove:npcm8xx = "file://0004-core-Define-section-attributes-for-clang.patch"
+SRC_URI:remove:npcm8xx = "file://0005-core-ldelf-link-add-z-execstack.patch"
+SRC_URI:remove:npcm8xx = "file://0006-arm32-libutils-libutee-ta-add-.note.GNU-stack-sectio.patch"
 
 SRC_URI:append:npcm8xx = "git://github.com/Nuvoton-Israel/optee_os.git;branch=npcm_3_18;protocol=https"
 
-SRCREV:npcm8xx = "6bac40e18433a1c0cf219d994cc33610899febe7"
+SRCREV:npcm8xx = "57e44ae6b3d6de756da8652ec132ffd7005439b7"
 
 EXTRA_OEMAKE:append:npcm8xx = " \
     CFG_REE_FS=n \
