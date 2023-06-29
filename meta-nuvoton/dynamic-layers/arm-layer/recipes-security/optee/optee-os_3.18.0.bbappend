@@ -19,13 +19,6 @@ EXTRA_OEMAKE:append:npcm8xx = " \
     CFG_TEE_RAM_VA_SIZE=3145728 \
     "
 
-EXTRA_OEMAKE:append:npcm8xx = "\
-    ${@bb.utils.contains('MACHINE_FEATURES', \
-    'optee-ftpm', \
-    'CFG_EARLY_TA=y EARLY_TA_PATHS="${STAGING_DIR_TARGET}/${nonarch_base_libdir}/optee_armtz/${FTPM_UUID}.stripped.elf"', \
-    '', \
-    d)} "
-
 do_deploy:npcm8xx() {
     install -d ${DEPLOYDIR}/
     install -m 644 ${D}${nonarch_base_libdir}/firmware/* ${DEPLOYDIR}/
