@@ -4,6 +4,7 @@ FILESEXTRAPATHS:prepend:buv-runbmc := "${THISDIR}/${PN}:"
 
 SRC_URI:append:buv-runbmc = " file://0001-Implements-PowerSubsystem-schema.patch"
 SRC_URI:append:buv-runbmc = " file://0002-Implements-Power-Equipment-Distribution-Supply-Suppl.patch"
+SRC_URI:append:buv-runbmc = " file://0003-Implement-fan-spped-rpm-support.patch"
 
 # Enable Redfish DBUS log/Journal support
 EXTRA_OEMESON:append:buv-runbmc = " ${@entity_enabled(d, '-Dredfish-bmc-journal=enabled', '-Dredfish-dbus-log=enabled')}"

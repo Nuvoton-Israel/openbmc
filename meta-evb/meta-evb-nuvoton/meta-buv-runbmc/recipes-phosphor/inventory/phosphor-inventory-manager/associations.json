@@ -130,6 +130,7 @@
                 "paths":
                 [
                     "/xyz/openbmc_project/sensors/temperature/PSU0_Temperature",
+                    "/xyz/openbmc_project/sensors/fan_tach/PSU0_Fan_Speed",
                     "/xyz/openbmc_project/sensors/current/PSU0_Input_Current",
                     "/xyz/openbmc_project/sensors/voltage/PSU0_Input_Voltage",
                     "/xyz/openbmc_project/sensors/power/PSU0_Input_Power",
@@ -173,6 +174,7 @@
                 "paths":
                 [
                     "/xyz/openbmc_project/sensors/temperature/PSU1_Temperature",
+                    "/xyz/openbmc_project/sensors/fan_tach/PSU1_Fan_Speed",
                     "/xyz/openbmc_project/sensors/current/PSU1_Input_Current",
                     "/xyz/openbmc_project/sensors/voltage/PSU1_Input_Voltage",
                     "/xyz/openbmc_project/sensors/power/PSU1_Input_Power",
@@ -230,6 +232,7 @@
                     "/xyz/openbmc_project/sensors/voltage/ADC7",
                     "/xyz/openbmc_project/sensors/voltage/ADC8",
                     "/xyz/openbmc_project/sensors/temperature/PSU1_Temperature",
+                    "/xyz/openbmc_project/sensors/fan_tach/PSU1_Fan_Speed",
                     "/xyz/openbmc_project/sensors/current/PSU1_Input_Current",
                     "/xyz/openbmc_project/sensors/voltage/PSU1_Input_Voltage",
                     "/xyz/openbmc_project/sensors/power/PSU1_Input_Power",
@@ -237,6 +240,7 @@
                     "/xyz/openbmc_project/sensors/voltage/PSU1_Output_Voltage",
                     "/xyz/openbmc_project/sensors/power/PSU1_Output_Power",
                     "/xyz/openbmc_project/sensors/temperature/PSU0_Temperature",
+                    "/xyz/openbmc_project/sensors/fan_tach/PSU0_Fan_Speed",
                     "/xyz/openbmc_project/sensors/current/PSU0_Input_Current",
                     "/xyz/openbmc_project/sensors/voltage/PSU0_Input_Voltage",
                     "/xyz/openbmc_project/sensors/power/PSU0_Input_Power",
