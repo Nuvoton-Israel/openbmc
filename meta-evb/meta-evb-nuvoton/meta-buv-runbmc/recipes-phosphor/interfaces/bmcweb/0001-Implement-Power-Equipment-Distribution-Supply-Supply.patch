@@ -1,26 +1,27 @@
-From bd8b08bb67cc88324011c683cf9abc194a4d095b Mon Sep 17 00:00:00 2001
+From 9381abfdbf016a1a74367cc64abb88670c850f0a Mon Sep 17 00:00:00 2001
 From: Ban Feng <kcfeng0@nuvoton.com>
-Date: Tue, 13 Jun 2023 11:24:46 +0800
-Subject: [PATCH 2/2] Implements Power{Equipment, Distribution, Supply,
+Date: Wed, 5 Jul 2023 09:24:04 +0800
+Subject: [PATCH] Implement Power{Equipment, Distribution, Supply,
  SupplyMetrics} schema
 
 Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
+Signed-off-by: Allen Kang <jhkang@nuvoton.com>
 ---
  redfish-core/include/redfish.hpp          |   6 +
- redfish-core/lib/power_distribution.hpp   | 338 ++++++++++++++++++++++
+ redfish-core/lib/power_distribution.hpp   | 336 ++++++++++++++++++++++
  redfish-core/lib/power_equipment.hpp      |  47 +++
- redfish-core/lib/power_supply.hpp         | 198 +++++++++++--
- redfish-core/lib/power_supply_metrics.hpp | 232 +++++++++++++++
+ redfish-core/lib/power_supply.hpp         | 222 ++++++++++++--
+ redfish-core/lib/power_supply_metrics.hpp | 251 ++++++++++++++++
  redfish-core/lib/service_root.hpp         |   2 +
- 6 files changed, 800 insertions(+), 23 deletions(-)
+ 6 files changed, 840 insertions(+), 24 deletions(-)
  create mode 100644 redfish-core/lib/power_distribution.hpp
  create mode 100644 redfish-core/lib/power_equipment.hpp
  create mode 100644 redfish-core/lib/power_supply_metrics.hpp
 
-Index: git/redfish-core/include/redfish.hpp
-===================================================================
---- git.orig/redfish-core/include/redfish.hpp
-+++ git/redfish-core/include/redfish.hpp
+diff --git a/redfish-core/include/redfish.hpp b/redfish-core/include/redfish.hpp
+index e97a83286..7583276a6 100644
+--- a/redfish-core/include/redfish.hpp
++++ b/redfish-core/include/redfish.hpp
 @@ -38,8 +38,11 @@
  #include "pcie.hpp"
  #include "pcie_slots.hpp"
@@ -46,19 +47,21 @@ Index: git/redfish-core/include/redfish.hpp
          requestRoutesThermalSubsystem(app);
  #endif
          requestRoutesManagerCollection(app);
-Index: git/redfish-core/lib/power_distribution.hpp
-===================================================================
+diff --git a/redfish-core/lib/power_distribution.hpp b/redfish-core/lib/power_distribution.hpp
+new file mode 100644
+index 000000000..a9022f285
 --- /dev/null
-+++ git/redfish-core/lib/power_distribution.hpp
-@@ -0,0 +1,338 @@
++++ b/redfish-core/lib/power_distribution.hpp
+@@ -0,0 +1,336 @@
 +#pragma once
 +
 +#include "app.hpp"
 +#include "registries/privilege_registry.hpp"
++#include "utils/chassis_utils.hpp"
 +#include "utils/collection.hpp"
 +#include "utils/dbus_utils.hpp"
 +#include "utils/json_utils.hpp"
-+#include "utils/chassis_utils.hpp"
++#include "utils/sw_utils.hpp"
 +
 +#include <boost/system/error_code.hpp>
 +#include <boost/url/format.hpp>
@@ -119,6 +122,9 @@ Index: git/redfish-core/lib/power_distribution.hpp
 +    asyncResp->res.jsonValue["Metrics"]["@odata.id"] =
 +        boost::urls::format("/redfish/v1/PowerEquipment/PowerShelves/{}/Metrics",
 +                            powerdistributionId);
++
++    sw_util::populateSoftwareInformation(asyncResp, sw_util::bmcPurpose,
++                                         "FirmwareVersion", false);
 +
 +    constexpr std::array<std::string_view, 2> interfaces{
 +        "xyz.openbmc_project.Inventory.Item.Board",
@@ -232,11 +238,11 @@ Index: git/redfish-core/lib/power_distribution.hpp
 +}
 +
 +inline void
-+    getTemperatureReading(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
-+                          const std::string& chassisId,
-+                          const std::string& sensorPath,
-+                          const std::string& id,
-+                          const std::string& location)
++    getPowerDistributionMetricsReading(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
++                                       const std::string& chassisId,
++                                       const std::string& sensorPath,
++                                       const std::string& id,
++                                       const std::string& location)
 +{
 +    constexpr std::array<std::string_view, 1> interfaces = {
 +        "xyz.openbmc_project.Sensor.Value"};
@@ -268,13 +274,9 @@ Index: git/redfish-core/lib/power_distribution.hpp
 +
 +            if (value)
 +            {
-+                nlohmann::json::object_t item;
-+                item["DataSourceUri"] = boost::urls::format(
++                asyncResp->res.jsonValue[location]["DataSourceUri"] = boost::urls::format(
 +                    "/redfish/v1/Chassis/{}/Sensors/{}", chassisId, id);
-+                item["Reading"] = std::to_string(value);
-+
-+                nlohmann::json& sensorList = asyncResp->res.jsonValue[location];
-+                sensorList.emplace_back(std::move(item));
++                asyncResp->res.jsonValue[location]["Reading"] = std::to_string(value);
 +            }
 +            });
 +        });
@@ -300,8 +302,8 @@ Index: git/redfish-core/lib/power_distribution.hpp
 +
 +    if (sensorName.find("BUV") != std::string::npos)
 +    {
-+        getTemperatureReading(asyncResp, powerdistributionId, sensorPath,
-+                              id, "TemperatureCelsius");
++        getPowerDistributionMetricsReading(asyncResp, powerdistributionId, sensorPath,
++                                           id, "TemperatureCelsius");
 +    }
 +    else
 +    {
@@ -326,8 +328,6 @@ Index: git/redfish-core/lib/power_distribution.hpp
 +    asyncResp->res.jsonValue["Id"] = "Metrics";
 +    asyncResp->res.jsonValue["@odata.id"] = boost::urls::format(
 +        "/redfish/v1/PowerEquipment/PowerShelves/{}/Metrics", powerdistributionId);
-+
-+    asyncResp->res.jsonValue["TemperatureCelsius"] = nlohmann::json::array();
 +
 +    std::string sensorPath = *validChassisPath + "/all_sensors";
 +    dbus::utility::getAssociationEndPoints(
@@ -389,10 +389,11 @@ Index: git/redfish-core/lib/power_distribution.hpp
 +}
 +
 +} // namespace redfish
-Index: git/redfish-core/lib/power_equipment.hpp
-===================================================================
+diff --git a/redfish-core/lib/power_equipment.hpp b/redfish-core/lib/power_equipment.hpp
+new file mode 100644
+index 000000000..d81423d02
 --- /dev/null
-+++ git/redfish-core/lib/power_equipment.hpp
++++ b/redfish-core/lib/power_equipment.hpp
 @@ -0,0 +1,47 @@
 +#pragma once
 +
@@ -441,46 +442,46 @@ Index: git/redfish-core/lib/power_equipment.hpp
 +}
 +
 +} // namespace redfish
-Index: git/redfish-core/lib/power_supply.hpp
-===================================================================
---- git.orig/redfish-core/lib/power_supply.hpp
-+++ git/redfish-core/lib/power_supply.hpp
-@@ -20,7 +20,8 @@ namespace redfish
- {
+diff --git a/redfish-core/lib/power_supply.hpp b/redfish-core/lib/power_supply.hpp
+index 09f731b54..cd95d4516 100644
+--- a/redfish-core/lib/power_supply.hpp
++++ b/redfish-core/lib/power_supply.hpp
+@@ -22,10 +22,12 @@ static constexpr std::array<std::string_view, 1> powerSupplyInterface = {
+     "xyz.openbmc_project.Inventory.Item.PowerSupply"};
  
- inline void
--    updatePowerSupplyList(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
-+    updatePowerSupplyList(const crow::Request& req,
-+                          const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
-                           const std::string& chassisId,
-                           const std::string& powerSupplyPath)
+ inline void updatePowerSupplyList(
++    const crow::Request& req,
+     const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
+     const std::string& chassisId,
+     const dbus::utility::MapperGetSubTreePathsResponse& powerSupplyPaths)
  {
-@@ -31,10 +32,21 @@ inline void
-         return;
-     }
- 
 +    size_t found = req.url().encoded_path().find("PowerEquipment");
-+
-     nlohmann::json item = nlohmann::json::object();
--    item["@odata.id"] = boost::urls::format(
--        "/redfish/v1/Chassis/{}/PowerSubsystem/PowerSupplies/{}", chassisId,
--        powerSupplyName);
-+    if (found == std::string::npos)
-+    {
-+        item["@odata.id"] = boost::urls::format(
-+            "/redfish/v1/Chassis/{}/PowerSubsystem/PowerSupplies/{}", chassisId,
-+            powerSupplyName);
-+    }
-+    else
-+    {
-+        item["@odata.id"] = boost::urls::format(
-+            "/redfish/v1/PowerEquipment/PowerShelves/{}/PowerSupplies/{}", chassisId,
-+            powerSupplyName);
-+    }
- 
      nlohmann::json& powerSupplyList = asyncResp->res.jsonValue["Members"];
-     powerSupplyList.emplace_back(std::move(item));
-@@ -42,7 +54,8 @@ inline void
+     for (const std::string& powerSupplyPath : powerSupplyPaths)
+     {
+@@ -37,9 +39,18 @@ inline void updatePowerSupplyList(
+         }
+ 
+         nlohmann::json item = nlohmann::json::object();
+-        item["@odata.id"] = boost::urls::format(
+-            "/redfish/v1/Chassis/{}/PowerSubsystem/PowerSupplies/{}", chassisId,
+-            powerSupplyName);
++        if (found == std::string::npos)
++        {
++            item["@odata.id"] = boost::urls::format(
++                "/redfish/v1/Chassis/{}/PowerSubsystem/PowerSupplies/{}", chassisId,
++                powerSupplyName);
++        }
++        else
++        {
++            item["@odata.id"] = boost::urls::format(
++                "/redfish/v1/PowerEquipment/PowerShelves/{}/PowerSupplies/{}", chassisId,
++                powerSupplyName);
++        }
+ 
+         powerSupplyList.emplace_back(std::move(item));
+     }
+@@ -47,7 +58,8 @@ inline void updatePowerSupplyList(
  }
  
  inline void
@@ -490,7 +491,7 @@ Index: git/redfish-core/lib/power_supply.hpp
                              const std::string& chassisId,
                              const std::optional<std::string>& validChassisPath)
  {
-@@ -52,14 +65,26 @@ inline void
+@@ -57,14 +69,26 @@ inline void
          return;
      }
  
@@ -507,37 +508,37 @@ Index: git/redfish-core/lib/power_supply.hpp
 +
 +    if (found == std::string::npos)
 +    {
-+        asyncResp->res.jsonValue["@odata.id"] =
-+            boost::urls::format("/redfish/v1/Chassis/{}/PowerSubsystem/PowerSupplies", chassisId);
++        asyncResp->res.jsonValue["@odata.id"] = boost::urls::format(
++            "/redfish/v1/Chassis/{}/PowerSubsystem/PowerSupplies", chassisId);
 +    }
 +    else
 +    {
-+        asyncResp->res.jsonValue["@odata.id"] =
-+            boost::urls::format("/redfish/v1/PowerEquipment/PowerShelves/{}/PowerSupplies", chassisId);
++        asyncResp->res.jsonValue["@odata.id"] = boost::urls::format(
++            "/redfish/v1/PowerEquipment/PowerShelves/{}/PowerSupplies", chassisId);
 +    }
 +
      asyncResp->res.jsonValue["Description"] =
          "The collection of PowerSupply resource instances.";
      asyncResp->res.jsonValue["Members"] = nlohmann::json::array();
-@@ -67,7 +92,7 @@ inline void
+@@ -75,7 +99,7 @@ inline void
+         powerPath,
+         sdbusplus::message::object_path("/xyz/openbmc_project/inventory"), 0,
+         powerSupplyInterface,
+-        [asyncResp, chassisId](
++        [req, asyncResp, chassisId](
+             const boost::system::error_code& ec,
+             const dbus::utility::MapperGetSubTreePathsResponse& subtreePaths) {
+         if (ec)
+@@ -88,7 +112,7 @@ inline void
+             return;
+         }
  
-     std::string powerPath = *validChassisPath + "/powered_by";
-     dbus::utility::getAssociationEndPoints(
--        powerPath, [asyncResp, chassisId](
-+        powerPath, [req, asyncResp, chassisId](
-                        const boost::system::error_code& ec,
-                        const dbus::utility::MapperEndPoints& endpoints) {
-             if (ec)
-@@ -82,7 +107,7 @@ inline void
- 
-             for (const auto& endpoint : endpoints)
-             {
--                updatePowerSupplyList(asyncResp, chassisId, endpoint);
-+                updatePowerSupplyList(req, asyncResp, chassisId, endpoint);
-             }
+-        updatePowerSupplyList(asyncResp, chassisId, subtreePaths);
++        updatePowerSupplyList(req, asyncResp, chassisId, subtreePaths);
          });
  }
-@@ -124,7 +149,7 @@ inline void handlePowerSupplyCollectionG
+ 
+@@ -129,7 +153,7 @@ inline void handlePowerSupplyCollectionGet(
  
      redfish::chassis_utils::getValidChassisPath(
          asyncResp, chassisId,
@@ -546,7 +547,7 @@ Index: git/redfish-core/lib/power_supply.hpp
  }
  
  inline void requestRoutesPowerSupplyCollection(App& app)
-@@ -138,6 +163,11 @@ inline void requestRoutesPowerSupplyColl
+@@ -143,6 +167,11 @@ inline void requestRoutesPowerSupplyCollection(App& app)
          .privileges(redfish::privileges::getPowerSupplyCollection)
          .methods(boost::beast::http::verb::get)(
              std::bind_front(handlePowerSupplyCollectionGet, std::ref(app)));
@@ -558,77 +559,42 @@ Index: git/redfish-core/lib/power_supply.hpp
  }
  
  inline bool checkPowerSupplyId(const std::string& powerSupplyPath,
-@@ -308,16 +338,46 @@ inline void
+@@ -435,21 +464,140 @@ inline void handlePowerSupplyAttributesSubTreeResponse(
  }
  
  inline void
 -    getEfficiencyPercent(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp)
-+    getPowerSupplyHotPluggable(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
-+                               const std::string& service, const std::string& path)
-+{
-+    sdbusplus::asio::getProperty<bool>(
-+        *crow::connections::systemBus, service, path,
-+        "xyz.openbmc_project.Inventory.Decorator.Replaceable", "HotPluggable",
-+        [asyncResp](const boost::system::error_code& ec, const bool value) {
-+        if (ec)
-+        {
-+            if (ec.value() != EBADR)
-+            {
-+                BMCWEB_LOG_ERROR << "DBUS response error for State";
-+                messages::internalError(asyncResp->res);
-+            }
-+            return;
-+        }
-+        if (!value)
-+        {
-+            asyncResp->res.jsonValue["HotPluggable"] = "False";
-+        }
-+        else
-+        {
-+            asyncResp->res.jsonValue["HotPluggable"] = "True";
-+        }
-+        });
-+}
-+
-+inline void
 +    getEfficiencyPercent(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
 +                         const std::string& powerSupplyPath)
  {
-     static const std::string efficiencyIntf =
--        "xyz.openbmc_project.Control.PowerSupplyAttributes";
-+        //"xyz.openbmc_project.Control.PowerSupplyAttributes";
+-    constexpr std::array<std::string_view, 1> efficiencyIntf = {
+-        "xyz.openbmc_project.Control.PowerSupplyAttributes"};
++    static const std::string efficiencyIntf =
 +        "xyz.openbmc_project.Inventory.Decorator.EfficiencyRatings";
-     // Gets the Power Supply Attributes such as EfficiencyPercent.
-     // Currently we only support one power supply EfficiencyPercent, use this
-     // for all the power supplies.
-     crow::connections::systemBus->async_method_call(
--        [asyncResp](const boost::system::error_code ec,
--                    const dbus::utility::MapperGetSubTreeResponse& subtree) {
-+        [asyncResp, powerSupplyPath](const boost::system::error_code ec,
-+            const dbus::utility::MapperGetSubTreeResponse& subtree) {
-         if (ec)
-         {
-             if (ec.value() == EBADR)
-@@ -333,7 +393,7 @@ inline void
-         {
-             for (const auto& [service, interfaces] : serviceMap)
-             {
--                sdbusplus::asio::getProperty<uint32_t>(
-+                /*sdbusplus::asio::getProperty<uint32_t>(
-                     *crow::connections::systemBus, service, path,
-                     efficiencyIntf, "DeratingFactor",
-                     [asyncResp](const boost::system::error_code ec1,
-@@ -344,10 +404,73 @@ inline void
-                     }
++    crow::connections::systemBus->async_method_call(
++        [asyncResp, powerSupplyPath]
++        (const boost::system::error_code ec,
++         const dbus::utility::MapperGetSubTreeResponse& subtree) {
++        if (ec)
++        {
++            if (ec.value() == EBADR)
++            {
++                return;
++            }
++            BMCWEB_LOG_ERROR << "respHandler DBus error " << ec.message();
++            messages::internalError(asyncResp->res);
++            return;
++        }
  
-                     nlohmann::json item;
--                    item["EfficiencyPercent"] = value;
-+                    item["EfficiencyPercent"] = std::to_string(value);
-+                    item["LoadPercent"] = "30";
-                     nlohmann::json& efficiencyList =
-                         asyncResp->res.jsonValue["EfficiencyRatings"];
-                     efficiencyList.emplace_back(std::move(item));
-+                    });*/
+-    dbus::utility::getSubTree(
+-        "/xyz/openbmc_project", 0, efficiencyIntf,
+-        [asyncResp](const boost::system::error_code& ec,
+-                    const dbus::utility::MapperGetSubTreeResponse& subtree) {
+-        handlePowerSupplyAttributesSubTreeResponse(asyncResp, ec, subtree);
++        for (const auto& [path, serviceMap] : subtree)
++        {
++            for (const auto& [service, interfaces] : serviceMap)
++            {
 +                if (powerSupplyPath != path)
 +                {
 +                    continue;
@@ -690,10 +656,50 @@ Index: git/redfish-core/lib/power_supply.hpp
 +                        item["LoadPercent"] = *loadPL;
 +                        efficiencyList.emplace_back(std::move(item));
 +                    }
-                     });
-             }
-         }
-@@ -360,7 +483,8 @@ inline void
++                    });
++            }
++        }
++        },
++        "xyz.openbmc_project.ObjectMapper",
++        "/xyz/openbmc_project/object_mapper",
++        "xyz.openbmc_project.ObjectMapper", "GetSubTree",
++        "/xyz/openbmc_project", 0,
++        std::array<const char*, 1>{efficiencyIntf.c_str()});
++}
++
++inline void
++    getPowerSupplyReplaceable(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
++                              const std::string& service, const std::string& path)
++{
++    sdbusplus::asio::getAllProperties(
++        *crow::connections::systemBus, service, path,
++        "xyz.openbmc_project.Inventory.Decorator.Replaceable",
++        [asyncResp](const boost::system::error_code& /*ec*/,
++                    const dbus::utility::DBusPropertiesMap& propertiesList) {
++        const bool* replaceable = nullptr;
++        const bool* hotpluggable = nullptr;
++
++        const bool success = sdbusplus::unpackPropertiesNoThrow(
++            dbus_utils::UnpackErrorPrinter(), propertiesList,
++            "FieldReplaceable", replaceable,
++            "HotPluggable", hotpluggable);
++
++        if (!success)
++        {
++            messages::internalError(asyncResp->res);
++            return;
++        }
++
++        if (replaceable != nullptr)
++        {
++            asyncResp->res.jsonValue["Replaceable"] = *replaceable;
++        }
++
++        if (hotpluggable != nullptr)
++        {
++            asyncResp->res.jsonValue["HotPluggable"] = *hotpluggable;
++        }
+         });
  }
  
  inline void
@@ -703,7 +709,7 @@ Index: git/redfish-core/lib/power_supply.hpp
                       const std::string& chassisId,
                       const std::string& powerSupplyId,
                       const std::optional<std::string>& validChassisPath)
-@@ -371,9 +495,11 @@ inline void
+@@ -460,9 +608,11 @@ inline void
          return;
      }
  
@@ -716,7 +722,7 @@ Index: git/redfish-core/lib/power_supply.hpp
                                  const std::string& powerSupplyPath) {
          asyncResp->res.addHeader(
              boost::beast::http::field::link,
-@@ -382,9 +508,25 @@ inline void
+@@ -471,9 +621,25 @@ inline void
              "#PowerSupply.v1_5_0.PowerSupply";
          asyncResp->res.jsonValue["Name"] = "Power Supply";
          asyncResp->res.jsonValue["Id"] = powerSupplyId;
@@ -729,28 +735,28 @@ Index: git/redfish-core/lib/power_supply.hpp
 +            asyncResp->res.jsonValue["@odata.id"] = boost::urls::format(
 +                "/redfish/v1/Chassis/{}/PowerSubsystem/PowerSupplies/{}", chassisId,
 +                powerSupplyId);
-+            asyncResp->res.jsonValue["Metrics"]["@odata.id"] =
-+                boost::urls::format("/redfish/v1/Chassis/{}/PowerSubsystem/PowerSupplies/{}/Metrics",
-+                                    chassisId, powerSupplyId);
++            asyncResp->res.jsonValue["Metrics"]["@odata.id"] = boost::urls::format(
++                "/redfish/v1/Chassis/{}/PowerSubsystem/PowerSupplies/{}/Metrics",
++                chassisId, powerSupplyId);
 +        }
 +        else
 +        {
 +            asyncResp->res.jsonValue["@odata.id"] = boost::urls::format(
 +                "/redfish/v1/PowerEquipment/PowerShelves/{}/PowerSupplies/{}", chassisId,
 +                powerSupplyId);
-+            asyncResp->res.jsonValue["Metrics"]["@odata.id"] =
-+                boost::urls::format("/redfish/v1/PowerEquipment/PowerShelves/{}/PowerSupplies/{}/Metrics",
++            asyncResp->res.jsonValue["Metrics"]["@odata.id"] = boost::urls::format(
++                "/redfish/v1/PowerEquipment/PowerShelves/{}/PowerSupplies/{}/Metrics",
 +                chassisId, powerSupplyId);
 +        }
  
          asyncResp->res.jsonValue["Status"]["State"] = "Enabled";
          asyncResp->res.jsonValue["Status"]["Health"] = "OK";
-@@ -406,9 +548,11 @@ inline void
-                                  powerSupplyPath);
-             getPowerSupplyAsset(asyncResp, object.begin()->first,
-                                 powerSupplyPath);
-+            getPowerSupplyHotPluggable(asyncResp, object.begin()->first,
-+                                       powerSupplyPath);
+@@ -499,9 +665,11 @@ inline void
+                                           powerSupplyPath);
+             getPowerSupplyLocation(asyncResp, object.begin()->first,
+                                    powerSupplyPath);
++            getPowerSupplyReplaceable(asyncResp, object.begin()->first,
++                                      powerSupplyPath);
              });
  
 -        getEfficiencyPercent(asyncResp);
@@ -758,7 +764,7 @@ Index: git/redfish-core/lib/power_supply.hpp
      });
  }
  
-@@ -456,7 +600,7 @@ inline void
+@@ -549,7 +717,7 @@ inline void
  
      redfish::chassis_utils::getValidChassisPath(
          asyncResp, chassisId,
@@ -767,7 +773,7 @@ Index: git/redfish-core/lib/power_supply.hpp
  }
  
  inline void requestRoutesPowerSupply(App& app)
-@@ -472,6 +616,12 @@ inline void requestRoutesPowerSupply(App
+@@ -565,6 +733,12 @@ inline void requestRoutesPowerSupply(App& app)
          .privileges(redfish::privileges::getPowerSupply)
          .methods(boost::beast::http::verb::get)(
              std::bind_front(handlePowerSupplyGet, std::ref(app)));
@@ -780,11 +786,12 @@ Index: git/redfish-core/lib/power_supply.hpp
  }
  
  } // namespace redfish
-Index: git/redfish-core/lib/power_supply_metrics.hpp
-===================================================================
+diff --git a/redfish-core/lib/power_supply_metrics.hpp b/redfish-core/lib/power_supply_metrics.hpp
+new file mode 100644
+index 000000000..95b2f40db
 --- /dev/null
-+++ git/redfish-core/lib/power_supply_metrics.hpp
-@@ -0,0 +1,232 @@
++++ b/redfish-core/lib/power_supply_metrics.hpp
+@@ -0,0 +1,251 @@
 +#pragma once
 +
 +#include "app.hpp"
@@ -810,13 +817,14 @@ Index: git/redfish-core/lib/power_supply_metrics.hpp
 +                          const std::string& chassisId,
 +                          const std::string& powerSupplyPath,
 +                          const std::string& id,
-+                          const std::string& location)
++                          const std::string& location,
++                          bool isArray)
 +{
 +    constexpr std::array<std::string_view, 1> interfaces = {
 +        "xyz.openbmc_project.Sensor.Value"};
 +    dbus::utility::getDbusObject(
 +        powerSupplyPath, interfaces,
-+        [asyncResp, chassisId, powerSupplyPath, id, location]
++        [asyncResp, chassisId, powerSupplyPath, id, location, isArray]
 +        (const boost::system::error_code& ec,
 +         const dbus::utility::MapperGetObject& object) {
 +        if (ec || object.empty())
@@ -828,7 +836,7 @@ Index: git/redfish-core/lib/power_supply_metrics.hpp
 +        sdbusplus::asio::getProperty<double>(
 +            *crow::connections::systemBus, object.begin()->first, powerSupplyPath,
 +            "xyz.openbmc_project.Sensor.Value", "Value",
-+            [asyncResp, chassisId, id, location]
++            [asyncResp, chassisId, id, location, isArray]
 +            (const boost::system::error_code& ec2, const double value) {
 +            if (ec2)
 +            {
@@ -840,15 +848,29 @@ Index: git/redfish-core/lib/power_supply_metrics.hpp
 +                return;
 +            }
 +
-+            if (value)
++            if (value >= 0)
 +            {
-+                nlohmann::json::object_t item;
-+                item["DataSourceUri"] = boost::urls::format(
-+                    "/redfish/v1/Chassis/{}/Sensors/{}", chassisId, id);
-+                item["Reading"] = std::to_string(value);
++                if (isArray)
++                {
++                    nlohmann::json::object_t item;
++                    item["DataSourceUri"] = boost::urls::format(
++                        "/redfish/v1/Chassis/{}/Sensors/{}", chassisId, id);
 +
-+                nlohmann::json& sensorList = asyncResp->res.jsonValue[location];
-+                sensorList.emplace_back(std::move(item));
++                    if ( location == "FanSpeedPercent" ) {
++                        item["SpeedRPM"] = std::to_string(value);
++                    }
++                    else
++                        item["Reading"] = std::to_string(value);
++
++                    nlohmann::json& sensorList = asyncResp->res.jsonValue[location];
++                    sensorList.emplace_back(std::move(item));
++                }
++                else
++                {
++                    asyncResp->res.jsonValue[location]["DataSourceUri"] = boost::urls::format(
++                        "/redfish/v1/Chassis/{}/Sensors/{}", chassisId, id);
++                    asyncResp->res.jsonValue[location]["Reading"] = std::to_string(value);
++                }
 +            }
 +            });
 +        });
@@ -884,37 +906,48 @@ Index: git/redfish-core/lib/power_supply_metrics.hpp
 +    if (sensorName.find("Input_Current") != std::string::npos)
 +    {
 +        getPowerSupplyReading(asyncResp, chassisId, powerSupplyPath,
-+                              id, "InputCurrentAmps");
++                              id, "InputCurrentAmps", false);
 +    }
 +    else if (sensorName.find("Input_Power") != std::string::npos)
 +    {
 +        getPowerSupplyReading(asyncResp, chassisId, powerSupplyPath,
-+                              id, "InputPowerWatts");
++                              id, "InputPowerWatts", false);
 +    }
 +    else if (sensorName.find("Input_Voltage") != std::string::npos)
 +    {
 +        getPowerSupplyReading(asyncResp, chassisId, powerSupplyPath,
-+                              id, "InputVoltage");
++                              id, "InputVoltage", false);
 +    }
 +    else if (sensorName.find("Output_Current") != std::string::npos)
 +    {
++        asyncResp->res.jsonValue["RailCurrentAmps"] = nlohmann::json::array();
 +        getPowerSupplyReading(asyncResp, chassisId, powerSupplyPath,
-+                              id, "RailCurrentAmps");
++                              id, "RailCurrentAmps", true);
 +    }
 +    else if (sensorName.find("Output_Power") != std::string::npos)
 +    {
++        asyncResp->res.jsonValue["RailPowerWatts"] = nlohmann::json::array();
 +        getPowerSupplyReading(asyncResp, chassisId, powerSupplyPath,
-+                              id, "RailPowerWatts");
++                              id, "RailPowerWatts", true);
 +    }
 +    else if (sensorName.find("Output_Voltage") != std::string::npos)
 +    {
++        asyncResp->res.jsonValue["RailVoltage"] = nlohmann::json::array();
 +        getPowerSupplyReading(asyncResp, chassisId, powerSupplyPath,
-+                              id, "RailVoltage");
++                              id, "RailVoltage", true);
++        getPowerSupplyReading(asyncResp, chassisId, powerSupplyPath,
++                              id, "OutputPowerWatts", false);
 +    }
 +    else if (sensorName.find("Temperature") != std::string::npos)
 +    {
 +        getPowerSupplyReading(asyncResp, chassisId, powerSupplyPath,
-+                              id, "TemperatureCelsius");
++                              id, "TemperatureCelsius", false);
++    }
++    else if (sensorName.find("Fan_Speed") != std::string::npos)
++    {
++        asyncResp->res.jsonValue["FanSpeedPercent"] = nlohmann::json::array();
++        getPowerSupplyReading(asyncResp, chassisId, powerSupplyPath,
++                              id, "FanSpeedPercent", true);
 +    }
 +    else
 +    {
@@ -955,13 +988,6 @@ Index: git/redfish-core/lib/power_supply_metrics.hpp
 +            chassisId, powerSupplyId);
 +    }
 +
-+    asyncResp->res.jsonValue["InputCurrentAmps"] = nlohmann::json::array();
-+    asyncResp->res.jsonValue["InputPowerWatts"] = nlohmann::json::array();
-+    asyncResp->res.jsonValue["InputVoltage"] = nlohmann::json::array();
-+    asyncResp->res.jsonValue["RailCurrentAmps"] = nlohmann::json::array();
-+    asyncResp->res.jsonValue["RailPowerWatts"] = nlohmann::json::array();
-+    asyncResp->res.jsonValue["RailVoltage"] = nlohmann::json::array();
-+    asyncResp->res.jsonValue["TemperatureCelsius"] = nlohmann::json::array();
 +    asyncResp->res.jsonValue["Status"]["State"] = "Enabled";
 +    asyncResp->res.jsonValue["Status"]["Health"] = "OK";
 +
@@ -1017,11 +1043,11 @@ Index: git/redfish-core/lib/power_supply_metrics.hpp
 +}
 +
 +} // namespace redfish
-Index: git/redfish-core/lib/service_root.hpp
-===================================================================
---- git.orig/redfish-core/lib/service_root.hpp
-+++ git/redfish-core/lib/service_root.hpp
-@@ -82,6 +82,8 @@ inline void handleServiceRootGetImpl(
+diff --git a/redfish-core/lib/service_root.hpp b/redfish-core/lib/service_root.hpp
+index 6ae16c378..b9578e47f 100644
+--- a/redfish-core/lib/service_root.hpp
++++ b/redfish-core/lib/service_root.hpp
+@@ -86,6 +86,8 @@ inline void handleServiceRootGetImpl(
      asyncResp->res.jsonValue["TelemetryService"]["@odata.id"] =
          "/redfish/v1/TelemetryService";
      asyncResp->res.jsonValue["Cables"]["@odata.id"] = "/redfish/v1/Cables";
@@ -1030,3 +1056,6 @@ Index: git/redfish-core/lib/service_root.hpp
  
      asyncResp->res.jsonValue["Links"]["ManagerProvidingService"]["@odata.id"] =
          "/redfish/v1/Managers/bmc";
+-- 
+2.34.1
+
