@@ -1,6 +1,6 @@
-From 9381abfdbf016a1a74367cc64abb88670c850f0a Mon Sep 17 00:00:00 2001
+From bf9c8ab7ab94fc09382fadf22e90227e07fb3d33 Mon Sep 17 00:00:00 2001
 From: Ban Feng <kcfeng0@nuvoton.com>
-Date: Wed, 5 Jul 2023 09:24:04 +0800
+Date: Wed, 12 Jul 2023 08:55:11 +0800
 Subject: [PATCH] Implement Power{Equipment, Distribution, Supply,
  SupplyMetrics} schema
 
@@ -8,18 +8,18 @@ Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
 Signed-off-by: Allen Kang <jhkang@nuvoton.com>
 ---
  redfish-core/include/redfish.hpp          |   6 +
- redfish-core/lib/power_distribution.hpp   | 336 ++++++++++++++++++++++
- redfish-core/lib/power_equipment.hpp      |  47 +++
- redfish-core/lib/power_supply.hpp         | 222 ++++++++++++--
- redfish-core/lib/power_supply_metrics.hpp | 251 ++++++++++++++++
+ redfish-core/lib/power_distribution.hpp   | 574 ++++++++++++++++++++++
+ redfish-core/lib/power_equipment.hpp      |  54 ++
+ redfish-core/lib/power_supply.hpp         | 457 +++++++++++++----
+ redfish-core/lib/power_supply_metrics.hpp | 261 ++++++++++
  redfish-core/lib/service_root.hpp         |   2 +
- 6 files changed, 840 insertions(+), 24 deletions(-)
+ 6 files changed, 1271 insertions(+), 83 deletions(-)
  create mode 100644 redfish-core/lib/power_distribution.hpp
  create mode 100644 redfish-core/lib/power_equipment.hpp
  create mode 100644 redfish-core/lib/power_supply_metrics.hpp
 
 diff --git a/redfish-core/include/redfish.hpp b/redfish-core/include/redfish.hpp
-index e97a83286..7583276a6 100644
+index e97a83286f..7583276a66 100644
 --- a/redfish-core/include/redfish.hpp
 +++ b/redfish-core/include/redfish.hpp
 @@ -38,8 +38,11 @@
@@ -49,10 +49,10 @@ index e97a83286..7583276a6 100644
          requestRoutesManagerCollection(app);
 diff --git a/redfish-core/lib/power_distribution.hpp b/redfish-core/lib/power_distribution.hpp
 new file mode 100644
-index 000000000..a9022f285
+index 0000000000..0a3cb2751d
 --- /dev/null
 +++ b/redfish-core/lib/power_distribution.hpp
-@@ -0,0 +1,336 @@
+@@ -0,0 +1,574 @@
 +#pragma once
 +
 +#include "app.hpp"
@@ -95,6 +95,241 @@ index 000000000..a9022f285
 +        asyncResp, boost::urls::url("/redfish/v1/PowerEquipment/PowerShelves"), interfaces);
 +}
 +
++inline void getPowerDistributionProductionDate(
++    const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
++    const std::string& model)
++{
++    constexpr std::array<std::string_view, 1> interfaces{
++        "xyz.openbmc_project.FruDevice"};
++    dbus::utility::getSubTree(
++        "/xyz/openbmc_project/FruDevice", 0, interfaces,
++        [asyncResp, model](
++            const boost::system::error_code& ec,
++            const dbus::utility::MapperGetSubTreeResponse& subtree) {
++        if (ec)
++        {
++            messages::internalError(asyncResp->res);
++            return;
++        }
++
++        // Iterate over all retrieved ObjectPaths.
++        for (const std::pair<
++                 std::string,
++                 std::vector<std::pair<std::string, std::vector<std::string>>>>&
++                 object : subtree)
++        {
++            const std::string& path = object.first;
++            const std::vector<std::pair<std::string, std::vector<std::string>>>&
++                connectionNames = object.second;
++
++            sdbusplus::message::object_path objPath(path);
++            if (objPath.filename() != model)
++            {
++                continue;
++            }
++
++            if (connectionNames.empty())
++            {
++                BMCWEB_LOG_ERROR << "Got 0 Connection names";
++                continue;
++            }
++
++            const std::string& connectionName = connectionNames[0].first;
++
++            sdbusplus::asio::getProperty<std::string>(
++                *crow::connections::systemBus, connectionName, objPath,
++                "xyz.openbmc_project.FruDevice", "BOARD_MANUFACTURE_DATE",
++                [asyncResp](const boost::system::error_code& ec2,
++                            const std::string& value) {
++                if (ec2)
++                {
++                    if (ec2.value() != EBADR)
++                    {
++                        BMCWEB_LOG_ERROR << "DBUS response error for Location "
++                                         << ec2.value();
++                        messages::internalError(asyncResp->res);
++                    }
++                    return;
++                }
++                asyncResp->res.jsonValue["ProductionDate"] = value;
++                });
++            return;
++        }
++        });
++}
++
++inline void getPowerDistributionAsset(
++    const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
++    const std::string& service, const std::string& path)
++{
++    sdbusplus::asio::getAllProperties(
++        *crow::connections::systemBus, service, path,
++        "xyz.openbmc_project.Inventory.Decorator.Asset",
++        [asyncResp](const boost::system::error_code& /*ec2*/,
++                    const dbus::utility::DBusPropertiesMap& propertiesList) {
++        const std::string* partNumber = nullptr;
++        const std::string* serialNumber = nullptr;
++        const std::string* manufacturer = nullptr;
++        const std::string* model = nullptr;
++        const std::string* sparePartNumber = nullptr;
++
++        const bool success = sdbusplus::unpackPropertiesNoThrow(
++            dbus_utils::UnpackErrorPrinter(), propertiesList,
++            "PartNumber", partNumber, "SerialNumber", serialNumber,
++            "Manufacturer", manufacturer, "Model", model,
++            "SparePartNumber", sparePartNumber);
++
++        if (!success)
++        {
++            messages::internalError(asyncResp->res);
++            return;
++        }
++
++        if (partNumber != nullptr)
++        {
++            asyncResp->res.jsonValue["PartNumber"] = *partNumber;
++        }
++
++        if (serialNumber != nullptr)
++        {
++            asyncResp->res.jsonValue["SerialNumber"] = *serialNumber;
++        }
++
++        if (manufacturer != nullptr)
++        {
++            asyncResp->res.jsonValue["Manufacturer"] = *manufacturer;
++        }
++
++        if (model != nullptr)
++        {
++            asyncResp->res.jsonValue["Model"] = *model;
++            asyncResp->res.jsonValue["UserLabel"] = *model;
++            getPowerDistributionProductionDate(asyncResp, *model);
++        }
++
++        // SparePartNumber is optional on D-Bus
++        // so skip if it is empty
++        if (sparePartNumber != nullptr && !sparePartNumber->empty())
++        {
++            asyncResp->res.jsonValue["SparePartNumber"] =
++                *sparePartNumber;
++        }
++        });
++}
++
++inline void getPowerDistributionLocation(
++    const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
++    const std::string& service, const std::string& path)
++{
++    sdbusplus::asio::getAllProperties(
++        *crow::connections::systemBus, service, path,
++        "xyz.openbmc_project.Inventory.Decorator.LocationCode",
++        [asyncResp](const boost::system::error_code& ec,
++                    const dbus::utility::DBusPropertiesMap& propertiesList) {
++        if (ec)
++        {
++            if (ec.value() != EBADR)
++            {
++                BMCWEB_LOG_ERROR << "DBUS response error for LocationCode "
++                                 << ec.value();
++                messages::internalError(asyncResp->res);
++            }
++            return;
++        }
++
++        const size_t* locationOrdinalValue = nullptr;
++        const std::string* locationType = nullptr;
++        const std::string* orientation = nullptr;
++        const std::string* reference = nullptr;
++        const std::string* serviceLabel = nullptr;
++
++        const bool success = sdbusplus::unpackPropertiesNoThrow(
++            dbus_utils::UnpackErrorPrinter(), propertiesList, "LocationOrdinalValue",
++            locationOrdinalValue, "LocationType", locationType, "Orientation",
++            orientation, "Reference", reference, "ServiceLabel", serviceLabel);
++
++        if (!success)
++        {
++            messages::internalError(asyncResp->res);
++            return;
++        }
++
++        if (locationOrdinalValue != nullptr)
++        {
++            asyncResp->res.jsonValue["Location"]["PartLocation"]["LocationOrdinalValue"] =
++                *locationOrdinalValue;
++        }
++        if (locationType != nullptr)
++        {
++            asyncResp->res.jsonValue["Location"]["PartLocation"]["LocationType"] =
++                *locationType;
++        }
++        if (orientation != nullptr)
++        {
++            asyncResp->res.jsonValue["Location"]["PartLocation"]["Orientation"] =
++                *orientation;
++        }
++        if (reference != nullptr)
++        {
++            asyncResp->res.jsonValue["Location"]["PartLocation"]["Reference"] =
++                *reference;
++        }
++        if (serviceLabel != nullptr)
++        {
++            asyncResp->res.jsonValue["Location"]["PartLocation"]["ServiceLabel"] =
++                *serviceLabel;
++        }
++        });
++}
++
++inline void getPowerDistributionUniqueIdentifier(
++    const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
++    const std::string& service, const std::string& path)
++{
++    sdbusplus::asio::getProperty<std::string>(
++        *crow::connections::systemBus, service, path,
++        "xyz.openbmc_project.Inventory.Decorator.UniqueIdentifier",
++        "UniqueIdentifier",
++        [path, asyncResp{std::move(asyncResp)}](
++            const boost::system::error_code& ec, const std::string& property) {
++        if (ec)
++        {
++            if (ec.value() != EBADR)
++            {
++                BMCWEB_LOG_ERROR << "DBUS response error for UniqueIdentifier "
++                                 << ec.value();
++                messages::internalError(asyncResp->res);
++            }
++            return;
++        }
++        asyncResp->res.jsonValue["UUID"] = property;
++        });
++}
++
++inline void getPowerDistributionHWVersion(
++    const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
++    const std::string& service, const std::string& path)
++{
++    sdbusplus::asio::getProperty<std::string>(
++        *crow::connections::systemBus, service, path,
++        "xyz.openbmc_project.Inventory.Decorator.Revision",
++        "Version",
++        [path, asyncResp{std::move(asyncResp)}](
++            const boost::system::error_code& ec, const std::string& property) {
++        if (ec)
++        {
++            if (ec.value() != EBADR)
++            {
++                BMCWEB_LOG_ERROR << "DBUS response error for UniqueIdentifier "
++                                 << ec.value();
++                messages::internalError(asyncResp->res);
++            }
++            return;
++        }
++        asyncResp->res.jsonValue["Version"] = property;
++        });
++}
++
 +inline void doPowerDistributionCollection(
 +    const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
 +    const std::string& powerdistributionId,
@@ -121,6 +356,24 @@ index 000000000..a9022f285
 +                            powerdistributionId);
 +    asyncResp->res.jsonValue["Metrics"]["@odata.id"] =
 +        boost::urls::format("/redfish/v1/PowerEquipment/PowerShelves/{}/Metrics",
++                            powerdistributionId);
++
++    nlohmann::json::array_t chassisAry;
++    nlohmann::json::object_t chassis;
++    chassis["@odata.id"] = "/redfish/v1/Chassis";
++    chassisAry.emplace_back(std::move(chassis));
++    asyncResp->res.jsonValue["Links"]["Chassis"] =
++        std::move(chassisAry);
++
++    nlohmann::json::array_t managedBy;
++    nlohmann::json::object_t manager;
++    manager["@odata.id"] = "/redfish/v1/Managers/bmc";
++    managedBy.emplace_back(std::move(manager));
++    asyncResp->res.jsonValue["Links"]["ManagedBy"] =
++        std::move(managedBy);
++
++    asyncResp->res.jsonValue["Sensors"]["@odata.id"] =
++        boost::urls::format("/redfish/v1/Chassis/{}/Sensors",
 +                            powerdistributionId);
 +
 +    sw_util::populateSoftwareInformation(asyncResp, sw_util::bmcPurpose,
@@ -164,58 +417,10 @@ index 000000000..a9022f285
 +
 +            const std::string& connectionName = connectionNames[0].first;
 +
-+            sdbusplus::asio::getAllProperties(
-+                *crow::connections::systemBus, connectionName, path,
-+                "xyz.openbmc_project.Inventory.Decorator.Asset",
-+                [asyncResp, powerdistributionId(std::string(powerdistributionId))](
-+                    const boost::system::error_code& /*ec2*/,
-+                    const dbus::utility::DBusPropertiesMap& propertiesList) {
-+                const std::string* partNumber = nullptr;
-+                const std::string* serialNumber = nullptr;
-+                const std::string* manufacturer = nullptr;
-+                const std::string* model = nullptr;
-+                const std::string* sparePartNumber = nullptr;
-+
-+                const bool success = sdbusplus::unpackPropertiesNoThrow(
-+                    dbus_utils::UnpackErrorPrinter(), propertiesList,
-+                    "PartNumber", partNumber, "SerialNumber", serialNumber,
-+                    "Manufacturer", manufacturer, "Model", model,
-+                    "SparePartNumber", sparePartNumber);
-+
-+                if (!success)
-+                {
-+                    messages::internalError(asyncResp->res);
-+                    return;
-+                }
-+
-+                if (partNumber != nullptr)
-+                {
-+                    asyncResp->res.jsonValue["PartNumber"] = *partNumber;
-+                }
-+
-+                if (serialNumber != nullptr)
-+                {
-+                    asyncResp->res.jsonValue["SerialNumber"] = *serialNumber;
-+                }
-+
-+                if (manufacturer != nullptr)
-+                {
-+                    asyncResp->res.jsonValue["Manufacturer"] = *manufacturer;
-+                }
-+
-+                if (model != nullptr)
-+                {
-+                    asyncResp->res.jsonValue["Model"] = *model;
-+                }
-+
-+                // SparePartNumber is optional on D-Bus
-+                // so skip if it is empty
-+                if (sparePartNumber != nullptr && !sparePartNumber->empty())
-+                {
-+                    asyncResp->res.jsonValue["SparePartNumber"] =
-+                        *sparePartNumber;
-+                }
-+                });
++            getPowerDistributionAsset(asyncResp, connectionName, path);
++            getPowerDistributionLocation(asyncResp, connectionName, path);
++            getPowerDistributionUniqueIdentifier(asyncResp, connectionName, path);
++            getPowerDistributionHWVersion(asyncResp, connectionName, path);
 +
 +            return;
 +        }
@@ -289,7 +494,15 @@ index 000000000..a9022f285
 +{
 +    sdbusplus::message::object_path path(sensorPath);
 +    std::string sensorName = path.filename();
-+    if (sensorName.empty() || sensorName.find("Temp") == std::string::npos)
++    if (sensorName.empty())
++    {
++        return;
++    }
++
++    const std::string& pdId =
++        boost::replace_all_copy(powerdistributionId, "powerdistribution", "PD");
++
++    if (sensorName.find(pdId) == std::string::npos)
 +    {
 +        return;
 +    }
@@ -300,7 +513,32 @@ index 000000000..a9022f285
 +    id += "_";
 +    id += sensorName;
 +
-+    if (sensorName.find("BUV") != std::string::npos)
++    if (sensorName.find("Absolute_Humidity") != std::string::npos)
++    {
++        getPowerDistributionMetricsReading(asyncResp, powerdistributionId, sensorPath,
++                                           id, "AbsoluteHumidity");
++    }
++    else if (sensorName.find("Energy_kWh") != std::string::npos)
++    {
++        getPowerDistributionMetricsReading(asyncResp, powerdistributionId, sensorPath,
++                                           id, "EnergykWh");
++    }
++    else if (sensorName.find("Humidity_Percent") != std::string::npos)
++    {
++        getPowerDistributionMetricsReading(asyncResp, powerdistributionId, sensorPath,
++                                           id, "HumidityPercent");
++    }
++    else if (sensorName.find("PowerLoad_Percent") != std::string::npos)
++    {
++        getPowerDistributionMetricsReading(asyncResp, powerdistributionId, sensorPath,
++                                           id, "PowerLoadPercent");
++    }
++    else if (sensorName.find("Power_Watts") != std::string::npos)
++    {
++        getPowerDistributionMetricsReading(asyncResp, powerdistributionId, sensorPath,
++                                           id, "PowerWatts");
++    }
++    else if (sensorName.find("Temperature") != std::string::npos)
 +    {
 +        getPowerDistributionMetricsReading(asyncResp, powerdistributionId, sensorPath,
 +                                           id, "TemperatureCelsius");
@@ -391,10 +629,10 @@ index 000000000..a9022f285
 +} // namespace redfish
 diff --git a/redfish-core/lib/power_equipment.hpp b/redfish-core/lib/power_equipment.hpp
 new file mode 100644
-index 000000000..d81423d02
+index 0000000000..baba5474c5
 --- /dev/null
 +++ b/redfish-core/lib/power_equipment.hpp
-@@ -0,0 +1,47 @@
+@@ -0,0 +1,54 @@
 +#pragma once
 +
 +#include "app.hpp"
@@ -427,6 +665,13 @@ index 000000000..d81423d02
 +    asyncResp->res.jsonValue["Description"] = "Power Equipment Configuration Service";
 +    asyncResp->res.jsonValue["PowerShelves"]["@odata.id"] =
 +        "/redfish/v1/PowerEquipment/PowerShelves";
++
++    nlohmann::json::array_t managedBy;
++    nlohmann::json::object_t manager;
++    manager["@odata.id"] = "/redfish/v1/Managers/bmc";
++    managedBy.emplace_back(std::move(manager));
++    asyncResp->res.jsonValue["Links"]["ManagedBy"] =
++        std::move(managedBy);
 +}
 +
 +/**
@@ -443,7 +688,7 @@ index 000000000..d81423d02
 +
 +} // namespace redfish
 diff --git a/redfish-core/lib/power_supply.hpp b/redfish-core/lib/power_supply.hpp
-index 09f731b54..cd95d4516 100644
+index 09f731b54e..837b3bda6a 100644
 --- a/redfish-core/lib/power_supply.hpp
 +++ b/redfish-core/lib/power_supply.hpp
 @@ -22,10 +22,12 @@ static constexpr std::array<std::string_view, 1> powerSupplyInterface = {
@@ -491,7 +736,7 @@ index 09f731b54..cd95d4516 100644
                              const std::string& chassisId,
                              const std::optional<std::string>& validChassisPath)
  {
-@@ -57,14 +69,26 @@ inline void
+@@ -57,14 +69,31 @@ inline void
          return;
      }
  
@@ -517,10 +762,15 @@ index 09f731b54..cd95d4516 100644
 +            "/redfish/v1/PowerEquipment/PowerShelves/{}/PowerSupplies", chassisId);
 +    }
 +
++    asyncResp->res.jsonValue["Actions"]["#PowerSupply.Reset"]["target"] =
++        boost::urls::format(
++        "/redfish/v1/PowerEquipment/PowerShelves/{}/PowerSupplies/Actions/PowerSupply.Reset/",
++        chassisId);
++
      asyncResp->res.jsonValue["Description"] =
          "The collection of PowerSupply resource instances.";
      asyncResp->res.jsonValue["Members"] = nlohmann::json::array();
-@@ -75,7 +99,7 @@ inline void
+@@ -75,7 +104,7 @@ inline void
          powerPath,
          sdbusplus::message::object_path("/xyz/openbmc_project/inventory"), 0,
          powerSupplyInterface,
@@ -529,7 +779,7 @@ index 09f731b54..cd95d4516 100644
              const boost::system::error_code& ec,
              const dbus::utility::MapperGetSubTreePathsResponse& subtreePaths) {
          if (ec)
-@@ -88,7 +112,7 @@ inline void
+@@ -88,7 +117,7 @@ inline void
              return;
          }
  
@@ -538,16 +788,77 @@ index 09f731b54..cd95d4516 100644
          });
  }
  
-@@ -129,7 +153,7 @@ inline void handlePowerSupplyCollectionGet(
+@@ -129,7 +158,68 @@ inline void handlePowerSupplyCollectionGet(
  
      redfish::chassis_utils::getValidChassisPath(
          asyncResp, chassisId,
 -        std::bind_front(doPowerSupplyCollection, asyncResp, chassisId));
 +        std::bind_front(doPowerSupplyCollection, req, asyncResp, chassisId));
++}
++
++inline void handlePowerSupplyCollectionResetPost(
++    App& app, const crow::Request& req,
++    const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
++    const std::string& /*chassisId*/)
++{
++    if (!redfish::setUpRedfishRoute(app, req, asyncResp))
++    {
++        return;
++    }
++    std::optional<std::string> resetType;
++    if (!json_util::readJsonAction(req, asyncResp->res, "ResetType", resetType))
++    {
++        // readJson adds appropriate error to response
++        return;
++    }
++
++    if (!resetType)
++    {
++        messages::actionParameterMissing(asyncResp->res, "PowerSupply.Reset",
++                                         "ResetType");
++        return;
++    }
++
++    // PowerSupply object so far only support On operation for TEST
++    if (resetType != "On")
++    {
++        messages::propertyValueNotInList(asyncResp->res, *resetType,
++                                         "ResetType");
++        return;
++    }
++
++    std::string command = "xyz.openbmc_project.State.Host.Transition.On";
++
++    sdbusplus::asio::setProperty(
++        *crow::connections::systemBus, "xyz.openbmc_project.State.Host",
++        "/xyz/openbmc_project/state/host0",
++        "xyz.openbmc_project.State.Host", "RequestedHostTransition", command,
++        [asyncResp, resetType](const boost::system::error_code& ec) {
++        if (ec)
++        {
++            BMCWEB_LOG_ERROR << "D-Bus responses error: " << ec;
++            if (ec.value() == boost::asio::error::invalid_argument)
++            {
++                messages::actionParameterNotSupported(asyncResp->res,
++                                                      *resetType, "Reset");
++                return;
++            }
++
++            if (ec.value() == boost::asio::error::host_unreachable)
++            {
++                messages::resourceNotFound(asyncResp->res, "Actions", "Reset");
++                return;
++            }
++
++            messages::internalError(asyncResp->res);
++            return;
++        }
++        messages::success(asyncResp->res);
++        });
  }
  
  inline void requestRoutesPowerSupplyCollection(App& app)
-@@ -143,6 +167,11 @@ inline void requestRoutesPowerSupplyCollection(App& app)
+@@ -143,6 +233,17 @@ inline void requestRoutesPowerSupplyCollection(App& app)
          .privileges(redfish::privileges::getPowerSupplyCollection)
          .methods(boost::beast::http::verb::get)(
              std::bind_front(handlePowerSupplyCollectionGet, std::ref(app)));
@@ -556,19 +867,96 @@ index 09f731b54..cd95d4516 100644
 +        .privileges(redfish::privileges::getPowerSupplyCollection)
 +        .methods(boost::beast::http::verb::get)(
 +            std::bind_front(handlePowerSupplyCollectionGet, std::ref(app)));
++
++    BMCWEB_ROUTE(app,
++        "/redfish/v1/PowerEquipment/PowerShelves/<str>/PowerSupplies/Actions/PowerSupply.Reset/")
++        .privileges(redfish::privileges::postPowerSupplyCollection)
++        .methods(boost::beast::http::verb::post)(
++            std::bind_front(handlePowerSupplyCollectionResetPost, std::ref(app)));
  }
  
  inline bool checkPowerSupplyId(const std::string& powerSupplyPath,
-@@ -435,21 +464,140 @@ inline void handlePowerSupplyAttributesSubTreeResponse(
+@@ -345,111 +446,266 @@ inline void
+     getPowerSupplyLocation(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
+                            const std::string& service, const std::string& path)
+ {
+-    sdbusplus::asio::getProperty<std::string>(
++    sdbusplus::asio::getAllProperties(
+         *crow::connections::systemBus, service, path,
+-        "xyz.openbmc_project.Inventory.Decorator.LocationCode", "LocationCode",
++        "xyz.openbmc_project.Inventory.Decorator.LocationCode",
+         [asyncResp](const boost::system::error_code& ec,
+-                    const std::string& value) {
++                    const dbus::utility::DBusPropertiesMap& propertiesList) {
+         if (ec)
+         {
+             if (ec.value() != EBADR)
+             {
+-                BMCWEB_LOG_ERROR << "DBUS response error for Location "
++                BMCWEB_LOG_ERROR << "DBUS response error for LocationCode "
+                                  << ec.value();
+                 messages::internalError(asyncResp->res);
+             }
+             return;
+         }
+-        asyncResp->res.jsonValue["Location"]["PartLocation"]["ServiceLabel"] =
+-            value;
++
++        const size_t* locationOrdinalValue = nullptr;
++        const std::string* locationType = nullptr;
++        const std::string* orientation = nullptr;
++        const std::string* reference = nullptr;
++        const std::string* serviceLabel = nullptr;
++
++        const bool success = sdbusplus::unpackPropertiesNoThrow(
++            dbus_utils::UnpackErrorPrinter(), propertiesList, "LocationOrdinalValue",
++            locationOrdinalValue, "LocationType", locationType, "Orientation",
++            orientation, "Reference", reference, "ServiceLabel", serviceLabel);
++
++        if (!success)
++        {
++            messages::internalError(asyncResp->res);
++            return;
++        }
++
++        if (locationOrdinalValue != nullptr)
++        {
++            asyncResp->res.jsonValue["Location"]["PartLocation"]["LocationOrdinalValue"] =
++                *locationOrdinalValue;
++        }
++        if (locationType != nullptr)
++        {
++            asyncResp->res.jsonValue["Location"]["PartLocation"]["LocationType"] =
++                *locationType;
++        }
++        if (orientation != nullptr)
++        {
++            asyncResp->res.jsonValue["Location"]["PartLocation"]["Orientation"] =
++                *orientation;
++        }
++        if (reference != nullptr)
++        {
++            asyncResp->res.jsonValue["Location"]["PartLocation"]["Reference"] =
++                *reference;
++        }
++        if (serviceLabel != nullptr)
++        {
++            asyncResp->res.jsonValue["Location"]["PartLocation"]["ServiceLabel"] =
++                *serviceLabel;
++        }
+         });
  }
  
- inline void
--    getEfficiencyPercent(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp)
+-inline void handleGetEfficiencyResponse(
+-    const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
+-    const boost::system::error_code& ec, uint32_t value)
++inline void
 +    getEfficiencyPercent(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
 +                         const std::string& powerSupplyPath)
  {
--    constexpr std::array<std::string_view, 1> efficiencyIntf = {
--        "xyz.openbmc_project.Control.PowerSupplyAttributes"};
+-    if (ec)
+-    {
+-        if (ec.value() != EBADR)
 +    static const std::string efficiencyIntf =
 +        "xyz.openbmc_project.Inventory.Decorator.EfficiencyRatings";
 +    crow::connections::systemBus->async_method_call(
@@ -576,21 +964,31 @@ index 09f731b54..cd95d4516 100644
 +        (const boost::system::error_code ec,
 +         const dbus::utility::MapperGetSubTreeResponse& subtree) {
 +        if (ec)
-+        {
+         {
+-            BMCWEB_LOG_ERROR << "DBUS response error for DeratingFactor "
+-                             << ec.value();
 +            if (ec.value() == EBADR)
 +            {
 +                return;
 +            }
 +            BMCWEB_LOG_ERROR << "respHandler DBus error " << ec.message();
-+            messages::internalError(asyncResp->res);
+             messages::internalError(asyncResp->res);
 +            return;
-+        }
+         }
+-        return;
+-    }
+-    // The PDI default value is 0, if it hasn't been set leave off
+-    if (value == 0)
+-    {
+-        return;
+-    }
  
--    dbus::utility::getSubTree(
--        "/xyz/openbmc_project", 0, efficiencyIntf,
--        [asyncResp](const boost::system::error_code& ec,
--                    const dbus::utility::MapperGetSubTreeResponse& subtree) {
--        handlePowerSupplyAttributesSubTreeResponse(asyncResp, ec, subtree);
+-    nlohmann::json::array_t efficiencyRatings;
+-    nlohmann::json::object_t efficiencyPercent;
+-    efficiencyPercent["EfficiencyPercent"] = value;
+-    efficiencyRatings.emplace_back(std::move(efficiencyPercent));
+-    asyncResp->res.jsonValue["EfficiencyRatings"] =
+-        std::move(efficiencyRatings);
 +        for (const auto& [path, serviceMap] : subtree)
 +        {
 +            for (const auto& [service, interfaces] : serviceMap)
@@ -665,12 +1063,19 @@ index 09f731b54..cd95d4516 100644
 +        "xyz.openbmc_project.ObjectMapper", "GetSubTree",
 +        "/xyz/openbmc_project", 0,
 +        std::array<const char*, 1>{efficiencyIntf.c_str()});
-+}
-+
+ }
+ 
+-inline void handlePowerSupplyAttributesSubTreeResponse(
+-    const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
+-    const boost::system::error_code& ec,
+-    const dbus::utility::MapperGetSubTreeResponse& subtree)
 +inline void
 +    getPowerSupplyReplaceable(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
 +                              const std::string& service, const std::string& path)
-+{
+ {
+-    if (ec)
+-    {
+-        if (ec.value() != EBADR)
 +    sdbusplus::asio::getAllProperties(
 +        *crow::connections::systemBus, service, path,
 +        "xyz.openbmc_project.Inventory.Decorator.Replaceable",
@@ -685,19 +1090,116 @@ index 09f731b54..cd95d4516 100644
 +            "HotPluggable", hotpluggable);
 +
 +        if (!success)
+         {
+-            BMCWEB_LOG_ERROR << "DBUS response error for EfficiencyPercent "
+-                             << ec.value();
+             messages::internalError(asyncResp->res);
++            return;
+         }
+-        return;
+-    }
+-
+-    if (subtree.empty())
+-    {
+-        BMCWEB_LOG_DEBUG << "Can't find Power Supply Attributes!";
+-        return;
+-    }
+ 
+-    if (subtree.size() != 1)
+-    {
+-        BMCWEB_LOG_ERROR
+-            << "Unexpected number of paths returned by getSubTree: "
+-            << subtree.size();
+-        messages::internalError(asyncResp->res);
+-        return;
+-    }
++        if (replaceable != nullptr)
++        {
++            asyncResp->res.jsonValue["Replaceable"] = *replaceable;
++        }
+ 
+-    const auto& [path, serviceMap] = *subtree.begin();
+-    const auto& [service, interfaces] = *serviceMap.begin();
+-    sdbusplus::asio::getProperty<uint32_t>(
+-        *crow::connections::systemBus, service, path,
+-        "xyz.openbmc_project.Control.PowerSupplyAttributes", "DeratingFactor",
+-        [asyncResp](const boost::system::error_code& ec1, uint32_t value) {
+-        handleGetEfficiencyResponse(asyncResp, ec1, value);
++        if (hotpluggable != nullptr)
++        {
++            asyncResp->res.jsonValue["HotPluggable"] = *hotpluggable;
++        }
+         });
+ }
+ 
+ inline void
+-    getEfficiencyPercent(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp)
++    getPowerSupplyVendorInformation(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
++                                    const std::string& service, const std::string& path)
+ {
+-    constexpr std::array<std::string_view, 1> efficiencyIntf = {
+-        "xyz.openbmc_project.Control.PowerSupplyAttributes"};
++    sdbusplus::asio::getAllProperties(
++        *crow::connections::systemBus, service, path,
++        "xyz.openbmc_project.Inventory.Decorator.VendorInformation",
++        [asyncResp](const boost::system::error_code& /*ec*/,
++                    const dbus::utility::DBusPropertiesMap& propertiesList) {
++        const std::string* inputNominalVoltage = nullptr;
++        const std::string* outputNominalVoltage = nullptr;
++        const std::string* phaseWiringType = nullptr;
++        const std::string* plugType = nullptr;
++        const std::string* powerSupplyType = nullptr;
++        const std::string* version = nullptr;
+ 
+-    dbus::utility::getSubTree(
+-        "/xyz/openbmc_project", 0, efficiencyIntf,
+-        [asyncResp](const boost::system::error_code& ec,
+-                    const dbus::utility::MapperGetSubTreeResponse& subtree) {
+-        handlePowerSupplyAttributesSubTreeResponse(asyncResp, ec, subtree);
++        const bool success = sdbusplus::unpackPropertiesNoThrow(
++            dbus_utils::UnpackErrorPrinter(), propertiesList,
++            "InputNominalVoltageType", inputNominalVoltage,
++            "OutputNominalVoltageType", outputNominalVoltage,
++            "PhaseWiringType", phaseWiringType,
++            "PlugType", plugType,
++            "PowerSupplyType", powerSupplyType,
++            "Version", version);
++
++        if (!success)
 +        {
 +            messages::internalError(asyncResp->res);
 +            return;
 +        }
 +
-+        if (replaceable != nullptr)
++        if (inputNominalVoltage != nullptr)
 +        {
-+            asyncResp->res.jsonValue["Replaceable"] = *replaceable;
++            asyncResp->res.jsonValue["InputNominalVoltageType"] = *inputNominalVoltage;
 +        }
 +
-+        if (hotpluggable != nullptr)
++        if (outputNominalVoltage != nullptr)
 +        {
-+            asyncResp->res.jsonValue["HotPluggable"] = *hotpluggable;
++            asyncResp->res.jsonValue["OutputNominalVoltageType"] = *outputNominalVoltage;
++        }
++
++        if (phaseWiringType != nullptr)
++        {
++            asyncResp->res.jsonValue["PhaseWiringType"] = *phaseWiringType;
++        }
++
++        if (plugType != nullptr)
++        {
++            asyncResp->res.jsonValue["PlugType"] = *plugType;
++        }
++
++        if (powerSupplyType != nullptr)
++        {
++            asyncResp->res.jsonValue["PowerSupplyType"] = *powerSupplyType;
++        }
++
++        if (version != nullptr)
++        {
++            /* Should be from PMBUS */
++            asyncResp->res.jsonValue["Version"] = *version;
 +        }
          });
  }
@@ -709,7 +1211,7 @@ index 09f731b54..cd95d4516 100644
                       const std::string& chassisId,
                       const std::string& powerSupplyId,
                       const std::optional<std::string>& validChassisPath)
-@@ -460,9 +608,11 @@ inline void
+@@ -460,9 +716,11 @@ inline void
          return;
      }
  
@@ -722,7 +1224,7 @@ index 09f731b54..cd95d4516 100644
                                  const std::string& powerSupplyPath) {
          asyncResp->res.addHeader(
              boost::beast::http::field::link,
-@@ -471,9 +621,25 @@ inline void
+@@ -471,9 +729,32 @@ inline void
              "#PowerSupply.v1_5_0.PowerSupply";
          asyncResp->res.jsonValue["Name"] = "Power Supply";
          asyncResp->res.jsonValue["Id"] = powerSupplyId;
@@ -748,15 +1250,24 @@ index 09f731b54..cd95d4516 100644
 +                "/redfish/v1/PowerEquipment/PowerShelves/{}/PowerSupplies/{}/Metrics",
 +                chassisId, powerSupplyId);
 +        }
++
++        nlohmann::json::array_t chassisAry;
++        nlohmann::json::object_t chassis;
++        chassis["@odata.id"] = "/redfish/v1/Chassis";
++        chassisAry.emplace_back(std::move(chassis));
++        asyncResp->res.jsonValue["Links"]["PoweringChassis"] =
++            std::move(chassisAry);
  
          asyncResp->res.jsonValue["Status"]["State"] = "Enabled";
          asyncResp->res.jsonValue["Status"]["Health"] = "OK";
-@@ -499,9 +665,11 @@ inline void
+@@ -499,9 +780,13 @@ inline void
                                            powerSupplyPath);
              getPowerSupplyLocation(asyncResp, object.begin()->first,
                                     powerSupplyPath);
 +            getPowerSupplyReplaceable(asyncResp, object.begin()->first,
 +                                      powerSupplyPath);
++            getPowerSupplyVendorInformation(asyncResp, object.begin()->first,
++                                            powerSupplyPath);
              });
  
 -        getEfficiencyPercent(asyncResp);
@@ -764,7 +1275,7 @@ index 09f731b54..cd95d4516 100644
      });
  }
  
-@@ -549,7 +717,7 @@ inline void
+@@ -549,7 +834,7 @@ inline void
  
      redfish::chassis_utils::getValidChassisPath(
          asyncResp, chassisId,
@@ -773,7 +1284,7 @@ index 09f731b54..cd95d4516 100644
  }
  
  inline void requestRoutesPowerSupply(App& app)
-@@ -565,6 +733,12 @@ inline void requestRoutesPowerSupply(App& app)
+@@ -565,6 +850,12 @@ inline void requestRoutesPowerSupply(App& app)
          .privileges(redfish::privileges::getPowerSupply)
          .methods(boost::beast::http::verb::get)(
              std::bind_front(handlePowerSupplyGet, std::ref(app)));
@@ -788,10 +1299,10 @@ index 09f731b54..cd95d4516 100644
  } // namespace redfish
 diff --git a/redfish-core/lib/power_supply_metrics.hpp b/redfish-core/lib/power_supply_metrics.hpp
 new file mode 100644
-index 000000000..95b2f40db
+index 0000000000..29f9b309c4
 --- /dev/null
 +++ b/redfish-core/lib/power_supply_metrics.hpp
-@@ -0,0 +1,251 @@
+@@ -0,0 +1,261 @@
 +#pragma once
 +
 +#include "app.hpp"
@@ -903,7 +1414,23 @@ index 000000000..95b2f40db
 +    id += "_";
 +    id += sensorName;
 +
-+    if (sensorName.find("Input_Current") != std::string::npos)
++    if (sensorName.find("Energy_kWh") != std::string::npos)
++    {
++        getPowerSupplyReading(asyncResp, chassisId, powerSupplyPath,
++                              id, "EnergykWh", false);
++    }
++    else if (sensorName.find("Fan_Speed") != std::string::npos)
++    {
++        asyncResp->res.jsonValue["FanSpeedPercent"] = nlohmann::json::array();
++        getPowerSupplyReading(asyncResp, chassisId, powerSupplyPath,
++                              id, "FanSpeedPercent", true);
++    }
++    else if (sensorName.find("Frequency_Hz") != std::string::npos)
++    {
++        getPowerSupplyReading(asyncResp, chassisId, powerSupplyPath,
++                              id, "FrequencyHz", false);
++    }
++    else if (sensorName.find("Input_Current") != std::string::npos)
 +    {
 +        getPowerSupplyReading(asyncResp, chassisId, powerSupplyPath,
 +                              id, "InputCurrentAmps", false);
@@ -929,25 +1456,19 @@ index 000000000..95b2f40db
 +        asyncResp->res.jsonValue["RailPowerWatts"] = nlohmann::json::array();
 +        getPowerSupplyReading(asyncResp, chassisId, powerSupplyPath,
 +                              id, "RailPowerWatts", true);
++        getPowerSupplyReading(asyncResp, chassisId, powerSupplyPath,
++                              id, "OutputPowerWatts", false);
 +    }
 +    else if (sensorName.find("Output_Voltage") != std::string::npos)
 +    {
 +        asyncResp->res.jsonValue["RailVoltage"] = nlohmann::json::array();
 +        getPowerSupplyReading(asyncResp, chassisId, powerSupplyPath,
 +                              id, "RailVoltage", true);
-+        getPowerSupplyReading(asyncResp, chassisId, powerSupplyPath,
-+                              id, "OutputPowerWatts", false);
 +    }
 +    else if (sensorName.find("Temperature") != std::string::npos)
 +    {
 +        getPowerSupplyReading(asyncResp, chassisId, powerSupplyPath,
 +                              id, "TemperatureCelsius", false);
-+    }
-+    else if (sensorName.find("Fan_Speed") != std::string::npos)
-+    {
-+        asyncResp->res.jsonValue["FanSpeedPercent"] = nlohmann::json::array();
-+        getPowerSupplyReading(asyncResp, chassisId, powerSupplyPath,
-+                              id, "FanSpeedPercent", true);
 +    }
 +    else
 +    {
@@ -1044,7 +1565,7 @@ index 000000000..95b2f40db
 +
 +} // namespace redfish
 diff --git a/redfish-core/lib/service_root.hpp b/redfish-core/lib/service_root.hpp
-index 6ae16c378..b9578e47f 100644
+index 6ae16c3780..b9578e47f4 100644
 --- a/redfish-core/lib/service_root.hpp
 +++ b/redfish-core/lib/service_root.hpp
 @@ -86,6 +86,8 @@ inline void handleServiceRootGetImpl(
