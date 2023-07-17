@@ -53,5 +53,5 @@
         "Address": "$ADDRESS",
         "Name": "$BOARD_PRODUCT_NAME"
     },
-    "xyz.openbmc_project.Inventory.Item.BMC": {}
+    "xyz.openbmc_project.Inventory.Item.Bmc": {}
 }
