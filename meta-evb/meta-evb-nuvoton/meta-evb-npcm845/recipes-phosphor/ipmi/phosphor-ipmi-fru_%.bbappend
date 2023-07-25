@@ -6,10 +6,8 @@ FILESEXTRAPATHS:prepend:evb-npcm845 := "${THISDIR}/${PN}:"
 DEPENDS:append:evb-npcm845 = " \
     ${@entity_enabled(d, '', 'evb-npcm845-yaml-config')}"
 
-EXTRA_OECONF:evb-npcm845 = " \
-    ${@entity_enabled(d, '', 'YAML_GEN=${STAGING_DIR_HOST}${datadir}/evb-npcm845-yaml-config/ipmi-fru-read.yaml')} \
-    ${@entity_enabled(d, '', 'PROP_YAML=${STAGING_DIR_HOST}${datadir}/evb-npcm845-yaml-config/ipmi-extra-properties.yaml')} \
-    "
+IPMI_FRU_YAML:evb-npcm845="${@entity_enabled(d, '', '${STAGING_DIR_HOST}${datadir}/evb-npcm845-yaml-config/ipmi-fru-read.yaml')}"
+IPMI_FRU_PROP_YAML:evb-npcm845="${@entity_enabled(d, '', '${STAGING_DIR_HOST}${datadir}/evb-npcm845-yaml-config/ipmi-extra-properties.yaml')}"
 
 EEPROM_NAMES = "bmc"
 
