@@ -1,6 +1,6 @@
-From bf9c8ab7ab94fc09382fadf22e90227e07fb3d33 Mon Sep 17 00:00:00 2001
+From 240890eb171def8be7b7bb7bc366e852c0bcce2d Mon Sep 17 00:00:00 2001
 From: Ban Feng <kcfeng0@nuvoton.com>
-Date: Wed, 12 Jul 2023 08:55:11 +0800
+Date: Tue, 25 Jul 2023 17:29:31 +0800
 Subject: [PATCH] Implement Power{Equipment, Distribution, Supply,
  SupplyMetrics} schema
 
@@ -19,10 +19,10 @@ Signed-off-by: Allen Kang <jhkang@nuvoton.com>
  create mode 100644 redfish-core/lib/power_supply_metrics.hpp
 
 diff --git a/redfish-core/include/redfish.hpp b/redfish-core/include/redfish.hpp
-index e97a83286f..7583276a66 100644
+index 3d8dae97a..138d228f0 100644
 --- a/redfish-core/include/redfish.hpp
 +++ b/redfish-core/include/redfish.hpp
-@@ -38,8 +38,11 @@
+@@ -39,8 +39,11 @@
  #include "pcie.hpp"
  #include "pcie_slots.hpp"
  #include "power.hpp"
@@ -34,7 +34,7 @@ index e97a83286f..7583276a66 100644
  #include "processor.hpp"
  #include "redfish_sessions.hpp"
  #include "redfish_v1.hpp"
-@@ -91,9 +94,12 @@ class RedfishService
+@@ -92,9 +95,12 @@ class RedfishService
  #endif
  #ifdef BMCWEB_NEW_POWERSUBSYSTEM_THERMALSUBSYSTEM
          requestRoutesEnvironmentMetrics(app);
@@ -45,11 +45,11 @@ index e97a83286f..7583276a66 100644
          requestRoutesPowerSupplyCollection(app);
 +        requestRoutesPowerSupplyMetricsCollection(app);
          requestRoutesThermalSubsystem(app);
- #endif
-         requestRoutesManagerCollection(app);
+         requestRoutesFan(app);
+         requestRoutesFanCollection(app);
 diff --git a/redfish-core/lib/power_distribution.hpp b/redfish-core/lib/power_distribution.hpp
 new file mode 100644
-index 0000000000..0a3cb2751d
+index 000000000..c1a7fe8a7
 --- /dev/null
 +++ b/redfish-core/lib/power_distribution.hpp
 @@ -0,0 +1,574 @@
@@ -130,7 +130,7 @@ index 0000000000..0a3cb2751d
 +
 +            if (connectionNames.empty())
 +            {
-+                BMCWEB_LOG_ERROR << "Got 0 Connection names";
++                BMCWEB_LOG_ERROR("Got 0 Connection names");
 +                continue;
 +            }
 +
@@ -145,8 +145,8 @@ index 0000000000..0a3cb2751d
 +                {
 +                    if (ec2.value() != EBADR)
 +                    {
-+                        BMCWEB_LOG_ERROR << "DBUS response error for Location "
-+                                         << ec2.value();
++                        BMCWEB_LOG_ERROR("DBUS response error for Location {}",
++                                         ec2.value());
 +                        messages::internalError(asyncResp->res);
 +                    }
 +                    return;
@@ -230,8 +230,8 @@ index 0000000000..0a3cb2751d
 +        {
 +            if (ec.value() != EBADR)
 +            {
-+                BMCWEB_LOG_ERROR << "DBUS response error for LocationCode "
-+                                 << ec.value();
++                BMCWEB_LOG_ERROR("DBUS response error for LocationCode {}",
++                                 ec.value());
 +                messages::internalError(asyncResp->res);
 +            }
 +            return;
@@ -296,8 +296,8 @@ index 0000000000..0a3cb2751d
 +        {
 +            if (ec.value() != EBADR)
 +            {
-+                BMCWEB_LOG_ERROR << "DBUS response error for UniqueIdentifier "
-+                                 << ec.value();
++                BMCWEB_LOG_ERROR("DBUS response error for UniqueIdentifier {}",
++                                 ec.value());
 +                messages::internalError(asyncResp->res);
 +            }
 +            return;
@@ -320,8 +320,8 @@ index 0000000000..0a3cb2751d
 +        {
 +            if (ec.value() != EBADR)
 +            {
-+                BMCWEB_LOG_ERROR << "DBUS response error for UniqueIdentifier "
-+                                 << ec.value();
++                BMCWEB_LOG_ERROR("DBUS response error for HWVersion {}",
++                                 ec.value());
 +                messages::internalError(asyncResp->res);
 +            }
 +            return;
@@ -411,7 +411,7 @@ index 0000000000..0a3cb2751d
 +
 +            if (connectionNames.empty())
 +            {
-+                BMCWEB_LOG_ERROR << "Got 0 Connection names";
++                BMCWEB_LOG_ERROR("Got 0 Connection names");
 +                continue;
 +            }
 +
@@ -471,7 +471,7 @@ index 0000000000..0a3cb2751d
 +            {
 +                if (ec2.value() != EBADR)
 +                {
-+                    BMCWEB_LOG_ERROR << "DBUS response error for DeratingFactor";
++                    BMCWEB_LOG_ERROR("DBUS response error for Reading {}", ec2.value());
 +                    messages::internalError(asyncResp->res);
 +                }
 +                return;
@@ -576,7 +576,7 @@ index 0000000000..0a3cb2751d
 +            {
 +                if (ec.value() != EBADR)
 +                {
-+                    BMCWEB_LOG_ERROR << "DBUS response error" << ec.value();
++                    BMCWEB_LOG_ERROR("DBUS response error {}", ec.value());
 +                    messages::internalError(asyncResp->res);
 +                }
 +                return;
@@ -629,7 +629,7 @@ index 0000000000..0a3cb2751d
 +} // namespace redfish
 diff --git a/redfish-core/lib/power_equipment.hpp b/redfish-core/lib/power_equipment.hpp
 new file mode 100644
-index 0000000000..baba5474c5
+index 000000000..baba5474c
 --- /dev/null
 +++ b/redfish-core/lib/power_equipment.hpp
 @@ -0,0 +1,54 @@
@@ -688,7 +688,7 @@ index 0000000000..baba5474c5
 +
 +} // namespace redfish
 diff --git a/redfish-core/lib/power_supply.hpp b/redfish-core/lib/power_supply.hpp
-index 09f731b54e..837b3bda6a 100644
+index 0035b118f..e64e9e64d 100644
 --- a/redfish-core/lib/power_supply.hpp
 +++ b/redfish-core/lib/power_supply.hpp
 @@ -22,10 +22,12 @@ static constexpr std::array<std::string_view, 1> powerSupplyInterface = {
@@ -836,7 +836,7 @@ index 09f731b54e..837b3bda6a 100644
 +        [asyncResp, resetType](const boost::system::error_code& ec) {
 +        if (ec)
 +        {
-+            BMCWEB_LOG_ERROR << "D-Bus responses error: " << ec;
++            BMCWEB_LOG_ERROR("D-Bus responses error: {}", ec.value());
 +            if (ec.value() == boost::asio::error::invalid_argument)
 +            {
 +                messages::actionParameterNotSupported(asyncResp->res,
@@ -876,7 +876,7 @@ index 09f731b54e..837b3bda6a 100644
  }
  
  inline bool checkPowerSupplyId(const std::string& powerSupplyPath,
-@@ -345,111 +446,266 @@ inline void
+@@ -345,11 +446,11 @@ inline void
      getPowerSupplyLocation(const std::shared_ptr<bmcweb::AsyncResp>& asyncResp,
                             const std::string& service, const std::string& path)
  {
@@ -891,11 +891,7 @@ index 09f731b54e..837b3bda6a 100644
          if (ec)
          {
              if (ec.value() != EBADR)
-             {
--                BMCWEB_LOG_ERROR << "DBUS response error for Location "
-+                BMCWEB_LOG_ERROR << "DBUS response error for LocationCode "
-                                  << ec.value();
-                 messages::internalError(asyncResp->res);
+@@ -360,96 +461,251 @@ inline void
              }
              return;
          }
@@ -965,14 +961,15 @@ index 09f731b54e..837b3bda6a 100644
 +         const dbus::utility::MapperGetSubTreeResponse& subtree) {
 +        if (ec)
          {
--            BMCWEB_LOG_ERROR << "DBUS response error for DeratingFactor "
--                             << ec.value();
-+            if (ec.value() == EBADR)
+-            BMCWEB_LOG_ERROR("DBUS response error for DeratingFactor {}",
+-                             ec.value());
+-            messages::internalError(asyncResp->res);
++            if (ec.value() != EBADR)
 +            {
-+                return;
++                BMCWEB_LOG_ERROR("DBUS response error for EfficiencyPercent {}",
++                                 ec.value());
++                messages::internalError(asyncResp->res);
 +            }
-+            BMCWEB_LOG_ERROR << "respHandler DBus error " << ec.message();
-             messages::internalError(asyncResp->res);
 +            return;
          }
 -        return;
@@ -1091,25 +1088,25 @@ index 09f731b54e..837b3bda6a 100644
 +
 +        if (!success)
          {
--            BMCWEB_LOG_ERROR << "DBUS response error for EfficiencyPercent "
--                             << ec.value();
+-            BMCWEB_LOG_ERROR("DBUS response error for EfficiencyPercent {}",
+-                             ec.value());
              messages::internalError(asyncResp->res);
 +            return;
          }
 -        return;
 -    }
--
+ 
 -    if (subtree.empty())
 -    {
--        BMCWEB_LOG_DEBUG << "Can't find Power Supply Attributes!";
+-        BMCWEB_LOG_DEBUG("Can't find Power Supply Attributes!");
 -        return;
 -    }
- 
+-
 -    if (subtree.size() != 1)
 -    {
--        BMCWEB_LOG_ERROR
--            << "Unexpected number of paths returned by getSubTree: "
--            << subtree.size();
+-        BMCWEB_LOG_ERROR(
+-            "Unexpected number of paths returned by getSubTree: {}",
+-            subtree.size());
 -        messages::internalError(asyncResp->res);
 -        return;
 -    }
@@ -1299,7 +1296,7 @@ index 09f731b54e..837b3bda6a 100644
  } // namespace redfish
 diff --git a/redfish-core/lib/power_supply_metrics.hpp b/redfish-core/lib/power_supply_metrics.hpp
 new file mode 100644
-index 0000000000..29f9b309c4
+index 000000000..dab873000
 --- /dev/null
 +++ b/redfish-core/lib/power_supply_metrics.hpp
 @@ -0,0 +1,261 @@
@@ -1353,7 +1350,7 @@ index 0000000000..29f9b309c4
 +            {
 +                if (ec2.value() != EBADR)
 +                {
-+                    BMCWEB_LOG_ERROR << "DBUS response error for DeratingFactor";
++                    BMCWEB_LOG_ERROR("DBUS response error for Reading {}", ec2.value());
 +                    messages::internalError(asyncResp->res);
 +                }
 +                return;
@@ -1521,7 +1518,7 @@ index 0000000000..29f9b309c4
 +            {
 +                if (ec.value() != EBADR)
 +                {
-+                    BMCWEB_LOG_ERROR << "DBUS response error" << ec.value();
++                    BMCWEB_LOG_ERROR("DBUS response error {}", ec.value());
 +                    messages::internalError(asyncResp->res);
 +                }
 +                return;
@@ -1565,7 +1562,7 @@ index 0000000000..29f9b309c4
 +
 +} // namespace redfish
 diff --git a/redfish-core/lib/service_root.hpp b/redfish-core/lib/service_root.hpp
-index 6ae16c3780..b9578e47f4 100644
+index 6ae16c378..b9578e47f 100644
 --- a/redfish-core/lib/service_root.hpp
 +++ b/redfish-core/lib/service_root.hpp
 @@ -86,6 +86,8 @@ inline void handleServiceRootGetImpl(
