@@ -10,5 +10,3 @@ SyslogIdentifier=first-boot-set-psu
 Restart=on-failure
 RestartSec=20
 
-[Install]
-WantedBy=multi-user.target
