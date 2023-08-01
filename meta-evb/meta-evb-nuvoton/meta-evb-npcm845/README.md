@@ -34,6 +34,7 @@ For more product questions, please contact us at:
     + [ISP](#ISP)
     + [U-BOOT](#u-boot)
   * [Boot from eMMC](#boot-from-emmc)
+  * [Baudrate change](#baudrate-change)
 - [BMC Modules](#bmc-modules)
   * [GPIO](#gpio)
   * [UART](#uart)
@@ -346,6 +347,43 @@ setenv loadaddr 0x10000000
 setenv mmcboot 'setenv bootpart 2; setenv rootfs rofs-a; run setmmcargs; ext4load mmc 0:${bootpart} ${loadaddr} fitImage && bootm ${loadaddr}; echo Error loading kernel FIT image'
 run mmcboot
 ```
+
+## Baudrate change
+NPCM845 can be change the baudrate.
+If need to change it you should modify igps xml and uboot.
+
+* IGPS
+```
+Download IGPS 03.09.02 or newer.
+Base on your platform modify the BootBlockAndHeader_*.xml
+If you use npcm845 evb you need to modify BootBlockAndHeader_A1_EB.xml
+The xml file will show baud rate options and default is 115200.
+	<BinField>
+		<!-- baud rate options:
+		9600,14400,19200,38400,57600,115200,230400,380400,460800,921600
+		default is 115200.
+			-->
+		<name>BAUD_RATE</name>          
+		<config>
+			<offset>0x154</offset>       
+			<size>0x4</size> 
+		</config>
+		<content format='32bit'>115200</content>
+	</BinField>
+
+If you build openbmc, you can find this xml in
+tmp/work/evb_npcm845-openbmc-linux/obmc-phosphor-image/1.0-r0/recipe-sysroot-native/usr/share/npcm8xx-igps
+```
+
+* UBOOT
+```
+Please add a config
+CONFIG_SYS_SKIP_UART_INIT=y
+
+This config will skip uart init and followed BB xml setting.
+```
+
+
 
 # BMC Modules
 
