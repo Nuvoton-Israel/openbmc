@@ -29,7 +29,21 @@
   * [PSU Hot Plug Related Setting](#psu-hot-plug-related-setting)
   * [PSU Hot Plug Call flow](#psu-hot-plug-call-flow)
   * [PSU Hot Plug Test](#psu-hot-plug-test)
+- [PowerShelves Related Redfish Schema Implementation](#powershelves-related-redfish-schema-implementation)
+  * [Use chassis String as PowerDistributionId](#use-chassis-string-as-powerdistributionId)
+  * [Use a number String as PowerDistributionId](#use-a-number-string-as-[owerdistributionId)
 - [Reference](#reference)
+
+## Implementation List of Redfish API
+
+
+### Use chassis String as PowerDistributionId
+
+### /redfish/v1/Chassis/{ChassisId}/PowerSubsystem/PowerSupplies/{PowerSupplyId}
+
+### /redfish/v1/PowerEquipment/PowerShelves/{PowerDistributionId}/PowerSupplies/{PowerSupplyId}
+
+### Use number String as PowerDistributionId
 
 # Introduction
 
@@ -426,8 +440,97 @@ Using commands to echo 0/1 to gpio5 value to simulate gpio5 falling/rising.
 <img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_36_EM_PSU0_installed.png">
 
 
+# PowerShelves Related Redfish Schema Implementation
+For powershelf products, we refer latest(DSP2046_2023.1) Redfish schema to implement some Redfish API for powershelf. In these API, we are able to see the data/information of each PSUs which are installed in a powershelf.
+
+Please refer following commit of our implementations:
+
+https://github.com/Nuvoton-Israel/openbmc/commit/d13699f523596cb2d9ee028a134dbbd6f81da1a2  
+https://github.com/Nuvoton-Israel/openbmc/commit/76e8aabbe28e19830266fd0e6aa64126f92b485e  
+https://github.com/Nuvoton-Israel/openbmc/commit/a5aeabe697c1a9986a07744ccee4dbc0b890fa45  
+https://github.com/Nuvoton-Israel/openbmc/commit/4f5a4f49e3af5330c0e9a40f4ed0554f36a64cc0  
+https://github.com/Nuvoton-Israel/openbmc/commit/307512dd664353b21e4343fa22ca4c40c9fa7e69  
+
+
+## Implementation List of Redfish API
+The power supply is a major component of a powershelf.
+In DSP2046_2023.1, power supply data are collected and be linked to properties of PowerSubsystem and PowerEquipment.
+
+6.97 PowerSupply 1.5.1, descript PowerSupply schema:
+
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/PSU_redfish_1.PNG">
+
+The URLs and examples as following:
+### Use chassis String as PowerDistributionId
+
+### /redfish/v1/Chassis/{ChassisId}/PowerSubsystem/PowerSupplies/{PowerSupplyId}
+/redfish/v1/Chassis/{ChassisId}/PowerSubsystem
+
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/PSU_redfish_3.PNG">
+
+/redfish/v1/Chassis/{ChassisId}/PowerSubsystem/PowerSupplies
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/PSU_redfish_4.PNG">
+
+/redfish/v1/Chassis/{ChassisId}/PowerSubsystem/PowerSupplies/{PowerSupplyId}
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/PSU_redfish_5.PNG">
+
+### /redfish/v1/PowerEquipment/PowerShelves/{PowerDistributionId}/PowerSupplies/{PowerSupplyId}
+/redfish/v1/PowerEquipment
+
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/PSU_redfish_6.PNG">
+
+/redfish/v1/PowerEquipment/PowerShelves
+
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/PSU_redfish_7.PNG">
+
+/redfish/v1/PowerEquipment/PowerShelves/{PowerDistributionId}
+
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/PSU_redfish_8.PNG">
+
+/redfish/v1/PowerEquipment/PowerShelves/{PowerDistributionId}/Metrics
+
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/PSU_redfish_9.PNG">
+
+/redfish/v1/PowerEquipment/PowerShelves/{PowerDistributionId}/PowerSupplies
+
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/PSU_redfish_10.PNG">
+
+/redfish/v1/PowerEquipment/PowerShelves/{PowerDistributionId}/PowerSupplies/{PowerSupplyId}
+
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/PSU_redfish_11.PNG">
+
+/redfish/v1/PowerEquipment/PowerShelves/{PowerDistributionId}/PowerSupplies/{PowerSupplyId}/Metrics
+
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/PSU_redfish_16.PNG">
+
+### Use a number String as PowerDistributionId
+On DMTF official web page, there is an example that uses a number string as PowerDistributionId. We also refer it to implement the following URLs:
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/PSU_redfish_2.PNG">
+
+redfish/v1/PowerEquipment/PowerShelves
+
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/PSU_redfish_12.PNG">
+
+redfish/v1/PowerEquipment/PowerShelves/{PowerDistributionId}
+
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/PSU_redfish_13.PNG">
+
+redfish/v1/PowerEquipment/PowerShelves/{PowerDistributionId}/Metrics
+
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/PSU_redfish_13.PNG">
+
+redfish/v1/PowerEquipment/PowerShelves/{PowerDistributionId}/PowerSupplies/{PowerSupplyId}
+
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/PSU_redfish_14.PNG">
+
+redfish/v1/PowerEquipment/PowerShelves/{PowerDistributionId}/PowerSupplies/{PowerSupplyId}/Metrics
+
+<img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/PSU_redfish_17.PNG">
+
 # Reference
-###  [phosphor-power](https://github.com/openbmc/phosphor-power)
-###  [phosphor-logging](https://github.com/openbmc/phosphor-logging)
+### [phosphor-power](https://github.com/openbmc/phosphor-power)
+### [phosphor-logging](https://github.com/openbmc/phosphor-logging)
 ### [phosphor-gpio-monitor](https://github.com/openbmc/phosphor-gpio-monitor)
 ### [phosphor-bmc-code-mgmt](https://github.com/openbmc/phosphor-bmc-code-mgmt)
+### Redfish Resource and Schema Guide - DSP2046_2023_1
+### [openbmc-bmcweb GitHub](https://github.com/openbmc/bmcweb/tree/master)
