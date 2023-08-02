@@ -1,0 +1,114 @@
+From 410c21b44da41633373cc64882be546b1c64e0ef Mon Sep 17 00:00:00 2001
+From: Monte Lee <Monte_Lee@wiwynn.com>
+Date: Tue, 7 Mar 2023 13:57:48 +0800
+Subject: [PATCH] Add DVO slew rate and remove smb11 default pinctrl
+
+---
+ .../dts/nuvoton/nuvoton-common-npcm8xx.dtsi   |  6 +-
+ .../nuvoton/nuvoton-npcm845-pincfg-evb.dtsi   | 60 +++++++++++++++++++
+ 2 files changed, 65 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi b/arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi
+index 62fbb1a9d281..81920368b83d 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi
+@@ -739,7 +739,7 @@
+ 				clock-frequency = <100000>;
+ 				interrupts = <GIC_SPI 139 IRQ_TYPE_LEVEL_HIGH>;
+ 				pinctrl-names = "default";
+-				pinctrl-0 = <&smb11_pins>;
++				pinctrl-0 = <>;
+ 				nuvoton,sys-mgr = <&gcr>;
+ 				status = "disabled";
+ 			};
+@@ -1171,6 +1171,10 @@
+ 			groups = "smb23";
+ 			function = "smb23";
+ 		};
++		smb23b_pins: smb23b-pins {
++			groups = "smb23b";
++			function = "smb23b";
++		};
+ 		smb4d_pins: smb4d-pins {
+ 			groups = "smb4d";
+ 			function = "smb4d";
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-pincfg-evb.dtsi b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-pincfg-evb.dtsi
+index c5fdac07984e..c61d1f699617 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-pincfg-evb.dtsi
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-pincfg-evb.dtsi
+@@ -43,6 +43,62 @@
+ 			pins = "GPIO109/SG1_MDIO";
+ 			slew-rate = <1>;
+ 		};
++		pin110_slew: pin110-slew {
++			pins = "GPIO110/RG2_TXD0/DDRV0/R3_TXD0";
++			slew-rate = <1>;
++		};
++		pin111_slew: pin111-slew {
++			pins = "GPIO111/RG2_TXD1/DDRV1/R3_TXD1";
++			slew-rate = <1>;
++		};
++		pin112_slew: pin112-slew {
++			pins = "GPIO112/RG2_TXD2/DDRV2";
++			slew-rate = <1>;
++		};
++		pin113_slew: pin113-slew {
++			pins = "GPIO113/RG2_TXD3/DDRV3";
++			slew-rate = <1>;
++		};
++		pin208_slew: pin208-slew {
++			pins = "GPIO208/RG2_TXC/DVCK";
++			slew-rate = <1>;
++		};
++		pin209_slew: pin209-slew {
++			pins = "GPIO209/RG2_TXCTL/DDRV4/R3_TXEN";
++			slew-rate = <1>;
++		};
++		pin210_slew: pin210-slew {
++			pins = "GPIO210/RG2_RXD0/DDRV5/R3_RXD0";
++			slew-rate = <1>;
++		};
++		pin211_slew: pin211-slew {
++			pins = "GPIO211/RG2_RXD1/DDRV6/R3_RXD1";
++			slew-rate = <1>;
++		};
++		pin212_slew: pin212-slew {
++			pins = "GPIO212/RG2_RXD2/DDRV7/R3_RXD2";
++			slew-rate = <1>;
++		};
++		pin213_slew: pin213-slew {
++			pins = "GPIO213/RG2_RXD3/DDRV8/R3_OEN";
++			slew-rate = <1>;
++		};
++		pin214_slew: pin214-slew {
++			pins = "GPIO214/RG2_RXC/DDRV9/R3_CK";
++			slew-rate = <1>;
++		};
++		pin215_slew: pin215-slew {
++			pins = "GPIO215/RG2_RXCTL/DDRV10/R3_CRSDV";
++			slew-rate = <1>;
++		};
++		pin216_slew: pin216-slew {
++			pins = "GPIO216/RG2_MDC/DDRV11";
++			slew-rate = <1>;
++		};
++		pin217_slew: pin217-slew {
++			pins = "GPIO217/RG2_MDIO/DVHSYNC";
++			slew-rate = <1>;
++		};
+ 		pin240_slew: pin240-slew {
+ 			pins = "GPIO240/I3C0_SCL";
+ 			slew-rate = <1>;
+@@ -75,5 +131,9 @@
+ 			pins = "GPIO247/I3C3_SDA";
+ 			slew-rate = <1>;
+ 		};
++		pin250_slew: pin250-slew {
++			pins = "GPIO250/RG2_REFCK/DVVSYNC";
++			slew-rate = <1>;
++		};
+ 	};
+ };
+-- 
+2.17.1
+

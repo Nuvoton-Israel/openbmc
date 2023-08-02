@@ -111,6 +111,7 @@
             "EntityId": 7,
             "EntityInstance": 3,
             "Name": "Temp_Inlet_SCM",
+            "PollRate": 1.0,
             "Thresholds": [
                 {
                     "Direction": "greater than",
@@ -129,7 +130,7 @@
         }
     ],
     "Name": "Aurea",
-    "Probe": "xyz.openbmc_project.FruDevice({'BOARD_PRODUCT_NAME': 'Aurea|M1110'})",
+    "Probe": "xyz.openbmc_project.FruDevice({'BOARD_PRODUCT_NAME': 'Aurea|M1110|M1120'})",
     "Type": "Board",
     "xyz.openbmc_project.Inventory.Decorator.Asset": {
         "Manufacturer": "$BOARD_MANUFACTURER",

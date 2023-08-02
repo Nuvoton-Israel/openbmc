@@ -1,0 +1,32 @@
+From 50ecbb80be9ba64c2e46bcad8c759106c823428d Mon Sep 17 00:00:00 2001
+From: Monte Lee <Monte_Lee@wiwynn.com>
+Date: Fri, 26 May 2023 10:25:03 +0800
+Subject: [PATCH] Enable DVO HSYNC, DDC i2c port and don't reset GPIO1/2 group
+
+---
+ board/nuvoton/arbel/arbel.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/board/nuvoton/arbel/arbel.c b/board/nuvoton/arbel/arbel.c
+index a674757064..bc46415571 100644
+--- a/board/nuvoton/arbel/arbel.c
++++ b/board/nuvoton/arbel/arbel.c
+@@ -77,6 +77,15 @@ int board_init(void)
+ 	arbel_clk_init();
+ 	arbel_eth_init();
+ 
++	/* Set INTCR [27]=1b for HSYNC enable */
++	setbits_le32(0xF080003C, BIT(27));
++	/* Set MFSEL4 [30:29]=10b, SMB11 for Graphics DDC port */
++	clrbits_le32(0xF080026C, BIT(29));
++	setbits_le32(0xF080026C, BIT(30));
++	/* Clear GPIOM1/GPIOM2 reset bit */
++	clrbits_le32(0xF0801044, BIT(17));
++	clrbits_le32(0xF0801044, BIT(18));
++
+ 	return 0;
+ }
+ 
+-- 
+2.17.1
+

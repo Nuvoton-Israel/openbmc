@@ -1,5 +1,5 @@
 MACHINE ??= "scm-npcm845"
-DISTRO ?= "openbmc-phosphor"
+DISTRO ?= "arbel-scm-entity"
 PACKAGE_CLASSES ?= "package_ipk"
 SANITY_TESTED_DISTROS:append ?= " *"
 EXTRA_IMAGE_FEATURES ?= "debug-tweaks"

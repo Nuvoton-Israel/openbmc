@@ -3,6 +3,7 @@ FILESEXTRAPATHS:prepend:scm-npcm845 := "${THISDIR}/${PN}:"
 SRC_URI:append:scm-npcm845 = " file://aurea-scm.json"
 SRC_URI:append:scm-npcm845 = " file://aurea-hpm.json"
 SRC_URI:append:scm-npcm845 = " file://blacklist.json"
+SRC_URI:append:m1120-c2195 = " file://blacklist-m1120.json"
 
 do_install:append:scm-npcm845() {
     rm -f ${D}/usr/share/entity-manager/configurations/*.json
@@ -13,4 +14,9 @@ do_install:append:scm-npcm845() {
         ${D}${datadir}/entity-manager/configurations/aurea-scm.json
     install -m 0644 -D ${WORKDIR}/aurea-hpm.json \
         ${D}${datadir}/entity-manager/configurations/aurea-hpm.json
+}
+
+do_install:append:m1120-c2195() {
+    install -m 0644 ${WORKDIR}/blacklist-m1120.json \
+        ${D}${datadir}/entity-manager/blacklist.json
 }

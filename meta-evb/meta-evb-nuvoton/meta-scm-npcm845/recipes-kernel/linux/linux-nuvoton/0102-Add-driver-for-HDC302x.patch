@@ -1,0 +1,293 @@
+From cd310d183a1e9d332e1e2d84886587571fcdcd01 Mon Sep 17 00:00:00 2001
+From: Angela TH Lin <angela_th_lin@wiwynn.com>
+Date: Tue, 7 Mar 2023 11:22:55 +0800
+Subject: [PATCH] Add driver for HDC302x
+
+---
+ drivers/hwmon/Kconfig   |  11 ++
+ drivers/hwmon/Makefile  |   1 +
+ drivers/hwmon/hdc302x.c | 240 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 252 insertions(+)
+ create mode 100644 drivers/hwmon/hdc302x.c
+
+diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
+index e5866419261c..50c73202bcbd 100644
+--- a/drivers/hwmon/Kconfig
++++ b/drivers/hwmon/Kconfig
+@@ -683,6 +683,17 @@ config SENSORS_GPIO_FAN
+ 	  This driver can also be built as a module. If so, the module
+ 	  will be called gpio-fan.
+ 
++config SENSORS_HDC302X
++	tristate "Texas Instruments HDC3020 and compatibles"
++	depends on I2C
++	select CRC8
++	help
++	  If you say yes here you get support for Texas Instruments HDC3020,
++	  HDC3021, and HDC3022 relative humidity and temperature sensor chips.
++
++	  This driver can also be built as a module. If so, the module
++	  will be called hdc302x.
++
+ config SENSORS_HIH6130
+ 	tristate "Honeywell Humidicon HIH-6130 humidity/temperature sensor"
+ 	depends on I2C
+diff --git a/drivers/hwmon/Makefile b/drivers/hwmon/Makefile
+index a4eee1103b9c..e9647a737275 100644
+--- a/drivers/hwmon/Makefile
++++ b/drivers/hwmon/Makefile
+@@ -80,6 +80,7 @@ obj-$(CONFIG_SENSORS_GL518SM)	+= gl518sm.o
+ obj-$(CONFIG_SENSORS_GL520SM)	+= gl520sm.o
+ obj-$(CONFIG_SENSORS_GSC)	+= gsc-hwmon.o
+ obj-$(CONFIG_SENSORS_GPIO_FAN)	+= gpio-fan.o
++obj-$(CONFIG_SENSORS_HDC302X)	+= hdc302x.o
+ obj-$(CONFIG_SENSORS_HIH6130)	+= hih6130.o
+ obj-$(CONFIG_SENSORS_ULTRA45)	+= ultra45_env.o
+ obj-$(CONFIG_SENSORS_I5500)	+= i5500_temp.o
+diff --git a/drivers/hwmon/hdc302x.c b/drivers/hwmon/hdc302x.c
+new file mode 100644
+index 000000000000..ed5fe03a96d9
+--- /dev/null
++++ b/drivers/hwmon/hdc302x.c
+@@ -0,0 +1,240 @@
++/*
++ * Driver for the Texas Instruments HDC302x
++ * relative humidity and temperature sensor.
++ */
++
++#include <linux/crc8.h>
++#include <linux/device.h>
++#include <linux/err.h>
++#include <linux/hwmon.h>
++#include <linux/hwmon-sysfs.h>
++#include <linux/i2c.h>
++#include <linux/module.h>
++#include <linux/mutex.h>
++#include <linux/of.h>
++
++/* Command codes */
++#define HDC302X_CMD_MEASURE_0_MSB 0x24
++#define HDC302X_CMD_MEASURE_0_LSB 0x00
++
++#define HDC302X_CMD_LEN 2
++#define HDC302X_WORD_LEN 2
++#define HDC302X_RESP_LEN 6
++#define HDC302X_CRC8_POLYNOMIAL 0x31
++
++#define CONVERSION_FACTOR_TO_MILLIS 1000
++
++DECLARE_CRC8_TABLE(hdc302x_crc8_table);
++
++struct hdc302x_data {
++	struct i2c_client *client;
++	struct mutex update_lock;
++	u16 temperature;
++	u16 humidity;
++};
++
++static int hdc302x_read_values(struct hdc302x_data *data)
++{
++	u8 crc;
++	u16 t_raw, rh_raw;
++	int ret = 0;
++	u8 cmd[HDC302X_CMD_LEN] = { HDC302X_CMD_MEASURE_0_MSB,
++				    HDC302X_CMD_MEASURE_0_LSB };
++	u8 raw_data[HDC302X_RESP_LEN];
++	struct i2c_client *client = data->client;
++	struct i2c_msg msgs[2] = {
++		{
++			.addr = client->addr,
++			.flags = 0,
++			.len = HDC302X_CMD_LEN,
++			.buf = cmd,
++		},
++		{
++			.addr = client->addr,
++			.flags = I2C_M_RD,
++			.len = HDC302X_RESP_LEN,
++			.buf = raw_data,
++		},
++	};
++
++	mutex_lock(&data->update_lock);
++	ret = i2c_transfer(client->adapter, msgs, 2);
++	if (ret < 0)
++		goto err_unlock;
++
++	t_raw = raw_data[0];
++	t_raw = t_raw << 8 | raw_data[1];
++	rh_raw = raw_data[3];
++	rh_raw = rh_raw << 8 | raw_data[4];
++
++	crc = crc8(hdc302x_crc8_table, &raw_data[0], HDC302X_WORD_LEN,
++		   CRC8_INIT_VALUE);
++	if (crc != raw_data[2]) {
++		dev_err(&client->dev,
++			"Error checking of the temperature data failed\n");
++		ret = -EIO;
++		goto err_unlock;
++	}
++
++	crc = crc8(hdc302x_crc8_table, &raw_data[3], HDC302X_WORD_LEN,
++		   CRC8_INIT_VALUE);
++	if (crc != raw_data[5]) {
++		dev_err(&client->dev,
++			"Error checking of the humidity data failed\n");
++		ret = -EIO;
++		goto err_unlock;
++	}
++
++	/*
++	 * Link of the data sheet (Rev. C):
++	 * https://www.ti.com/lit/ds/symlink/hdc3020.pdf
++	 * 
++	 * As stated in section 8.3.3 (p. 13) of the data sheet,
++	 * the temperature conversion formula is:
++	 * -45 + 175 * [t_raw / (2^16 - 1)] = t_real (in degrees Celsius)
++	 * 
++	 * According to the kernel documentation, the unit of the temperature
++	 * is millidegree Celsius, and we have to convert the unit before
++	 * calculating the real input value to prevent precision loss, so
++	 * the formula becomes:
++	 * [-45 + 175 * t_raw / (2^16 - 1)] * 1000
++	 * = -45 * 1000 + 175 * (t_raw * 1000) / (2^16 - 1)
++	 * = t_real (in millidegrees Celsius)
++	 * 
++	 * Similarly, the relative humidity conversion formula stated in the
++	 * data sheet is:
++	 * 100 * rh_raw / (2^16 - 1) = rh_real (in percent)
++	 * After converting to milli-percent, the formula becomes:
++	 * 100 * (rh_raw * 1000) / (2^16 - 1) = rh_real (in milli-percent)
++	 */
++	data->temperature = -45 * CONVERSION_FACTOR_TO_MILLIS +
++			    175 * ((u32)t_raw * CONVERSION_FACTOR_TO_MILLIS) /
++				    (int_pow(2, 16) - 1);
++	data->humidity = 100 * ((u32)rh_raw * CONVERSION_FACTOR_TO_MILLIS) /
++			 (int_pow(2, 16) - 1);
++	ret = 0;
++
++err_unlock:
++	mutex_unlock(&data->update_lock);
++	return ret;
++}
++
++static umode_t hdc302x_is_visible(const void *data,
++				  enum hwmon_sensor_types type, u32 attr,
++				  int channel)
++{
++	switch (type) {
++	case hwmon_temp:
++	case hwmon_humidity:
++		return 0444;
++	default:
++		return 0;
++	}
++}
++
++static int hdc302x_read_temp(struct hdc302x_data *data, long *val)
++{
++	int res;
++
++	res = hdc302x_read_values(data);
++	if (res < 0)
++		return res;
++
++	*val = data->temperature;
++	return 0;
++}
++
++static int hdc302x_read_humidity(struct hdc302x_data *data, long *val)
++{
++	int res;
++
++	res = hdc302x_read_values(data);
++	if (res < 0)
++		return res;
++
++	*val = data->humidity;
++	return 0;
++}
++
++static int hdc302x_read(struct device *dev, enum hwmon_sensor_types type,
++			u32 attr, int channel, long *val)
++{
++	struct hdc302x_data *data = dev_get_drvdata(dev);
++
++	switch (type) {
++	case hwmon_temp:
++		return hdc302x_read_temp(data, val);
++	case hwmon_humidity:
++		return hdc302x_read_humidity(data, val);
++	default:
++		return -EOPNOTSUPP;
++	}
++}
++
++static const struct hwmon_ops hdc302x_hwmon_ops = {
++	.is_visible = hdc302x_is_visible,
++	.read = hdc302x_read,
++};
++
++static const struct hwmon_channel_info *hdc302x_info[] = {
++	HWMON_CHANNEL_INFO(humidity, HWMON_H_INPUT),
++	HWMON_CHANNEL_INFO(temp, HWMON_T_INPUT),
++	NULL
++};
++
++static const struct hwmon_chip_info hdc302x_chip_info = {
++	.ops = &hdc302x_hwmon_ops,
++	.info = hdc302x_info,
++};
++
++static int hdc302x_probe(struct i2c_client *client)
++{
++	struct device *dev = &client->dev;
++	struct device *hwmon_dev;
++	struct hdc302x_data *data;
++
++	data = devm_kzalloc(dev, sizeof(struct hdc302x_data), GFP_KERNEL);
++	if (!data)
++		return -ENOMEM;
++
++	data->client = client;
++	mutex_init(&data->update_lock);
++
++	crc8_populate_msb(hdc302x_crc8_table, HDC302X_CRC8_POLYNOMIAL);
++
++	hwmon_dev = devm_hwmon_device_register_with_info(
++		dev, client->name, data, &hdc302x_chip_info, NULL);
++	if (IS_ERR(hwmon_dev))
++		return PTR_ERR(hwmon_dev);
++
++	dev_info(dev, "Found %s chip\n", client->name);
++
++	return 0;
++}
++
++static const struct i2c_device_id hdc302x_id[] = {
++	{ "hdc3020", 0 },
++	{}
++};
++MODULE_DEVICE_TABLE(i2c, hdc302x_id);
++
++static const struct of_device_id __maybe_unused hdc302x_of_match[] = {
++	{ .compatible = "ti,hdc3020" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, hdc302x_of_match);
++
++static struct i2c_driver hdc302x_driver = {
++	.driver = {
++		.name		= "hdc302x",
++		.of_match_table = of_match_ptr(hdc302x_of_match),
++	},
++	.probe_new	= hdc302x_probe,
++	.id_table	= hdc302x_id,
++};
++
++module_i2c_driver(hdc302x_driver);
++
++MODULE_AUTHOR("Angela TH Lin <angela_th_lin@wiwynn.com>");
++MODULE_DESCRIPTION("Texas Instruments HDC302x relative humidity and temperature sensor driver");
++MODULE_LICENSE("GPL");
+\ No newline at end of file

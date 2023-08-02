@@ -1,0 +1,27 @@
+From a7b3d0123d5c6b014a88793a17c32b2197f61008 Mon Sep 17 00:00:00 2001
+From: Brian Ma <chma0@nuvoton.com>
+Date: Wed, 2 Aug 2023 16:31:13 +0800
+Subject: [PATCH] uboot m1120 dts makefile
+
+Signed-off-by: Brian Ma <chma0@nuvoton.com>
+---
+ arch/arm/dts/Makefile | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/dts/Makefile b/arch/arm/dts/Makefile
+index 13618a99aa..ff0886f967 100644
+--- a/arch/arm/dts/Makefile
++++ b/arch/arm/dts/Makefile
+@@ -1035,7 +1035,8 @@ dtb-$(CONFIG_TARGET_PRESIDIO_ASIC) += ca-presidio-engboard.dtb
+ dtb-$(CONFIG_TARGET_ARBEL_EVB) += \
+ 	nuvoton-npcm845-evb.dtb \
+ 	nuvoton-npcm845-meta-evb.dtb \
+-	nuvoton-npcm845-scm.dtb
++	nuvoton-npcm845-scm.dtb \
++	m1120.dtb
+ 
+ dtb-$(CONFIG_ARCH_NPCM7xx) += \
+ 		nuvoton-npcm750-buv.dtb \
+-- 
+2.34.1
+

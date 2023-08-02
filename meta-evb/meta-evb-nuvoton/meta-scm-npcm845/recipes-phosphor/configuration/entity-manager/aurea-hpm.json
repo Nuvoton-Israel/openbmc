@@ -898,6 +898,7 @@
             "EntityInstance": 0,
             "Name": "Temp_Inlet_1",
             "PowerState": "Off",
+            "PollRate": 1.0,
             "Thresholds": [
                 {
                     "Direction": "greater than",
@@ -921,6 +922,7 @@
             "EntityInstance": 0,
             "Name": "Temp_Inlet_2",
             "PowerState": "Off",
+            "PollRate": 1.0,
             "Thresholds": [
                 {
                     "Direction": "greater than",
@@ -944,6 +946,7 @@
             "EntityInstance": 0,
             "Name": "Temp_Inlet_3",
             "PowerState": "Off",
+            "PollRate": 1.0,
             "Thresholds": [
                 {
                     "Direction": "greater than",
@@ -968,6 +971,7 @@
             "Name": "CP_S2_AMB_TEMP",
             "Name1": "CP_S2_FPGA_TEMP",
             "PowerState": "On",
+            "PollRate": 1.0,
             "Thresholds": [
                 {
                     "Direction": "greater than",
@@ -996,6 +1000,7 @@
             "pin_Name": "CP_S2_POWER",
             "EntityId": 8,
             "EntityInstance": 13,
+            "PollRate": 1.0,
             "Name": "CP_S2_HSC",
             "Type": "pmbus"
         },
@@ -1004,6 +1009,7 @@
             "Bus": 34,
             "EntityId": 11,
             "EntityInstance": 0,
+            "PollRate": 1.0,
             "Name": "Temp_OCP_NIC",
             "Reg": "0x01",
             "RegWidth": 1,
@@ -1032,6 +1038,7 @@
             "EntityId": 10,
             "EntityInstance": 16,
             "PowerState": "Off",
+            "PollRate": 1.0,
             "pin_Name": "HSC0 Input Power",
             "vin_Name": "HSC0 Input Volt",
             "iout1_Name": "HSC0 Output Curr",
@@ -1510,6 +1517,7 @@
             "iout2_Name": "VR_SOC_CUR",
             "EntityId": 3,
             "EntityInstance": 0,
+            "PollRate": 1.0,
             "Name": "vrm",
             "Type": "pmbus"
         },
@@ -1656,6 +1664,7 @@
             "iout2_Name": "VR_VDDIO_CUR",
             "EntityId": 3,
             "EntityInstance": 1,
+            "PollRate": 1.0,
             "Name": "vrm1",
             "Type": "pmbus"
         },
@@ -1731,6 +1740,7 @@
             "iout1_Name": "VR_SUS_CUR",
             "EntityId": 3,
             "EntityInstance": 4,
+            "PollRate": 1.0,
             "Name": "vrm2",
             "Type": "pmbus"
         },
