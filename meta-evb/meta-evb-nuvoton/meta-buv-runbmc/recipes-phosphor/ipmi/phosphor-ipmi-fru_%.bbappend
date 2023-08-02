@@ -6,11 +6,8 @@ FILESEXTRAPATHS:prepend:buv-runbmc := "${THISDIR}/${PN}:"
 DEPENDS:append:buv-runbmc= " \
     ${@entity_enabled(d, '', 'buv-runbmc-yaml-config')}"
 
-
-EXTRA_OECONF:buv-runbmc = " \
-    ${@entity_enabled(d, '', 'YAML_GEN=${STAGING_DIR_HOST}${datadir}/buv-runbmc-yaml-config/ipmi-fru-read.yaml')} \
-    ${@entity_enabled(d, '', 'PROP_YAML=${STAGING_DIR_HOST}${datadir}/buv-runbmc-yaml-config/ipmi-extra-properties.yaml')} \
-    "
+IPMI_FRU_YAML:buv-runbmc = "${@entity_enabled(d, '', '${STAGING_DIR_HOST}${datadir}/buv-runbmc-yaml-config/ipmi-fru-read.yaml')}"
+IPMI_FRU_PROP_YAML:buv-runbmc = "${@entity_enabled(d, '', '${STAGING_DIR_HOST}${datadir}/buv-runbmc-yaml-config/ipmi-extra-properties.yaml')}"
 
 EEPROM_NAMES = "motherboard bmc"
 
