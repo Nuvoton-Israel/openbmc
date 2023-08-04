@@ -1,0 +1,28 @@
+From 1a99e3e1f96840b7d6edcb854d925e421c0722f7 Mon Sep 17 00:00:00 2001
+From: Brian Ma <chma0@nuvoton.com>
+Date: Fri, 4 Aug 2023 13:28:41 +0800
+Subject: [PATCH] Add smb23b pin define
+
+Signed-off-by: Brian Ma <chma0@nuvoton.com>
+---
+ arch/arm/dts/nuvoton-common-npcm8xx.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/dts/nuvoton-common-npcm8xx.dtsi b/arch/arm/dts/nuvoton-common-npcm8xx.dtsi
+index 3ac1601b97..9d79d522a9 100644
+--- a/arch/arm/dts/nuvoton-common-npcm8xx.dtsi
++++ b/arch/arm/dts/nuvoton-common-npcm8xx.dtsi
+@@ -968,6 +968,10 @@
+ 			groups = "smb23";
+ 			function = "smb23";
+ 		};
++		smb23b_pins: smb23b-pins {
++			groups = "smb23b";
++			function = "smb23b";
++		};
+ 		smb4d_pins: smb4d-pins {
+ 			groups = "smb4d";
+ 			function = "smb4d";
+-- 
+2.34.1
+

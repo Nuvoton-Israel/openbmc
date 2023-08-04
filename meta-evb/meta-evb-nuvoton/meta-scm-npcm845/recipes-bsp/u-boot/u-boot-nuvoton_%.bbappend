@@ -12,4 +12,5 @@ SRC_URI:append:scm-npcm845 = " \
 SRC_URI:append:m1120-c2195 = " file://m1120.dts;subdir=git/arch/arm/dts/"
 SRC_URI:append:m1120-c2195 = " file://m1120-pincfg.dtsi;subdir=git/arch/arm/dts/"
 SRC_URI:append:m1120-c2195 = " file://0001-uboot-m1120-dts-makefile.patch"
+SRC_URI:append:m1120-c2195 = " file://0002-Add-smb23b-pin-define.patch"
 SRC_URI:append:m1120-c2195 = " file://0012-Enable-DVO-HSYNC-DDC-i2c-port-and-don-t-reset-GPIO1-.patch"

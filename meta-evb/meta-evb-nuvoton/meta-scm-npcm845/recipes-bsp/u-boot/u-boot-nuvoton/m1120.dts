@@ -145,6 +145,7 @@
 };
 
 &i2c23 { //MM1
+	pinctrl-0 = <&smb23b_pins>;
 	status = "okay";
 };
 
@@ -153,6 +154,7 @@
 };
 
 &i2c3 { //MM3
+	pinctrl-0 = <&smb3c_pins>;
 	status = "okay";
 };
 

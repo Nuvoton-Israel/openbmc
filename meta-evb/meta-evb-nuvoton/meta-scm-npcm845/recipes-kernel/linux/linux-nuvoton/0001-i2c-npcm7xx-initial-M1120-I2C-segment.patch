@@ -1,0 +1,29 @@
+From 1caaaa031099c62febe4e743af3f5b0704009259 Mon Sep 17 00:00:00 2001
+From: Brian Ma <chma0@nuvoton.com>
+Date: Fri, 4 Aug 2023 11:56:15 +0800
+Subject: [PATCH] i2c-npcm7xx: initial M1120 I2C segment
+
+Update segment initail value for M1120.
+segments: SMB1C, SMB3C, SMB4B.
+
+Signed-off-by: Brian Ma <chma0@nuvoton.com>
+---
+ drivers/i2c/busses/i2c-npcm7xx.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/i2c/busses/i2c-npcm7xx.c b/drivers/i2c/busses/i2c-npcm7xx.c
+index a35ae8fe21b6..c43259c3f821 100644
+--- a/drivers/i2c/busses/i2c-npcm7xx.c
++++ b/drivers/i2c/busses/i2c-npcm7xx.c
+@@ -395,7 +395,7 @@ static const struct npcm_i2c_data npxm7xx_i2c_data = {
+ 
+ static const struct npcm_i2c_data npxm8xx_i2c_data = {
+ 	.fifo_size = 32,
+-	.segctl_init_val = 0x9333F000,
++	.segctl_init_val = 0x9333F188,
+ 	.txf_sts_tx_bytes = GENMASK(5, 0),
+ 	.rxf_sts_rx_bytes = GENMASK(5, 0),
+ 	.rxf_ctl_last_pec = BIT(7),
+-- 
+2.34.1
+
