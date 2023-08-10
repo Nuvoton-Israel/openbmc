@@ -1,4 +1,4 @@
-From bf77fa0078b9b7cdef3bea481b93eb3e8fe50371 Mon Sep 17 00:00:00 2001
+From 26f848cadeb656e8ca9659f6b1fff601d49a3493 Mon Sep 17 00:00:00 2001
 From: Joseph Liu <kwliu@nuvoton.com>
 Date: Thu, 25 Mar 2021 13:12:00 +0800
 Subject: [PATCH] driver: misc: seven segment display/gpio driver
@@ -17,10 +17,10 @@ Signed-off-by: Allen Kang <jhkang@nuvoton.com>
  create mode 100644 drivers/misc/seven_seg_gpio.c
 
 diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
-index 90d113c3f6fe..1100446bc02c 100644
+index e7eab4e70611..94c02e26367d 100644
 --- a/drivers/misc/Kconfig
 +++ b/drivers/misc/Kconfig
-@@ -555,6 +555,22 @@ config NPCM750_ECE
+@@ -507,6 +507,22 @@ config NPCM750_ECE
  	help
  	  Enable Nuvoton Encoding and Compression Engine.
  
@@ -44,13 +44,13 @@ index 90d113c3f6fe..1100446bc02c 100644
  source "drivers/misc/eeprom/Kconfig"
  source "drivers/misc/cb710/Kconfig"
 diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
-index 1cc4c1c90860..09f4a7ef96ba 100644
+index 2db97ac01a4f..07a0c17d9195 100644
 --- a/drivers/misc/Makefile
 +++ b/drivers/misc/Makefile
-@@ -70,3 +70,5 @@ obj-$(CONFIG_NPCM7XX_JTAG_MASTER) += npcm7xx-jtag-master.o
- obj-$(CONFIG_NPCM8XX_JTAG_MASTER) += npcm8xx-jtag-master.o
- obj-$(CONFIG_NPCM750_VCD)	+= npcm750_vcd.o
- obj-$(CONFIG_NPCM750_ECE)	+= npcm750_ece.o
+@@ -65,3 +65,5 @@ obj-$(CONFIG_NPCM7XX_JTAG_MASTER)	+= npcm7xx-jtag-master.o
+ obj-$(CONFIG_NPCM8XX_JTAG_MASTER)       += npcm8xx-jtag-master.o
+ obj-$(CONFIG_NPCM750_VCD) += npcm750_vcd.o
+ obj-$(CONFIG_NPCM750_ECE) += npcm750_ece.o
 +obj-$(CONFIG_SEVEN_SEGMENT_DISPLAY)    += seven_seg_disp.o
 +obj-$(CONFIG_SEVEN_SEGMENT_GPIO) += seven_seg_gpio.o
 diff --git a/drivers/misc/seven_seg_disp.c b/drivers/misc/seven_seg_disp.c
