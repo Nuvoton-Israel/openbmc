@@ -3,6 +3,7 @@
 set -e
 log_file="/var/log/program_edid.log"
 
+echo "Starting program EDID... $(date)" > "$log_file"
 if [ ! -f "$1" ]; then
     echo "$1 does not exist." >> "$log_file"
     exit 1
