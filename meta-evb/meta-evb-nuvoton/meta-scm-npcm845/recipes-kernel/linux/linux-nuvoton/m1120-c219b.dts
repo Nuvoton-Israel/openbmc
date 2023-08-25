@@ -6,6 +6,7 @@
 #include "nuvoton-npcm845.dtsi"
 #include "nuvoton-npcm845-pincfg-evb.dtsi"
 #include <dt-bindings/thermal/thermal.h>
+#include <dt-bindings/i2c/i2c.h>
 
 / {
 	model = "Nuvoton npcm845 scm (Device Tree)";
@@ -685,19 +686,95 @@
 			"","","","","","","","";
 		};
 	};
+
+	i2cmux3 {
+		compatible = "nuvoton,i2c-mux-npcm";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		status = "okay";
+		i2c-parent = <&i2c3>;
+		syscon = <&gcr>;
+		nuvoton,i2c-number = <3>;
+		i2c_segment_number = <2>;
+
+		i2c3@2 {
+			reg = <0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+
+			sbrmi@3c {
+				compatible = "amd,sbrmi";
+				reg = <0x3c>;
+				status = "okay";
+			};
+
+			sbtsi@4c {
+				compatible = "amd,sbtsi";
+				reg = <0x4c>;
+				status = "okay";
+			};
+		};
+	};
+	i2cmux1 {
+		compatible = "nuvoton,i2c-mux-npcm";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		status = "okay";
+		i2c-parent = <&i2c1>;
+		syscon = <&gcr>;
+		nuvoton,i2c-number = <1>;
+		i2c_segment_number = <2>;
+
+		i2c1@2 {
+			reg = <0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+
+			i2c-mux@72 {
+				compatible = "nxp,pca9546";
+				#address-cells = <1>;
+				#size-cells = <0>;
+				reg = <0x72>;
+				status = "okay";
+			};
+		};
+	};
+	i2cmux4 {
+		compatible = "nuvoton,i2c-mux-npcm";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		status = "okay";
+		i2c-parent = <&i2c4>;
+		syscon = <&gcr>;
+		nuvoton,i2c-number = <4>;
+		i2c_segment_number = <1>;
+
+		i2c4@1 {
+			reg = <0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+
+			i2c-mux@74 {
+				compatible = "nxp,pca9546";
+				#address-cells = <1>;
+				#size-cells = <0>;
+				reg = <0x74>;
+				status = "okay";
+			};
+		};
+	};
+
 };
 
 &i2c3 { //MM1
 	pinctrl-0 = <&smb3c_pins>;
 	status = "okay";
-	sbrmi@3c {
-		compatible = "amd,sbrmi";
-		reg = <0x3c>;
-	};
-	sbtsi@4c {
-                compatible = "amd,sbtsi";
-                reg = <0x4c>;
-	};
 };
 
 &i2c2 { //MM2
@@ -970,6 +1047,8 @@
 	status = "okay";
 	i2c-switch@70 {
 		compatible = "nxp,pca9548";
+		#address-cells = <1>;
+		#size-cells = <0>;
 		reg = <0x70>;
 	};
 };
@@ -978,6 +1057,8 @@
 	status = "okay";
 	i2c-switch@71 {
 		compatible = "nxp,pca9548";
+		#address-cells = <1>;
+		#size-cells = <0>;
 		reg = <0x71>;
 		bus10_mux33: i2c@5 {
 			#address-cells = <1>;
@@ -998,19 +1079,11 @@
 &i2c1 { //MM11
 	pinctrl-0 = <&smb1c_pins>;
 	status = "okay";
-	i2c-switch@72 {
-		compatible = "nxp,pca9546";
-		reg = <0x72>;
-	};
 };
 
 &i2c4 { //MM12
 	pinctrl-0 = <&smb4b_pins>;
 	status = "okay";
-	i2c-switch@74 {
-		compatible = "nxp,pca9546";
-		reg = <0x74>;
-	};
 };
 
 &i2c15 { //MM15

@@ -1,7 +1,2 @@
-do_patch:m1120-c2195() {
-    bb.build.exec_func("update_i2cdev", d)
-}
+FILESEXTRAPATHS:prepend:m1120-c2195 = "${THISDIR}/files/m1120:"
 
-update_i2cdev() {
-    sed -i 's/f0081000.i2c/f0083000.i2c/g' ${WORKDIR}/reload-sensors.sh
-}
