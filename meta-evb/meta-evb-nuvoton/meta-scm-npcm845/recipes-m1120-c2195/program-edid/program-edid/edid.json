@@ -1,0 +1,162 @@
+{
+    "Base": {
+        "Basic Display": {
+            "Aspect ratio (landscape)": null,
+            "Aspect ratio (portrait)": null,
+            "Color Bit Depth": "8 Bits per Primary Color",
+            "Continuous frequency supported": false,
+            "DPM active-off supported": true,
+            "DPM standby supported": true,
+            "DPM suspend supported": false,
+            "Digital Video Interface Standard Support": null,
+            "Display color type": "RGB 4:4:4 + YCrCb 4:4:4 + YCrCb 4:2:2",
+            "Display gamma": 2.2,
+            "Maximum dimensions (cm)": {
+                "x": 48,
+                "y": 27
+            },
+            "Preferred timing includes native timing pixel format and refresh rate": true,
+            "Video input type": "Digital",
+            "sRGB Standard is default colour space": false
+        },
+        "Chromaticity": {
+            "Blue": {
+                "x": 156,
+                "y": 54
+            },
+            "Green": {
+                "x": 349,
+                "y": 637
+            },
+            "Red": {
+                "x": 646,
+                "y": 357
+            },
+            "White": {
+                "x": 321,
+                "y": 337
+            }
+        },
+        "Descriptors": [
+            {
+                "Addressable": {
+                    "x": 1920,
+                    "y": 1080
+                },
+                "Blanking": {
+                    "x": 280,
+                    "y": 45
+                },
+                "Border": {
+                    "x": 0,
+                    "y": 0
+                },
+                "Front porch": {
+                    "x": 88,
+                    "y": 4
+                },
+                "Image size (mm)": {
+                    "x": 477,
+                    "y": 268
+                },
+                "Interlace": false,
+                "Pixel clock (MHz)": 148.5,
+                "Stereo viewing": "No stereo",
+                "Sync pulse": {
+                    "x": 44,
+                    "y": 5
+                },
+                "Sync type": {
+                    "Horizontal sync (outside of V-sync)": "Positive",
+                    "Type": "Digital Separate Sync",
+                    "Vertical sync": "Positive"
+                },
+                "Type": "Detailed Timing Descriptor"
+            },
+            {
+                "Horizontal rate (kHz)": {
+                    "Maximum": 94,
+                    "Minimum": 24
+                },
+                "Pixel clock (MHz)": 200,
+                "Subtype": "Default GTF supported",
+                "Type": "Display Range Limits Descriptor",
+                "Vertical rate (Hz)": {
+                    "Maximum": 76,
+                    "Minimum": 50
+                }
+            },
+            {
+                "Data string": "HP LA2206",
+                "Type": "Display Product Name"
+            },
+            {
+                "Data string": "CNC219RM7X",
+                "Type": "Display Product Serial Number"
+            }
+        ],
+        "Established Timing": {
+            "1024x768 @ 60 Hz": true,
+            "1024x768 @ 72 Hz": false,
+            "1024x768 @ 75 Hz": false,
+            "1024x768 @ 87 Hz, interlaced (1024x768i)": false,
+            "1152x870 @ 75 Hz (Apple Macintosh II)": false,
+            "1280x1024 @ 75 Hz": false,
+            "640x480 @ 60 Hz": true,
+            "640x480 @ 67 Hz": false,
+            "640x480 @ 72 Hz": false,
+            "640x480 @ 75 Hz": false,
+            "720x400 @ 70 Hz": true,
+            "720x400 @ 88 Hz": false,
+            "800x600 @ 56 Hz": false,
+            "800x600 @ 60 Hz": true,
+            "800x600 @ 72 Hz": false,
+            "800x600 @ 75 Hz": false,
+            "832x624 @ 75 Hz": false,
+            "Manufacturer specific display mode 1": false,
+            "Manufacturer specific display mode 2": false,
+            "Manufacturer specific display mode 3": false,
+            "Manufacturer specific display mode 4": false,
+            "Manufacturer specific display mode 5": false,
+            "Manufacturer specific display mode 6": false,
+            "Manufacturer specific display mode 7": false
+        },
+        "Manufacturer Info": {
+            "ID Product Code": 10568,
+            "Manufacturer ID": "HWP",
+            "Model year": null,
+            "Serial number": 16843009,
+            "Week of manufacture": 19,
+            "Year of manufacture": 2012
+        },
+        "Standard Timing": [
+            {
+                "Frequency": 60,
+                "Ratio": "16:9",
+                "X resolution": 1280
+            },
+            {
+                "Frequency": 60,
+                "Ratio": "5:4",
+                "X resolution": 1280
+            },
+            {
+                "Frequency": 60,
+                "Ratio": "16:10",
+                "X resolution": 1440
+            },
+            {
+                "Frequency": 60,
+                "Ratio": "16:10",
+                "X resolution": 1680
+            },
+            {
+                "Frequency": 60,
+                "Ratio": "16:9",
+                "X resolution": 1920
+            }
+        ]
+    },
+    "Extensions": [],
+    "Version": "1.3"
+}
