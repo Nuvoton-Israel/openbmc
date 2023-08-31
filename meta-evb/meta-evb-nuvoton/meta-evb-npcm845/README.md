@@ -64,6 +64,8 @@ For more product questions, please contact us at:
   * [Host Serial Port](#host-serial-port)
   * [PECI](#peci)
   * [FLM](#flm)
+  * [Watchdog](#watchdog)
+  * [Software Reset](#software-reset)
 - [Troubleshooting](#troubleshooting)
   * [Failed to probe SPI0 CS0 in u-boot](#failed-to-probe-SPI0-CS0-in-u-boot)
 
@@ -2211,6 +2213,136 @@ Select SW1.6 to on to enable FLM feature.
   md a0000000            //correct data
   md a0001000            //correct data
   ```
+
+## Watchdog
+Arbel SOC provides three watchdog timers
+### Linux test
+- We have enabled watchdog1 in dts
+```
+@ arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi
+			watchdog0: watchdog@801c {
+				compatible = "nuvoton,npcm845-wdt";
+				interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
+				reg = <0x801c 0x4>;
+				status = "disabled";
+				clocks = <&clk NPCM8XX_CLK_REFCLK>;
+				syscon = <&gcr>;
+			};
+
+			watchdog1: watchdog@901c {
+				compatible = "nuvoton,npcm845-wdt";
+				interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
+				reg = <0x901c 0x4>;
+				status = "disabled";
+				clocks = <&clk NPCM8XX_CLK_REFCLK>;
+				syscon = <&gcr>;
+			};
+
+			watchdog2: watchdog@a01c {
+				compatible = "nuvoton,npcm845-wdt";
+				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
+				reg = <0xa01c 0x4>;
+				status = "disabled";
+				clocks = <&clk NPCM8XX_CLK_REFCLK>;
+				syscon = <&gcr>;
+			};
+
+@ arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+&watchdog1 {
+	status = "okay";
+};
+```
+- Enable kernel config
+```
+CONFIG_WATCHDOG=y
+CONFIG_NPCM7XX_WATCHDOG=y
+CONFIG_WATCHDOG_SYSFS=y 
+```
+```
+# Kernel message
+npcm-wdt f000901c.watchdog: NPCM watchdog driver enabled
+```
+- Test the Watchdog
+```
+echo c > /proc/sysrq-trigger
+```
+### U-boot test
+- Default wdt is disabled in u-boot, we can enable watchdog0 in dts
+```
+@ arch/arm/dts/nuvoton-common-npcm8xx.dtsi
+			watchdog0: watchdog@801c {
+				compatible = "nuvoton,npcm750-wdt";
+				interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
+				reg = <0x801c 0x4>;
+				status = "disabled";
+				clocks = <&clk NPCM8XX_CLK_REFCLK>;
+			};
+
+			watchdog1: watchdog@901c {
+				compatible = "nuvoton,npcm750-wdt";
+				interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
+				reg = <0x901c 0x4>;
+				status = "disabled";
+				clocks = <&clk NPCM8XX_CLK_REFCLK>;
+			};
+
+			watchdog2: watchdog@a01c {
+				compatible = "nuvoton,npcm750-wdt";
+				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
+				reg = <0xa01c 0x4>;
+				status = "disabled";
+				clocks = <&clk NPCM8XX_CLK_REFCLK>;
+			};
+
+@ arch/arm/dts/nuvoton-npcm845-evb.dts
+&watchdog0 {
+	status = "okay";
+};
+```
+- Enable u-boot config
+```
+CONFIG_WDT=y
+CONFIG_WDT_NPCM=y
+CONFIG_WATCHDOG_TIMEOUT_MSECS=60000
+CONFIG_CMD_WDT=y
+# CONFIG_WATCHDOG is not set
+```
+```
+# u-boot message
+WDT:   Started without servicing (60s timeout)
+//After 60 seconds, watchdog0 would issue power on reset
+```
+- Disable watchdog
+```
+U-Boot>wdt list
+watchdog@801c (npcm_wdt)
+U-Boot>wdt dev watchdog@801c
+U-Boot>wdt stop
+```
+## Software Reset
+Software reset (1 to 3) is generated on assertion of the SWRST1-3 registers.
+### Linux test
+- DTS
+```
+@ arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi
+		rstc: reset-controller@f0801000 {
+			compatible = "nuvoton,npcm845-reset";
+			reg = <0x0 0xf0801000 0x0 0x78>;
+			#reset-cells = <2>;
+			nuvoton,sysgcr = <&gcr>;
+			nuvoton,sw-reset-number = <2>;
+		};
+
+		# Specifying reset lines connected to IP NPCM8XX modules
+		pcie: pcie@e1000000 {
+			...
+			resets = <&rstc 0x34 0x15>;
+		};
+```
+- Enable kernel config
+```
+CONFIG_RESET_NPCM=y
+```
 
 # Troubleshooting
 
