@@ -1,0 +1,155 @@
+From e011833e25e4e283edc616ebf7f1f314aade3264 Mon Sep 17 00:00:00 2001
+From: Mia Lin <mimi05633@gmail.com>
+Date: Wed, 30 Aug 2023 16:49:40 +0800
+Subject: [PATCH 1/1] Add mctp discovery command
+
+Usage:
+  mctp discovery <busnum>
+
+Base on
+  commit a591ad885aa28f113cb45870b2fd5bce48378d6f
+  Author: Jeremy Kerr <jk@codeconstruct.com.au>
+  Date:   Thu Apr 13 11:37:12 2023 +0800
+
+      Version 1.1
+
+Signed-off-by: Mia Lin <mimi05633@gmail.com>
+---
+ meson.build |  7 ++++++
+ src/mctp.c  | 67 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 74 insertions(+)
+
+diff --git a/meson.build b/meson.build
+index 7d605cb..0210f86 100644
+--- a/meson.build
++++ b/meson.build
+@@ -15,6 +15,9 @@ add_project_arguments('-Wno-unused-parameter', language : 'c')
+ 
+ libsystemd = dependency('libsystemd', version: '>=247', required: false)
+ 
++# i2c-tools doesn't ship a pkg-config file for libi2c
++i2c = meson.get_compiler('c').find_library('i2c')
++
+ conf = configuration_data()
+ conf.set10('HAVE_LINUX_MCTP_H',
+     cc.has_header('linux/mctp.h'),
+@@ -31,6 +34,10 @@ netlink_sources = ['src/mctp-netlink.c']
+ 
+ executable('mctp',
+     sources: ['src/mctp.c'] + netlink_sources + util_sources,
++    dependencies: [
++        libsystemd,
++        i2c,
++    ],
+     install: true,
+ )
+ 
+diff --git a/src/mctp.c b/src/mctp.c
+index 72ab7db..7193ec3 100644
+--- a/src/mctp.c
++++ b/src/mctp.c
+@@ -21,6 +21,7 @@
+ #include <stdbool.h>
+ #include <stddef.h>
+ #include <unistd.h>
++#include <fcntl.h>
+ 
+ #include <sys/ioctl.h>
+ #include <sys/socket.h>
+@@ -29,6 +30,10 @@
+ #include <linux/netlink.h>
+ #include <linux/rtnetlink.h>
+ #include <linux/netdevice.h>
++#include <linux/i2c-dev.h>
++#include <i2c/smbus.h>
++
++#include <systemd/sd-bus.h>
+ 
+ #include "mctp.h"
+ #include "mctp-util.h"
+@@ -39,6 +44,9 @@
+ 
+ #define ARRAY_SIZE(a) (sizeof(a)/sizeof((a)[0]))
+ 
++static uint8_t slave_addr_min = 0x08;
++static uint8_t slave_addr_max = 0x78;
++
+ struct ctx {
+ 	mctp_nl			*nl;
+ 	bool			verbose;
+@@ -1208,6 +1216,64 @@ static int cmd_monitor(struct ctx *ctx, int argc, const char **argv) {
+ 	return 0;
+ }
+ 
++static int cmd_discovery(struct ctx *ctx, int argc, const char **argv) {
++	const char* busnum;
++	int rc, fd;
++	char file[60];
++	char ifname[10];
++	uint8_t i;
++	sd_bus *bus = NULL;
++	sd_bus_message *m = NULL;
++	sd_bus_error error = SD_BUS_ERROR_NULL;
++
++	rc = 0;
++	if (argc == 1 || (argc == 2 && !strcmp(argv[1], "help"))) {
++		fprintf(stderr, "%s discovery <busnum>\n", ctx->top_cmd);
++		return 255;
++	}
++
++	busnum = argv[1];
++
++	/* Open I2C port fd */
++	memset(file, 0, sizeof(file));
++	snprintf(file, sizeof(file), "/dev/i2c-%d", atoi(busnum));
++	fd = open(file, O_RDWR | O_NONBLOCK);
++	if (fd < 0)
++		return fd;
++
++	rc = sd_bus_open_system(&bus);
++	if (rc < 0) {
++		printf("Failed to connect to dbus: %d", rc);
++		return rc;
++	}
++
++	/* Scan devices and setup endpoints */
++	memset(ifname, 0, sizeof(ifname));
++	snprintf(ifname, sizeof(ifname), "mctpi2c%d", atoi(busnum));
++	for (i = slave_addr_min; i <= slave_addr_max; i++) {
++		if (ioctl(fd, I2C_SLAVE, i) < 0)
++			continue; // busy slave
++		else {
++			if (i2c_smbus_write_quick(fd, I2C_SMBUS_WRITE) < 0)
++				continue;
++		}
++
++		/* Send dbus method call - SetupEndpoint */
++		rc = sd_bus_call_method(bus, "xyz.openbmc_project.MCTP",
++								"/xyz/openbmc_project/mctp",
++								"au.com.CodeConstruct.MCTP", "SetupEndpoint",
++								&error, &m, "say", ifname, 1, i);
++		if (rc < 0)
++			sd_bus_error_free(&error);
++		else
++			sd_bus_message_unref(m);
++	}
++
++	sd_bus_flush_close_unref(bus);
++
++	return 0;
++}
++
+ static int cmd_help(struct ctx * ctx, int argc, const char** argv);
+ 
+ struct command {
+@@ -1220,6 +1286,7 @@ struct command {
+ 	{ "route", cmd_route, 0 },
+ 	{ "neighbour", cmd_neigh, 0 },
+ 	{ "monitor", cmd_monitor, 0 },
++	{ "discovery", cmd_discovery, 0 },
+ 	{ "help", cmd_help, 0 },
+ };
+ 
+-- 
+2.17.1
+
