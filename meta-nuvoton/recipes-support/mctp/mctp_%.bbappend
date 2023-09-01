@@ -1,4 +1,4 @@
-FILESEXTRAPATHS:prepend:evb-npcm845 := "${THISDIR}/${PN}:"
+FILESEXTRAPATHS:prepend:nuvoton := "${THISDIR}/${PN}:"
 
 SRC_URI:append:nuvoton = " file://0001-Add-mctp-discovery-command.patch"
 SRC_URI:append:nuvoton = " file://mctpd.service"
