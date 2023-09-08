@@ -6,6 +6,7 @@ SRCREV = "fd356a64e9c997e8f1981a9c0a90d948d96d2d84"
 require linux-nuvoton.inc
 
 SRC_URI:append:nuvoton = " file://0017-drivers-i2c-workaround-for-i2c-slave-behavior.patch"
+SRC_URI:append:nuvoton = " file://enable-emc.cfg"
 
 # New Arch VDMX/VDMA driver
 # SRC_URI:append:nuvoton = " file://2222-driver-misc-add-nuvoton-vdmx-vdma-driver.patch"
