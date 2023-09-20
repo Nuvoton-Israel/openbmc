@@ -1,0 +1,40 @@
+From 6068122836726aadbb0a3ebae2290723774b8071 Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Fri, 4 Aug 2023 04:03:29 +0900
+Subject: [PATCH 3/3] switch-root: reopen target directory after it is mounted
+
+Fixes a bug introduced by f717d7a40a696b351415976f22a4f498c401de41.
+
+(cherry picked from commit 2159662608a00232f94302bd5942d07830c279b4)
+
+Upstream-Status: Submitted [https://github.com/systemd/systemd/pull/28648]
+---
+ src/shared/switch-root.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/src/shared/switch-root.c b/src/shared/switch-root.c
+index 99036c1364..9fb9a3e376 100644
+--- a/src/shared/switch-root.c
++++ b/src/shared/switch-root.c
+@@ -76,6 +76,18 @@ int switch_root(const char *new_root,
+         r = fd_make_mount_point(new_root_fd);
+         if (r < 0)
+                 return log_error_errno(r, "Failed to make new root directory a mount point: %m");
++        if (r > 0) {
++                int fd;
++
++                /* When the path was not a mount point, then we need to reopen the path, otherwise, it still
++                 * points to the underlying directory. */
++
++                fd = open(new_root, O_DIRECTORY|O_CLOEXEC);
++                if (fd < 0)
++                        return log_error_errno(errno, "Failed to reopen target directory '%s': %m", new_root);
++
++                close_and_replace(new_root_fd, fd);
++        }
+ 
+         if (FLAGS_SET(flags, SWITCH_ROOT_DESTROY_OLD_ROOT)) {
+                 istmp = fd_is_temporary_fs(old_root_fd);
+-- 
+2.34.1
+

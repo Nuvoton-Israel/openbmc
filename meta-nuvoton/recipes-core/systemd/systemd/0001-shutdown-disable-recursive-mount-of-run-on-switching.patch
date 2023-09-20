@@ -1,0 +1,41 @@
+From 60046bf2a9f750a3ef17aab5948b9e5ba8734265 Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Thu, 3 Aug 2023 02:50:09 +0900
+Subject: [PATCH 1/3] shutdown: disable recursive mount of /run/ on switching
+ root
+
+Mounting /run/ recursively may be harmless, but not necessary on
+shutdown as the new root is /run/initramfs.
+
+Follow-up for b12d41a8bb7c99f7d7a1c7821a886d98b42d9ce0.
+
+(cherry picked from commit d709d1b20e2e15ee2ae1b44de94d493e17834235)
+
+Upstream-Status: Submitted [https://github.com/systemd/systemd/pull/28648]
+---
+ src/shutdown/shutdown.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/src/shutdown/shutdown.c b/src/shutdown/shutdown.c
+index 8395bb429d..97a4050ae9 100644
+--- a/src/shutdown/shutdown.c
++++ b/src/shutdown/shutdown.c
+@@ -167,11 +167,13 @@ static int switch_root_initramfs(void) {
+          *
+          * Disable sync() during switch-root, we after all sync'ed here plenty, and a dumb sync (as opposed
+          * to the "smart" sync() we did here that looks at progress parameters) would defeat much of our
+-         * efforts here. */
++         * efforts here. As the new root will be /run/initramfs/, it is not necessary to mount /run/
++         * recursively. */
+         return switch_root(
+                         /* new_root= */ "/run/initramfs",
+                         /* old_root_after= */ "/oldroot",
+-                        /* flags= */ SWITCH_ROOT_DONT_SYNC);
++                        /* flags= */ SWITCH_ROOT_DONT_SYNC |
++                                     SWITCH_ROOT_SKIP_RECURSIVE_RUN);
+ }
+ 
+ /* Read the following fields from /proc/meminfo:
+-- 
+2.34.1
+

@@ -1,0 +1,75 @@
+From c75ca569500bf538058cc0e252ab29fe17131f41 Mon Sep 17 00:00:00 2001
+From: Yu Watanabe <watanabe.yu+github@gmail.com>
+Date: Thu, 3 Aug 2023 04:19:14 +0900
+Subject: [PATCH 2/3] shutdown: do not umount recursively before MS_MOVE
+
+Unmounting filesystem will be done gracefully by shutdown itself.
+
+Follow-up for f2c1d491a539035d6cc1fa53a7cef0cbc8d52902 and
+268d1244e87a35ff8dff56c92ef375ebf69d462e.
+
+(cherry picked from commit 6b219b74de53729249956221a971047aab7c96e0)
+
+Upstream-Status: Submitted [https://github.com/systemd/systemd/pull/28648]
+---
+ src/shared/switch-root.c | 3 ++-
+ src/shared/switch-root.h | 8 +++++---
+ src/shutdown/shutdown.c  | 5 +++--
+ 3 files changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/src/shared/switch-root.c b/src/shared/switch-root.c
+index 37395e02ad..99036c1364 100644
+--- a/src/shared/switch-root.c
++++ b/src/shared/switch-root.c
+@@ -166,7 +166,8 @@ int switch_root(const char *new_root,
+                  * MS_MOVE won't magically unmount anything below it. Once the chroot() succeeds the mounts
+                  * below would still be around but invisible to us, because not accessible via
+                  * /proc/self/mountinfo. Hence, let's clean everything up first, as long as we still can. */
+-                (void) umount_recursive_full(NULL, MNT_DETACH, STRV_MAKE(new_root));
++                if (!FLAGS_SET(flags, SWITCH_ROOT_SKIP_RECURSIVE_UMOUNT))
++                        (void) umount_recursive_full(NULL, MNT_DETACH, STRV_MAKE(new_root));
+ 
+                 if (mount(".", "/", NULL, MS_MOVE, NULL) < 0)
+                         return log_error_errno(errno, "Failed to move %s to /: %m", new_root);
+diff --git a/src/shared/switch-root.h b/src/shared/switch-root.h
+index 78d62f28e0..20561fcee8 100644
+--- a/src/shared/switch-root.h
++++ b/src/shared/switch-root.h
+@@ -4,9 +4,11 @@
+ #include <stdbool.h>
+ 
+ typedef enum SwitchRootFlags {
+-        SWITCH_ROOT_DESTROY_OLD_ROOT   = 1 << 0, /* rm -rf old root when switching – under the condition that it is backed by non-persistent tmpfs/ramfs/… */
+-        SWITCH_ROOT_DONT_SYNC          = 1 << 1, /* don't call sync() immediately before switching root */
+-        SWITCH_ROOT_SKIP_RECURSIVE_RUN = 1 << 2, /* move /run without MS_REC */
++        SWITCH_ROOT_DESTROY_OLD_ROOT      = 1 << 0, /* rm -rf old root when switching – under the condition
++                                                     * that it is backed by non-persistent tmpfs/ramfs/… */
++        SWITCH_ROOT_DONT_SYNC             = 1 << 1, /* don't call sync() immediately before switching root */
++        SWITCH_ROOT_SKIP_RECURSIVE_RUN    = 1 << 2, /* move /run without MS_REC */
++        SWITCH_ROOT_SKIP_RECURSIVE_UMOUNT = 1 << 3, /* do not umount recursively on move */
+ } SwitchRootFlags;
+ 
+ int switch_root(const char *new_root, const char *old_root_after, SwitchRootFlags flags);
+diff --git a/src/shutdown/shutdown.c b/src/shutdown/shutdown.c
+index 97a4050ae9..ed873c61f1 100644
+--- a/src/shutdown/shutdown.c
++++ b/src/shutdown/shutdown.c
+@@ -168,12 +168,13 @@ static int switch_root_initramfs(void) {
+          * Disable sync() during switch-root, we after all sync'ed here plenty, and a dumb sync (as opposed
+          * to the "smart" sync() we did here that looks at progress parameters) would defeat much of our
+          * efforts here. As the new root will be /run/initramfs/, it is not necessary to mount /run/
+-         * recursively. */
++         * recursively. Also, do not umount filesystems before MS_MOVE, as that should be done by ourself. */
+         return switch_root(
+                         /* new_root= */ "/run/initramfs",
+                         /* old_root_after= */ "/oldroot",
+                         /* flags= */ SWITCH_ROOT_DONT_SYNC |
+-                                     SWITCH_ROOT_SKIP_RECURSIVE_RUN);
++                                     SWITCH_ROOT_SKIP_RECURSIVE_RUN |
++                                     SWITCH_ROOT_SKIP_RECURSIVE_UMOUNT);
+ }
+ 
+ /* Read the following fields from /proc/meminfo:
+-- 
+2.34.1
+
