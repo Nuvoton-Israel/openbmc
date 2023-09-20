@@ -1,23 +1,18 @@
-From 55abd2cd1e412c9f704c64407996015610ce0cac Mon Sep 17 00:00:00 2001
+From 66f0dca90d7733af0e6fb181ae8047f563c7056e Mon Sep 17 00:00:00 2001
 From: Brian Ma <chma0@nuvoton.com>
 Date: Thu, 17 Feb 2022 08:55:45 +0800
 Subject: [PATCH 3/3] Add support report same version error
 
 Signed-off-by: Brian Ma <chma0@nuvoton.com>
 ---
- image_manager.cpp | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+ image_manager.cpp | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
 diff --git a/image_manager.cpp b/image_manager.cpp
-index a9a5a69..f4dadee 100644
+index 4fc4f8e..c85290a 100644
 --- a/image_manager.cpp
 +++ b/image_manager.cpp
-@@ -11,10 +11,11 @@
- #include <sys/wait.h>
- #include <unistd.h>
- 
--#include <elog-errors.hpp>
-+#include <phosphor-logging/elog-errors.hpp>
+@@ -15,6 +15,7 @@
  #include <phosphor-logging/elog.hpp>
  #include <phosphor-logging/lg2.hpp>
  #include <xyz/openbmc_project/Software/Image/error.hpp>
@@ -25,7 +20,7 @@ index a9a5a69..f4dadee 100644
  
  #include <algorithm>
  #include <cstring>
-@@ -31,11 +32,14 @@ namespace manager
+@@ -34,11 +35,14 @@ namespace manager
  PHOSPHOR_LOG2_USING;
  using namespace phosphor::logging;
  using namespace sdbusplus::xyz::openbmc_project::Software::Image::Error;
@@ -40,7 +35,7 @@ index a9a5a69..f4dadee 100644
  namespace fs = std::filesystem;
  
  struct RemovablePath
-@@ -219,8 +223,10 @@ int Manager::processImage(const std::string& tarFilePath)
+@@ -229,8 +233,10 @@ int Manager::processImage(const std::string& tarFilePath)
      }
      else
      {
@@ -54,5 +49,5 @@ index a9a5a69..f4dadee 100644
      return 0;
  }
 -- 
-2.17.1
+2.34.1
 

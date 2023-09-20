@@ -1,4 +1,4 @@
-From 9948066e00ef95006ecbe5cb4d7507f54d835a4e Mon Sep 17 00:00:00 2001
+From 2e60da2b765e2a40b66e878146650644dc7b4f11 Mon Sep 17 00:00:00 2001
 From: Allen Kang <jhkang@nuvoton.com>
 Date: Tue, 18 Apr 2023 11:23:55 +0800
 Subject: [PATCH 10/10] phosphor-power: support PSU hot plug DBus property and
@@ -6,79 +6,41 @@ Subject: [PATCH 10/10] phosphor-power: support PSU hot plug DBus property and
 
 Signed-off-by: Allen Kang <jhkang@nuvoton.com>
 ---
- elog-errors.hpp                               | 148 ++++++++++++++++++
+ elog-errors.hpp                               | 110 ++++++++++++++++++
  org/open_power/Witherspoon/Fault.errors.yaml  |   6 +
- .../Witherspoon/Fault.metadata.yaml           |  16 ++
- power-supply/power_supply.cpp                 |  21 ++-
+ .../Witherspoon/Fault.metadata.yaml           |  16 +++
+ power-supply/power_supply.cpp                 |  21 +++-
  types.hpp                                     |   2 +-
- 5 files changed, 189 insertions(+), 4 deletions(-)
+ 5 files changed, 151 insertions(+), 4 deletions(-)
 
 diff --git a/elog-errors.hpp b/elog-errors.hpp
-index 46797139..ea53f096 100644
+index 269587e6..cd250018 100644
 --- a/elog-errors.hpp
 +++ b/elog-errors.hpp
-@@ -670,6 +670,46 @@ struct PowerSupplyFanFault;
- } // namespace org
- } // namespace sdbusplus
- 
-+namespace sdbusplus
-+{
-+namespace org
-+{
-+namespace open_power
-+{
-+namespace Witherspoon
-+{
-+namespace Fault
-+{
-+namespace Error
-+{
+@@ -196,6 +196,14 @@ struct PowerSupplyInputFault;
+ } // namespace sdbusplus::error::org::open_power::witherspoon::fault
+ namespace sdbusplus::error::org::open_power::witherspoon::fault
+ {
 +struct PowerSupplyRemoved;
-+} // namespace Error
-+} // namespace Fault
-+} // namespace Witherspoon
-+} // namespace open_power
-+} // namespace org
-+} // namespace sdbusplus
-+
-+namespace sdbusplus
-+{
-+namespace org
-+{
-+namespace open_power
-+{
-+namespace Witherspoon
-+{
-+namespace Fault
-+{
-+namespace Error
++} // namespace sdbusplus::error::org::open_power::witherspoon::fault
++namespace sdbusplus::error::org::open_power::witherspoon::fault
 +{
 +struct PowerSupplyInserted;
-+} // namespace Error
-+} // namespace Fault
-+} // namespace Witherspoon
-+} // namespace open_power
-+} // namespace org
-+} // namespace sdbusplus
-+
- namespace sdbusplus
- {
- namespace org
-@@ -3249,6 +3289,114 @@ struct map_exception_type<
++} // namespace sdbusplus::error::org::open_power::witherspoon::fault
++namespace sdbusplus::error::org::open_power::witherspoon::fault
++{
+ struct PowerSupplyOutputOvercurrent;
+ } // namespace sdbusplus::error::org::open_power::witherspoon::fault
+ namespace sdbusplus::error::org::open_power::witherspoon::fault
+@@ -1982,6 +1990,108 @@ struct map_exception_type<sdbusplus::error::org::open_power::witherspoon::
+         PowerSupplyInputFault;
+ };
  
- } // namespace details
- 
-+namespace org
-+{
-+namespace open_power
-+{
-+namespace Witherspoon
-+{
-+namespace Fault
++} // namespace details
++namespace org::open_power::witherspoon::fault
 +{
 +namespace _PowerSupplyRemoved
 +{
-+
 +struct RAW_STATUS
 +{
 +    /*
@@ -93,46 +55,43 @@ index 46797139..ea53f096 100644
 +        _entry(entry("RAW_STATUS=%s", a)){};
 +    type _entry;
 +};
-+
 +} // namespace _PowerSupplyRemoved
 +
 +struct PowerSupplyRemoved
 +{
 +    static constexpr auto L = level::ERR;
 +    using RAW_STATUS = _PowerSupplyRemoved::RAW_STATUS;
-+    using CALLOUT_INVENTORY_PATH = xyz::openbmc_project::Common::Callout::
-+        Inventory::CALLOUT_INVENTORY_PATH;
++    using CALLOUT_INVENTORY_PATH = phosphor::logging::xyz::openbmc_project::
++        common::callout::Inventory::CALLOUT_INVENTORY_PATH;
 +    using metadata_types = std::tuple<RAW_STATUS, CALLOUT_INVENTORY_PATH>;
 +};
 +
-+} // namespace Fault
-+} // namespace Witherspoon
-+} // namespace open_power
-+} // namespace org
++} // namespace org::open_power::witherspoon::fault
++
++#ifndef SDBUSPP_REMOVE_DEPRECATED_NAMESPACE
++namespace org::open_power::Witherspoon::Fault
++{
++using PowerSupplyRemoved = phosphor::logging::org::open_power::witherspoon::
++    fault::PowerSupplyRemoved;
++}
++#endif
 +
 +namespace details
 +{
 +
 +template <>
-+struct map_exception_type<
-+    sdbusplus::org::open_power::Witherspoon::Fault::Error::PowerSupplyRemoved>
++struct map_exception_type<sdbusplus::error::org::open_power::witherspoon::
++                              fault::PowerSupplyRemoved>
 +{
-+    using type = org::open_power::Witherspoon::Fault::PowerSupplyRemoved;
++    using type = phosphor::logging::org::open_power::witherspoon::fault::
++        PowerSupplyRemoved;
 +};
 +
 +} // namespace details
-+
-+namespace org
-+{
-+namespace open_power
-+{
-+namespace Witherspoon
-+{
-+namespace Fault
++namespace org::open_power::witherspoon::fault
 +{
 +namespace _PowerSupplyInserted
 +{
-+
 +struct RAW_STATUS
 +{
 +    /*
@@ -147,38 +106,41 @@ index 46797139..ea53f096 100644
 +        _entry(entry("RAW_STATUS=%s", a)){};
 +    type _entry;
 +};
-+
 +} // namespace _PowerSupplyInserted
 +
 +struct PowerSupplyInserted
 +{
 +    static constexpr auto L = level::ERR;
 +    using RAW_STATUS = _PowerSupplyInserted::RAW_STATUS;
-+    using CALLOUT_INVENTORY_PATH = xyz::openbmc_project::Common::Callout::
-+        Inventory::CALLOUT_INVENTORY_PATH;
++    using CALLOUT_INVENTORY_PATH = phosphor::logging::xyz::openbmc_project::
++        common::callout::Inventory::CALLOUT_INVENTORY_PATH;
 +    using metadata_types = std::tuple<RAW_STATUS, CALLOUT_INVENTORY_PATH>;
 +};
 +
-+} // namespace Fault
-+} // namespace Witherspoon
-+} // namespace open_power
-+} // namespace org
++} // namespace org::open_power::witherspoon::fault
++
++#ifndef SDBUSPP_REMOVE_DEPRECATED_NAMESPACE
++namespace org::open_power::Witherspoon::Fault
++{
++using PowerSupplyInserted = phosphor::logging::org::open_power::witherspoon::
++    fault::PowerSupplyInserted;
++}
++#endif
 +
 +namespace details
 +{
 +
 +template <>
-+struct map_exception_type<
-+    sdbusplus::org::open_power::Witherspoon::Fault::Error::PowerSupplyInserted>
++struct map_exception_type<sdbusplus::error::org::open_power::witherspoon::
++                              fault::PowerSupplyInserted>
 +{
-+    using type = org::open_power::Witherspoon::Fault::PowerSupplyInserted;
++    using type = phosphor::logging::org::open_power::witherspoon::fault::
++        PowerSupplyInserted;
 +};
 +
-+} // namespace details
-+
- namespace org
+ } // namespace details
+ namespace org::open_power::witherspoon::fault
  {
- namespace open_power
 diff --git a/org/open_power/Witherspoon/Fault.errors.yaml b/org/open_power/Witherspoon/Fault.errors.yaml
 index 02178eeb..1083ca1b 100644
 --- a/org/open_power/Witherspoon/Fault.errors.yaml
@@ -224,7 +186,7 @@ index 4bdecf2b..321ae2bb 100644
    level: ERR
    meta:
 diff --git a/power-supply/power_supply.cpp b/power-supply/power_supply.cpp
-index 9309ba8c..7ca025b3 100644
+index 388c8e62..55dec5b2 100644
 --- a/power-supply/power_supply.cpp
 +++ b/power-supply/power_supply.cpp
 @@ -227,6 +227,13 @@ void PowerSupply::inventoryChanged(sdbusplus::message_t& msg)
@@ -255,7 +217,7 @@ index 9309ba8c..7ca025b3 100644
  #endif
              present = false;
              presentTimer.setEnabled(false);
-@@ -768,7 +782,7 @@ void PowerSupply::createInventoryObj()
+@@ -763,7 +777,7 @@ void PowerSupply::createInventoryObj()
      using Object = std::map<object_path, Interfaces>;
      Properties assetProps;
      Properties operProps;
@@ -264,7 +226,7 @@ index 9309ba8c..7ca025b3 100644
      Properties cachedProps;
      Properties presentProps ;
      Properties itemProps ;
-@@ -782,8 +796,9 @@ void PowerSupply::createInventoryObj()
+@@ -777,8 +791,9 @@ void PowerSupply::createInventoryObj()
      cachedProps.emplace(CACHED_PROP, true);
      interfaces.emplace(DECOR_CACHEABLE_IFACE, std::move(cachedProps));
  
@@ -277,10 +239,10 @@ index 9309ba8c..7ca025b3 100644
      itemProps.emplace(PRESENT_PROP, true);
      itemProps.emplace(PRETTYNAME_PROP, std::move(powersupplyName));
 diff --git a/types.hpp b/types.hpp
-index 247dc48d..f4cd9699 100644
+index e554d8d6..65e8cd36 100644
 --- a/types.hpp
 +++ b/types.hpp
-@@ -37,7 +37,7 @@ constexpr auto AVAILABLE_PROP = "Available";
+@@ -38,7 +38,7 @@ constexpr auto AVAILABLE_PROP = "Available";
  constexpr auto ASSOC_PROP = "Associations";
  constexpr auto CACHED_PROP = "Cached";
  constexpr auto FIELDREPLACEABLE_PROP = "FieldReplaceable";

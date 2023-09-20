@@ -1,20 +1,21 @@
-From 8e8aa415917c2086c7cc843078f339ba82117fa0 Mon Sep 17 00:00:00 2001
+From fe8df94d441d2db1edd003d3d798c75f3d70fd49 Mon Sep 17 00:00:00 2001
 From: Eason Yang <yhyang2@nuvoton.com>
 Date: Mon, 6 Feb 2023 13:20:02 +0800
 Subject: [PATCH 5/5] Add support for CPLD firmware upgrade
 
 Signed-off-by: Eason Yang <yhyang2@nuvoton.com>
+Signed-off-by: Allen Kang <jhkang@nuvoton.com>
 ---
- activation.cpp    | 79 +++++++++++++++++++++++++++++++++++++++++++++++
- activation.hpp    |  5 +++
- item_updater.cpp  | 61 ++++++++++++++++++++++++++++++++++++
- item_updater.hpp  | 20 ++++++++++++
- meson.build       |  7 +++++
- meson_options.txt |  9 ++++++
+ activation.cpp   | 79 ++++++++++++++++++++++++++++++++++++++++++++++++
+ activation.hpp   |  5 +++
+ item_updater.cpp | 61 +++++++++++++++++++++++++++++++++++++
+ item_updater.hpp | 20 ++++++++++++
+ meson.build      |  7 +++++
+ meson.options    |  9 ++++++
  6 files changed, 181 insertions(+)
 
 diff --git a/activation.cpp b/activation.cpp
-index b2c3336..eb37ecb 100644
+index 442d20e..8455c0e 100644
 --- a/activation.cpp
 +++ b/activation.cpp
 @@ -159,6 +159,19 @@ auto Activation::activation(Activations value) -> Activations
@@ -52,7 +53,7 @@ index b2c3336..eb37ecb 100644
      onStateChanges(msg);
  
      return;
-@@ -550,6 +571,64 @@ void Activation::onStateChangesMcu(sdbusplus::message::message& msg)
+@@ -549,6 +570,64 @@ void Activation::onStateChangesMcu(sdbusplus::message::message& msg)
  
  #endif
  
@@ -118,7 +119,7 @@ index b2c3336..eb37ecb 100644
  {
      auto method = bus.new_method_call(SYSTEMD_BUSNAME, SYSTEMD_PATH,
 diff --git a/activation.hpp b/activation.hpp
-index 557b00b..7d8c03b 100644
+index 34f13b2..73fddcd 100644
 --- a/activation.hpp
 +++ b/activation.hpp
 @@ -255,6 +255,11 @@ class Activation : public ActivationInherit, public Flash
@@ -134,7 +135,7 @@ index 557b00b..7d8c03b 100644
      void onStateChanges(sdbusplus::message_t&) override;
  
 diff --git a/item_updater.cpp b/item_updater.cpp
-index 9cc71c3..d55f0c0 100644
+index 62f7486..8efec8c 100644
 --- a/item_updater.cpp
 +++ b/item_updater.cpp
 @@ -74,6 +74,9 @@ void ItemUpdater::createActivation(sdbusplus::message_t& msg)
@@ -147,7 +148,7 @@ index 9cc71c3..d55f0c0 100644
  #endif
                          value == VersionPurpose::System)
                      {
-@@ -957,6 +960,64 @@ void ItemUpdater::createMCUObject()
+@@ -960,6 +963,64 @@ void ItemUpdater::createMCUObject()
  }
  #endif
  
@@ -213,7 +214,7 @@ index 9cc71c3..d55f0c0 100644
  {
      // Check /run/media/slot to get the slot number
 diff --git a/item_updater.hpp b/item_updater.hpp
-index 46472ca..d486acb 100644
+index 0ac964a..0d3a249 100644
 --- a/item_updater.hpp
 +++ b/item_updater.hpp
 @@ -67,6 +67,9 @@ class ItemUpdater : public ItemUpdaterInherit
@@ -251,7 +252,7 @@ index 46472ca..d486acb 100644
      void getRunningSlot();
  };
 diff --git a/meson.build b/meson.build
-index 969fa43..4406b2d 100644
+index 2db72a5..de6accc 100644
 --- a/meson.build
 +++ b/meson.build
 @@ -61,6 +61,8 @@ conf.set_quoted('OS_RELEASE_FILE', '/etc/os-release')
@@ -268,10 +269,10 @@ index 969fa43..4406b2d 100644
  conf.set('HOST_BIOS_UPGRADE', get_option('host-bios-upgrade').enabled())
  conf.set('MCU_UPGRADE', get_option('mcu-upgrade').enabled())
 +conf.set('CPLD_UPGRADE', get_option('cpld-upgrade').enabled())
- conf.set('WANT_SIGNATURE_VERIFY', \
-     get_option('verify-signature').enabled() or \
-     get_option('verify-full-signature').enabled())
-@@ -106,6 +109,10 @@ if get_option('mcu-upgrade').enabled()
+ conf.set('WANT_SIGNATURE_VERIFY', get_option('verify-signature').enabled())
+ 
+ # Configurable variables
+@@ -103,6 +106,10 @@ if get_option('mcu-upgrade').enabled()
      conf.set_quoted('MCU_OBJPATH', get_option('mcu-object-path'))
  endif
  
@@ -282,10 +283,10 @@ index 969fa43..4406b2d 100644
  if get_option('bmc-static-dual-image').enabled()
    conf.set('BMC_STATIC_DUAL_IMAGE', get_option('bmc-static-dual-image').enabled())
    conf.set_quoted('ALT_ROFS_DIR', get_option('alt-rofs-dir'))
-diff --git a/meson_options.txt b/meson_options.txt
-index 519ba2c..574a9cb 100644
---- a/meson_options.txt
-+++ b/meson_options.txt
+diff --git a/meson.options b/meson.options
+index 192c012..e9bf4c7 100644
+--- a/meson.options
++++ b/meson.options
 @@ -15,6 +15,9 @@ option('host-bios-upgrade', type: 'feature', value: 'enabled',
  option('mcu-upgrade', type: 'feature', value: 'enabled',
      description: 'Enable mcu upgrade support.')
@@ -296,7 +297,7 @@ index 519ba2c..574a9cb 100644
  option('sync-bmc-files', type: 'feature', value: 'enabled',
      description: 'Enable sync of filesystem files.')
  
-@@ -133,6 +136,12 @@ option(
+@@ -131,6 +134,12 @@ option(
      description: 'The MCU DBus object path.',
  )
  
@@ -310,5 +311,5 @@ index 519ba2c..574a9cb 100644
      description: 'Enable the dual image support for static layout.')
  
 -- 
-2.17.1
+2.34.1
 

@@ -1,20 +1,21 @@
-From ef4e81a9039120baa3a052a8a1f0bd6906390c75 Mon Sep 17 00:00:00 2001
+From cfab2f9a92c65b14df4de051587f56edef0a857a Mon Sep 17 00:00:00 2001
 From: Eason Yang <yhyang2@nuvoton.com>
 Date: Mon, 6 Feb 2023 11:49:04 +0800
-Subject: [PATCH 4/4] Add support for MCU firmware upgrade
+Subject: [PATCH 4/5] Add support for MCU firmware upgrade
 
 Signed-off-by: Eason Yang <yhyang2@nuvoton.com>
+Signed-off-by: Allen Kang <jhkang@nuvoton.com>
 ---
- activation.cpp    | 97 ++++++++++++++++++++++++++++++++++++++++++++++-
- activation.hpp    |  8 ++++
- item_updater.cpp  | 59 ++++++++++++++++++++++++++++
- item_updater.hpp  | 17 +++++++++
- meson.build       |  8 ++++
- meson_options.txt | 15 ++++++++
- 6 files changed, 202 insertions(+), 2 deletions(-)
+ activation.cpp   | 97 +++++++++++++++++++++++++++++++++++++++++++++++-
+ activation.hpp   |  8 ++++
+ item_updater.cpp | 59 +++++++++++++++++++++++++++++
+ item_updater.hpp | 17 +++++++++
+ meson.build      |  8 ++++
+ meson.options    | 16 ++++++++
+ 6 files changed, 203 insertions(+), 2 deletions(-)
 
 diff --git a/activation.cpp b/activation.cpp
-index 7c1f735..b2c3336 100644
+index b5fe199..442d20e 100644
 --- a/activation.cpp
 +++ b/activation.cpp
 @@ -126,8 +126,8 @@ auto Activation::activation(Activations value) -> Activations
@@ -75,7 +76,7 @@ index 7c1f735..b2c3336 100644
      onStateChanges(msg);
  
      return;
-@@ -457,6 +481,75 @@ void Activation::onStateChangesBios(sdbusplus::message_t& msg)
+@@ -456,6 +480,75 @@ void Activation::onStateChangesBios(sdbusplus::message_t& msg)
  
  #endif
  
@@ -152,7 +153,7 @@ index 7c1f735..b2c3336 100644
  {
      auto method = bus.new_method_call(SYSTEMD_BUSNAME, SYSTEMD_PATH,
 diff --git a/activation.hpp b/activation.hpp
-index 94cc1bb..557b00b 100644
+index 04562ea..34f13b2 100644
 --- a/activation.hpp
 +++ b/activation.hpp
 @@ -247,6 +247,14 @@ class Activation : public ActivationInherit, public Flash
@@ -171,7 +172,7 @@ index 94cc1bb..557b00b 100644
      void onStateChanges(sdbusplus::message_t&) override;
  
 diff --git a/item_updater.cpp b/item_updater.cpp
-index ff9cfc0..9cc71c3 100644
+index 9d18cfd..62f7486 100644
 --- a/item_updater.cpp
 +++ b/item_updater.cpp
 @@ -71,6 +71,9 @@ void ItemUpdater::createActivation(sdbusplus::message_t& msg)
@@ -184,7 +185,7 @@ index ff9cfc0..9cc71c3 100644
  #endif
                          value == VersionPurpose::System)
                      {
-@@ -898,6 +901,62 @@ void ItemUpdater::createBIOSObject()
+@@ -901,6 +904,62 @@ void ItemUpdater::createBIOSObject()
  }
  #endif
  
@@ -248,7 +249,7 @@ index ff9cfc0..9cc71c3 100644
  {
      // Check /run/media/slot to get the slot number
 diff --git a/item_updater.hpp b/item_updater.hpp
-index c50d9de..46472ca 100644
+index 316113a..0ac964a 100644
 --- a/item_updater.hpp
 +++ b/item_updater.hpp
 @@ -280,6 +280,23 @@ class ItemUpdater : public ItemUpdaterInherit
@@ -276,7 +277,7 @@ index c50d9de..46472ca 100644
      void getRunningSlot();
  };
 diff --git a/meson.build b/meson.build
-index f99a034..969fa43 100644
+index bde7510..2db72a5 100644
 --- a/meson.build
 +++ b/meson.build
 @@ -59,6 +59,8 @@ conf.set_quoted('BMC_ROFS_PREFIX', get_option('media-dir') + '/rofs-')
@@ -288,15 +289,14 @@ index f99a034..969fa43 100644
  # The dir where activation data is stored in files
  conf.set_quoted('PERSIST_DIR', '/var/lib/phosphor-bmc-code-mgmt/')
  
-@@ -69,6 +71,7 @@ conf.set('MMC_LAYOUT', get_option('bmc-layout').contains('mmc'))
+@@ -69,12 +71,14 @@ conf.set('MMC_LAYOUT', get_option('bmc-layout').contains('mmc'))
  
  # Configurable features
  conf.set('HOST_BIOS_UPGRADE', get_option('host-bios-upgrade').enabled())
 +conf.set('MCU_UPGRADE', get_option('mcu-upgrade').enabled())
- conf.set('WANT_SIGNATURE_VERIFY', \
-     get_option('verify-signature').enabled() or \
-     get_option('verify-full-signature').enabled())
-@@ -78,6 +81,7 @@ conf.set('WANT_SIGNATURE_FULL_VERIFY', get_option('verify-full-signature').enabl
+ conf.set('WANT_SIGNATURE_VERIFY', get_option('verify-signature').enabled())
+ 
+ # Configurable variables
  conf.set('ACTIVE_BMC_MAX_ALLOWED', get_option('active-bmc-max-allowed'))
  conf.set_quoted('HASH_FILE_NAME', get_option('hash-file-name'))
  conf.set_quoted('IMG_UPLOAD_DIR', get_option('img-upload-dir'))
@@ -304,7 +304,7 @@ index f99a034..969fa43 100644
  conf.set_quoted('MANIFEST_FILE_NAME', get_option('manifest-file-name'))
  conf.set_quoted('MEDIA_DIR', get_option('media-dir'))
  optional_array = get_option('optional-images')
-@@ -98,6 +102,10 @@ if get_option('host-bios-upgrade').enabled()
+@@ -95,6 +99,10 @@ if get_option('host-bios-upgrade').enabled()
      conf.set_quoted('BIOS_OBJPATH', get_option('bios-object-path'))
  endif
  
@@ -315,10 +315,10 @@ index f99a034..969fa43 100644
  if get_option('bmc-static-dual-image').enabled()
    conf.set('BMC_STATIC_DUAL_IMAGE', get_option('bmc-static-dual-image').enabled())
    conf.set_quoted('ALT_ROFS_DIR', get_option('alt-rofs-dir'))
-diff --git a/meson_options.txt b/meson_options.txt
-index a356b5b..519ba2c 100644
---- a/meson_options.txt
-+++ b/meson_options.txt
+diff --git a/meson.options b/meson.options
+index b088a8d..192c012 100644
+--- a/meson.options
++++ b/meson.options
 @@ -12,6 +12,9 @@ option('bmc-layout', type: 'combo',
  option('host-bios-upgrade', type: 'feature', value: 'enabled',
      description: 'Enable host bios upgrade support.')
@@ -329,7 +329,7 @@ index a356b5b..519ba2c 100644
  option('sync-bmc-files', type: 'feature', value: 'enabled',
      description: 'Enable sync of filesystem files.')
  
-@@ -52,6 +55,12 @@ option(
+@@ -49,6 +52,13 @@ option(
      description: 'Directory where downloaded software images are placed.',
  )
  
@@ -339,10 +339,11 @@ index a356b5b..519ba2c 100644
 +    description: 'Directory where downloaded software images are placed.',
 +)
 +
++
  option(
      'manifest-file-name', type: 'string',
      value: 'MANIFEST',
-@@ -118,6 +127,12 @@ option(
+@@ -115,6 +125,12 @@ option(
      description: 'The BIOS DBus object path.',
  )
  
@@ -356,5 +357,5 @@ index a356b5b..519ba2c 100644
      description: 'Enable the dual image support for static layout.')
  
 -- 
-2.17.1
+2.34.1
 
