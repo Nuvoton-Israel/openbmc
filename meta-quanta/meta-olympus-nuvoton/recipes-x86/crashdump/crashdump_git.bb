@@ -12,8 +12,10 @@ EXTRA_OECMAKE = "-DYOCTO_DEPENDENCIES=ON -DCRASHDUMP_BUILD_UT=OFF"
 LICENSE = "Proprietary"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=43c09494f6b77f344027eea0a1c22830"
 
-SRC_URI = "git://git@github.com/Intel-BMC/crashdump;protocol=https;nobranch=1"
-SRCREV = "wht-1.0.6"
+SRC_URI = "git://github.com/Intel-BMC/crashdump.git;protocol=https;nobranch=1"
+# from now on, bitbake not allow set git revsion without sha-1 style
+#SRCREV = "wht-1.0.6"
+SRCREV = "edea231cc1df74576e5a46c70bf163bb2b365d99"
 
 S = "${WORKDIR}/git"
 
