@@ -236,7 +236,7 @@ do_generate_ext4_tar:append() {
     ln -sf ${DEPLOY_DIR_IMAGE}/${FLASH_KERNEL_IMAGE} image-kernel
     ln -sf ${S}/ext4/${IMAGE_LINK_NAME}.${FLASH_EXT4_BASETYPE}.zst image-rofs
     ln -sf ${IMGDEPLOYDIR}/${IMAGE_LINK_NAME}.rwfs.${FLASH_EXT4_OVERLAY_BASETYPE} image-rwfs
-    ln -sf ${IMAGE_NAME}.rootfs.wic.gz image-emmc.gz
+    ln -sf ${IMAGE_NAME}.wic.gz image-emmc.gz
 }
 
 addtask do_pad_binary before do_prepare_bootloaders

@@ -82,7 +82,7 @@ do_generate_ext4_tar:npcm7xx() {
     # if "wic.gz" in d.getVar('IMAGE_FSTYPES')
     wic_gz="${@bb.utils.contains('IMAGE_FSTYPES', 'wic.gz', 'yes', '', d)}"
     if [ -n "$wic_gz" ];then
-        ln -sf ${IMAGE_NAME}.rootfs.wic.gz image-emmc.gz
+        ln -sf ${IMAGE_NAME}.wic.gz image-emmc.gz
     elif [ -h image-emmc.gz ];then
         rm -f image-emmc.gz
     fi
