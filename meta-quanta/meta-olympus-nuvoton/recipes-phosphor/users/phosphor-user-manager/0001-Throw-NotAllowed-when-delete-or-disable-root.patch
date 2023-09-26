@@ -1,4 +1,4 @@
-From 939067d91febed1052c281bafa845f067f149ba5 Mon Sep 17 00:00:00 2001
+From 793ee8b07f15d0f842f969807965cb56978f7be0 Mon Sep 17 00:00:00 2001
 From: Brian Ma <chma0@nuvoton.com>
 Date: Fri, 25 Mar 2022 16:28:25 +0800
 Subject: [PATCH] Throw NotAllowed when delete or disable root
@@ -16,10 +16,10 @@ Change-Id: I32430ab376c584ef7e4eec88cf604e00bfc6f415
  2 files changed, 21 insertions(+)
 
 diff --git a/user_mgr.cpp b/user_mgr.cpp
-index f4a90ec..099b2d1 100644
+index 4f49925..78b85b2 100644
 --- a/user_mgr.cpp
 +++ b/user_mgr.cpp
-@@ -92,6 +92,7 @@ using InternalFailure =
+@@ -91,6 +91,7 @@ using InternalFailure =
      sdbusplus::xyz::openbmc_project::Common::Error::InternalFailure;
  using InvalidArgument =
      sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument;
@@ -27,7 +27,7 @@ index f4a90ec..099b2d1 100644
  using UserNameExists =
      sdbusplus::xyz::openbmc_project::User::Common::Error::UserNameExists;
  using UserNameDoesNotExist =
-@@ -101,6 +102,7 @@ using UserNameGroupFail =
+@@ -100,6 +101,7 @@ using UserNameGroupFail =
  using NoResource =
      sdbusplus::xyz::openbmc_project::User::Common::Error::NoResource;
  using Argument = xyz::openbmc_project::Common::InvalidArgument;
@@ -35,7 +35,7 @@ index f4a90ec..099b2d1 100644
  using GroupNameExists =
      sdbusplus::xyz::openbmc_project::User::Common::Error::GroupNameExists;
  using GroupNameDoesNotExists =
-@@ -230,6 +232,15 @@ void UserMgr::throwForUserExists(const std::string& userName)
+@@ -226,6 +228,15 @@ void UserMgr::throwForUserExists(const std::string& userName)
      }
  }
  
@@ -51,15 +51,15 @@ index f4a90ec..099b2d1 100644
  void UserMgr::throwForUserNameConstraints(
      const std::string& userName, const std::vector<std::string>& groupNames)
  {
-@@ -393,6 +404,7 @@ void UserMgr::deleteUser(std::string userName)
+@@ -392,6 +403,7 @@ void UserMgr::deleteUser(std::string userName)
      // All user management lock has to be based on /etc/shadow
      // TODO  phosphor-user-manager#10 phosphor::user::shadow::Lock lock{};
      throwForUserDoesNotExist(userName);
 +    throwForNotAllowRoot(userName);
      try
      {
-         executeUserDelete(userName.c_str());
-@@ -766,6 +778,8 @@ void UserMgr::userEnable(const std::string& userName, bool enabled)
+         // Clear user fail records
+@@ -745,6 +757,8 @@ void UserMgr::userEnable(const std::string& userName, bool enabled)
      // All user management lock has to be based on /etc/shadow
      // TODO  phosphor-user-manager#10 phosphor::user::shadow::Lock lock{};
      throwForUserDoesNotExist(userName);
@@ -69,10 +69,10 @@ index f4a90ec..099b2d1 100644
      {
          executeUserModifyUserEnable(userName.c_str(), enabled);
 diff --git a/user_mgr.hpp b/user_mgr.hpp
-index ec205e4..29be825 100644
+index d7b731c..6d3a32d 100644
 --- a/user_mgr.hpp
 +++ b/user_mgr.hpp
-@@ -299,6 +299,13 @@ class UserMgr : public Ifaces
+@@ -333,6 +333,13 @@ class UserMgr : public Ifaces
       */
      void throwForUserExists(const std::string& userName);
  
