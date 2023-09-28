@@ -8,11 +8,11 @@ Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
  src/entity_manager.cpp | 29 +++++++++++++++++++++++++++++
  1 file changed, 29 insertions(+)
 
-diff --git a/src/entity_manager.cpp b/src/entity_manager.cpp
-index f5e303a7..73129e3e 100644
---- a/src/entity_manager.cpp
-+++ b/src/entity_manager.cpp
-@@ -633,6 +633,35 @@ void postToDbus(const nlohmann::json& newConfiguration,
+Index: git/src/entity_manager.cpp
+===================================================================
+--- git.orig/src/entity_manager.cpp
++++ git/src/entity_manager.cpp
+@@ -633,6 +633,34 @@ void postToDbus(const nlohmann::json& ne
              }
          }
  
@@ -20,7 +20,7 @@ index f5e303a7..73129e3e 100644
 +        if (findAssociations != boardValues.end() &&
 +            findAssociations->type() == nlohmann::json::value_t::array)
 +        {
-+            std::cerr << "create xyz.openbmc_project.Association.Definitions from json\n";
++            std::cerr << "create Associations to " << boardNameOrig << "\n";
 +            std::vector<Association> associations;
 +            for (auto& association : *findAssociations)
 +            {
@@ -37,10 +37,9 @@ index f5e303a7..73129e3e 100644
 +                        findPath->get<std::string>());
 +                }
 +            }
-+
-+            auto ifacePtr = objServer.add_interface(
-+                boardName, "xyz.openbmc_project.Association.Definitions");
-+
++            auto ifacePtr = createInterface(
++                objServer, boardPath,
++		"xyz.openbmc_project.Association.Definitions", boardNameOrig);
 +            ifacePtr->register_property("Associations", associations);
 +            ifacePtr->initialize();
 +        }
@@ -48,6 +47,3 @@ index f5e303a7..73129e3e 100644
          auto exposes = boardValues.find("Exposes");
          if (exposes == boardValues.end())
          {
--- 
-2.34.1
-
