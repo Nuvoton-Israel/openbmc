@@ -1,4 +1,4 @@
-From 4be4ce8c2a37b3295731141903c0e97da7acc91b Mon Sep 17 00:00:00 2001
+From f6245547cb9274d452b77a427e688eb8a325f1be Mon Sep 17 00:00:00 2001
 From: "Kowalski, Mariusz" <mariusz.kowalski@intel.com>
 Date: Thu, 27 Feb 2020 15:48:56 +0100
 Subject: [PATCH] MCTP Daemon D-Bus interface definition.
@@ -340,7 +340,7 @@ index 00000000..d46298ed
 +      type: boolean
 +      description: Indicates Eid pool is managed by self
 diff --git a/yaml/xyz/openbmc_project/MCTP/Endpoint.interface.yaml b/yaml/xyz/openbmc_project/MCTP/Endpoint.interface.yaml
-index 8cb0f133..abb3ac93 100644
+index 568fb999..84d203b4 100644
 --- a/yaml/xyz/openbmc_project/MCTP/Endpoint.interface.yaml
 +++ b/yaml/xyz/openbmc_project/MCTP/Endpoint.interface.yaml
 @@ -6,6 +6,11 @@ description: >
@@ -353,7 +353,7 @@ index 8cb0f133..abb3ac93 100644
 +          Endpoint / BusOwner / Bridge
 +
      - name: NetworkId
-       type: size
+       type: uint32
        description: >
 diff --git a/yaml/xyz/openbmc_project/MCTP/SupportedMessageTypes.interface.yaml b/yaml/xyz/openbmc_project/MCTP/SupportedMessageTypes.interface.yaml
 new file mode 100644
@@ -398,5 +398,5 @@ index 00000000..fa447ee6
 +      type: boolean
 +      description: Indicates support availability
 -- 
-2.17.1
+2.34.1
 
