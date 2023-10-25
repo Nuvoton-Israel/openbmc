@@ -8,6 +8,14 @@ EXTRA_OEMAKE:append:npcm8xx = " \
     CFG_TEE_SDP_MEM_SIZE=0x00100000 \
     "
 
+# enable RPMB FS for fTPM
+EXTRA_OEMAKE:append:npcm8xx = " \
+    CFG_REE_FS=n \
+    CFG_RPMB_FS=y \
+    "
+# use TEST key only on special device
+# EXTRA_OEMAKE:append:npcm8xx = " CFG_RPMB_TESTKEY=y"
+
 do_deploy:npcm8xx() {
     install -d ${DEPLOYDIR}/
     install -m 644 ${D}${nonarch_base_libdir}/firmware/* ${DEPLOYDIR}/
