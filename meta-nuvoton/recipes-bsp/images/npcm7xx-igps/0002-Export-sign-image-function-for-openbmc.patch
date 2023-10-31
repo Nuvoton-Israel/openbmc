@@ -1,0 +1,88 @@
+From dede797416351709c2bd78c5905a1428516ade50 Mon Sep 17 00:00:00 2001
+From: Ban Feng <kcfeng0@nuvoton.com>
+Date: Mon, 30 Oct 2023 13:33:56 +0800
+Subject: [PATCH] Export sign image function for openbmc
+
+Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
+---
+ ImageGeneration/BinarySignatureGenerator.py | 44 ++++++++++++---------
+ 1 file changed, 25 insertions(+), 19 deletions(-)
+
+Index: git/ImageGeneration/BinarySignatureGenerator.py
+===================================================================
+--- git.orig/ImageGeneration/BinarySignatureGenerator.py
++++ git/ImageGeneration/BinarySignatureGenerator.py
+@@ -22,7 +22,7 @@ def sign_binary(binfile, begin_offset, p
+ 
+ 
+ signit = "signit"
+-linux_prefix = "sudo ./"
++linux_prefix = " "
+ 
+ 
+ class SignitError(Exception):
+@@ -69,30 +69,22 @@ class OpensslError(Exception):
+ 
+ def convertBinToDER(public, private):
+ 
+-	DER_template_array = ""
+ 
+ 	# MODULUS (PUBLIC KEY)
+-	DER_template_array += "".join(['\x30', '\x82', '\x04', '\xa4', '\x02', '\x01', '\x00', '\x02', '\x82', '\x01', '\x01', '\x00'])
+-	DER_template_array += public
++	DER_template_array = b'\x30\x82\x04\xa4\x02\x01\x00\x02\x82\x01\x01\x00' + public
+ 	
+ 	# PRIVATE EXPONENT
+-	DER_template_array += "".join(['\x02', '\x03', '\x01', '\x00', '\x01', '\x02', '\x82', '\x01', '\x01', '\x00'])
+-	DER_template_array += private
++	DER_template_array += b'\x02\x03\x01\x00\x01\x02\x82\x01\x01\x00' + private
+ 
+-	DER_template_array += "".join(['\x02', '\x81', '\x81', '\x00'])	
+-	DER_template_array += "".join(['\xff']*0x80)
++	DER_template_array += b'\x02\x81\x81\x00' + b'\xff' * 0x80
+ 
+-	DER_template_array += "".join(['\x02', '\x81', '\x81', '\x00'])	
+-	DER_template_array += "".join(['\xff']*0x80)
++	DER_template_array += b'\x02\x81\x81\x00' + b'\xff' * 0x80
+ 
+-	DER_template_array += "".join(['\x02', '\x81', '\x80'])	
+-	DER_template_array += "".join(['\xff']*0x80)
++	DER_template_array += b'\x02\x81\x80' + b'\xff' * 0x80
+ 
+-	DER_template_array += "".join(['\x02', '\x81', '\x81', '\x00'])	
+-	DER_template_array += "".join(['\xff']*0x80)
++	DER_template_array += b'\x02\x81\x81\x00' + b'\xff' * 0x80
+ 
+-	DER_template_array += "".join(['\x02', '\x81', '\x80'])	
+-	DER_template_array += "".join(['\xff']*0x80)
++	DER_template_array += b'\x02\x81\x80' + b'\xff' * 0x80
+ 
+ 	return DER_template_array
+ 
+@@ -115,6 +107,7 @@ def sign_binary_openssl(bin_filename, be
+ 		input = bin_file.read()
+ 		bin_file.close()
+ 
++		begin_offset = int(begin_offset)
+ 		signed_area_file = open(signed_area_filename, "wb")
+ 		signed_area_file.write(input[begin_offset:])
+ 		signed_area_file.close()
+@@ -147,6 +140,7 @@ def sign_binary_openssl(bin_filename, be
+ 		signature = output_file.read()
+ 		output_file.close()
+ 
++		embed_signature = int(embed_signature)
+ 		output = input[:embed_signature] + signature[::-1] + input[(embed_signature + len(signature)):]
+ 
+ 		# write the input with the embedded signature to the output file
+@@ -165,3 +159,10 @@ def sign_binary_openssl(bin_filename, be
+ 			os.remove(key_filename)
+ 
+ 		os.chdir(currpath)
++
++if __name__ == '__main__':
++	args = sys.argv
++	# args[0] = current file
++	# args[1] = function name
++	# args[2:] = function args : (*unpacked)
++	globals()[args[1]](*args[2:])

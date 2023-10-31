@@ -4,7 +4,15 @@ FULL_SUFFIX = "full"
 MERGED_SUFFIX = "merged"
 UBOOT_SUFFIX:append = ".${MERGED_SUFFIX}"
 
-IGPS_DIR = "${STAGING_DIR_NATIVE}/${datadir}/npcm7xx-igps"
+IGPS_DIR = "${STAGING_DIR_NATIVE}${datadir}/npcm7xx-igps"
+
+check_keys() {
+    if [ -n "${KEY_FOLDER}" ]; then
+        echo "local"
+    else
+        echo "default"
+    fi
+}
 
 # Prepare the Bootblock and U-Boot images using npcm7xx-bingo
 do_prepare_bootloaders() {
@@ -15,6 +23,39 @@ do_prepare_bootloaders() {
 
     bingo ${IGPS_DIR}/UbootHeader_${IGPS_MACHINE}.xml \
             -o ${DEPLOY_DIR_IMAGE}/${UBOOT_BINARY}.${FULL_SUFFIX}
+
+    # Signature prodedure if necessary
+    if [ "${SECURED_IMAGE}" = "True" ]; then
+        checked=`check_keys`
+        if [ "${checked}" = "local" ]; then
+            bbnote "Sign image with local keys"
+            key_rsa_pri=${KEY_FOLDER}/${KEY_RSA_PRI}
+            key_rsa_pub=${KEY_FOLDER}/${KEY_RSA_PUB}
+        else
+            bbnote "Sign image with default keys"
+            key_rsa_pri=${KEY_FOLDER_DEFAULT}/${KEY_RSA_PRI}
+            key_rsa_pub=${KEY_FOLDER_DEFAULT}/${KEY_RSA_PUB}
+        fi
+        bbnote "rsa prikey from ${checked}: ${key_rsa_pri}"
+        bbnote "rsa pubkey from ${checked}: ${key_rsa_pub}"
+
+        res=`python3 ${IGPS_DIR}/BinarySignatureGenerator.py sign_binary \
+            ${DEPLOY_DIR_IMAGE}/${BOOTBLOCK}.${FULL_SUFFIX} 320 ${key_rsa_pri} \
+            ${key_rsa_pub} 8 ${DEPLOY_DIR_IMAGE}/${BOOTBLOCK}.${FULL_SUFFIX}
+
+            python3 ${IGPS_DIR}/BinarySignatureGenerator.py sign_binary \
+            ${DEPLOY_DIR_IMAGE}/${UBOOT_BINARY}.${FULL_SUFFIX} 320 ${key_rsa_pri} \
+            ${key_rsa_pub} 8 ${DEPLOY_DIR_IMAGE}/${UBOOT_BINARY}.${FULL_SUFFIX}`
+
+	echo $res
+        # stop if signing binary gets failure
+        set +e
+        err=`echo $res | grep -E "missing|Invalid|failed"`
+        if [ -n "${err}" ]; then
+            bbfatal "Sign binary failed: keys are not found or invalid."
+            bbfatal "Please check your KEY_FOLDER and KEY definition."
+        fi
+    fi
 
     bingo ${IGPS_DIR}/mergedBootBlockAndUboot.xml \
             -o ${DEPLOY_DIR_IMAGE}/${UBOOT_BINARY}.${MERGED_SUFFIX}

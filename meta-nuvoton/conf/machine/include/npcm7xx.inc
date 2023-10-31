@@ -31,3 +31,13 @@ include conf/machine/include/soc-family.inc
 MACHINEOVERRIDES .= ":npcm7xx"
 
 require conf/machine/include/tune-arm7a-novfp.inc
+
+# Sign image
+SIGN_TYPE ?= "openssl"
+
+KEY_FOLDER ?= ""
+KEY_FOLDER_DEFAULT ?= "${DEPLOY_DIR_IMAGE}/${SIGN_TYPE}"
+KEY_RSA_PRI ?= "rsa_private_key_0.bin"
+KEY_RSA_PUB ?= "rsa_public_key_0.bin"
+
+SECURED_IMAGE ?= "False"
