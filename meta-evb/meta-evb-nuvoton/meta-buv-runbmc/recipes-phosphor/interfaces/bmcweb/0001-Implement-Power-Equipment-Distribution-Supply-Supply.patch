@@ -1,6 +1,6 @@
-From 240890eb171def8be7b7bb7bc366e852c0bcce2d Mon Sep 17 00:00:00 2001
+From 9df8b2e5e0ff9ad4b18b47d94fe0eacb5fbe0eae Mon Sep 17 00:00:00 2001
 From: Ban Feng <kcfeng0@nuvoton.com>
-Date: Tue, 25 Jul 2023 17:29:31 +0800
+Date: Mon, 30 Oct 2023 10:49:04 +0800
 Subject: [PATCH] Implement Power{Equipment, Distribution, Supply,
  SupplyMetrics} schema
 
@@ -8,20 +8,20 @@ Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
 Signed-off-by: Allen Kang <jhkang@nuvoton.com>
 ---
  redfish-core/include/redfish.hpp          |   6 +
- redfish-core/lib/power_distribution.hpp   | 574 ++++++++++++++++++++++
+ redfish-core/lib/power_distribution.hpp   | 575 ++++++++++++++++++++++
  redfish-core/lib/power_equipment.hpp      |  54 ++
  redfish-core/lib/power_supply.hpp         | 457 +++++++++++++----
  redfish-core/lib/power_supply_metrics.hpp | 261 ++++++++++
  redfish-core/lib/service_root.hpp         |   2 +
- 6 files changed, 1271 insertions(+), 83 deletions(-)
+ 6 files changed, 1272 insertions(+), 83 deletions(-)
  create mode 100644 redfish-core/lib/power_distribution.hpp
  create mode 100644 redfish-core/lib/power_equipment.hpp
  create mode 100644 redfish-core/lib/power_supply_metrics.hpp
 
-Index: git/redfish-core/include/redfish.hpp
-===================================================================
---- git.orig/redfish-core/include/redfish.hpp
-+++ git/redfish-core/include/redfish.hpp
+diff --git a/redfish-core/include/redfish.hpp b/redfish-core/include/redfish.hpp
+index 540bb070c7..cca700986e 100644
+--- a/redfish-core/include/redfish.hpp
++++ b/redfish-core/include/redfish.hpp
 @@ -39,8 +39,11 @@
  #include "pcie.hpp"
  #include "pcie_slots.hpp"
@@ -47,10 +47,11 @@ Index: git/redfish-core/include/redfish.hpp
          requestRoutesThermalSubsystem(app);
          requestRoutesFan(app);
          requestRoutesFanCollection(app);
-Index: git/redfish-core/lib/power_distribution.hpp
-===================================================================
+diff --git a/redfish-core/lib/power_distribution.hpp b/redfish-core/lib/power_distribution.hpp
+new file mode 100644
+index 0000000000..6a590031fe
 --- /dev/null
-+++ git/redfish-core/lib/power_distribution.hpp
++++ b/redfish-core/lib/power_distribution.hpp
 @@ -0,0 +1,575 @@
 +#pragma once
 +
@@ -627,10 +628,11 @@ Index: git/redfish-core/lib/power_distribution.hpp
 +}
 +
 +} // namespace redfish
-Index: git/redfish-core/lib/power_equipment.hpp
-===================================================================
+diff --git a/redfish-core/lib/power_equipment.hpp b/redfish-core/lib/power_equipment.hpp
+new file mode 100644
+index 0000000000..baba5474c5
 --- /dev/null
-+++ git/redfish-core/lib/power_equipment.hpp
++++ b/redfish-core/lib/power_equipment.hpp
 @@ -0,0 +1,54 @@
 +#pragma once
 +
@@ -686,11 +688,11 @@ Index: git/redfish-core/lib/power_equipment.hpp
 +}
 +
 +} // namespace redfish
-Index: git/redfish-core/lib/power_supply.hpp
-===================================================================
---- git.orig/redfish-core/lib/power_supply.hpp
-+++ git/redfish-core/lib/power_supply.hpp
-@@ -22,10 +22,12 @@ static constexpr std::array<std::string_
+diff --git a/redfish-core/lib/power_supply.hpp b/redfish-core/lib/power_supply.hpp
+index f59ed57d5f..c7d97e6e17 100644
+--- a/redfish-core/lib/power_supply.hpp
++++ b/redfish-core/lib/power_supply.hpp
+@@ -22,10 +22,12 @@ static constexpr std::array<std::string_view, 1> powerSupplyInterface = {
      "xyz.openbmc_project.Inventory.Item.PowerSupply"};
  
  inline void updatePowerSupplyList(
@@ -784,10 +786,10 @@ Index: git/redfish-core/lib/power_supply.hpp
  
 -        updatePowerSupplyList(asyncResp, chassisId, subtreePaths);
 +        updatePowerSupplyList(req, asyncResp, chassisId, subtreePaths);
-         });
+     });
  }
  
-@@ -129,7 +158,68 @@ inline void handlePowerSupplyCollectionG
+@@ -129,7 +158,68 @@ inline void handlePowerSupplyCollectionGet(
  
      redfish::chassis_utils::getValidChassisPath(
          asyncResp, chassisId,
@@ -857,7 +859,7 @@ Index: git/redfish-core/lib/power_supply.hpp
  }
  
  inline void requestRoutesPowerSupplyCollection(App& app)
-@@ -143,6 +233,17 @@ inline void requestRoutesPowerSupplyColl
+@@ -143,6 +233,17 @@ inline void requestRoutesPowerSupplyCollection(App& app)
          .privileges(redfish::privileges::getPowerSupplyCollection)
          .methods(boost::beast::http::verb::get)(
              std::bind_front(handlePowerSupplyCollectionGet, std::ref(app)));
@@ -939,7 +941,7 @@ Index: git/redfish-core/lib/power_supply.hpp
 +            asyncResp->res.jsonValue["Location"]["PartLocation"]["ServiceLabel"] =
 +                *serviceLabel;
 +        }
-         });
+     });
  }
  
 -inline void handleGetEfficiencyResponse(
@@ -1125,7 +1127,7 @@ Index: git/redfish-core/lib/power_supply.hpp
 +        {
 +            asyncResp->res.jsonValue["HotPluggable"] = *hotpluggable;
 +        }
-         });
+     });
  }
  
  inline void
@@ -1197,7 +1199,7 @@ Index: git/redfish-core/lib/power_supply.hpp
 +            /* Should be from PMBUS */
 +            asyncResp->res.jsonValue["Version"] = *version;
 +        }
-         });
+     });
  }
  
  inline void
@@ -1264,7 +1266,7 @@ Index: git/redfish-core/lib/power_supply.hpp
 +                                      powerSupplyPath);
 +            getPowerSupplyVendorInformation(asyncResp, object.begin()->first,
 +                                            powerSupplyPath);
-             });
+         });
  
 -        getEfficiencyPercent(asyncResp);
 +        getEfficiencyPercent(asyncResp, powerSupplyPath);
@@ -1280,7 +1282,7 @@ Index: git/redfish-core/lib/power_supply.hpp
  }
  
  inline void requestRoutesPowerSupply(App& app)
-@@ -565,6 +850,12 @@ inline void requestRoutesPowerSupply(App
+@@ -565,6 +850,12 @@ inline void requestRoutesPowerSupply(App& app)
          .privileges(redfish::privileges::getPowerSupply)
          .methods(boost::beast::http::verb::get)(
              std::bind_front(handlePowerSupplyGet, std::ref(app)));
@@ -1293,10 +1295,11 @@ Index: git/redfish-core/lib/power_supply.hpp
  }
  
  } // namespace redfish
-Index: git/redfish-core/lib/power_supply_metrics.hpp
-===================================================================
+diff --git a/redfish-core/lib/power_supply_metrics.hpp b/redfish-core/lib/power_supply_metrics.hpp
+new file mode 100644
+index 0000000000..dab8730001
 --- /dev/null
-+++ git/redfish-core/lib/power_supply_metrics.hpp
++++ b/redfish-core/lib/power_supply_metrics.hpp
 @@ -0,0 +1,261 @@
 +#pragma once
 +
@@ -1559,10 +1562,10 @@ Index: git/redfish-core/lib/power_supply_metrics.hpp
 +}
 +
 +} // namespace redfish
-Index: git/redfish-core/lib/service_root.hpp
-===================================================================
---- git.orig/redfish-core/lib/service_root.hpp
-+++ git/redfish-core/lib/service_root.hpp
+diff --git a/redfish-core/lib/service_root.hpp b/redfish-core/lib/service_root.hpp
+index 6ae16c3780..b9578e47f4 100644
+--- a/redfish-core/lib/service_root.hpp
++++ b/redfish-core/lib/service_root.hpp
 @@ -86,6 +86,8 @@ inline void handleServiceRootGetImpl(
      asyncResp->res.jsonValue["TelemetryService"]["@odata.id"] =
          "/redfish/v1/TelemetryService";
@@ -1572,3 +1575,6 @@ Index: git/redfish-core/lib/service_root.hpp
  
      asyncResp->res.jsonValue["Links"]["ManagerProvidingService"]["@odata.id"] =
          "/redfish/v1/Managers/bmc";
+-- 
+2.34.1
+
