@@ -1,13 +1,13 @@
-From 4ac35f942f732e89147ded01327db24ecdb51a4d Mon Sep 17 00:00:00 2001
+From 685be8219b1dd85f23b7525e622cdcb97fab7a7c Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Mon, 15 Aug 2022 16:13:12 +0800
-Subject: [PATCH 4/5] add dimm sensor
+Subject: [PATCH] add dimm sensor
 
 Signed-off-by: Stanley Chu <yschu@nuvoton.com>
 ---
  include/amd-apml.h |  74 ++++++
  include/i3cdev.h   |  39 +++
- meson_options.txt  |   1 +
+ meson.options      |   1 +
  src/DIMMSensor.cpp | 577 +++++++++++++++++++++++++++++++++++++++++++++
  src/DIMMSensor.hpp |  51 ++++
  src/meson.build    |  14 ++
@@ -142,10 +142,10 @@ index 00000000..7b8d429a
 +	_IOC(_IOC_READ|_IOC_WRITE, I3C_DEV_IOC_MAGIC, 30, I3C_PRIV_XFER_SIZE(N))
 +
 +#endif
-diff --git a/meson_options.txt b/meson_options.txt
+diff --git a/meson.options b/meson.options
 index d6a8b966..c0ec6454 100644
---- a/meson_options.txt
-+++ b/meson_options.txt
+--- a/meson.options
++++ b/meson.options
 @@ -12,3 +12,4 @@ option('external', type: 'feature', value: 'enabled', description: 'Enable Exter
  option('tests', type: 'feature', value: 'enabled', description: 'Build tests.',)
  option('validate-unsecure-feature', type : 'feature', value : 'disabled', description : 'Enables unsecure features required by validation. Note: mustbe turned off for production images.',)
@@ -792,10 +792,10 @@ index 00000000..86888cf6
 +    boost::asio::steady_timer waitTimer;
 +};
 diff --git a/src/meson.build b/src/meson.build
-index 9f56c315..f46acceb 100644
+index 03310b79..09a57cfa 100644
 --- a/src/meson.build
 +++ b/src/meson.build
-@@ -234,3 +234,17 @@ if get_option('external').enabled()
+@@ -227,3 +227,17 @@ if get_option('external').enabled()
          install: true,
      )
  endif
