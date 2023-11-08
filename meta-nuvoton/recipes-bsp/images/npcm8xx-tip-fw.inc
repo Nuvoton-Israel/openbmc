@@ -12,8 +12,12 @@ SRC_URI = "git://github.com/Nuvoton-Israel/npcm8xx-tip-fw;branch=main;protocol=h
 
 inherit deploy
 do_deploy () {
-    install -D -m 644 ${OUTPUT_BIN}/${TIP_FW} ${DEPLOYDIR}/${TIP_FW}
-    install -D -m 644 ${OUTPUT_BIN}/${SA_TIP_FW} ${DEPLOYDIR}/${SA_TIP_FW}
+    if [ "${TIP_IMAGE}" = "True" ] ; then
+        install -D -m 644 ${OUTPUT_BIN}/${TIP_FW} ${DEPLOYDIR}/${TIP_FW}
+    fi
+    if [ "${SA_TIP_IMAGE}" = "True" ] ; then
+        install -D -m 644 ${OUTPUT_BIN}/${SA_TIP_FW} ${DEPLOYDIR}/${SA_TIP_FW}
+    fi
 }
 
 addtask deploy before do_build after do_compile
