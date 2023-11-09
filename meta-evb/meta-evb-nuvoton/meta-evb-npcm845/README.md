@@ -45,6 +45,7 @@ For more product questions, please contact us at:
   * [JTAG Master](#jtag-master)
   * [SMBus](#smbus)
   * [ESPI](#espi)
+  * [VWGPIO](#vwgpio)
   * [SIOX](#siox)
   * [SPIX](#spix)
   * [VGA](#vga)
@@ -1132,8 +1133,9 @@ The EVB has the J_eSPI header to support ESPI transactions.
 - Enable u-boot configuration
 > _Edit nuvoton-npcm845-evb.dts in u-boot_  
 ```
-  config {
-    espi-channel-support = <0xf>;
+  &host_intf {
+       type = "espi";
+       channel-support = <0xf>;
   };
 ```
 > _The configuration above claims that all channels would be supported._  
@@ -1147,6 +1149,88 @@ The EVB has the J_eSPI header to support ESPI transactions.
   * The value of **ESPIHINDP** register is expected to be **0x0001111f**.
   * Bit **8** of **MFSEL4** register is set to **1**.  
 - Issue ESPI request packets from the host.
+
+## VWGPIO
+
+The EVB has sixteen Slave-to-Master and sixteen Master-to-Slave, each of them has 4 wires, total 128 GPIO pins can use.
+
+### Linux test
+- example of DTS setting in nuvoton-npcm845-evb.dts
+```
+&vw_gpio {
+        status = "okay";
+        nuvoton,gpio-control-map = <1>;
+        nuvoton,control-interrupt-map = <0>;
+        nuvoton,index-en-map = <0x80000008>;
+        nuvoton,vwgpms-wire-map = <0x80000000 0x00000000>;
+
+        nuvoton,vwgpsm-wire-map = <0xFFFFFFFF 0xFFFFFFFF>;
+        gpio-line-names =
+                "","","","","","","","",
+                "","","","","VW_FM_BMC_READY_N","","","",
+                "","","","","","","","",
+                "","","","","","","","",
+                "","","","","","","","",
+                "","","","","","","","",
+                "","","","","","","","",
+                "","","","","","","","",
+                "","","","","","","","",
+                "","","","","","","","",
+                "","","","","","","","",
+                "","","","","","","","",
+                "","","","","","","","",
+                "","","","","","","","",
+                "","","","","","","","",
+                "","","","","","","","VW_FM_BIOS_POST_CMPLT_N";
+};
+```
+- Enable Kernel config
+```
+CONFIG_NPCM_ESPI_VWGPIO=y
+```
+- Booting EVB to OpenBMC, and you can use libgpiod tools to check the information
+```
+root@evb-npcm845:/# gpioinfo 9
+gpiochip9 - 128 lines:
+        line   0:      unnamed       unused  output  active-high
+        line   1:      unnamed       unused  output  active-high
+        line   2:      unnamed       unused  output  active-high
+        line   3:      unnamed       unused  output  active-high
+        .....
+        line   8:      unnamed       unused  output  active-high
+        line   9:      unnamed       unused  output  active-high
+        line  10:      unnamed       unused  output  active-high
+        line  11:      unnamed       unused  output  active-high
+        line  12: "VW_FM_BMC_READY_N" unused output active-high
+        line  13:      unnamed       unused  output  active-high
+        line  14:      unnamed       unused  output  active-high
+        line  15:      unnamed       unused  output  active-high
+        .....
+        line  60:      unnamed       unused  output  active-high
+        line  61:      unnamed       unused  output  active-high
+        line  62:      unnamed       unused  output  active-high
+        line  63:      unnamed       unused  output  active-high
+        line  64:      unnamed       unused   input  active-high
+        line  65:      unnamed       unused   input  active-high
+        line  66:      unnamed       unused   input  active-high
+        line  67:      unnamed       unused   input  active-high
+        .....
+        line 124:      unnamed       unused   input  active-high
+        line 125:      unnamed       unused   input  active-high
+        line 126:      unnamed       unused   input  active-high
+        line 127: "VW_FM_BIOS_POST_CMPLT_N" "power-control" input active-high [used]
+
+root@evb-npcm845:/# gpioset 9 12=0
+root@evb-npcm845:/# gpioset 9 12=1
+
+root@evb-npcm845:/# gpioget 9 124
+0
+```
+- Using x86-power-control to monitor gpio127 status
+```
+event: FALLING EDGE offset: 127 timestamp: [   639.910727512]
+event: RISING EDGE offset: 127 timestamp: [   648.730730100]
+```
 
 ## SIOX
 
