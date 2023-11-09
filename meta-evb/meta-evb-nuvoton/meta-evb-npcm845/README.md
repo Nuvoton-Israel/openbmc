@@ -25,6 +25,8 @@ For more product questions, please contact us at:
 - [Getting Started](#getting-started)
   * [Setting up EVB](#setting-up-evb)
   * [Building your OpenBMC project](#building-your-openbmc-project)
+    + [Enable Secure Image](#enable-secure-image)
+    + [Enable NO TIP FW](#enable-no-tip-fw)
     + [Enable ECC](#enable-ecc)
     + [Configuration](#configuration)
     + [Build](#build)
@@ -100,6 +102,20 @@ TipROM 0x104 ** Secure boot is enabled
 ```
 
 ## Building your OpenBMC project
+
+### Enable Secure Image
+
+To enable Secure Image function, please set below variable in your platform include file. [Reference](https://github.com/Nuvoton-Israel/openbmc/blob/npcm-master/meta-nuvoton/conf/machine/include/npcm8xx.inc#L58)
+```ruby
+SECURED_IMAGE = "True"
+```
+
+### Enable NO TIP FW
+
+To enable NO TIP FW function, please set below variable in your platform include file. [Reference](https://github.com/Nuvoton-Israel/openbmc/blob/npcm-master/meta-nuvoton/conf/machine/include/npcm8xx.inc#L60)
+```ruby
+TIP_IMAGE = "False"
+```
 
 ### Enable ECC
 
