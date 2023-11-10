@@ -31,6 +31,7 @@ For more product questions, please contact us at:
     + [Configuration](#configuration)
     + [Build](#build)
     + [Output Images](#output-images)
+    + [Change FIU Speed](#change-fiu-speed)
   * [Flash Programing Tool](#flash-programing-tool)
     + [IGPS](#igps)
     + [ISP](#ISP)
@@ -167,6 +168,31 @@ image-bmc   |  includes image-u-boot and image-kernel and image-rofs            
 image-uboot   |  tipfw + bootlock + u-boot                                                                     |
 image-kernel  |  Fit Image(Linux kernel + dtb+ initramfs)                                                                                     |
 image-rofs    |  OpenBMC Root Filesystem                                                          |
+
+### Change FIU Speed
+
+NPCM845 support to change FIU speed depends on your platform design.
+To change FIU Speed, please modify content value of FIU_CLK_DIVIDER in **BootBlockAndHeader.xml** file. [Reference](https://github.com/Nuvoton-Israel/igps-npcm8xx/blob/main/py_scripts/ImageGeneration/references/BootBlockAndHeader_A1_EB.xml#L560)
+
+For NPCM845, you need to modify **BootBlockAndHeader_A1_EB.xml** that local at below path:
+```ruby
+tmp/work/evb_npcm845-openbmc-linux/obmc-phosphor-image/1.0-r0/recipe-sysroot-native/usr/share/npcm8xx-igps
+```
+Change to **25 MHz** then divider value should be filled as **10**.
+Change to **50 MHz** then divider value should be filled as **5**.
+The other value can be calculated according spec.
+Below is example for changing FIU0 speed to 50MHz.
+```ruby
+<BinField>
+	<!-- FIU 0 clk divider. -->
+	<name>FIU0_CLK_DIVIDER</name>
+	<config>
+		<offset>0x14F</offset>
+		<size>0x1</size>
+	</config>
+	<content format='32bit'>5</content>
+</BinField>
+```
 
 ## Flash Programing Tool
 
