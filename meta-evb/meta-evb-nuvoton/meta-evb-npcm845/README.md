@@ -1284,9 +1284,9 @@ The EVB has two SIOX modules connecting to CPLD. You could control LED_CPLD_7 an
 ```
 sgpio2: sgpio@102000 {
 	status = "okay";
-	bus-frequency = <16000000>;
-	nin_gpios = <64>;
-	nout_gpios = <64>;
+	bus-frequency = <8000000>;
+	nuvoton,input-ngpios = <64>;
+	nuvoton,output-ngpios = <64>;
 	gpio-line-names =
 		"POWER_OUT","RESET_OUT","","","","","","NMI_OUT",
 		"g_led","","","","","","","";
