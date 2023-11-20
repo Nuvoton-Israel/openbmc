@@ -1,5 +1,5 @@
-ALT_RMCPP_IFACE:npcm8xx = "eth1"
-SYSTEMD_SERVICE:${PN}:append:npcm8xx := " \
+ALT_RMCPP_IFACE:evb-npcm845 = "eth1"
+SYSTEMD_SERVICE:${PN}:append:evb-npcm845 := " \
         ${PN}@${ALT_RMCPP_IFACE}.service \
         ${PN}@${ALT_RMCPP_IFACE}.socket \
         "
