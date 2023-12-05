@@ -1,0 +1,467 @@
+From 6c0660e4e54dfa9b32b1911d9e3bf4d58c0af8ec Mon Sep 17 00:00:00 2001
+From: Mia Lin <mimi05633@gmail.com>
+Date: Fri, 1 Dec 2023 15:30:00 +0800
+Subject: [PATCH 1/1] mctpd: Support mctp over pcie vdm
+
+Signed-off-by: Mia Lin <mimi05633@gmail.com>
+---
+ src/mctp-control-spec.h |  21 +++--
+ src/mctp-netlink.c      |   3 +-
+ src/mctp-netlink.h      |   2 +
+ src/mctp.c              |  25 ++++++
+ src/mctpd.c             | 176 +++++++++++++++++++++++++++++++++++-----
+ 5 files changed, 198 insertions(+), 29 deletions(-)
+
+diff --git a/src/mctp-control-spec.h b/src/mctp-control-spec.h
+index ea6eb4f..dac5f9d 100644
+--- a/src/mctp-control-spec.h
++++ b/src/mctp-control-spec.h
+@@ -132,12 +132,8 @@ struct mctp_ctrl_cmd_get_routing_table {
+ 	uint8_t entry_handle;
+ } __attribute__((__packed__));
+ 
+-struct mctp_ctrl_resp_get_routing_table {
+-	struct mctp_ctrl_msg_hdr ctrl_hdr;
+-	uint8_t completion_code;
+-	uint8_t next_entry_handle;
+-	uint8_t number_of_entries;
+-} __attribute__((__packed__));
++/* Assume 8 byte is enough for holding largest physical address */
++#define MAX_PHYSICAL_ADDRESS_SIZE 8
+ 
+ struct get_routing_table_entry {
+ 	uint8_t eid_range_size;
+@@ -148,6 +144,19 @@ struct get_routing_table_entry {
+ 	uint8_t phys_address_size;
+ } __attribute__((__packed__));
+ 
++struct get_routing_table_entry_with_address {
++	struct get_routing_table_entry routing_info;
++	uint8_t phys_address[MAX_PHYSICAL_ADDRESS_SIZE];
++} __attribute__((__packed__));
++
++struct mctp_ctrl_resp_get_routing_table {
++	struct mctp_ctrl_msg_hdr ctrl_hdr;
++	uint8_t completion_code;
++	uint8_t next_entry_handle;
++	uint8_t number_of_entries;
++	struct get_routing_table_entry_with_address entries[0];
++} __attribute__((__packed__));
++
+ struct mctp_ctrl_resp_prepare_discovery {
+ 	struct mctp_ctrl_msg_hdr ctrl_hdr;
+ 	uint8_t completion_code;
+diff --git a/src/mctp-netlink.c b/src/mctp-netlink.c
+index 9c13751..ef571b4 100644
+--- a/src/mctp-netlink.c
++++ b/src/mctp-netlink.c
+@@ -52,7 +52,6 @@ struct mctp_nl {
+ #define ARRAY_SIZE(a) (sizeof(a)/sizeof((a)[0]))
+ 
+ static int fill_local_addrs(mctp_nl *nl);
+-static int fill_linkmap(mctp_nl *nl);
+ static void sort_linkmap(mctp_nl *nl);
+ static int linkmap_add_entry(mctp_nl *nl, struct ifinfomsg *info,
+ 		const char *ifname, size_t ifname_len, int net,
+@@ -721,7 +720,7 @@ static int parse_getlink_dump(mctp_nl *nl, struct nlmsghdr *nlh, uint32_t len)
+ 	return 1;
+ }
+ 
+-static int fill_linkmap(mctp_nl *nl)
++int fill_linkmap(mctp_nl *nl)
+ {
+ 	struct {
+ 		struct nlmsghdr     nh;
+diff --git a/src/mctp-netlink.h b/src/mctp-netlink.h
+index ec2fc40..15b88d8 100644
+--- a/src/mctp-netlink.h
++++ b/src/mctp-netlink.h
+@@ -107,3 +107,5 @@ int mctp_nl_handle_monitor(mctp_nl *nl, mctp_nl_change **changes,
+ void mctp_nl_changes_dump(mctp_nl *nl, mctp_nl_change *changes,
+ 	size_t num_changes);
+ 
++int fill_linkmap(mctp_nl *nl);
++
+diff --git a/src/mctp.c b/src/mctp.c
+index 7193ec3..7fe592a 100644
+--- a/src/mctp.c
++++ b/src/mctp.c
+@@ -677,6 +677,28 @@ static int cmd_link_serial(struct ctx *ctx, int argc, const char **argv)
+         return 0;
+ }
+ 
++static int cmd_link_vdm(struct ctx *ctx, int argc, const char **argv)
++{
++	const char *vdm;
++	int fd, rc, i;
++
++	if (argc != 2) {
++		fprintf(stderr, "%s link serial: no device specified\n",
++				ctx->top_cmd);
++		return 255;
++	}
++
++	vdm = argv[1];
++
++	fd = open(vdm, O_RDWR);
++	if (fd < 0)
++		err(EXIT_FAILURE, "Can't open vdm %s", vdm);
++
++	pause();
++
++        return 0;
++}
++
+ static int cmd_link(struct ctx *ctx, int argc, const char **argv)
+ {
+ 	const char* subcmd;
+@@ -686,6 +708,7 @@ static int cmd_link(struct ctx *ctx, int argc, const char **argv)
+ 		fprintf(stderr, "%s link show [ifname]\n", ctx->top_cmd);
+ 		fprintf(stderr, "%s link set <ifname> [up|down] [mtu <mtu>] [network <net>] [bus-owner <physaddr>]\n", ctx->top_cmd);
+ 		fprintf(stderr, "%s link serial <device>\n", ctx->top_cmd);
++		fprintf(stderr, "%s link vdm <device>\n", ctx->top_cmd);
+ 		return 255;
+ 	}
+ 
+@@ -703,6 +726,8 @@ static int cmd_link(struct ctx *ctx, int argc, const char **argv)
+ 		return cmd_link_set(ctx, argc, argv);
+ 	} else if (!strcmp(subcmd, "serial")) {
+ 		return cmd_link_serial(ctx, argc, argv);
++	} else if (!strcmp(subcmd, "vdm")) {
++		return cmd_link_vdm(ctx, argc, argv);
+ 	} else {
+ 		warnx("Unknown link command '%s'", subcmd);
+ 	}
+diff --git a/src/mctpd.c b/src/mctpd.c
+index 4aad60f..84240cb 100644
+--- a/src/mctpd.c
++++ b/src/mctpd.c
+@@ -128,6 +128,8 @@ struct ctx {
+ 	bool bus_owner;
+ 	// Flag for endpoint discovery process;
+ 	bool discovered;
++	// Record bus owner eid when we are as the endpoint
++	mctp_eid_t busowner_eid;
+ 
+ 	// An allocated array of peers, changes address (reallocated) during runtime
+ 	peer *peers;
+@@ -554,7 +556,7 @@ static int handle_control_set_endpoint_id(ctx *ctx,
+ 	req = (void*)buf;
+ 
+ 	resp->ctrl_hdr.command_code = req->ctrl_hdr.command_code;
+-	resp->ctrl_hdr.rq_dgram_inst = RQDI_RESP;
++	resp->ctrl_hdr.rq_dgram_inst = req->ctrl_hdr.rq_dgram_inst & ~RQDI_REQ;
+ 	resp->completion_code = 0;
+ 	resp_len = sizeof(struct mctp_ctrl_resp_set_eid);
+ 
+@@ -570,19 +572,23 @@ static int handle_control_set_endpoint_id(ctx *ctx,
+ 			return rc;
+ 		}
+ 
+-		rc = discover_peer_from_ext_addr(ctx, addr);
+-		if (rc < 0) {
+-			warnx("ERR: cannot discover bus owner");
+-			mctp_nl_addr_del(ctx->nl, req->eid, linkstr);
+-			return rc;
+-		}
+-
+ 		resp->status = 0x00; // Assignment accepted
+ 		resp->eid_set = req->eid;
+ 		resp->eid_pool_size = 0;
+ 		if (ctx->verbose)
+ 			fprintf(stderr, "Accepted set eid %d\n", req->eid);
+ 
++		rc = reply_message_phys(ctx, sd, resp, resp_len, addr);
++		if (rc == 0) {
++			rc = discover_peer_from_ext_addr(ctx, addr);
++			if (rc < 0) {
++				warnx("ERR: cannot discover bus owner");
++				mctp_nl_addr_del(ctx->nl, req->eid, linkstr);
++				return rc;
++			}
++			ctx->busowner_eid = addr->smctp_base.smctp_addr.s_addr;
++		}
++
+ 	} else {
+ 		resp->status = 0x01 << 4; // Already assigned
+ 		resp->eid_set = eid_set;
+@@ -592,13 +598,14 @@ static int handle_control_set_endpoint_id(ctx *ctx,
+ 			fprintf(stderr,
+ 				"Rejected set eid %d, already assigned with eid %d\n",
+ 				req->eid, eid_set);
++		rc = reply_message(ctx, sd, resp, resp_len, addr);
+ 	}
+ 
+ 	if (ctx->verbose && !ctx->discovered)
+ 		fprintf(stderr, "Setting discovered flag to true\n");
+ 	ctx->discovered = true;
+ 
+-	return reply_message(ctx, sd, resp, resp_len, addr);
++	return rc;
+ }
+ 
+ static int handle_control_get_version_support(ctx *ctx,
+@@ -639,7 +646,7 @@ static int handle_control_get_version_support(ctx *ctx,
+ 	}
+ 
+ 	resp->ctrl_hdr.command_code = req->ctrl_hdr.command_code;
+-	resp->ctrl_hdr.rq_dgram_inst = RQDI_RESP;
++	resp->ctrl_hdr.rq_dgram_inst = req->ctrl_hdr.rq_dgram_inst & ~RQDI_REQ;
+ 	return reply_message(ctx, sd, resp, resp_len, addr);
+ }
+ 
+@@ -657,16 +664,23 @@ static int handle_control_get_endpoint_id(ctx *ctx,
+ 
+ 	req = (void*)buf;
+ 	resp->ctrl_hdr.command_code = req->ctrl_hdr.command_code;
+-	resp->ctrl_hdr.rq_dgram_inst = RQDI_RESP;
++	resp->ctrl_hdr.rq_dgram_inst = req->ctrl_hdr.rq_dgram_inst & ~RQDI_REQ;
+ 
+ 	resp->eid = local_addr(ctx, addr->smctp_ifindex);
+ 	if (ctx->bus_owner)
+ 		SET_ENDPOINT_TYPE(resp->eid_type, MCTP_BUS_OWNER_BRIDGE);
+ 	// 10b = 2 = static EID supported, matches currently assigned.
+-	SET_ENDPOINT_ID_TYPE(resp->eid_type, 2);
++
++	warnx("resp->eid %d \n", resp->eid);
++
++	if (resp->eid == 0)
++		SET_ENDPOINT_ID_TYPE(resp->eid_type, 0);
++	else
++		SET_ENDPOINT_ID_TYPE(resp->eid_type, 2);
+ 	// TODO: medium specific information
+ 
+-	return reply_message(ctx, sd, resp, sizeof(*resp), addr);
++	// we need to send to physical location, no entry in routing table yet
++	return reply_message_phys(ctx, sd, resp, sizeof(*resp), addr);
+ }
+ 
+ static int handle_control_get_endpoint_uuid(ctx *ctx,
+@@ -683,7 +697,7 @@ static int handle_control_get_endpoint_uuid(ctx *ctx,
+ 
+ 	req = (void*)buf;
+ 	resp->ctrl_hdr.command_code = req->ctrl_hdr.command_code;
+-	resp->ctrl_hdr.rq_dgram_inst = RQDI_RESP;
++	resp->ctrl_hdr.rq_dgram_inst = req->ctrl_hdr.rq_dgram_inst & ~RQDI_REQ;
+ 	memcpy(resp->uuid, ctx->uuid, sizeof(resp->uuid));
+ 	return reply_message(ctx, sd, resp, sizeof(*resp), addr);
+ }
+@@ -695,7 +709,7 @@ static int handle_control_get_message_type_support(ctx *ctx,
+ {
+ 	struct mctp_ctrl_cmd_get_msg_type_support *req = NULL;;
+ 	struct mctp_ctrl_resp_get_msg_type_support *resp = NULL;
+-	uint8_t resp_buf[sizeof(*resp) + 1];
++	uint8_t resp_buf[sizeof(*resp) + 1] = {0};
+ 
+ 	if (buf_size < sizeof(*req)) {
+ 		warnx("short Get Message Type Support message");
+@@ -705,13 +719,13 @@ static int handle_control_get_message_type_support(ctx *ctx,
+ 	req = (void*)buf;
+ 	resp = (void*)resp_buf;
+ 	resp->ctrl_hdr.command_code = req->ctrl_hdr.command_code;
+-	resp->ctrl_hdr.rq_dgram_inst = RQDI_RESP;
++	resp->ctrl_hdr.rq_dgram_inst = req->ctrl_hdr.rq_dgram_inst & ~RQDI_REQ;
+ 
+ 	// Only control messages supported
+ 	resp->msg_type_count = 1;
+ 	*((uint8_t*)(resp+1)) = MCTP_CTRL_HDR_MSG_TYPE;
+ 
+-	return reply_message(ctx, sd, resp, sizeof(*resp), addr);
++	return reply_message(ctx, sd, resp, sizeof(resp_buf), addr);
+ }
+ 
+ static int handle_control_resolve_endpoint_id(ctx *ctx,
+@@ -733,7 +747,7 @@ static int handle_control_resolve_endpoint_id(ctx *ctx,
+ 	resp = (void*)resp_buf;
+ 	memset(resp, 0x0, sizeof(*resp));
+ 	resp->ctrl_hdr.command_code = req->ctrl_hdr.command_code;
+-	resp->ctrl_hdr.rq_dgram_inst = RQDI_RESP;
++	resp->ctrl_hdr.rq_dgram_inst = req->ctrl_hdr.rq_dgram_inst & ~RQDI_REQ;
+ 
+ 	peer = find_peer_by_addr(ctx, req->eid,
+ 		addr->smctp_base.smctp_network);
+@@ -770,7 +784,7 @@ static int handle_control_prepare_endpoint_discovery(ctx *ctx,
+ 	}
+ 
+ 	resp->ctrl_hdr.command_code = req->command_code;
+-	resp->ctrl_hdr.rq_dgram_inst = RQDI_RESP;
++	resp->ctrl_hdr.rq_dgram_inst = req->rq_dgram_inst & ~RQDI_REQ;
+ 
+ 	if (ctx->verbose && ctx->discovered)
+ 		fprintf(stderr, "Clearing discovered flag\n");
+@@ -817,7 +831,7 @@ handle_control_endpoint_discovery(ctx *ctx, int sd,
+ 	}
+ 
+ 	resp->ctrl_hdr.command_code = req->command_code;
+-	resp->ctrl_hdr.rq_dgram_inst = RQDI_RESP;
++	resp->ctrl_hdr.rq_dgram_inst = req->rq_dgram_inst & ~RQDI_REQ;
+ 
+ 	// we need to send to physical location, no entry in routing table yet
+ 	return reply_message_phys(ctx, sd, resp, sizeof(*resp), addr);
+@@ -841,7 +855,7 @@ static int handle_control_unsupported(ctx *ctx,
+ 
+ 	req = (void*)buf;
+ 	resp->ctrl_hdr.command_code = req->command_code;
+-	resp->ctrl_hdr.rq_dgram_inst = RQDI_RESP;
++	resp->ctrl_hdr.rq_dgram_inst = req->rq_dgram_inst & ~RQDI_REQ;
+ 	resp->completion_code = MCTP_CTRL_CC_ERROR_UNSUPPORTED_CMD;
+ 	return reply_message(ctx, sd, resp, sizeof(*resp), addr);
+ }
+@@ -989,6 +1003,8 @@ static int cb_listen_monitor(sd_event_source *s, int sd, uint32_t revents,
+ 		warnx("Error handling update from netlink, link state may now be outdated. %s",
+ 			strerror(-rc));
+ 		return rc;
++	} else {
++		rc = fill_linkmap(ctx->nl_query);
+ 	}
+ 
+ 	for (size_t i = 0; i < num_changes; i++) {
+@@ -2012,6 +2028,8 @@ static int method_notify_discovery(sd_bus_message *call, void *data,
+ 	uint8_t *buf;
+ 	size_t buf_size;
+ 	struct sockaddr_mctp_ext resp_addr;
++	mctp_eid_t *addrs;
++	size_t addrs_num;
+ 
+ 	rc = sd_bus_message_read(call, "s", &ifname);
+ 	if (rc < 0)
+@@ -2028,6 +2046,24 @@ static int method_notify_discovery(sd_bus_message *call, void *data,
+ 		return sd_bus_error_setf(berr, SD_BUS_ERROR_INVALID_ARGS,
+ 					 "Bad physaddr");
+ 
++	// clear local EIDs
++	addrs = mctp_nl_addrs_byindex(ctx->nl, dest->ifindex, &addrs_num);
++	if (!addrs) {
++		warnx("BUG: cannot get local EIDs at ifindex %d",
++		      dest->ifindex);
++		return -ENOENT;
++	}
++	for (size_t i = 0; i < addrs_num; i++) {
++		rc = mctp_nl_addr_del(ctx->nl, addrs[i],
++				      mctp_nl_if_byindex(ctx->nl,
++							 dest->ifindex));
++		if (rc < 0) {
++			errx(rc, "ERR: cannot remove local eid %d ifindex %d",
++			     addrs[i], dest->ifindex);
++		}
++	}
++	free(addrs);
++
+ 	req.ctrl_hdr.command_code = MCTP_CTRL_CMD_DISCOVERY_NOTIFY;
+ 	req.ctrl_hdr.rq_dgram_inst = RQDI_REQ;
+ 
+@@ -2060,6 +2096,97 @@ err:
+ 	return rc;
+ }
+ 
++static int method_get_routing_table_entries(sd_bus_message *call, void *data,
++				   sd_bus_error *berr)
++{
++	int rc, net, ifindex;
++	const char *ifname = NULL;
++	ctx *ctx = data;
++	struct mctp_ctrl_cmd_get_routing_table req = { 0 };
++	struct mctp_ctrl_resp_get_routing_table *resp;
++	struct get_routing_table_entry *rt_entry;
++	uint8_t *buf;
++	size_t buf_size, entry_offset;
++	struct sockaddr_mctp_ext resp_addr;
++	peer *peer = NULL;
++	uint16_t entry_hwaddr;
++
++	rc = sd_bus_message_read(call, "s", &ifname);
++	if (rc < 0)
++		goto err;
++
++	ifindex = mctp_nl_ifindex_byname(ctx->nl, ifname);
++	if (ifindex <= 0)
++		return sd_bus_error_setf(berr, SD_BUS_ERROR_INVALID_ARGS,
++					 "Unknown MCTP ifname '%s'", ifname);
++
++	net = mctp_nl_net_byindex(ctx->nl, ifindex);
++	peer = find_peer_by_addr(ctx, ctx->busowner_eid, net);
++	if (!peer)
++		return sd_bus_error_setf(berr, SD_BUS_ERROR_INVALID_ARGS,
++					 "local eid %d net %d to delete is missing", ctx->busowner_eid, net);
++
++	req.ctrl_hdr.command_code = MCTP_CTRL_CMD_GET_ROUTING_TABLE_ENTRIES;
++	req.ctrl_hdr.rq_dgram_inst = RQDI_REQ;
++
++	rc = endpoint_query_peer(peer, MCTP_CTRL_HDR_MSG_TYPE,
++		&req, sizeof(req), &buf, &buf_size, &resp_addr);
++	if (rc < 0)
++		goto free_buf;
++
++	if (buf_size < sizeof(*resp)) {
++		warnx("%s: wrong reply length %zu bytes.", __func__, buf_size);
++		rc = -ENOMSG;
++		goto free_buf;
++	}
++	resp = (void *)buf;
++
++	if (resp->completion_code != MCTP_CTRL_CC_SUCCESS) {
++		// TODO: make this a debug message?
++		warnx("Failure completion code 0x%02x", resp->completion_code);
++		rc = -ECONNREFUSED;
++		goto free_buf;
++	}
++
++	/* Need to check each rt entry size */
++
++	/* Set routing table entries to peers */
++	entry_offset = sizeof(struct mctp_ctrl_resp_get_routing_table);
++	for (uint8_t i = 0; i < resp->number_of_entries; i++) {
++		rt_entry = (struct get_routing_table_entry *)((uint8_t *)resp + entry_offset);
++
++		entry_offset += sizeof(struct get_routing_table_entry);
++		if (rt_entry->phys_transport_binding_id != MCTP_BINDING_PCIE)
++		{
++			entry_offset += rt_entry->phys_address_size;
++			continue;
++		}
++
++		entry_hwaddr = be16toh(*((uint8_t *)resp + entry_offset) | (*((uint8_t *)resp + entry_offset + 1) << 8));
++		entry_offset += rt_entry->phys_address_size;
++
++		peer = find_peer_by_addr(ctx, rt_entry->starting_eid, net);
++		if (!peer) {
++			resp_addr.smctp_base.smctp_addr.s_addr = rt_entry->starting_eid;
++			memset(resp_addr.smctp_haddr, 0x0, MAX_ADDR_LEN);
++			memcpy(resp_addr.smctp_haddr, &entry_hwaddr, rt_entry->phys_address_size);
++			resp_addr.smctp_halen = rt_entry->phys_address_size;
++
++			rc = discover_peer_from_ext_addr(ctx, &resp_addr);
++			if (rc < 0)
++				goto free_buf;
++		}
++	}
++
++	free(buf);
++	return sd_bus_reply_method_return(call, "");
++free_buf:
++	free(buf);
++err:
++	set_berr(ctx, rc, berr);
++	return rc;
++}
++
+ // Query various properties of a peer.
+ // To be called when a new peer is discovered/assigned, once an EID is known
+ // and routable.
+@@ -2510,6 +2637,13 @@ static const sd_bus_vtable bus_mctpd_vtable[] = {
+ 		method_notify_discovery,
+ 		0),
+ 
++	SD_BUS_METHOD_WITH_NAMES("GetRoutingTableEntries",
++		"s",
++		SD_BUS_PARAM(ifname),
++		"",,
++		method_get_routing_table_entries,
++		0),
++
+ 	SD_BUS_VTABLE_END,
+ 
+ };
+-- 
+2.25.1
+

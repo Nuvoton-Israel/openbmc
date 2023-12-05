@@ -1,0 +1,44 @@
+From 290cc250539029ee1771e3b2389d0c41cdc223ad Mon Sep 17 00:00:00 2001
+From: Mia Lin <mimi05633@gmail.com>
+Date: Wed, 24 May 2023 10:22:20 +0800
+Subject: [PATCH 1/1] kernel dts support for MCTP verification
+
+Signed-off-by: Mia Lin <mimi05633@gmail.com>
+---
+ arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi | 7 +++++++
+ arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts     | 4 ++++
+ 2 files changed, 11 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi b/arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi
+index 0644b47f9a66..138dca862553 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi
+@@ -183,6 +183,13 @@
+ 			status = "disabled";
+ 		};
+ 
++		vdma: vdma@e0800000 {
++			compatible = "nuvoton,npcm845-vdm";
++			reg = <0x0 0xe0800000 0x0 0x1000
++				   0x0 0xf0822000 0x0 0x1000>;
++			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
+ 		pcimbox: pcimbox@f0848000 {
+ 			compatible = "nuvoton,npcm845-pci-mbox", "nuvoton,npcm750-pci-mbox",
+ 					"simple-mfd", "syscon";
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+index 8b6b004fd9a9..3b4059cffb8b 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+@@ -660,3 +660,7 @@
+ &tip_mbox {
+ 	status = "okay";
+ };
++
++&vdma {
++	status = "okay";
++};
+-- 
+2.17.1
+

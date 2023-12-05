@@ -19,6 +19,10 @@ SRC_URI:append:evb-npcm845 = " file://0003-mctp-i3c-add-disable-calculate-pec-co
 SRC_URI:append:evb-npcm845 = " file://0004-dts-evb-npcm845-enable-udc8.patch"
 SRC_URI:append:evb-npcm845 = " file://mctp.cfg"
 
+# Support af_mctp over pcie vdm
+# SRC_URI:append:evb-npcm845 = " file://mctp_vdm.cfg"
+# SRC_URI:append:evb-npcm845 = " file://0001-kernel-dts-support-for-MCTP-verification.patch"
+
 # for i3c hub
 SRC_URI:append:evb-npcm845 = " file://i3c_hub.cfg"
 SRC_URI:append:evb-npcm845 = " file://0001-dts-add-i3c-hub-node-to-support-two-bic-slave-device.patch"

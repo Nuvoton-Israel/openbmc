@@ -1,0 +1,978 @@
+From bdc5e26a1d503341faf20034fdf1869cafd72a34 Mon Sep 17 00:00:00 2001
+From: Mia Lin <mimi05633@gmail.com>
+Date: Tue, 5 Dec 2023 14:52:43 +0800
+Subject: [PATCH 1/1] net: mctp: Support mctp over pcie vdm
+
+Signed-off-by: Mia Lin <mimi05633@gmail.com>
+---
+ drivers/misc/npcm-vdm.c      |  54 +++-
+ drivers/net/mctp/Kconfig     |   7 +
+ drivers/net/mctp/Makefile    |   1 +
+ drivers/net/mctp/mctp-vdm.c  | 495 +++++++++++++++++++++++++++++++++++
+ include/linux/nupcie.h       | 133 ++++++++++
+ include/linux/nuvoton-mctp.h |  76 ++++++
+ net/mctp/route.c             |  18 +-
+ 7 files changed, 780 insertions(+), 4 deletions(-)
+ create mode 100644 drivers/net/mctp/mctp-vdm.c
+ create mode 100644 include/linux/nupcie.h
+ create mode 100644 include/linux/nuvoton-mctp.h
+
+diff --git a/drivers/misc/npcm-vdm.c b/drivers/misc/npcm-vdm.c
+index c049196f5726..6fc66dd7f6e4 100644
+--- a/drivers/misc/npcm-vdm.c
++++ b/drivers/misc/npcm-vdm.c
+@@ -18,6 +18,9 @@
+ #include <linux/kfifo.h>
+ #include <linux/poll.h>
+ #include <linux/ptr_ring.h>
++#ifdef CONFIG_MCTP_TRANSPORT_PCIE_VDM
++#include <linux/nupcie.h>
++#endif
+ 
+ #define ENABLE_VDMA 1
+ 
+@@ -131,7 +134,7 @@ struct mctp_pcie_packet {
+ 
+ struct npcm_vdm {
+ 	struct device *dev;
+-	struct miscdevice miscdev;
++	struct miscdevice *miscdev;
+ 	spinlock_t lock;
+ 	int is_open;
+ 	int irq;
+@@ -146,6 +149,27 @@ struct npcm_vdm {
+ 	u32 wrap;
+ };
+ 
++#ifdef CONFIG_MCTP_TRANSPORT_PCIE_VDM
++static BLOCKING_NOTIFIER_HEAD(vdm_notifier);
++
++int vdm_register_notifier(struct notifier_block *nb)
++{
++	return blocking_notifier_chain_register(&vdm_notifier, nb);
++}
++EXPORT_SYMBOL_GPL(vdm_register_notifier);
++
++int vdm_unregister_notifier(struct notifier_block *nb)
++{
++	return blocking_notifier_chain_unregister(&vdm_notifier, nb);
++}
++EXPORT_SYMBOL_GPL(vdm_unregister_notifier);
++
++static void vdm_notify(void *data, unsigned int action)
++{
++	blocking_notifier_call_chain(&vdm_notifier, action, data);
++}
++#endif
++
+ static atomic_t npcm_vdm_open_count = ATOMIC_INIT(0);
+ 
+ struct kmem_cache *packet_cache;
+@@ -255,6 +279,9 @@ static void npcm_vdm_rx_tasklet(unsigned long data)
+ 	regmap_write(priv->vdma_base, VDMA_ERDPNT, rdpnt);
+ 
+ 	wake_up_all(&priv->wait_queue);
++#ifdef CONFIG_MCTP_TRANSPORT_PCIE_VDM
++	vdm_notify(priv->miscdev, VDM_NOTIFY_RECV);
++#endif
+ }
+ 
+ static irqreturn_t npcm_vdm_irq(int irq, void *arg)
+@@ -359,7 +386,11 @@ static int npcm_vdm_hw_init(struct npcm_vdm *priv)
+ 	return ret;
+ }
+ 
++#ifdef CONFIG_MCTP_TRANSPORT_PCIE_VDM
++static ssize_t npcm_vdm_read(struct file *file, char *buf,
++#else
+ static ssize_t npcm_vdm_read(struct file *file, char __user *buf,
++#endif
+ 				size_t count, loff_t *ppos)
+ {
+ 	struct miscdevice *misc = file->private_data;
+@@ -375,11 +406,15 @@ static ssize_t npcm_vdm_read(struct file *file, char __user *buf,
+ 		if (count > rx_packet->size)
+ 			count = rx_packet->size;
+ 
++#ifdef CONFIG_MCTP_TRANSPORT_PCIE_VDM
++		memcpy(buf, &rx_packet->data, count);
++#else
+ 		if (copy_to_user(buf, &rx_packet->data, count)) {
+ 			dev_err(priv->dev, "copy to user failed\n");
+ 			packet_free(rx_packet);
+ 			return -EFAULT;
+ 		}
++#endif
+ 
+ 		packet_free(rx_packet);
+ 	}
+@@ -417,7 +452,11 @@ npcm_vdm_send(struct npcm_vdm *priv, u8 *txbuf, int size)
+ 	return ret;
+ }
+ 
++#ifdef CONFIG_MCTP_TRANSPORT_PCIE_VDM
++static ssize_t npcm_vdm_write(struct file *file, const char *buf,
++#else
+ static ssize_t npcm_vdm_write(struct file *file, const char __user *buf,
++#endif
+ 				 size_t count, loff_t *ppos)
+ {
+ 	struct miscdevice *misc = file->private_data;
+@@ -426,10 +465,12 @@ static ssize_t npcm_vdm_write(struct file *file, const char __user *buf,
+ 	struct mctp_pcie_packet *tx_packet;
+ 	int ret;
+ 
++#ifndef CONFIG_MCTP_TRANSPORT_PCIE_VDM
+ 	if (!access_ok(buf, count)) {
+ 		ret = -EFAULT;
+ 		goto out;
+ 	}
++#endif
+ 
+ 	tx_packet = packet_alloc(GFP_KERNEL);
+ 	if (!tx_packet) {
+@@ -443,11 +484,15 @@ static ssize_t npcm_vdm_write(struct file *file, const char __user *buf,
+ 			goto out_packet;
+ 		}
+ 
++#ifdef CONFIG_MCTP_TRANSPORT_PCIE_VDM
++		memcpy(&tx_packet->data, buf, count);
++#else
+ 		if (copy_from_user(&tx_packet->data, buf, count)) {
+ 			dev_err(priv->dev, "copy from user failed\n");
+ 			ret = -EFAULT;
+ 			goto out_packet;
+ 		}
++#endif
+ 		tx_packet->size = count;
+ 
+ 		ret = npcm_vdm_send(priv, (u8 *)&tx_packet->data, tx_packet->size);
+@@ -475,6 +520,9 @@ static int npcm_vdm_open(struct inode *inode, struct file *file)
+ 		tasklet_hi_schedule(&priv->tasklet);
+ 		local_bh_enable();
+ 
++#ifdef CONFIG_MCTP_TRANSPORT_PCIE_VDM
++		vdm_notify(file, VDM_NOTIFY_ADD);
++#endif
+ 		return 0;
+ 	}
+ 
+@@ -491,6 +539,9 @@ static int npcm_vdm_release(struct inode *inode, struct file *file)
+ 	if (atomic_dec_return(&npcm_vdm_open_count) == 0)
+ 		npcm_vdm_hw_finit(priv);
+ 
++#ifdef CONFIG_MCTP_TRANSPORT_PCIE_VDM
++	vdm_notify(file, VDM_NOTIFY_REMOVE);
++#endif
+ 	return 0;
+ }
+ 
+@@ -662,6 +713,7 @@ static int npcm_vdm_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* register miscdev */
++	priv->miscdev = &npcm_vdm_miscdev;
+ 	npcm_vdm_miscdev.parent = priv->dev;
+ 	ret = misc_register(&npcm_vdm_miscdev);
+ 	if (ret) {
+diff --git a/drivers/net/mctp/Kconfig b/drivers/net/mctp/Kconfig
+index 07bd05872c93..06eeb845dd2a 100644
+--- a/drivers/net/mctp/Kconfig
++++ b/drivers/net/mctp/Kconfig
+@@ -51,6 +51,13 @@ config MCTP_TRANSPORT_I3C_PEC
+ 	  calculate the result of PEC.
+ 	  Provides a choice to enable/disable append pec byte.
+ 
++config MCTP_TRANSPORT_PCIE_VDM
++	tristate "MCTP PCIe VDM transport"
++	depends on NPCM_VDM
++	help
++	  Provides a driver to access MCTP devices over PCIe VDM transport,
++	  from DMTF specification DSP0238.
++
+ endmenu
+ 
+ endif
+diff --git a/drivers/net/mctp/Makefile b/drivers/net/mctp/Makefile
+index e1cb99ced54a..41849088e003 100644
+--- a/drivers/net/mctp/Makefile
++++ b/drivers/net/mctp/Makefile
+@@ -1,3 +1,4 @@
+ obj-$(CONFIG_MCTP_SERIAL) += mctp-serial.o
+ obj-$(CONFIG_MCTP_TRANSPORT_I2C) += mctp-i2c.o
+ obj-$(CONFIG_MCTP_TRANSPORT_I3C) += mctp-i3c.o
++obj-$(CONFIG_MCTP_TRANSPORT_PCIE_VDM) += mctp-vdm.o
+diff --git a/drivers/net/mctp/mctp-vdm.c b/drivers/net/mctp/mctp-vdm.c
+new file mode 100644
+index 000000000000..9c3a2bc70d07
+--- /dev/null
++++ b/drivers/net/mctp/mctp-vdm.c
+@@ -0,0 +1,495 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Implements DMTF specification
++ * "DSP0238 Management Component Transport Protocol (MCTP) PCIe VDM Transport
++ * Binding"
++ *  https://www.dmtf.org/sites/default/files/standards/documents/DSP0238_1.2.0.pdf
++ *
++ * Copyright (c) 2023 Code Construct
++ */
++
++#include <linux/module.h>
++#include <linux/netdevice.h>
++#include <linux/idr.h>
++#include <linux/if_arp.h>
++#include <net/mctp.h>
++#include <net/mctpdevice.h>
++
++#include <linux/miscdevice.h>
++#include <linux/nuvoton-mctp.h>
++#include <linux/nupcie.h>
++
++#define MCTP_VDM_MAXBUF 1024
++
++/* 64 bytes payload, 4 bytes MCTP header, and 12 bytes PCIe VDM header */
++static const int MCTP_VDM_MINMTU = 64 + 4 + 12;
++static const int MCTP_VDM_MAXMTU = MCTP_VDM_MAXBUF;
++/* 4 byte MCTP header, no data */
++static const int MCTP_VDM_MINLEN = 4;
++
++/* Sufficient for 64kB at min mtu */
++static const int MCTP_VDM_TX_QUEUE_LEN = 1100;
++
++/* List of mctp_vdm_busdev */
++static LIST_HEAD(busdevs);
++/* Protects busdevs, as well as mctp_vdm.devs lists */
++static DEFINE_MUTEX(busdevs_lock);
++
++static DEFINE_IDA(mctp_vdm_ida);
++
++struct mctp_vdm {
++	struct net_device *ndev;
++	struct file *file;
++	struct miscdevice *miscdev;
++	int idx;
++
++	u8 rx_buffer[MCTP_VDM_MAXBUF];
++
++	struct task_struct *tx_thread;
++	wait_queue_head_t tx_wq;
++	/* tx_lock protects tx_skb and devs */
++	spinlock_t tx_lock;
++	/* Next skb to transmit */
++	struct sk_buff *tx_skb;
++
++	/* Element of busdevs */
++	struct list_head list;
++
++	struct mctp_nupcie_pkt_private pkt_prv;
++};
++
++static int mctp_vdm_read(struct mctp_vdm *mvdev)
++{
++	struct net_device_stats *stats = &mvdev->ndev->stats;
++	struct sk_buff *skb = NULL;
++	struct mctp_pcie_hdr *hdr;
++	struct mctp_skb_cb *cb;
++	size_t recvlen;
++	int net_status;
++
++	recvlen = mvdev->miscdev->fops->read(mvdev->file, mvdev->rx_buffer, mvdev->ndev->max_mtu, 0);
++	if (recvlen <= 0)
++		return recvlen;
++
++	skb = netdev_alloc_skb(mvdev->ndev, recvlen);
++	if (!skb) {
++		stats->rx_dropped++;
++		return -ENOMEM;
++	}
++
++	hdr = (struct mctp_pcie_hdr *)mvdev->rx_buffer;
++	skb->protocol = htons(ETH_P_MCTP);
++	skb_put_data(skb, mvdev->rx_buffer, recvlen - PCIE_GET_PAD_LEN(hdr));
++
++	mvdev->pkt_prv.routing = PCIE_GET_ROUTING(hdr);
++	mvdev->pkt_prv.remote_id = PCIE_GET_REQ_ID(hdr);
++	mvdev->pkt_prv.own_id = PCIE_GET_TARGET_ID(hdr);
++
++	uint8_t ic_type = skb->data[MCTP_PCIE_VDM_HDR_SIZE];
++	struct mctp_ctrl_msg_hdr *ctrl_hdr = (struct mctp_ctrl_msg_hdr *)(skb->data + MCTP_PCIE_VDM_HDR_SIZE + sizeof(ic_type));
++
++	if ((ic_type & MSG_TYPE) == MCTP_MESSAGE_TYPE_MCTP_CTRL) { /* MCTP control = 0x00 (000_0000b) */
++		if (ctrl_hdr->rq_dgram_inst & RQDI_REQ) {
++			if (ctrl_hdr->command_code == MCTP_CTRL_CMD_ENDPOINT_DISCOVERY) {
++				mvdev->pkt_prv.busOwnerBdf = mvdev->pkt_prv.remote_id;
++			}
++		}
++	}
++
++	skb_pull(skb, sizeof(struct mctp_pcie_hdr));
++
++	cb = __mctp_cb(skb);
++	cb->halen = 2; //PCIe bdf is 2 bytes
++	memcpy(cb->haddr, &(mvdev->pkt_prv.remote_id), cb->halen);
++
++	net_status = netif_rx(skb);
++
++	if (net_status == NET_RX_SUCCESS) {
++		stats->rx_packets++;
++		stats->rx_bytes += skb->len;
++	} else {
++		stats->rx_dropped++;
++	}
++
++	return 0;
++}
++
++static void mctp_vdm_xmit(struct mctp_vdm *mvdev, struct sk_buff *skb)
++{
++	struct net_device_stats *stats = &mvdev->ndev->stats;
++	struct miscdevice *miscdev = mvdev->file->private_data;
++	struct mctp_nupcie_pkt_private *pkt_prv = &mvdev->pkt_prv;
++	struct mctp_pcie_hdr *hdr = (struct mctp_pcie_hdr *)skb->data;
++	uint8_t ic_type = skb->data[MCTP_PCIE_VDM_HDR_SIZE];
++	struct mctp_ctrl_msg_hdr *ctrl_hdr = (struct mctp_ctrl_msg_hdr *)(skb->data + MCTP_PCIE_VDM_HDR_SIZE + sizeof(ic_type));
++	uint16_t payload_len_dw = PCIE_PKT_ALIGN(skb->len) / sizeof(uint32_t) - MCTP_HDR_SIZE_DW - PCIE_HDR_SIZE_DW;
++	uint8_t pad = PCIE_PKT_ALIGN(skb->len) - skb->len;
++	uint16_t bdf = 0;
++	ssize_t write_len, len;
++
++	/* Set PCI message routing value of the hdr->fmt_type */
++	pkt_prv->routing = PCIE_ROUTE_BY_ID;
++	if (!(ic_type & MSG_TYPE)) { /* MCTP control = 0x00 (000_0000b) */
++		if (ctrl_hdr->rq_dgram_inst & RQDI_REQ) {
++			switch(ctrl_hdr->command_code) {
++				case MCTP_CTRL_CMD_DISCOVERY_NOTIFY:
++					pkt_prv->routing = PCIE_ROUTE_TO_RC;
++					pkt_prv->remote_id = 0xffff;
++					/* Target ID will be ignored for Broadcast and for Route to Root Complex messages. */
++					break;
++				case MCTP_CTRL_CMD_PREPARE_ENDPOINT_DISCOVERY:
++				case MCTP_CTRL_CMD_ENDPOINT_DISCOVERY:
++					pkt_prv->routing = PCIE_BROADCAST_FROM_RC;
++					break;
++				case MCTP_CTRL_CMD_GET_ROUTING_TABLE_ENTRIES:
++					pkt_prv->remote_id = pkt_prv->busOwnerBdf;
++					break;
++				default:
++					break;
++			}
++		} else {
++			switch(ctrl_hdr->command_code) {
++				case MCTP_CTRL_CMD_PREPARE_ENDPOINT_DISCOVERY:
++				case MCTP_CTRL_CMD_ENDPOINT_DISCOVERY:
++					pkt_prv->routing = PCIE_ROUTE_TO_RC;
++					break;
++				default:
++					break;
++			}
++		}
++	}
++	PCIE_SET_ROUTING(hdr, pkt_prv->routing);
++
++	/* Set payload length value of hdr->mbz_attr_length */
++	PCIE_SET_DATA_LEN(hdr, payload_len_dw);
++	
++	/* Set PCI requester ID */
++	PCIE_SET_REQ_ID(hdr, bdf);
++	
++	/* Set PCI target ID when sending response */
++	if (!(ctrl_hdr->rq_dgram_inst & RQDI_REQ))
++		PCIE_SET_TARGET_ID(hdr, pkt_prv->remote_id);
++
++	/* Set Pad len of hdr->tag */
++	PCIE_SET_PAD_LEN(hdr, pad);
++
++	len = (payload_len_dw * sizeof(uint32_t)) + MCTP_PCIE_VDM_HDR_SIZE;
++
++	if (len > MCTP_VDM_MAXMTU) {
++		/* Route MTU was larger than supported by the endpoint */
++		stats->tx_dropped++;
++		goto out;
++	}
++
++	if (miscdev->fops->write) {
++		write_len = miscdev->fops->write(mvdev->file, skb->data, len, 0);
++		if (write_len > 0) {
++			stats->tx_bytes += write_len;
++			stats->tx_packets++;
++		} else {
++			stats->tx_errors++;
++		}
++	}
++
++out:
++	return;
++}
++
++static int mctp_vdm_tx_thread(void *data)
++{
++	struct mctp_vdm *mvdev = data;
++	struct sk_buff *skb;
++	unsigned long flags;
++
++	for (;;) {
++		if (kthread_should_stop())
++			break;
++
++		spin_lock_irqsave(&mvdev->tx_lock, flags);
++		skb = mvdev->tx_skb;
++		mvdev->tx_skb = NULL;
++		spin_unlock_irqrestore(&mvdev->tx_lock, flags);
++
++		if (netif_queue_stopped(mvdev->ndev))
++			netif_wake_queue(mvdev->ndev);
++
++		if (skb) {
++			mctp_vdm_xmit(mvdev, skb);
++			kfree_skb(skb);
++		} else {
++			wait_event_idle(mvdev->tx_wq,
++					mvdev->tx_skb || kthread_should_stop());
++		}
++	}
++
++	return 0;
++}
++
++static netdev_tx_t mctp_vdm_start_xmit(struct sk_buff *skb,
++				       struct net_device *ndev)
++{
++	struct mctp_vdm *mvdev = netdev_priv(ndev);
++	unsigned long flags;
++	netdev_tx_t ret;
++
++	spin_lock_irqsave(&mvdev->tx_lock, flags);
++	netif_stop_queue(ndev);
++	if (mvdev->tx_skb) {
++		dev_warn_ratelimited(&ndev->dev, "TX with queue stopped");
++		ret = NETDEV_TX_BUSY;
++	} else {
++		mvdev->tx_skb = skb;
++		ret = NETDEV_TX_OK;
++	}
++	spin_unlock_irqrestore(&mvdev->tx_lock, flags);
++
++	if (ret == NETDEV_TX_OK)
++		wake_up(&mvdev->tx_wq);
++
++	return ret;
++}
++
++static void mctp_vdm_free(struct mctp_vdm *mvdev)
++__must_hold(&busdevs_lock)
++{
++	if (mvdev->tx_thread) {
++		kthread_stop(mvdev->tx_thread);
++		mvdev->tx_thread = NULL;
++	}
++
++	kfree_skb(mvdev->tx_skb);
++	list_del(&mvdev->list);
++}
++
++static void mctp_vdm_ndo_uninit(struct net_device *ndev)
++{
++	struct mctp_vdm *mvdev = netdev_priv(ndev);
++
++	/* Perform cleanup here to ensure there are no remaining references */
++	mctp_vdm_free(mvdev);
++}
++
++/*
++ * PCIe header template in "network format" - Big Endian
++ */
++static const struct mctp_pcie_hdr mctp_pcie_hdr_template_be = {
++	.fmt_type = MSG_4DW_HDR,
++	.mbz_attr_length = MCTP_PCIE_VDM_ATTR,
++	.code = MSG_CODE_VDM_TYPE_1,
++	.vendor = VENDOR_ID_DMTF_VDM
++};
++
++static int mctp_vdm_header_create(struct sk_buff *skb, struct net_device *dev,
++				  unsigned short type, const void *daddr,
++	   const void *saddr, unsigned int len)
++{
++	struct mctp_pcie_hdr *hdr;
++
++	hdr = skb_push(skb, sizeof(struct mctp_pcie_hdr));
++	memcpy(hdr, &mctp_pcie_hdr_template_be, sizeof(*hdr));
++	if (daddr)
++		PCIE_SET_TARGET_ID(hdr, *(uint16_t *)daddr);
++
++	return 0;
++}
++
++static const struct net_device_ops mctp_vdm_ops = {
++	.ndo_start_xmit = mctp_vdm_start_xmit,
++	.ndo_uninit = mctp_vdm_ndo_uninit,
++};
++
++static const struct header_ops mctp_vdm_headops = {
++	.create = mctp_vdm_header_create,
++};
++
++static void mctp_vdm_net_setup(struct net_device *dev)
++{
++	dev->type = ARPHRD_MCTP;
++
++	dev->mtu = MCTP_VDM_MAXMTU;
++	dev->min_mtu = MCTP_VDM_MINMTU;
++	dev->max_mtu = MCTP_VDM_MAXMTU;
++	dev->tx_queue_len = MCTP_VDM_TX_QUEUE_LEN;
++	dev->addr_len = 2; //PCIe bdf is 2 bytes
++	dev->hard_header_len = sizeof(struct mctp_pcie_hdr);
++
++	dev->netdev_ops	= &mctp_vdm_ops;
++	dev->header_ops	= &mctp_vdm_headops;
++}
++
++/* Returns an ERR_PTR on failure */
++static struct mctp_vdm *mctp_vdm_add(struct file *file)
++__must_hold(&busdevs_lock)
++{
++	struct mctp_vdm *mvdev = NULL;
++	struct net_device *ndev = NULL;
++	char namebuf[IFNAMSIZ];
++	int idx,rc;
++
++	idx = ida_alloc(&mctp_vdm_ida, GFP_KERNEL);
++	if (idx < 0)
++		return idx;
++
++	snprintf(namebuf, sizeof(namebuf), "mctpvdm%d", idx);
++	ndev = alloc_netdev(sizeof(*mvdev), namebuf, NET_NAME_ENUM, mctp_vdm_net_setup);
++	if (!ndev) {
++		rc = -ENOMEM;
++		goto err;
++	}
++	dev_net_set(ndev, current->nsproxy->net_ns);
++
++	mvdev = netdev_priv(ndev);
++	mvdev->ndev = ndev;
++	mvdev->file = file;
++	mvdev->miscdev = file->private_data;
++	list_add(&mvdev->list, &busdevs);
++
++	init_waitqueue_head(&mvdev->tx_wq);
++	spin_lock_init(&mvdev->tx_lock);
++	mvdev->tx_thread = kthread_create(mctp_vdm_tx_thread, mvdev,
++					 "%s/tx", ndev->name);
++	if (IS_ERR(mvdev->tx_thread)) {
++		dev_warn(&ndev->dev, "Error creating thread: %pe\n",
++			mvdev->tx_thread);
++		rc = PTR_ERR(mvdev->tx_thread);
++		mvdev->tx_thread = NULL;
++		goto err;
++	}
++	wake_up_process(mvdev->tx_thread);
++
++	rc = mctp_register_netdev(ndev, NULL);
++	if (rc < 0) {
++		dev_warn(&ndev->dev, "netdev register failed: %d\n", rc);
++		goto err;
++	}
++	return mvdev;
++err:
++	/* uninit will not get called if a netdev has not been registered,
++	 * so we perform the same mvdev cleanup manually.
++	 */
++	if (mvdev)
++		mctp_vdm_free(mvdev);
++	if (ndev)
++		free_netdev(ndev);
++	ida_free(&mctp_vdm_ida, idx);
++	return ERR_PTR(rc);
++}
++
++static void mctp_vdm_remove(struct mctp_vdm *mvdev)
++__must_hold(&busdevs_lock)
++{
++	int idx = mvdev->idx;
++	/* Unregister calls through to ndo_uninit -> mctp_vdm_free() */
++	mctp_unregister_netdev(mvdev->ndev);
++
++	free_netdev(mvdev->ndev);
++	/* mvdev is deallocated */
++
++	ida_free(&mctp_vdm_ida, idx);
++}
++
++/* Removes all mctp-vdm */
++static void mctp_vdm_remove_all(void)
++{
++	struct mctp_vdm *mvdev = NULL, *tmp = NULL;
++
++	mutex_lock(&busdevs_lock);
++	list_for_each_entry_safe(mvdev, tmp, &busdevs, list) {
++		mctp_vdm_remove(mvdev);
++	}
++	mutex_unlock(&busdevs_lock);
++}
++
++/* Adds a mctp-vdm dev if it isn't already in the busdevs list. */
++static int mctp_vdm_add_new(struct file *file, void *data)
++{
++	struct mctp_vdm *mvdev = NULL, *tmp = NULL;
++	bool exists = false;
++
++	mutex_lock(&busdevs_lock);
++	list_for_each_entry_safe(mvdev, tmp, &busdevs, list)
++		if (mvdev->file == file)
++			exists = true;
++
++	/* It is OK for a bus to already exist. That can occur due to
++	 * the race in mod_init between notifier and for_each_bus
++	 */
++	if (!exists)
++		mctp_vdm_add(file);
++	mutex_unlock(&busdevs_lock);
++	return 0;
++}
++
++static void mctp_vdm_notify_remove(struct file *file)
++{
++	struct mctp_vdm *mvdev = NULL, *tmp;
++
++	mutex_lock(&busdevs_lock);
++	list_for_each_entry_safe(mvdev, tmp, &busdevs, list)
++		if (mvdev->file == file)
++			mctp_vdm_remove(mvdev);
++	mutex_unlock(&busdevs_lock);
++}
++
++static void mctp_vdm_recv(struct miscdevice *miscdev)
++{
++	struct mctp_vdm *mvdev = NULL, *tmp = NULL;
++
++	mutex_lock(&busdevs_lock);
++	list_for_each_entry_safe(mvdev, tmp, &busdevs, list)
++		if (mvdev->miscdev == miscdev)
++			mctp_vdm_read(mvdev);
++	mutex_unlock(&busdevs_lock);
++}
++
++static int mctp_vdm_notifier_call(struct notifier_block *nb,
++				  unsigned long action, void *data)
++{
++	switch (action) {
++	case VDM_NOTIFY_ADD:
++		mctp_vdm_add_new((struct file *)data, NULL);
++		break;
++	case VDM_NOTIFY_REMOVE:
++		mctp_vdm_notify_remove((struct file *)data);
++		break;
++	case VDM_NOTIFY_RECV:
++		mctp_vdm_recv((struct miscdevice *)data);
++		break;
++	}
++	return NOTIFY_DONE;
++}
++
++static struct notifier_block mctp_vdm_notifier = {
++	.notifier_call = mctp_vdm_notifier_call,
++};
++
++static __init int mctp_vdm_mod_init(void)
++{
++	int rc;
++
++	pr_info("MCTP PCIe VDM interface\n");
++	rc = vdm_register_notifier(&mctp_vdm_notifier);
++	if (rc < 0) {
++		return rc;
++	}
++
++	return 0;
++}
++
++static __exit void mctp_vdm_mod_exit(void)
++{
++	int rc;
++
++	rc = vdm_unregister_notifier(&mctp_vdm_notifier);
++	if (rc < 0)
++		pr_warn("MCTP PCIe VDM could not unregister notifier, %d\n", rc);
++
++	mctp_vdm_remove_all();
++}
++
++module_init(mctp_vdm_mod_init);
++module_exit(mctp_vdm_mod_exit);
++
++MODULE_DESCRIPTION("MCTP PCIe VDM transport");
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("Mia <mimi05633@gmail.com>");
+diff --git a/include/linux/nupcie.h b/include/linux/nupcie.h
+new file mode 100644
+index 000000000000..e4e166494a42
+--- /dev/null
++++ b/include/linux/nupcie.h
+@@ -0,0 +1,133 @@
++/* SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later */
++/* Copyright (c) 2020 Nuvoton Technology Corporation */
++
++/* This is a private header file defining binding structure for PCIe binding */
++
++#ifndef _NUPCIE_H
++#define _NUPCIE_H
++
++#define MCTP_NUPCIE_BINDING_DEFAULT_BUFFER 1024
++
++#define NUPCIE_PACKET_SIZE(x) (MCTP_PCIE_VDM_HDR_SIZE + x)
++
++/* driver device file */
++#define NU_DRV_FILE "/dev/vdm"
++
++struct mctp_pcie_hdr {
++	uint8_t fmt_type;
++	uint8_t mbz;
++	uint16_t mbz_attr_length;
++	uint16_t requester;
++	uint8_t tag;
++	uint8_t code;
++	uint16_t target;
++	uint16_t vendor;
++} __attribute__((packed));
++
++/*
++ * MCTP PCIe template values
++ * The following non-zero values are defined by DSP0238 DMTF Spec as constants:
++ * .fmt_type:
++ * ----------
++ * [4:0]: Type[4:3] = 10b to indicate a message.
++ * [6:5]: Fmt = 11b to indicate 4 dword header with data.
++ * ----------
++ * .mbz_attr_length:
++ * [5:4]: Attr[1:0] = 01b for all MCTP over PCIe VDM
++ * ----------
++ * .code
++ * ----------
++ * [7:0]: Message Code = 0111_1111b to indicate a Type 1 VDM
++ * ----------
++ * .vendor
++ * ----------
++ * byte2[7:0]: Vendor ID MSB = 0x1a - DMTF VDMs
++ * byte3[7:0]: Vendor ID LSB = 0xb4 - DMTF VDMs
++ *
++ * See more details in Table 1 of DSP0238 DMTF Spec.
++ */
++#define be16toh(x)  be16_to_cpu(x)
++#define htobe16(x)  cpu_to_be16(x)
++
++#define MSG_4DW_HDR 0x70
++#define MCTP_PCIE_VDM_ATTR 0x0010
++#define MSG_CODE_VDM_TYPE_1 0x7f
++#define VENDOR_ID_DMTF_VDM 0xb41a
++
++#define PCIE_HDR_ROUTING_SHIFT 0
++#define PCIE_HDR_ROUTING_MASK 0x7
++
++#define PCIE_GET_ROUTING(x)                                                    \
++	((x->fmt_type >> PCIE_HDR_ROUTING_SHIFT) & PCIE_HDR_ROUTING_MASK)
++#define PCIE_SET_ROUTING(x, val)                                               \
++	(x->fmt_type |=                                                        \
++	 ((val & PCIE_HDR_ROUTING_MASK) << PCIE_HDR_ROUTING_SHIFT))
++
++#define PCIE_HDR_DATA_LEN_SHIFT 0
++#define PCIE_HDR_DATA_LEN_MASK 0xff03
++
++#define PCIE_GET_DATA_LEN(x)                                                   \
++	be16toh(((x->mbz_attr_length >> PCIE_HDR_DATA_LEN_SHIFT) &             \
++		 PCIE_HDR_DATA_LEN_MASK))
++
++#define PCIE_SET_DATA_LEN(x, val)                                              \
++	(x->mbz_attr_length |=                                                 \
++	 ((htobe16(val) & PCIE_HDR_DATA_LEN_MASK) << PCIE_HDR_DATA_LEN_SHIFT))
++
++#define PCIE_GET_REQ_ID(x) (be16toh(x->requester))
++#define PCIE_SET_REQ_ID(x, val) (x->requester |= (htobe16(val)))
++
++#define PCIE_HDR_PAD_LEN_SHIFT 4
++#define PCIE_HDR_PAD_LEN_MASK 0x3
++#define PCIE_GET_PAD_LEN(x)                                                    \
++	((x->tag >> PCIE_HDR_PAD_LEN_SHIFT) & PCIE_HDR_PAD_LEN_MASK)
++#define PCIE_SET_PAD_LEN(x, val)                                               \
++	(x->tag |= ((val & PCIE_HDR_PAD_LEN_MASK) << PCIE_HDR_PAD_LEN_SHIFT))
++
++#define PCIE_GET_TARGET_ID(x) (be16toh(x->target))
++#define PCIE_SET_TARGET_ID(x, val) (x->target |= (htobe16(val)))
++
++#define ALIGN_MASK(x, mask) (((x) + (mask)) & ~(mask))
++#define ALIGN(x, a) ALIGN_MASK(x, (a)-1)
++/* All PCIe packets are dword aligned */
++#define PCIE_PKT_ALIGN(x) ALIGN(x, sizeof(uint32_t))
++
++#define PCIE_HDR_SIZE_DW (sizeof(struct mctp_pcie_hdr) / sizeof(uint32_t))
++#define MCTP_HDR_SIZE_DW (sizeof(struct mctp_hdr) / sizeof(uint32_t))
++#define PCIE_VDM_HDR_SIZE_DW (PCIE_HDR_SIZE_DW + MCTP_HDR_SIZE_DW)
++
++#define PCIE_HDR_SIZE sizeof(struct mctp_pcie_hdr)
++#define MCTP_HDR_SIZE sizeof(struct mctp_hdr)
++#define PCIE_VDM_HDR_SIZE PCIE_HDR_SIZE + MCTP_HDR_SIZE
++
++/*
++ * Routing types
++ */
++enum mctp_nupcie_msg_routing {
++	PCIE_ROUTE_TO_RC = 0,
++	PCIE_RESERVED = 1,
++	PCIE_ROUTE_BY_ID = 2,
++	PCIE_BROADCAST_FROM_RC = 3
++};
++
++/*
++ * Extended data for transport layer control
++ */
++struct mctp_nupcie_pkt_private {
++	enum mctp_nupcie_msg_routing routing;
++	/* source (rx)/target (tx) endpoint bdf */
++	uint16_t remote_id;
++	uint16_t own_id;
++	uint16_t busOwnerBdf;
++} __attribute__((__packed__));
++
++enum {
++	VDM_NOTIFY_ADD,
++	VDM_NOTIFY_REMOVE,
++	VDM_NOTIFY_RECV,
++};
++
++int vdm_register_notifier(struct notifier_block *nb);
++int vdm_unregister_notifier(struct notifier_block *nb);
++
++#endif /* _NUPCIE_H */
+diff --git a/include/linux/nuvoton-mctp.h b/include/linux/nuvoton-mctp.h
+new file mode 100644
+index 000000000000..b5aec9c04e9d
+--- /dev/null
++++ b/include/linux/nuvoton-mctp.h
+@@ -0,0 +1,76 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/* Copyright (c) 2020 Intel Corporation */
++/* Copyright (c) 2020 Nuvoton Technology Corporation */
++
++#ifndef _UAPI_LINUX_NUVOTON_MCTP_H
++#define _UAPI_LINUX_NUVOTON_MCTP_H
++
++#include <linux/ioctl.h>
++#include <linux/types.h>
++
++/*
++ * nuvoton-mctp is a simple device driver exposing a read/write interface:
++ *  +----------------------+
++ *  | PCIe VDM Header      | 16 bytes (Big Endian)
++ *  +----------------------+
++ *  | MCTP Message Payload | 64/128/256/512 bytes (Little Endian)
++ *  +----------------------+
++ *
++ * MCTP packet description can be found in DMTF DSP0238,
++ * MCTP PCIe VDM Transport Specification.
++ *
++ */
++
++#define MCTP_PCIE_VDM_HDR_SIZE 16
++
++const uint8_t MSG_TYPE = 0x7f;
++const uint8_t RQDI_REQ = 1<<7;
++const uint8_t RQDI_RESP = 0x0;
++
++struct mctp_ctrl_msg_hdr {
++	uint8_t rq_dgram_inst;
++	uint8_t command_code;
++} __attribute__((__packed__));
++
++/*
++ * MCTP Message Type codes
++ * See DSP0239 v1.7.0 Table 1.
++ */
++#define MCTP_MESSAGE_TYPE_MCTP_CTRL 0x00
++#define MCTP_MESSAGE_TYPE_PLDM 0x01
++#define MCTP_MESSAGE_TYPE_NCSI 0x02
++#define MCTP_MESSAGE_TYPE_ETHERNET 0x03
++#define MCTP_MESSAGE_TYPE_NVME 0x04
++#define MCTP_MESSAGE_TYPE_SPDM 0x05
++#define MCTP_MESSAGE_TYPE_SECUREDMSG 0x06
++#define MCTP_MESSAGE_TYPE_VDPCI 0x7E
++#define MCTP_MESSAGE_TYPE_VDIANA 0x7F
++
++/*
++ * MCTP Control Command IDs
++ * See DSP0236 v1.3.0 Table 12.
++ */
++#define MCTP_CTRL_CMD_RESERVED 0x00
++#define MCTP_CTRL_CMD_SET_ENDPOINT_ID 0x01
++#define MCTP_CTRL_CMD_GET_ENDPOINT_ID 0x02
++#define MCTP_CTRL_CMD_GET_ENDPOINT_UUID 0x03
++#define MCTP_CTRL_CMD_GET_VERSION_SUPPORT 0x04
++#define MCTP_CTRL_CMD_GET_MESSAGE_TYPE_SUPPORT 0x05
++#define MCTP_CTRL_CMD_GET_VENDOR_MESSAGE_SUPPORT 0x06
++#define MCTP_CTRL_CMD_RESOLVE_ENDPOINT_ID 0x07
++#define MCTP_CTRL_CMD_ALLOCATE_ENDPOINT_IDS 0x08
++#define MCTP_CTRL_CMD_ROUTING_INFO_UPDATE 0x09
++#define MCTP_CTRL_CMD_GET_ROUTING_TABLE_ENTRIES 0x0A
++#define MCTP_CTRL_CMD_PREPARE_ENDPOINT_DISCOVERY 0x0B
++#define MCTP_CTRL_CMD_ENDPOINT_DISCOVERY 0x0C
++#define MCTP_CTRL_CMD_DISCOVERY_NOTIFY 0x0D
++#define MCTP_CTRL_CMD_GET_NETWORK_ID 0x0E
++#define MCTP_CTRL_CMD_QUERY_HOP 0x0F
++#define MCTP_CTRL_CMD_RESOLVE_UUID 0x10
++#define MCTP_CTRL_CMD_QUERY_RATE_LIMIT 0x11
++#define MCTP_CTRL_CMD_REQUEST_TX_RATE_LIMIT 0x12
++#define MCTP_CTRL_CMD_UPDATE_RATE_LIMIT 0x13
++#define MCTP_CTRL_CMD_QUERY_SUPPORTED_INTERFACES 0x14
++#define MCTP_CTRL_CMD_MAX 0x15
++
++#endif /* _UAPI_LINUX_NUVOTON_MCTP_H */
+diff --git a/net/mctp/route.c b/net/mctp/route.c
+index f51a05ec7162..65438629c936 100644
+--- a/net/mctp/route.c
++++ b/net/mctp/route.c
+@@ -898,7 +898,8 @@ int mctp_local_output(struct sock *sk, struct mctp_route *rt,
+ 
+ 	spin_lock_irqsave(&rt->dev->addrs_lock, flags);
+ 	if (rt->dev->num_addrs == 0) {
+-		rc = -EHOSTUNREACH;
++		saddr = 0;
++		rc = 0;
+ 	} else {
+ 		/* use the outbound interface's first address as our source */
+ 		saddr = rt->dev->addrs[0];
+@@ -1084,6 +1085,8 @@ static int mctp_pkttype_receive(struct sk_buff *skb, struct net_device *dev,
+ 	struct mctp_skb_cb *cb;
+ 	struct mctp_route *rt;
+ 	struct mctp_hdr *mh;
++	struct mctp_route tmp_rt = {0};
++	bool ext_rt = false;
+ 
+ 	rcu_read_lock();
+ 	mdev = __mctp_dev_get(dev);
+@@ -1128,14 +1131,23 @@ static int mctp_pkttype_receive(struct sk_buff *skb, struct net_device *dev,
+ 	rt = mctp_route_lookup(net, cb->net, mh->dest);
+ 
+ 	/* NULL EID, but addressed to our physical address */
+-	if (!rt && mh->dest == MCTP_ADDR_NULL && skb->pkt_type == PACKET_HOST)
++	if (!rt && (mctp_address_null(mh->dest) || mctp_address_broadcast(mh->dest)) && skb->pkt_type == PACKET_HOST) {
+ 		rt = mctp_route_lookup_null(net, dev);
++		if (!rt) {
++			ext_rt = true;
++			rt = &tmp_rt;
++			rt->dev = mdev;
++			rt->output = mctp_route_input;
++			rt->mtu = 0;
++		}
++	}
+ 
+ 	if (!rt)
+ 		goto err_drop;
+ 
+ 	rt->output(rt, skb);
+-	mctp_route_release(rt);
++	if (!ext_rt)
++		mctp_route_release(rt);
+ 	mctp_dev_put(mdev);
+ 
+ 	return NET_RX_SUCCESS;
+-- 
+2.25.1
+
