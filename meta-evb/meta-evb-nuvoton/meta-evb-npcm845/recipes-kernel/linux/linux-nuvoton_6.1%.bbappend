@@ -22,3 +22,6 @@ SRC_URI:append:evb-npcm845 = " file://mctp.cfg"
 # for i3c hub
 SRC_URI:append:evb-npcm845 = " file://i3c_hub.cfg"
 SRC_URI:append:evb-npcm845 = " file://0001-dts-add-i3c-hub-node-to-support-two-bic-slave-device.patch"
+
+# for npcm bic
+# SRC_URI:append:evb-npcm845 = " file://0001-i3c-master-svc-add-delay-for-NPCM-BIC.patch"

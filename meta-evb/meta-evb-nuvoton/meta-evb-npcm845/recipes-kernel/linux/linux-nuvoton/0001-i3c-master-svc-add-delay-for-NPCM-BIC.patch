@@ -1,0 +1,53 @@
+From a557f7212d6d60584091fa80097104e3ac54bc06 Mon Sep 17 00:00:00 2001
+From: cpchiang <cpchiang1@nuvoton.com>
+Date: Wed, 6 Dec 2023 13:08:08 +0800
+Subject: [PATCH] i3c: master: svc: add delay for NPCM BIC
+
+Add delay for NPCM BIC.
+
+1. Since NPCM BIC may enable CONFIG_XIP (run code on SPI flash),
+   CPU need load execution code from spi flash to cache during
+   system boot up.
+   Add delay 100us in daa flow that give BIC more time to loading
+   code from SPI flash.
+
+2. NPCM BIC CPU cannot handle data in time if master send command
+   too fast.
+   Add delay 100us~110us for max write 255 bytes.
+   If write data more than 255 bytes, need increase the delay value.
+
+Signed-off-by: cpchiang <cpchiang1@nuvoton.com>
+---
+ drivers/i3c/master/svc-i3c-master.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/i3c/master/svc-i3c-master.c b/drivers/i3c/master/svc-i3c-master.c
+index 5715eddcdd56..f1b12a235da1 100644
+--- a/drivers/i3c/master/svc-i3c-master.c
++++ b/drivers/i3c/master/svc-i3c-master.c
+@@ -1250,6 +1250,8 @@ static int svc_i3c_master_do_daa(struct i3c_master_controller *m)
+ 		return ret;
+ 	}
+ 
++	usleep_range(100, 110);
++
+ 	mutex_lock(&master->lock);
+ 	local_irq_disable();
+ 	/*
+@@ -1726,7 +1728,13 @@ static void svc_i3c_master_start_xfer_locked(struct svc_i3c_master *master)
+ static void svc_i3c_master_enqueue_xfer(struct svc_i3c_master *master,
+ 					struct svc_i3c_xfer *xfer)
+ {
++	struct svc_i3c_cmd *cmd = &xfer->cmds[0];
++
+ 	init_completion(&xfer->comp);
++
++	if (cmd->rnw == 0)
++		usleep_range(100, 110);
++
+ 	mutex_lock(&master->lock);
+ 	if (master->xferqueue.cur) {
+ 		list_add_tail(&xfer->node, &master->xferqueue.list);
+-- 
+2.25.1
+
