@@ -1,7 +1,7 @@
-From 72435bca31e38c65a558527a2544c5874bb16053 Mon Sep 17 00:00:00 2001
+From f6e07032bb6537d672ceb4725a299c1be09b91f4 Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Mon, 15 Aug 2022 17:08:47 +0800
-Subject: [PATCH 02/19] Add SEL add command
+Subject: [PATCH 02/18] Add SEL add command
 
 Signed-off-by: Stanley Chu <yschu@nuvoton.com>
 ---
@@ -9,7 +9,7 @@ Signed-off-by: Stanley Chu <yschu@nuvoton.com>
  1 file changed, 78 insertions(+), 6 deletions(-)
 
 diff --git a/dbus-sdr/storagecommands.cpp b/dbus-sdr/storagecommands.cpp
-index 1ae0de22..2ba8cfb0 100644
+index 7439fd3e..2d0df5ae 100644
 --- a/dbus-sdr/storagecommands.cpp
 +++ b/dbus-sdr/storagecommands.cpp
 @@ -93,6 +93,11 @@ constexpr static const char* chassisTypeMainServer = "17";
@@ -24,7 +24,7 @@ index 1ae0de22..2ba8cfb0 100644
  static std::vector<uint8_t> fruCache;
  static constexpr uint16_t invalidBus = 0xFFFF;
  static constexpr uint8_t invalidAddr = 0xFF;
-@@ -1089,17 +1094,84 @@ Unused arguments
+@@ -1128,17 +1133,84 @@ Unused arguments
    uint8_t eventType, uint8_t eventData1, uint8_t eventData2,
    uint8_t eventData3
  */

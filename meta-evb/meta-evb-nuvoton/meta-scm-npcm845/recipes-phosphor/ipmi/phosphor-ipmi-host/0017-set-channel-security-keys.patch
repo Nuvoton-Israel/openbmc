@@ -1,7 +1,7 @@
-From 7ee5813d9e7573836f26f120fa9d4e43f57a78f9 Mon Sep 17 00:00:00 2001
+From fccff6033f10f76558a99b59b5f58d0b344664e6 Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Thu, 28 Jul 2022 09:59:17 +0800
-Subject: [PATCH 18/19] set channel security keys
+Subject: [PATCH 17/18] set channel security keys
 
 Signed-off-by: Stanley Chu <yschu@nuvoton.com>
 ---
@@ -37,7 +37,7 @@ index 8e5accbc..aca02bd9 100644
 +}__attribute__((packed));
 +
 diff --git a/apphandler.cpp b/apphandler.cpp
-index 96658df5..77de09ad 100644
+index 378806e5..a0879d0c 100644
 --- a/apphandler.cpp
 +++ b/apphandler.cpp
 @@ -69,7 +69,21 @@ using Activation =
@@ -62,7 +62,7 @@ index 96658df5..77de09ad 100644
  typedef struct
  {
      uint8_t busId;
-@@ -1818,6 +1832,144 @@ ipmi::RspType<std::vector<uint8_t>>
+@@ -1832,6 +1846,144 @@ ipmi::RspType<std::vector<uint8_t>>
      return ipmi::responseSuccess(readBuf);
  }
  
@@ -207,7 +207,7 @@ index 96658df5..77de09ad 100644
  void register_netfn_app_functions()
  {
      // <Get Device ID>
-@@ -1902,5 +2054,9 @@ void register_netfn_app_functions()
+@@ -1916,5 +2068,9 @@ void register_netfn_app_functions()
      ipmi::registerHandler(ipmi::prioOpenBmcBase, ipmi::netFnApp,
                            ipmi::app::cmdSetSystemInfoParameters,
                            ipmi::Privilege::Admin, ipmiAppSetSystemInfo);
@@ -296,7 +296,7 @@ index 5a2e7e02..92a13753 100644
 +}
  } // namespace ipmi
 diff --git a/user_channel/user_layer.hpp b/user_channel/user_layer.hpp
-index 8258f6b4..5975d054 100644
+index ad215e39..688b0eec 100644
 --- a/user_channel/user_layer.hpp
 +++ b/user_channel/user_layer.hpp
 @@ -266,5 +266,10 @@ Cc ipmiUserSetUserPayloadAccess(const uint8_t chNum, const uint8_t operation,

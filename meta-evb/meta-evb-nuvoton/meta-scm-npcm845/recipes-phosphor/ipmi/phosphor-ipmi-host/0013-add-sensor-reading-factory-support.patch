@@ -1,7 +1,7 @@
-From 2d7b4cf6a64d6659006e1e3e018ad54fb757f8c5 Mon Sep 17 00:00:00 2001
+From ee380bd4bd915057bb0a66ff1cdf6edd093db5c5 Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Tue, 16 Aug 2022 16:33:07 +0800
-Subject: [PATCH 14/19] add sensor reading factory support
+Subject: [PATCH 13/18] add sensor reading factory support
 
 Signed-off-by: Stanley Chu <yschu@nuvoton.com>
 ---
@@ -9,11 +9,11 @@ Signed-off-by: Stanley Chu <yschu@nuvoton.com>
  1 file changed, 113 insertions(+)
 
 diff --git a/dbus-sdr/sensorcommands.cpp b/dbus-sdr/sensorcommands.cpp
-index df1049ec..fa7461ff 100644
+index c85b56c0..89e5c054 100644
 --- a/dbus-sdr/sensorcommands.cpp
 +++ b/dbus-sdr/sensorcommands.cpp
-@@ -2636,6 +2636,115 @@ ipmi::RspType<uint8_t,              // No of instances for requested id
- }
+@@ -2819,6 +2819,115 @@ ipmi::RspType<uint8_t,                // No of instances for requested id
+ 
  } // namespace dcmi
  
 +// TODO: implement non-linear part
@@ -128,7 +128,7 @@ index df1049ec..fa7461ff 100644
  /* end storage commands */
  
  void registerSensorFunctions()
-@@ -2723,5 +2832,9 @@ void registerSensorFunctions()
+@@ -2905,6 +3014,10 @@ void registerSensorFunctions()
      ipmi::registerHandler(ipmi::prioOpenBmcBase, ipmi::netFnSensor,
                            ipmi::sensor_event::cmdGetSensorType,
                            ipmi::Privilege::User, ipmiSenGetSensorType);
@@ -136,8 +136,9 @@ index df1049ec..fa7461ff 100644
 +    ipmi::registerHandler(ipmi::prioOpenBmcBase, ipmi::netFnSensor,
 +                          ipmi::sensor_event::cmdGetSensorReadingFactors,
 +                          ipmi::Privilege::User, ipmiSenReadingFactor);
- }
- } // namespace ipmi
+     // <Get Temperature Readings>
+     ipmi::registerGroupHandler(ipmi::prioOpenBmcBase, ipmi::groupDCMI,
+                                ipmi::dcmi::cmdGetTemperatureReadings,
 -- 
 2.34.1
 

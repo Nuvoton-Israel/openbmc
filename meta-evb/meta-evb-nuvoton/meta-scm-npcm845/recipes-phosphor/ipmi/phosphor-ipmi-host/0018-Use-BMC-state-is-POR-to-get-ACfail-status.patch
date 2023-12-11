@@ -1,7 +1,7 @@
-From 0bdee33ac3ca7a10ea6bf867b4d1887a9e2dd06e Mon Sep 17 00:00:00 2001
+From 7e1ca53004ad06ce9c9d56bb012e49a352b5829e Mon Sep 17 00:00:00 2001
 From: Brian Ma <chma0@nuvoton.com>
 Date: Mon, 22 Aug 2022 13:50:48 +0800
-Subject: [PATCH 19/19] Use BMC state is POR to get ACfail status
+Subject: [PATCH 18/18] Use BMC state is POR to get ACfail status
 
 ---
  chassishandler.cpp | 27 +++++++++++++++++++++++++++

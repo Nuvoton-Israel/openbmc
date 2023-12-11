@@ -1,7 +1,7 @@
-From 485d290b9757febd05590b73a8200da68f9b0168 Mon Sep 17 00:00:00 2001
+From c2049d92cf7a805917a616df58d2ef1d4cf8b889 Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Tue, 16 Aug 2022 16:00:00 +0800
-Subject: [PATCH 09/19] Add reset SEL
+Subject: [PATCH 08/18] Add reset SEL
 
 Signed-off-by: Stanley Chu <yschu@nuvoton.com>
 ---
@@ -11,7 +11,7 @@ Signed-off-by: Stanley Chu <yschu@nuvoton.com>
  3 files changed, 48 insertions(+), 2 deletions(-)
 
 diff --git a/dbus-sdr/sdrutils.cpp b/dbus-sdr/sdrutils.cpp
-index a5a82e9e..4a2589b9 100644
+index 3e7b966d..21cf0283 100644
 --- a/dbus-sdr/sdrutils.cpp
 +++ b/dbus-sdr/sdrutils.cpp
 @@ -264,6 +264,10 @@ uint16_t getSensorNumberFromPath(const std::string& path)

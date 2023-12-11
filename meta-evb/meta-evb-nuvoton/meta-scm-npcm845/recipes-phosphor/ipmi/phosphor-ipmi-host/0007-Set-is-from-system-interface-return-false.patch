@@ -1,7 +1,7 @@
-From 9581bbf4fbbb0037eb5b51e6b072c7e468c96e50 Mon Sep 17 00:00:00 2001
+From 48154229233f3985537417a0628e8c7717cf1f84 Mon Sep 17 00:00:00 2001
 From: Brian Ma <chma0@nuvoton.com>
 Date: Fri, 8 Jul 2022 16:41:26 +0800
-Subject: [PATCH 08/19] Set is from system interface return false
+Subject: [PATCH 07/18] Set is from system interface return false
 
 The ipmitool get the event is from system interface return false, but
 ipmid set true as default. Change the ipmid default value to send event.
@@ -10,7 +10,7 @@ ipmid set true as default. Change the ipmid default value to send event.
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/sensorhandler.cpp b/sensorhandler.cpp
-index 3fcb75d6..5c8cb5c9 100644
+index b1c1cdf0..cb766932 100644
 --- a/sensorhandler.cpp
 +++ b/sensorhandler.cpp
 @@ -1401,7 +1401,7 @@ static bool isFromSystemChannel()

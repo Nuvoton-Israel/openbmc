@@ -1,7 +1,7 @@
-From 97068759a15d76dcc48dab251bc8fff9517fa1a9 Mon Sep 17 00:00:00 2001
+From c122d06deacb7f78877b8f02a3cd56a89ad2371f Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Tue, 16 Aug 2022 15:41:43 +0800
-Subject: [PATCH 07/19] Force self test OK
+Subject: [PATCH 06/18] Force self test OK
 
 Signed-off-by: Stanley Chu <yschu@nuvoton.com>
 ---
@@ -9,10 +9,10 @@ Signed-off-by: Stanley Chu <yschu@nuvoton.com>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/apphandler.cpp b/apphandler.cpp
-index 5e305d1c..a02b2ccb 100644
+index 043e2323..52e4a9a0 100644
 --- a/apphandler.cpp
 +++ b/apphandler.cpp
-@@ -749,9 +749,9 @@ auto ipmiAppGetSelfTestResults() -> ipmi::RspType<uint8_t, uint8_t>
+@@ -758,9 +758,9 @@ auto ipmiAppGetSelfTestResults() -> ipmi::RspType<uint8_t, uint8_t>
      //      [2] 1b = Internal Use Area of BMC FRU corrupted.
      //      [1] 1b = controller update 'boot block' firmware corrupted.
      //      [0] 1b = controller operational firmware corrupted.

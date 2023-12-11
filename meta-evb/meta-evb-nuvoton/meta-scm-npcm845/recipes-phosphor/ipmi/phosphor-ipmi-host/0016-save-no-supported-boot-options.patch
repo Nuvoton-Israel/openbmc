@@ -1,7 +1,7 @@
-From ab8844bcf865407f5e2a50d6dac74ddaf961e5f8 Mon Sep 17 00:00:00 2001
+From 2568488afbd7e71596ecba3907209d6a5dd09735 Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Tue, 16 Aug 2022 16:50:31 +0800
-Subject: [PATCH 17/19] save no supported boot options
+Subject: [PATCH 16/18] save no supported boot options
 
 Signed-off-by: Stanley Chu <yschu@nuvoton.com>
 ---

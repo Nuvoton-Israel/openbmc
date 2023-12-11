@@ -1,7 +1,7 @@
-From 125de4c4d36aba5cbed858052019fdab0f6b3eed Mon Sep 17 00:00:00 2001
+From 6e611c7e3fc01c818f9570615a9f32b63647a4f4 Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Tue, 16 Aug 2022 16:23:46 +0800
-Subject: [PATCH 13/19] sensor reading optional zero
+Subject: [PATCH 12/18] sensor reading optional zero
 
 Signed-off-by: Stanley Chu <yschu@nuvoton.com>
 ---
@@ -9,7 +9,7 @@ Signed-off-by: Stanley Chu <yschu@nuvoton.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/dbus-sdr/sensorcommands.cpp b/dbus-sdr/sensorcommands.cpp
-index 3af76dda..df1049ec 100644
+index 205ef78d..c85b56c0 100644
 --- a/dbus-sdr/sensorcommands.cpp
 +++ b/dbus-sdr/sensorcommands.cpp
 @@ -963,7 +963,7 @@ ipmi::RspType<uint8_t, uint8_t, uint8_t, std::optional<uint8_t>>

@@ -1,7 +1,7 @@
-From 30a07b8b43474b9807bf6cb92aece49739cc9ec1 Mon Sep 17 00:00:00 2001
+From 4c923de6d8dbe99ff3a3ccaceb1375d4bd3e0212 Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Tue, 16 Aug 2022 16:44:30 +0800
-Subject: [PATCH 15/19] add oem sel support
+Subject: [PATCH 14/18] add oem sel support
 
 Signed-off-by: Stanley Chu <yschu@nuvoton.com>
 ---
@@ -9,10 +9,10 @@ Signed-off-by: Stanley Chu <yschu@nuvoton.com>
  1 file changed, 21 insertions(+)
 
 diff --git a/dbus-sdr/storagecommands.cpp b/dbus-sdr/storagecommands.cpp
-index 8a9fbf91..54ee9b10 100644
+index 2d0df5ae..62547833 100644
 --- a/dbus-sdr/storagecommands.cpp
 +++ b/dbus-sdr/storagecommands.cpp
-@@ -1092,6 +1092,27 @@ ipmi::RspType<uint16_t,                   // Next Record ID
+@@ -1084,6 +1084,27 @@ ipmi::RspType<uint16_t,                   // Next Record ID
              systemEventType{timestamp, generatorID, evmRev, sensorType,
                              sensorNum, eventType, eventDir, eventData});
      }
@@ -38,8 +38,8 @@ index 8a9fbf91..54ee9b10 100644
 +                                     oemTsEventType{timestamp, eventData});
 +    }
  
-     return ipmi::responseUnspecifiedError();
- }
+     if (recordType >= dynamic_sensors::ipmi::sel::oemTsEventFirst &&
+         recordType <= dynamic_sensors::ipmi::sel::oemTsEventLast)
 -- 
 2.34.1
 

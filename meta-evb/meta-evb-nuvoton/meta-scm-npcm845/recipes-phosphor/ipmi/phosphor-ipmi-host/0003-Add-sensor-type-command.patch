@@ -1,16 +1,16 @@
-From 8a4f355b1ffea8a9ec3eea41393916318c62dcc8 Mon Sep 17 00:00:00 2001
+From 3ca81baf9ffbfb105c8ee1d99050e5335c98205c Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Mon, 15 Aug 2022 17:23:50 +0800
-Subject: [PATCH 03/17] Add sensor type command
+Subject: [PATCH 03/18] Add sensor type command
 
 Signed-off-by: Stanley Chu <yschu@nuvoton.com>
 ---
- dbus-sdr/sensorcommands.cpp | 35 +++++++++++++++++++++++++++++++++++
+ dbus-sdr/sensorcommands.cpp | 33 +++++++++++++++++++++++++++++++++
  sensorhandler.cpp           | 10 +++++-----
- 2 files changed, 40 insertions(+), 5 deletions(-)
+ 2 files changed, 38 insertions(+), 5 deletions(-)
 
 diff --git a/dbus-sdr/sensorcommands.cpp b/dbus-sdr/sensorcommands.cpp
-index 55ba6d94..ffacf297 100644
+index 55ba6d94..8b43a3fa 100644
 --- a/dbus-sdr/sensorcommands.cpp
 +++ b/dbus-sdr/sensorcommands.cpp
 @@ -2315,6 +2315,35 @@ static ipmi::RspType<uint8_t, // respcount
@@ -49,23 +49,17 @@ index 55ba6d94..ffacf297 100644
  /* end sensor commands */
  
  /* storage commands */
-@@ -2853,10 +2882,16 @@ void registerSensorFunctions()
+@@ -2853,6 +2882,10 @@ void registerSensorFunctions()
                                 ipmi::dcmi::cmdGetDcmiSensorInfo,
                                 ipmi::Privilege::Operator,
                                 ipmi::dcmi::getSensorInfo);
-+
-     // <Get Temperature Readings>
-     ipmi::registerGroupHandler(ipmi::prioOpenBmcBase, ipmi::groupDCMI,
-                                ipmi::dcmi::cmdGetTemperatureReadings,
-                                ipmi::Privilege::User,
-                                ipmi::dcmi::getTempReadings);
-+
 +    // <Get Sensor Type>
 +    ipmi::registerHandler(ipmi::prioOpenBmcBase, ipmi::netFnSensor,
 +                          ipmi::sensor_event::cmdGetSensorType,
 +                          ipmi::Privilege::User, ipmiSenGetSensorType);
- }
- } // namespace ipmi
+     // <Get Temperature Readings>
+     ipmi::registerGroupHandler(ipmi::prioOpenBmcBase, ipmi::groupDCMI,
+                                ipmi::dcmi::cmdGetTemperatureReadings,
 diff --git a/sensorhandler.cpp b/sensorhandler.cpp
 index ad7286b4..b1c1cdf0 100644
 --- a/sensorhandler.cpp
