@@ -37,7 +37,7 @@ SIGN_TYPE ?= "openssl"
 
 KEY_FOLDER ?= ""
 KEY_FOLDER_DEFAULT ?= "${DEPLOY_DIR_IMAGE}/${SIGN_TYPE}"
-KEY_RSA_PRI ?= "rsa_private_key_0.bin"
-KEY_RSA_PUB ?= "rsa_public_key_0.bin"
+KEY_RSA_PRI ?= "rsa_private_key_cs20.bin"
+KEY_RSA_PUB ?= "rsa_public_key_cs20.bin"
 
-SECURED_IMAGE ?= "False"
+SECURED_IMAGE ?= "True"

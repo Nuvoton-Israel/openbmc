@@ -11,11 +11,12 @@ S = "${WORKDIR}"
 SRCREV = "4fa655f95547b927b0133c8ed96c88c5d14ac7b3"
 SRC_URI = " \
     https://raw.githubusercontent.com/Nuvoton-Israel/bootblock/${SRCREV}/LICENSE;name=lic \
-    https://github.com/Nuvoton-Israel/bootblock/releases/download/BootBlock_${PV}/Poleg_bootblock_basic.bin;downloadfilename=${FILENAME};name=bin \
+    https://github.com/Nuvoton-Israel/bootblock/releases/download/BootBlock_${PV}/Poleg_bootblock_secure.bin;downloadfilename=${FILENAME};name=bin \
 "
 
 SRC_URI[lic.md5sum] = "b234ee4d69f5fce4486a80fdaf4a4263"
-SRC_URI[bin.sha256sum] = "a33f3fe96786929a8f35e986ae76bbd1bf53459770a6ece7d6777dced1d62ddf"
+# SRC_URI[bin.sha256sum] = "a33f3fe96786929a8f35e986ae76bbd1bf53459770a6ece7d6777dced1d62ddf"
+SRC_URI[bin.sha256sum] = "c4b267429d448aeb1f23364da093430d4862a0dcdfb5a5be3c8746f8e69d4102"
 
 inherit deploy
 

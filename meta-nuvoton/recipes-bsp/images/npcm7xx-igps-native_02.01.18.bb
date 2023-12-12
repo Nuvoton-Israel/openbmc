@@ -8,6 +8,8 @@ SRC_URI = " \
     git://github.com/Nuvoton-Israel/igps;branch=master;protocol=https \
     file://0001-Adjust-paths-for-use-with-Bitbake.patch \
     file://0002-Export-sign-image-function-for-openbmc.patch \
+    file://rsa_private_key_cs20.bin;subdir=git/ImageGeneration/inputs/ \
+    file://rsa_public_key_cs20.bin;subdir=git/ImageGeneration/inputs/ \
 "
 # tag IGPS_02.01.18
 SRCREV = "e0fc2ba58d561220a957bc06aefe1ac7f6e96126"
