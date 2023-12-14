@@ -1,4 +1,4 @@
-From bdc5e26a1d503341faf20034fdf1869cafd72a34 Mon Sep 17 00:00:00 2001
+From 1e04f5a01f19a445c47b871d0048b3a536f4ee11 Mon Sep 17 00:00:00 2001
 From: Mia Lin <mimi05633@gmail.com>
 Date: Tue, 5 Dec 2023 14:52:43 +0800
 Subject: [PATCH 1/1] net: mctp: Support mctp over pcie vdm
@@ -8,11 +8,11 @@ Signed-off-by: Mia Lin <mimi05633@gmail.com>
  drivers/misc/npcm-vdm.c      |  54 +++-
  drivers/net/mctp/Kconfig     |   7 +
  drivers/net/mctp/Makefile    |   1 +
- drivers/net/mctp/mctp-vdm.c  | 495 +++++++++++++++++++++++++++++++++++
- include/linux/nupcie.h       | 133 ++++++++++
+ drivers/net/mctp/mctp-vdm.c  | 481 +++++++++++++++++++++++++++++++++++
+ include/linux/nupcie.h       | 132 ++++++++++
  include/linux/nuvoton-mctp.h |  76 ++++++
  net/mctp/route.c             |  18 +-
- 7 files changed, 780 insertions(+), 4 deletions(-)
+ 7 files changed, 765 insertions(+), 4 deletions(-)
  create mode 100644 drivers/net/mctp/mctp-vdm.c
  create mode 100644 include/linux/nupcie.h
  create mode 100644 include/linux/nuvoton-mctp.h
@@ -204,10 +204,10 @@ index e1cb99ced54a..41849088e003 100644
 +obj-$(CONFIG_MCTP_TRANSPORT_PCIE_VDM) += mctp-vdm.o
 diff --git a/drivers/net/mctp/mctp-vdm.c b/drivers/net/mctp/mctp-vdm.c
 new file mode 100644
-index 000000000000..9c3a2bc70d07
+index 000000000000..72c89efe9d2d
 --- /dev/null
 +++ b/drivers/net/mctp/mctp-vdm.c
-@@ -0,0 +1,495 @@
+@@ -0,0 +1,481 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Implements DMTF specification
@@ -295,17 +295,6 @@ index 000000000000..9c3a2bc70d07
 +	mvdev->pkt_prv.remote_id = PCIE_GET_REQ_ID(hdr);
 +	mvdev->pkt_prv.own_id = PCIE_GET_TARGET_ID(hdr);
 +
-+	uint8_t ic_type = skb->data[MCTP_PCIE_VDM_HDR_SIZE];
-+	struct mctp_ctrl_msg_hdr *ctrl_hdr = (struct mctp_ctrl_msg_hdr *)(skb->data + MCTP_PCIE_VDM_HDR_SIZE + sizeof(ic_type));
-+
-+	if ((ic_type & MSG_TYPE) == MCTP_MESSAGE_TYPE_MCTP_CTRL) { /* MCTP control = 0x00 (000_0000b) */
-+		if (ctrl_hdr->rq_dgram_inst & RQDI_REQ) {
-+			if (ctrl_hdr->command_code == MCTP_CTRL_CMD_ENDPOINT_DISCOVERY) {
-+				mvdev->pkt_prv.busOwnerBdf = mvdev->pkt_prv.remote_id;
-+			}
-+		}
-+	}
-+
 +	skb_pull(skb, sizeof(struct mctp_pcie_hdr));
 +
 +	cb = __mctp_cb(skb);
@@ -350,9 +339,6 @@ index 000000000000..9c3a2bc70d07
 +				case MCTP_CTRL_CMD_PREPARE_ENDPOINT_DISCOVERY:
 +				case MCTP_CTRL_CMD_ENDPOINT_DISCOVERY:
 +					pkt_prv->routing = PCIE_BROADCAST_FROM_RC;
-+					break;
-+				case MCTP_CTRL_CMD_GET_ROUTING_TABLE_ENTRIES:
-+					pkt_prv->remote_id = pkt_prv->busOwnerBdf;
 +					break;
 +				default:
 +					break;
@@ -705,10 +691,10 @@ index 000000000000..9c3a2bc70d07
 +MODULE_AUTHOR("Mia <mimi05633@gmail.com>");
 diff --git a/include/linux/nupcie.h b/include/linux/nupcie.h
 new file mode 100644
-index 000000000000..e4e166494a42
+index 000000000000..b9979646681b
 --- /dev/null
 +++ b/include/linux/nupcie.h
-@@ -0,0 +1,133 @@
+@@ -0,0 +1,132 @@
 +/* SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later */
 +/* Copyright (c) 2020 Nuvoton Technology Corporation */
 +
@@ -829,7 +815,6 @@ index 000000000000..e4e166494a42
 +	/* source (rx)/target (tx) endpoint bdf */
 +	uint16_t remote_id;
 +	uint16_t own_id;
-+	uint16_t busOwnerBdf;
 +} __attribute__((__packed__));
 +
 +enum {
