@@ -1,4 +1,4 @@
-From 3e89ae1c7731874c1f4cbbf50cab5dff66f94ce9 Mon Sep 17 00:00:00 2001
+From 10360f5f7fa4d653006b75341e27c83cf2b9f692 Mon Sep 17 00:00:00 2001
 From: Joseph Liu <kwliu@nuvoton.com>
 Date: Fri, 27 Oct 2023 16:16:40 +0800
 Subject: [PATCH] pldm: fix pldmtool cmd fail issue
@@ -131,7 +131,7 @@ index afd49dd57..5a51a66e4 100644
      {
          void* responseMessage = nullptr;
 diff --git a/pldmtool/pldm_cmd_helper.hpp b/pldmtool/pldm_cmd_helper.hpp
-index 11b7ada9a..2df66ad49 100644
+index 11b7ada9a..846cedeaa 100644
 --- a/pldmtool/pldm_cmd_helper.hpp
 +++ b/pldmtool/pldm_cmd_helper.hpp
 @@ -79,10 +79,11 @@ class CommandInterface
@@ -143,7 +143,7 @@ index 11b7ada9a..2df66ad49 100644
          instanceId(0)
      {
          app->add_option("-m,--mctp_eid", mctp_eid, "MCTP endpoint ID");
-+        app->add_option("-n,--mctp_netid", mctp_netid, "MCTP endpoint net ID");
++        app->add_option("-x,--mctp_netid", mctp_netid, "MCTP endpoint net ID");
          app->add_flag("-v, --verbose", pldmVerbose);
          app->add_option("-n, --retry-count", numRetries,
                          "Number of retry when PLDM request message is failed");

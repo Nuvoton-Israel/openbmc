@@ -8,7 +8,8 @@ After=mctp-local.target
 Type=dbus
 BusName=xyz.openbmc_project.MCTP
 ExecStart=/usr/sbin/mctpd
-ExecStartPost=/usr/share/mctp/mctp-config.sh
+# ignore fail if we are not bus owner
+ExecStartPost=-/usr/bin/mctp-config.sh
 
 [Install]
 WantedBy=mctp.target
