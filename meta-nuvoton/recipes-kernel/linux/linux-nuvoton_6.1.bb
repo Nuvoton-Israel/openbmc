@@ -7,6 +7,7 @@ require linux-nuvoton.inc
 
 SRC_URI:append:nuvoton = " file://0017-drivers-i2c-workaround-for-i2c-slave-behavior.patch"
 SRC_URI:append:nuvoton = " file://enable-emc.cfg"
+SRC_URI:append:nuvoton:df-obmc-static-norootfs = " file://enable-spinor-ubifs.cfg"
 
 # New Arch VDMX/VDMA driver
 # SRC_URI:append:nuvoton = " file://2222-driver-misc-add-nuvoton-vdmx-vdma-driver.patch"
