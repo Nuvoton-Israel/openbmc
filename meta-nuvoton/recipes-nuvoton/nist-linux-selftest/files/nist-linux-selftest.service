@@ -1,0 +1,9 @@
+[Unit]
+Description=nist-linux-selftest Service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/nist-linux-selftest
+
+[Install]
+WantedBy=multi-user.target

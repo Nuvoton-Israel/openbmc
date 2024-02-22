@@ -52,6 +52,7 @@ RDEPENDS:${PN}-system = " \
     phosphor-power \
     phosphor-gpio-monitor \
     phosphor-gpio-monitor-monitor \
+    nist-linux-selftest \
     "
 
 RDEPENDS:${PN}-system:append = " \
