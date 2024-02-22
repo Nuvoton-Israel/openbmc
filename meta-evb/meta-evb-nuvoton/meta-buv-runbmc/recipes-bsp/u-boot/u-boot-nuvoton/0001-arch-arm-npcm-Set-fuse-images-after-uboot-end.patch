@@ -1,0 +1,34 @@
+From fd316b506ba23ef30c57c64accd97583c4905eab Mon Sep 17 00:00:00 2001
+From: Eason Yang <yhyang2@nuvoton.com>
+Date: Wed, 21 Feb 2024 17:35:03 +0800
+Subject: [PATCH 1/1] arch: arm: npcm: Set fuse images after uboot end
+
+Signed-off-by: Eason Yang <yhyang2@nuvoton.com>
+---
+ arch/arm/mach-npcm/secure_boot.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-npcm/secure_boot.c b/arch/arm/mach-npcm/secure_boot.c
+index f90c65e91b..6d2d85de03 100644
+--- a/arch/arm/mach-npcm/secure_boot.c
++++ b/arch/arm/mach-npcm/secure_boot.c
+@@ -12,6 +12,7 @@
+ #include <asm/arch/cpu.h>
+ #include <asm/arch/gcr.h>
+ #include <asm/arch/otp.h>
++#include <asm/arch/poleg_info.h>
+ #include <cpu_func.h>
+ 
+ #define NPCM_GCR_INTCR2_SELFTEST_PASSED		BIT(11)
+@@ -82,7 +83,7 @@ static int secure_boot_configuration(void)
+ 	 * fuse images should be a part of the flash image, right after the uboot
+ 	 * TODO: set addr
+ 	 */
+-	//addr = POLEG_UBOOT_END;
++	addr = POLEG_UBOOT_END;
+ 
+ 	/*
+ 	 * if found, program the image to the fuse arrays, set the secure boot
+-- 
+2.25.1
+

@@ -60,6 +60,18 @@ do_prepare_bootloaders() {
     bingo ${IGPS_DIR}/mergedBootBlockAndUboot.xml \
             -o ${DEPLOY_DIR_IMAGE}/${UBOOT_BINARY}.${MERGED_SUFFIX}
 
+    # Signature prodedure if necessary
+    if [ "${SECURED_IMAGE}" = "True" ]; then
+            bingo ${IGPS_DIR}/poleg_key_map.xml \
+                  -o ${DEPLOY_DIR_IMAGE}/poleg_key_map.bin
+            bingo ${IGPS_DIR}/poleg_fuse_map.xml \
+                  -o ${DEPLOY_DIR_IMAGE}/poleg_fuse_map.bin
+            bingo ${IGPS_DIR}/mergedFuses.xml \
+                  -o ${DEPLOY_DIR_IMAGE}/mergedFuses.bin
+            bingo ${IGPS_DIR}/mergedSecureBoot.xml \
+                  -o ${DEPLOY_DIR_IMAGE}/mergedBootBlockAndUboot.bin
+    fi
+
     cd "$olddir"
 }
 

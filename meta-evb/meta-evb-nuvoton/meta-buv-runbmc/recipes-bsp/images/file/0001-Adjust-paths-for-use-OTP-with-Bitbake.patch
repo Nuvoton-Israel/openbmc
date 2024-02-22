@@ -1,0 +1,69 @@
+From e31dada0c5b3975a4dc2ee47aaae8bd2aec23c77 Mon Sep 17 00:00:00 2001
+From: Eason Yang <yhyang2@nuvoton.com>
+Date: Mon, 11 Dec 2023 17:35:55 +0800
+Subject: [PATCH 3/3] Adjust paths for use OTP with Bitbake
+
+Signed-off-by: Eason Yang <yhyang2@nuvoton.com>
+---
+ ImageGeneration/inputs/mergedFuses.xml      |  8 ++++----
+ ImageGeneration/inputs/mergedSecureBoot.xml | 10 +++++-----
+ 2 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/ImageGeneration/inputs/mergedFuses.xml b/ImageGeneration/inputs/mergedFuses.xml
+index 739d978..7e7e307 100644
+--- a/ImageGeneration/inputs/mergedFuses.xml
++++ b/ImageGeneration/inputs/mergedFuses.xml
+@@ -18,18 +18,18 @@
+ 		<name>key-array</name>             <!-- name of field -->
+ 		<config>
+ 			<offset>0</offset>        <!-- offset in the header -->
+-			<size format='FileSize'>output_binaries/Secure/poleg_key_map.bin</size>                 <!-- size in the header calculated by tool-->
++			<size format='FileSize'>poleg_key_map.bin</size>                 <!-- size in the header calculated by tool-->
+ 		</config>
+-		<content format='FileContent'>output_binaries/Secure/poleg_key_map.bin</content>  <!-- content the user should fill -->
++		<content format='FileContent'>poleg_key_map.bin</content>  <!-- content the user should fill -->
+ 	</BinField>	
+ 		
+ 	<BinField>
+ 		<name>fuse-array</name>             <!-- name of field -->
+ 		<config>
+ 			<offset>0x400</offset>        <!-- offset in the header -->
+-			<size format='FileSize'>output_binaries/Secure/poleg_fuse_map.bin</size>                 <!-- size in the header calculated by tool-->
++			<size format='FileSize'>poleg_fuse_map.bin</size>                 <!-- size in the header calculated by tool-->
+ 		</config>
+-		<content format='FileContent'>output_binaries/Secure/poleg_fuse_map.bin</content>  <!-- content the user should fill -->
++		<content format='FileContent'>poleg_fuse_map.bin</content>  <!-- content the user should fill -->
+ 	</BinField>
+ 		
+ 	<BinField>
+diff --git a/ImageGeneration/inputs/mergedSecureBoot.xml b/ImageGeneration/inputs/mergedSecureBoot.xml
+index 33244a1..db99396 100644
+--- a/ImageGeneration/inputs/mergedSecureBoot.xml
++++ b/ImageGeneration/inputs/mergedSecureBoot.xml
+@@ -18,18 +18,18 @@
+ 		<name>BootBlockAndHeader</name>         <!-- name of field -->
+ 		<config>
+ 			<offset>0</offset>            <!-- offset in the header -->
+-			<size format='FileSize'>output_binaries/Secure/mergedBootBlockAndUboot.bin</size>              <!-- size in the header -->
++			<size format='FileSize'>u-boot.bin.merged</size>              <!-- size in the header -->
+ 		</config>
+-		<content format='FileContent'>output_binaries/Secure/mergedBootBlockAndUboot.bin</content>  <!-- content the user should fill -->
++		<content format='FileContent'>u-boot.bin.merged</content>  <!-- content the user should fill -->
+ 	</BinField>
+ 		
+ 	<BinField>
+ 		<name>mergedFuses</name>         <!-- name of field -->
+ 		<config>
+-			<offset format='FileSize' align='0x1000'>output_binaries/Secure/mergedBootBlockAndUboot.bin</offset>            <!-- offset in the header -->
+-			<size format='FileSize'>output_binaries/Secure/mergedFuses.bin</size>              <!-- size in the header -->
++			<offset format='FileSize' align='0x1000'>u-boot.bin.merged</offset>            <!-- offset in the header -->
++			<size format='FileSize'>mergedFuses.bin</size>              <!-- size in the header -->
+ 		</config>
+-		<content format='FileContent'>output_binaries/Secure/mergedFuses.bin</content>  <!-- content the user should fill -->
++		<content format='FileContent'>mergedFuses.bin</content>  <!-- content the user should fill -->
+ 	</BinField>
+ 	
+ </Bin_Ecc_Map>
+-- 
+2.25.1
+
