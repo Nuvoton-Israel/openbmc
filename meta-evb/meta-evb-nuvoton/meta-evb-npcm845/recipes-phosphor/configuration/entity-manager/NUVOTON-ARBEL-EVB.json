@@ -524,10 +524,70 @@
             ],
             "Type": "BMCOnDieThermalSensor"
         },
-	{
-	    "Name":"evb_emmc",
-	    "Type":"EmmcDevice"
-	}
+        {
+            "Name":"evb_emmc",
+            "Type":"EmmcDevice"
+        },
+        {
+            "AllowedBuses": [
+                "xyz.openbmc_project.MCTP_I3C_MNG_PFR"
+            ],
+            "Bus": 0,
+            "DefaultEID": 9,
+            "EIDPoolDistribution": {
+                "MCTP_I3C_MNG_PFR": 2
+            },
+            "GetRoutingInterval": 60,
+            "Index": 3,
+            "Name": "MCTP I3C MNG CPU1",
+            "PhysicalMediumID": "I3cSDR",
+            "ProvisionalIdMask": 15,
+            "ReqRetryCount": 2,
+            "ReqToRespTimeMs": 300,
+            "RequiredEIDPoolFromBO": 2,
+            "RequiresCpuPidMask": true,
+            "Role": "Endpoint",
+            "SupportsBridge": true,
+            "TransportBindingType": "MctpI3C",
+            "Type": "MctpConfiguration"
+        },
+        {
+            "AllowedBuses": [
+                "xyz.openbmc_project.MCTP_I3C_MNG_PFR"
+            ],
+            "Bus": 0,
+            "DefaultEID": 0,
+            "GetRoutingInterval": 60,
+            "Index": 4,
+            "Name": "MCTP I3C MNG CPU2",
+            "PhysicalMediumID": "I3cSDR",
+            "ProvisionalIdMask": 4111,
+            "ReqRetryCount": 2,
+            "ReqToRespTimeMs": 300,
+            "RequiresCpuPidMask": true,
+            "Role": "Endpoint",
+            "SupportsBridge": true,
+            "TransportBindingType": "MctpI3C",
+            "Type": "MctpConfiguration"
+        },
+        {
+            "AllowedBuses": [
+                "xyz.openbmc_project.MCTP_I3C_MNG_CPU1",
+                "xyz.openbmc_project.MCTP_I3C_MNG_CPU2"
+            ],
+            "Bus": 1,
+            "DefaultEID": 9,
+            "Index": 5,
+            "Name": "MCTP I3C MNG PFR",
+            "PhysicalMediumID": "I3cSDR",
+            "ReqRetryCount": 2,
+            "ReqToRespTimeMs": 300,
+            "RequiredEIDPoolSize": 2,
+            "RequiresCpuPidMask": false,
+            "Role": "BusOwner",
+            "TransportBindingType": "MctpI3C",
+            "Type": "MctpConfiguration"
+        }
     ],
     "Name": "EVB_ARBEL_NUVOTON",
     "Probe": "xyz.openbmc_project.FruDevice({'BOARD_PRODUCT_NAME': 'NUVOTON-ARBEL-EVB'})",

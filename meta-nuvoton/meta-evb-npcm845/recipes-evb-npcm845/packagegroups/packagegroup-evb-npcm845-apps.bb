@@ -72,7 +72,4 @@ RDEPENDS:${PN}-system = " \
         estoraged \
         cryptsetup \
         systemd-analyze \
-        pldm \
-        mctp \
-        usb-tty \
         "
