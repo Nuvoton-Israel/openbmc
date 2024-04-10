@@ -1,4 +1,4 @@
-From cd310d183a1e9d332e1e2d84886587571fcdcd01 Mon Sep 17 00:00:00 2001
+From f09b070cf3f6621ad6031f91fe76b09b441b2b54 Mon Sep 17 00:00:00 2001
 From: Angela TH Lin <angela_th_lin@wiwynn.com>
 Date: Tue, 7 Mar 2023 11:22:55 +0800
 Subject: [PATCH] Add driver for HDC302x
@@ -11,12 +11,12 @@ Subject: [PATCH] Add driver for HDC302x
  create mode 100644 drivers/hwmon/hdc302x.c
 
 diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
-index e5866419261c..50c73202bcbd 100644
+index b71a51c2b502..0c5f86b31ece 100644
 --- a/drivers/hwmon/Kconfig
 +++ b/drivers/hwmon/Kconfig
-@@ -683,6 +683,17 @@ config SENSORS_GPIO_FAN
- 	  This driver can also be built as a module. If so, the module
- 	  will be called gpio-fan.
+@@ -723,6 +723,17 @@ config SENSORS_GXP_FAN_CTRL
+ 	  The GXP controls fan function via the CPLD through the use of PWM
+ 	  registers. This driver reports status and pwm setting of the fans.
  
 +config SENSORS_HDC302X
 +	tristate "Texas Instruments HDC3020 and compatibles"
@@ -33,14 +33,14 @@ index e5866419261c..50c73202bcbd 100644
  	tristate "Honeywell Humidicon HIH-6130 humidity/temperature sensor"
  	depends on I2C
 diff --git a/drivers/hwmon/Makefile b/drivers/hwmon/Makefile
-index a4eee1103b9c..e9647a737275 100644
+index 2d62ba3ab674..0b577e76bf8a 100644
 --- a/drivers/hwmon/Makefile
 +++ b/drivers/hwmon/Makefile
-@@ -80,6 +80,7 @@ obj-$(CONFIG_SENSORS_GL518SM)	+= gl518sm.o
- obj-$(CONFIG_SENSORS_GL520SM)	+= gl520sm.o
+@@ -84,6 +84,7 @@ obj-$(CONFIG_SENSORS_GL520SM)	+= gl520sm.o
  obj-$(CONFIG_SENSORS_GSC)	+= gsc-hwmon.o
  obj-$(CONFIG_SENSORS_GPIO_FAN)	+= gpio-fan.o
-+obj-$(CONFIG_SENSORS_HDC302X)	+= hdc302x.o
+ obj-$(CONFIG_SENSORS_GXP_FAN_CTRL) += gxp-fan-ctrl.o
++obj-$(CONFIG_SENSORS_HDC302X)  += hdc302x.o
  obj-$(CONFIG_SENSORS_HIH6130)	+= hih6130.o
  obj-$(CONFIG_SENSORS_ULTRA45)	+= ultra45_env.o
  obj-$(CONFIG_SENSORS_I5500)	+= i5500_temp.o
@@ -291,3 +291,6 @@ index 000000000000..ed5fe03a96d9
 +MODULE_DESCRIPTION("Texas Instruments HDC302x relative humidity and temperature sensor driver");
 +MODULE_LICENSE("GPL");
 \ No newline at end of file
+-- 
+2.34.1
+

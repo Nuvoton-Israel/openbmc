@@ -1,7 +1,7 @@
-From ce68bceede6675e647e1a6ad8f07b1cf7429476c Mon Sep 17 00:00:00 2001
+From 6cd849f04abe74094baef28ce47c3898e1ea81ea Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Mon, 15 Aug 2022 14:42:20 +0800
-Subject: [PATCH] add NIC temp sensor
+Subject: [PATCH 1/5] add NIC temp sensor
 
 Signed-off-by: Stanley Chu <yschu@nuvoton.com>
 ---
@@ -10,7 +10,7 @@ Signed-off-by: Stanley Chu <yschu@nuvoton.com>
  2 files changed, 83 insertions(+), 7 deletions(-)
 
 diff --git a/src/MCUTempSensor.cpp b/src/MCUTempSensor.cpp
-index e82c80fb..201be188 100644
+index fef23e92..1e02abe6 100644
 --- a/src/MCUTempSensor.cpp
 +++ b/src/MCUTempSensor.cpp
 @@ -55,12 +55,12 @@ MCUTempSensor::MCUTempSensor(std::shared_ptr<sdbusplus::asio::connection>& conn,
@@ -29,7 +29,7 @@ index e82c80fb..201be188 100644
  {
      sensorInterface = objectServer.add_interface(
          "/xyz/openbmc_project/sensors/temperature/" + name,
-@@ -95,6 +95,55 @@ void MCUTempSensor::init(void)
+@@ -95,6 +95,55 @@ void MCUTempSensor::init()
      read();
  }
  
@@ -82,10 +82,10 @@ index e82c80fb..201be188 100644
 +    return 0;
 +}
 +
- void MCUTempSensor::checkThresholds(void)
+ void MCUTempSensor::checkThresholds()
  {
      thresholds::checkThresholds(this);
-@@ -167,10 +216,20 @@ void MCUTempSensor::read(void)
+@@ -167,10 +216,20 @@ void MCUTempSensor::read()
              return;
          }
          int32_t temp = 0;
@@ -138,7 +138,7 @@ index e82c80fb..201be188 100644
                  sensor->init();
              }
 diff --git a/src/MCUTempSensor.hpp b/src/MCUTempSensor.hpp
-index 40075464..0c28c21b 100644
+index 2948af33..ae0189d3 100644
 --- a/src/MCUTempSensor.hpp
 +++ b/src/MCUTempSensor.hpp
 @@ -16,7 +16,8 @@ struct MCUTempSensor : public Sensor
@@ -150,7 +150,7 @@ index 40075464..0c28c21b 100644
 +                  uint8_t tempRegWidth, uint16_t scale);
      ~MCUTempSensor() override;
  
-     void checkThresholds(void) override;
+     void checkThresholds() override;
 @@ -26,9 +27,12 @@ struct MCUTempSensor : public Sensor
      uint8_t busId;
      uint8_t mcuAddress;
