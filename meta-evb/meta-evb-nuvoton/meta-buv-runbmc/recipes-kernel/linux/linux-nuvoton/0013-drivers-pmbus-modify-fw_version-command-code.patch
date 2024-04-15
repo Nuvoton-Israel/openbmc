@@ -1,0 +1,35 @@
+From 944731c5821fbf236ce1290cf5a848473983d3a8 Mon Sep 17 00:00:00 2001
+From: Allen Kang <jhkang@nuvoton.com>
+Date: Wed, 28 Jun 2023 16:45:32 +0800
+Subject: [PATCH] drivers: pmbus: modify fw_version command code
+
+Signed-off-by: Allen Kang <jhkang@nuvoton.com>
+---
+ drivers/hwmon/pmbus/inspur-ipsps.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/hwmon/pmbus/inspur-ipsps.c b/drivers/hwmon/pmbus/inspur-ipsps.c
+index 4e190b37c474..1d9ec66dd70b 100644
+--- a/drivers/hwmon/pmbus/inspur-ipsps.c
++++ b/drivers/hwmon/pmbus/inspur-ipsps.c
+@@ -15,7 +15,7 @@
+ 
+ #define IPSPS_REG_VENDOR_ID	0x99
+ #define IPSPS_REG_MODEL		0x9A
+-#define IPSPS_REG_FW_VERSION	0x9B
++#define IPSPS_REG_FW_VERSION	0x9D
+ #define IPSPS_REG_PN		0x9C
+ #define IPSPS_REG_SN		0x9E
+ #define IPSPS_REG_HW_VERSION	0xB0
+@@ -159,7 +159,7 @@ static SENSOR_DEVICE_ATTR_RO(model, ipsps_string, model);
+ static SENSOR_DEVICE_ATTR_RO(part_number, ipsps_string, part_number);
+ static SENSOR_DEVICE_ATTR_RO(serial_number, ipsps_string, serial_number);
+ static SENSOR_DEVICE_ATTR_RO(hw_version, ipsps_string, hw_version);
+-static SENSOR_DEVICE_ATTR_RO(fw_version, ipsps_fw_version, fw_version);
++static SENSOR_DEVICE_ATTR_RO(fw_version, ipsps_string, fw_version);
+ static SENSOR_DEVICE_ATTR_RW(mode, ipsps_mode, mode);
+ 
+ static struct attribute *ipsps_attrs[] = {
+-- 
+2.34.1
+

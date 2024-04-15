@@ -1,0 +1,40 @@
+From 2b005e47237d25ed79b475884470f8c5816c917f Mon Sep 17 00:00:00 2001
+From: Allen Kang <jhkang@nuvoton.com>
+Date: Thu, 23 Mar 2023 10:58:27 +0800
+Subject: [PATCH] dts: add two test PSUs settings
+
+---
+ arch/arm/boot/dts/nuvoton-npcm750-buv-runbmc.dts | 14 +++++++++-----
+ 1 file changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/boot/dts/nuvoton-npcm750-buv-runbmc.dts b/arch/arm/boot/dts/nuvoton-npcm750-buv-runbmc.dts
+index 72985a81dbe3..c551c72e546c 100644
+--- a/arch/arm/boot/dts/nuvoton-npcm750-buv-runbmc.dts
++++ b/arch/arm/boot/dts/nuvoton-npcm750-buv-runbmc.dts
+@@ -281,14 +281,18 @@ &i2c1 {
+ 	#size-cells = <0>;
+ 	clock-frequency = <100000>;
+ 	status = "okay";
++	power-supply@5a {
++		compatible = "inspur,ipsps1";
++		reg = <0x5a>;
++	};
++	power-supply@5b {
++		compatible = "inspur,ipsps1";
++		reg = <0x5b>;
++	};
+ };
+ 
+ &i2c2 {
+-	/* Refer Olympus's setting, should be modified once needed. */
+-	power-supply@58 {
+-		compatible = "inspur,ipsps1";
+-		reg = <0x58>;
+-	};
++	status = "okay";
+ };
+ 
+ &i2c3 {
+-- 
+2.34.1
+

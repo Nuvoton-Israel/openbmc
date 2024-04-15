@@ -1,0 +1,30 @@
+From 997cab50512c42d43b18f2bb2679906db30e04c4 Mon Sep 17 00:00:00 2001
+From: Eason Yang <yhyang2@nuvoton.com>
+Date: Tue, 16 May 2023 16:56:02 +0800
+Subject: [PATCH 12/12] Don't use Write_PROTECT command in chicony psu
+
+Some PMBus chips respond with invalid data when reading the WRITE_PROTECT
+register. For such chips, this flag should be set so that the PMBus core
+driver doesn't use the WRITE_PROTECT command to determine its behavior.
+
+Signed-off-by: Eason Yang <yhyang2@nuvoton.com>
+---
+ drivers/hwmon/pmbus/inspur-ipsps.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/hwmon/pmbus/inspur-ipsps.c b/drivers/hwmon/pmbus/inspur-ipsps.c
+index 0f614e8d95f6..4e190b37c474 100644
+--- a/drivers/hwmon/pmbus/inspur-ipsps.c
++++ b/drivers/hwmon/pmbus/inspur-ipsps.c
+@@ -187,7 +187,7 @@ static struct pmbus_driver_info ipsps_info = {
+ };
+ 
+ static struct pmbus_platform_data ipsps_pdata = {
+-	.flags = PMBUS_SKIP_STATUS_CHECK,
++	.flags = PMBUS_SKIP_STATUS_CHECK | PMBUS_NO_WRITE_PROTECT,
+ };
+ 
+ static int ipsps_probe(struct i2c_client *client)
+-- 
+2.17.1
+

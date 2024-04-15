@@ -1,0 +1,33 @@
+From d11f3e6368b5ad4e5a2d153d04609646adb3a0fc Mon Sep 17 00:00:00 2001
+From: Allen Kang <jhkang@nuvoton.com>
+Date: Mon, 6 Mar 2023 16:14:17 +0800
+Subject: [PATCH] Add buv-runbmc PSU driver, inspur-ipsps.c.
+
+Signed-off-by: Allen Kang <jhkang@nuvoton.com>
+---
+ arch/arm/boot/dts/nuvoton-npcm750-buv-runbmc.dts | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/nuvoton-npcm750-buv-runbmc.dts b/arch/arm/boot/dts/nuvoton-npcm750-buv-runbmc.dts
+index 25b58a47203f..72985a81dbe3 100644
+--- a/arch/arm/boot/dts/nuvoton-npcm750-buv-runbmc.dts
++++ b/arch/arm/boot/dts/nuvoton-npcm750-buv-runbmc.dts
+@@ -284,10 +284,11 @@ &i2c1 {
+ };
+ 
+ &i2c2 {
+-	#address-cells = <1>;
+-	#size-cells = <0>;
+-	clock-frequency= <100000>;
+-	status = "okay";
++	/* Refer Olympus's setting, should be modified once needed. */
++	power-supply@58 {
++		compatible = "inspur,ipsps1";
++		reg = <0x58>;
++	};
+ };
+ 
+ &i2c3 {
+-- 
+2.34.1
+
