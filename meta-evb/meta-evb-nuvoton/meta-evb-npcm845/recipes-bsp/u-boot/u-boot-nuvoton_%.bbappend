@@ -7,3 +7,5 @@ SRC_URI:append:evb-npcm845 = " file://mem_hide.cfg"
 SRC_URI:append:evb-npcm845 = " file://fit_sig.cfg"
 
 #SRC_URI:append:evb-npcm845 = " file://0001-board-nuvoton-arbel-add-spix-init.patch"
+SRC_URI:append:evb-npcm845 = " file://0001-Update-env-offset-for-layout-change.patch"
+SRC_URI:append:evb-npcm845 = " file://0002-Enable-openbmc-copy-base-file-to-ram-feature.patch"

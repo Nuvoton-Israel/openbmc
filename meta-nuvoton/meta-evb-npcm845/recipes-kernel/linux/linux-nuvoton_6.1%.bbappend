@@ -8,6 +8,7 @@ SRC_URI:append = " file://luks.cfg"
 SRC_URI:append = " file://0001-dts-nuvoton-evb-npcm845-support-openbmc-partition.patch"
 # SRC_URI:append = " file://0016-support-CPLD-UART-16450.patch"
 # SRC_URI:append = " file://0002-dts-nuvoton-evb-npcm845-boot-from-fiu0-cs1.patch"
+SRC_URI:append:evb-npcm845 = " file://0005-dts-update-flash-layout-for-TIP-2M.patch"
 
 # For gfx edid
 SRC_URI:append = " file://0001-dts-npcm845-evb-enable-slave-eeprom-on-i2c11.patch"
