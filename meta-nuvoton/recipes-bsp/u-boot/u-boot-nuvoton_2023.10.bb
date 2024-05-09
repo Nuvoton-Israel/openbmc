@@ -6,6 +6,8 @@ require u-boot-emmc.inc
 
 PROVIDES += "u-boot"
 
-DEPENDS += "dtc-native"
+DEPENDS += "bc-native dtc-native"
 
 SRC_URI:append:df-phosphor-mmc = " file://u-boot-emmc.cfg"
+UBOOT_ENV_SIZE = "0x40000"
+UBOOT_ENV_SUFFIX = "bin"
