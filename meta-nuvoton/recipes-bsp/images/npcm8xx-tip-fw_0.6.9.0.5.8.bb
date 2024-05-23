@@ -1,4 +1,4 @@
-SRCREV = "65c421f6bd7efb96c1d95fcaaf13425129fba2c0"
+SRCREV = "0f7e299e0ab4153cd7ecdb511c1afd95c67fee47"
 
 OUTPUT_BIN = "output_binaries_${DEVICE_GEN}_${IGPS_MACHINE}"
 
