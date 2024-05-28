@@ -1,3 +1,3 @@
-SRCREV = "b42684013eca57f7b4599a5da04d6b8792f20c85"
+SRCREV = "e18737d17d4cf5e7768598a291a7ef2b8a07a776"
 
 require npcm8xx-bootblock.inc
