@@ -87,14 +87,19 @@ For more product questions, please contact us at:
 * JP_5V_SEL set to 1-2, If On-Board VR(12V->5V) is used to power the EVB (<span style="color: green">Recommended)
 * JP_5V_SEL set to 2-3, If USB VBUS is used to power the EVB
 
-### 3) BMC Console
+### 3) Automation header
+* Confirm that the jumps on the automation header are disconnected.
+When the jumps are short, we cannot control some straps using a switch.
+Instead, they are controlled by FTDI.
+
+### 4) BMC Console
 
 * Connect a Mini-USB cable to J_USB_TO_UART
 * You will get 4 serial port options from your terminal settings.
 * Please select the second serial port and set the baud rate to 115200.
 * After EVB is powered on, you will get BMC logs from the terminal.
 
-### 4) Secure boot status
+### 5) Secure boot status
 * When you see the following BMC message, it means that secure boot is enabled.
 ```ruby
 Nuvoton Technologies: BMC NPCM8XX
@@ -106,13 +111,6 @@ TipROM 0x104 ** Secure boot is enabled
 ```
 
 ## Building your OpenBMC project
-
-### Enable Secure Image
-
-To enable the Secure Image function, please set the below variable in your platform include file. [Reference](https://github.com/Nuvoton-Israel/openbmc/blob/npcm-master/meta-nuvoton/conf/machine/include/npcm8xx.inc#L58)
-```ruby
-SECURED_IMAGE = "True"
-```
 
 ### Enable TIP FW
 
@@ -136,33 +134,26 @@ TIP_IMAGE = "False"
 
 To enable memory ECC function, please enable [MC_CAPABILITY_ECC_EN] in your customized [BootBlockAndHeader.xml](https://github.com/Nuvoton-Israel/igps-npcm8xx/blob/main/py_scripts/ImageGeneration/references/BootBlockAndHeader_A1_EB.xml#L243)
 
-You have to add a customized BootBlockAndHeader.xml in the npcm8xx-igps-native_%.bbappend of your project layer.
-```ruby
-<BinField>
-<!-- MC_CONFIG. 
-			Bit 0: ECC enable (0x01)
-			Bit 2: Select DRAM type. 
-				0: 1600 DRAM type clk.
-				1: 2133 DRAM type clk.
-			Bit 3: enable 3 seconds delay.
-			Bit 4: enable debug sweeps (in addition to sweep_debug)
-			Bit 5: enable prints during MC training
-			Bit 6: DRAM is DDP device (default is SDP)
-			 -->
-		<name>MC_CONFIG</name>          
-		<config>
-			<offset>0x134</offset>       
-			<size>0x1</size> 
-		</config>
-		<content format='32bit'>0x05</content>  
-</BinField>
+You should read the BootBlockAndHeader.xml comment carefully and update the parameter value by modify [settings.json](https://github.com/Nuvoton-Israel/openbmc/blob/npcm-master/meta-nuvoton/recipes-bsp/images/npcm8xx-bootloader/settings.json) under npcm8xx-bootloader folder. You can write your own settings.json and replace the original one in your bbappend recipe. For TIP enabled image, please set MC_CONFIG in BootBlockAndHeader.xml, or set MC_CONFIG in BootBlockAndHeader_no_tip.xml for no TIP image.
+
+```json
+{
+    "BootBlockAndHeader.xml":
+    {
+        "MC_CONFIG": "0x05"
+    },
+    "BootBlockAndHeader_no_tip.xml":
+    {
+        "MC_CONFIG": "0x05"
+    }
+}
 ```
 
 ### Change FIU Speed
 
 To change FIU Speed, please modify the content value of FIU_CLK_DIVIDER in **BootBlockAndHeader.xml** file. [Reference](https://github.com/Nuvoton-Israel/igps-npcm8xx/blob/main/py_scripts/ImageGeneration/references/BootBlockAndHeader_A1_EB.xml#L566)
 
-You have to add a customized BootBlockAndHeader.xml in the npcm8xx-igps-native_%.bbappend of your project layer.
+Just like **Enable ECC**, you should update the FIU0_CLK_DIVIDER value in [settings.json](https://github.com/Nuvoton-Israel/openbmc/blob/npcm-master/meta-nuvoton/recipes-bsp/images/npcm8xx-bootloader/settings.json)
 
 Change to **25 MHz** then the divider value should be filled as **10**.
 
@@ -171,16 +162,11 @@ Change to **50 MHz** then the divider value should be filled as **5**.
 The other value can be calculated according to spec.
 
 Below is an example of changing the FIU0 speed to 50MHz.
-```ruby
-<BinField>
-	<!-- FIU 0 clk divider. -->
-	<name>FIU0_CLK_DIVIDER</name>
-	<config>
-		<offset>0x14F</offset>
-		<size>0x1</size>
-	</config>
-	<content format='32bit'>5</content>
-</BinField>
+```json
+  "BootBlockAndHeader.xml":
+    {
+        "FIU0_CLK_DIVIDER": "5"
+    }
 ```
 ### Configuration
 
@@ -316,7 +302,7 @@ setenv stdout serial
 ```
 * Blue/Green EVB, boot from flash 0
 ```ruby
-setenv uimage_flash_addr 0x80200000
+setenv uimage_flash_addr 0x80800000
 ```
 * Red EVB, boot from flash 1
 ```ruby
@@ -349,7 +335,7 @@ setenv ethact gmac2
 tftp 10000000 image-kernel
 /* Blue/Green EVB */
 sf probe 0:0
-sf update 0x10000000 0x400000 ${filesize}
+sf update 0x10000000 0x800000 ${filesize}
 /* Red EVB */
 sf probe 0:1
 sf update 0x10000000 0x400000 ${filesize}
@@ -722,14 +708,14 @@ Creating 1 MTD partitions on "spi3.0":
 # MTD number for FIU3 is mtd7
 root@evb-npcm845:~# cat /proc/mtd
 dev:    size   erasesize  name
-mtd0: 02000000 00001000 "bmc"
-mtd1: 000c0000 00001000 "u-boot"
+mtd0: 04000000 00001000 "bmc"
+mtd1: 007c0000 00001000 "u-boot"
 mtd2: 00040000 00001000 "u-boot-env"
 mtd3: 00800000 00001000 "kernel"
-mtd4: 01500000 00001000 "rofs"
-mtd5: 00100000 00001000 "rwfs"
+mtd4: 02c00000 00001000 "rofs"
+mtd5: 00400000 00001000 "rwfs"
 mtd6: 00400000 00001000 "spi1-system1"
-mtd7: 02000000 00001000 "spi3-system1
+mtd7: 02000000 00001000 "spi3-system1"
 ```
 
 2. Erase/Write/Read flash
