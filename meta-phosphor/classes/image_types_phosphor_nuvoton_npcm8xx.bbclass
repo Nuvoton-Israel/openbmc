@@ -6,8 +6,12 @@ FIT_KERNEL_COMP_ALG_EXTENSION:df-obmc-static-norootfs = ".gz"
 
 # link images for we only need to flash partial image with idea name
 do_generate_ext4_tar:append() {
-    cd ${DEPLOY_DIR_IMAGE}
-    ln -sf ${IMAGE_NAME}.wic.gz image-emmc.gz
+    cd ${S}/ext4
+    install -m 644 image-u-boot ${IMGDEPLOYDIR}/image-u-boot
+    cd ${IMGDEPLOYDIR}
+    ln -sf ${IMAGE_LINK_NAME}.wic.gz image-emmc.gz
+    ln -sf ${FLASH_KERNEL_IMAGE} image-kernel
+    ln -sf ${IMAGE_LINK_NAME}.rwfs.${FLASH_EXT4_OVERLAY_BASETYPE} image-rwfs
 }
 
 # clean up image-u-boot because we may generate different size bootbloder
@@ -19,6 +23,7 @@ do_clean_image_uboot() {
 
 addtask do_clean_image_uboot after do_rootfs
 do_make_ubi[depends] += "npcm8xx-bootloader:do_deploy"
+do_generate_ubi_tar[depends] += "npcm8xx-bootloader:do_deploy"
 do_generate_static[depends] += " \
     npcm8xx-bootloader:do_deploy \
     ${PN}:do_clean_image_uboot \
