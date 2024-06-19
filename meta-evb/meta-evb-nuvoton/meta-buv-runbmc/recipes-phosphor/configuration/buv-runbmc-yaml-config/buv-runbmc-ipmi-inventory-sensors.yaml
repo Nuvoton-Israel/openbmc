@@ -98,3 +98,83 @@
   sensorType: 3
   eventReadingType: 1
   offset: 0xff
+/xyz/openbmc_project/sensors/temperature/PSU0_Temperature:
+  sensorID: 0x15
+  sensorType: 1
+  eventReadingType: 1
+  offset: 0xff
+/xyz/openbmc_project/sensors/fan_tach/PSU0_Fan_Speed:
+  sensorID: 0x16
+  sensorType: 4
+  eventReadingType: 1
+  offset: 0xff
+/xyz/openbmc_project/sensors/current/PSU0_Input_Current:
+  sensorID: 0x17
+  sensorType: 3
+  eventReadingType: 1
+  offset: 0xff
+/xyz/openbmc_project/sensors/voltage/PSU0_Input_Voltage:
+  sensorID: 0x18
+  sensorType: 2
+  eventReadingType: 1
+  offset: 0xff
+/xyz/openbmc_project/sensors/power/PSU0_Input_Power:
+  sensorID: 0x19
+  sensorType: 11
+  eventReadingType: 1
+  offset: 0xff
+/xyz/openbmc_project/sensors/current/PSU0_Output_Current:
+  sensorID: 0x1A
+  sensorType: 3
+  eventReadingType: 1
+  offset: 0xff
+/xyz/openbmc_project/sensors/voltage/PSU0_Output_Voltage:
+  sensorID: 0x1B
+  sensorType: 2
+  eventReadingType: 1
+  offset: 0xff
+/xyz/openbmc_project/sensors/power/PSU0_Output_Power:
+  sensorID: 0x1C
+  sensorType: 11
+  eventReadingType: 1
+  offset: 0xff
+/xyz/openbmc_project/sensors/temperature/PSU1_Temperature:
+  sensorID: 0x1D
+  sensorType: 1
+  eventReadingType: 1
+  offset: 0xff
+/xyz/openbmc_project/sensors/fan_tach/PSU1_Fan_Speed:
+  sensorID: 0x1E
+  sensorType: 4
+  eventReadingType: 1
+  offset: 0xff
+/xyz/openbmc_project/sensors/current/PSU1_Input_Current:
+  sensorID: 0x1F
+  sensorType: 3
+  eventReadingType: 1
+  offset: 0xff
+/xyz/openbmc_project/sensors/voltage/PSU1_Input_Voltage:
+  sensorID: 0x20
+  sensorType: 2
+  eventReadingType: 1
+  offset: 0xff
+/xyz/openbmc_project/sensors/power/PSU1_Input_Power:
+  sensorID: 0x21
+  sensorType: 11
+  eventReadingType: 1
+  offset: 0xff
+/xyz/openbmc_project/sensors/current/PSU1_Output_Current:
+  sensorID: 0x22
+  sensorType: 3
+  eventReadingType: 1
+  offset: 0xff
+/xyz/openbmc_project/sensors/voltage/PSU1_Output_Voltage:
+  sensorID: 0x23
+  sensorType: 2
+  eventReadingType: 1
+  offset: 0xff
+/xyz/openbmc_project/sensors/power/PSU1_Output_Power:
+  sensorID: 0x24
+  sensorType: 11
+  eventReadingType: 1
+  offset: 0xff

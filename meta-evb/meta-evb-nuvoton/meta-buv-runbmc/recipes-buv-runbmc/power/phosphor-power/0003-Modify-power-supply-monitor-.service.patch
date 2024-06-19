@@ -1,23 +1,31 @@
-From 7b8ce6eace1d15af947d0f0ead651f7eb5416b84 Mon Sep 17 00:00:00 2001
-From: Allen Kang <jhkang@nuvoton.com>
-Date: Thu, 23 Feb 2023 10:46:31 +0800
-Subject: [PATCH] Modify power-supply-monitor@.service
+From 61e5c1227ea54bff3d7c04c39dbd86c0986e9d7f Mon Sep 17 00:00:00 2001
+From: Eason Yang <yhyang2@nuvoton.com>
+Date: Mon, 3 Jun 2024 09:55:12 +0800
+Subject: [PATCH 3/3] Modify power-supply-monitor@.service
 
+`psu-monitor` can't create powersupply until
+xyz.openbmc_project.Inventory.Manager.service is running.
+
+Signed-off-by: Eason Yang <yhyang2@nuvoton.com>
 ---
- services/power-supply-monitor@.service | 4 ----
- 1 file changed, 4 deletions(-)
+ services/power-supply-monitor@.service | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/services/power-supply-monitor@.service b/services/power-supply-monitor@.service
-index 8f794d75..ac1d69bc 100644
+index 8f794d75..874b865c 100644
 --- a/services/power-supply-monitor@.service
 +++ b/services/power-supply-monitor@.service
-@@ -1,9 +1,5 @@
+@@ -1,9 +1,9 @@
  [Unit]
  Description=Power Supply %I Monitor
 -Wants=mapper-wait@-xyz-openbmc_project-inventory-system-chassis-motherboard-powersupply%i.service
 -After=mapper-wait@-xyz-openbmc_project-inventory-system-chassis-motherboard-powersupply%i.service
 -Wants=mapper-wait@-org-openbmc-control-power0.service
 -After=mapper-wait@-org-openbmc-control-power0.service
++Wants=mapper-wait@-xyz-openbmc_project-inventory.service
++After=mapper-wait@-xyz-openbmc_project-inventory.service
++Wants=mapper-wait@-xyz-openbmc_project-state-chassis0.service
++After=mapper-wait@-xyz-openbmc_project-state-chassis0.service
  ConditionPathExists=/etc/default/obmc/power-supply-monitor/power-supply-monitor-%i.conf
  
  [Service]

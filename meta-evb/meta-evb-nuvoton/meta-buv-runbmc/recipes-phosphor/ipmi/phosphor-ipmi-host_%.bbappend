@@ -11,3 +11,4 @@ EXTRA_OEMESON:append:buv-runbmc = " \
 PACKAGECONFIG:append:buv-entity = " dynamic-sensors"
 
 EXTRA_OEMESON:append:buv-runbmc = " -Di2c-whitelist-check=disabled"
+EXTRA_OEMESON:append:buv-runbmc = " -Dshortname-remove-suffix=disabled -Dshortname-replace-words=enabled"

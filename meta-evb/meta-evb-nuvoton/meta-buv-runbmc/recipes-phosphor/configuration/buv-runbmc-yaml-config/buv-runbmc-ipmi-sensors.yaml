@@ -196,3 +196,107 @@
   multiplierM: 4
   offsetB: 0
   rExp: -3
+21:
+  <<: *temperature
+  entityInstance: 3
+  path: /xyz/openbmc_project/sensors/temperature/PSU0_Temperature
+22:
+  <<: *fan_tach
+  entityInstance: 5
+  path: /xyz/openbmc_project/sensors/fan_tach/PSU0_Fan_Speed
+23:
+  <<: *current
+  entityInstance: 16
+  path: /xyz/openbmc_project/sensors/current/PSU0_Input_Current
+  multiplierM: 12
+  offsetB: 0
+  rExp: -3
+24:
+  <<: *voltage
+  entityInstance: 13
+  path: /xyz/openbmc_project/sensors/voltage/PSU0_Input_Voltage
+  multiplierM: 51
+  offsetB: 0
+  bExp: 0
+  rExp: -2
+25:
+  <<: *power
+  entityInstance: 25
+  path: /xyz/openbmc_project/sensors/power/PSU0_Input_Power
+  multiplierM: 94
+  offsetB: 0
+  rExp: -3
+26:
+  <<: *current
+  entityInstance: 26
+  path: /xyz/openbmc_project/sensors/current/PSU0_Output_Current
+  multiplierM: 12
+  offsetB: 0
+  rExp: -3
+27:
+  <<: *voltage
+  entityInstance: 27
+  path: /xyz/openbmc_project/sensors/voltage/PSU0_Output_Voltage
+  multiplierM: 51
+  offsetB: 0
+  bExp: 0
+  rExp: -3
+28:
+  <<: *power
+  entityInstance: 28
+  path: /xyz/openbmc_project/sensors/power/PSU0_Output_Power
+  multiplierM: 94
+  offsetB: 0
+  rExp: -3
+29:
+  <<: *temperature
+  entityInstance: 4
+  path: /xyz/openbmc_project/sensors/temperature/PSU1_Temperature
+30:
+  <<: *fan_tach
+  entityInstance: 6
+  path: /xyz/openbmc_project/sensors/fan_tach/PSU1_Fan_Speed
+31:
+  <<: *current
+  entityInstance: 31
+  path: /xyz/openbmc_project/sensors/current/PSU1_Input_Current
+  multiplierM: 12
+  offsetB: 0
+  rExp: -3
+32:
+  <<: *voltage
+  entityInstance: 32
+  path: /xyz/openbmc_project/sensors/voltage/PSU1_Input_Voltage
+  multiplierM: 51
+  offsetB: 0
+  bExp: 0
+  rExp: -2
+33:
+  <<: *power
+  entityInstance: 33
+  path: /xyz/openbmc_project/sensors/power/PSU1_Input_Power
+  multiplierM: 94
+  offsetB: 0
+  rExp: -3
+34:
+  <<: *current
+  entityInstance: 34
+  path: /xyz/openbmc_project/sensors/current/PSU1_Output_Current
+  multiplierM: 12
+  offsetB: 0
+  rExp: -3
+35:
+  <<: *voltage
+  entityInstance: 35
+  path: /xyz/openbmc_project/sensors/voltage/PSU1_Output_Voltage
+  multiplierM: 51
+  offsetB: 0
+  bExp: 0
+  rExp: -3
+36:
+  <<: *power
+  entityInstance: 36
+  path: /xyz/openbmc_project/sensors/power/PSU1_Output_Power
+  multiplierM: 94
+  offsetB: 0
+  rExp: -3
