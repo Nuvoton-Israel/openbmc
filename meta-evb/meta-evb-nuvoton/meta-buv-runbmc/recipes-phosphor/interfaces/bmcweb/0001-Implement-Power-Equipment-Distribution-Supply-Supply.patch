@@ -1,58 +1,30 @@
-From 9df8b2e5e0ff9ad4b18b47d94fe0eacb5fbe0eae Mon Sep 17 00:00:00 2001
-From: Ban Feng <kcfeng0@nuvoton.com>
-Date: Mon, 30 Oct 2023 10:49:04 +0800
-Subject: [PATCH] Implement Power{Equipment, Distribution, Supply,
+From cba2bd845d1c6f94370ed38b47ef32d0d02dc6d5 Mon Sep 17 00:00:00 2001
+From: Eason Yang <yhyang2@nuvoton.com>
+Date: Fri, 21 Jun 2024 14:13:05 +0800
+Subject: [PATCH 1/1] Implement Power{Equipment, Distribution, Supply,
  SupplyMetrics} schema
 
+Signed-off-by: Eason Yang <yhyang2@nuvoton.com>
 Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
 Signed-off-by: Allen Kang <jhkang@nuvoton.com>
 ---
- redfish-core/include/redfish.hpp          |   6 +
- redfish-core/lib/power_distribution.hpp   | 575 ++++++++++++++++++++++
+ redfish-core/lib/power_distribution.hpp   | 576 ++++++++++++++++++++++
  redfish-core/lib/power_equipment.hpp      |  54 ++
  redfish-core/lib/power_supply.hpp         | 457 +++++++++++++----
  redfish-core/lib/power_supply_metrics.hpp | 261 ++++++++++
  redfish-core/lib/service_root.hpp         |   2 +
- 6 files changed, 1272 insertions(+), 83 deletions(-)
+ redfish-core/src/redfish.cpp              |   6 +
+ 6 files changed, 1273 insertions(+), 83 deletions(-)
  create mode 100644 redfish-core/lib/power_distribution.hpp
  create mode 100644 redfish-core/lib/power_equipment.hpp
  create mode 100644 redfish-core/lib/power_supply_metrics.hpp
 
-diff --git a/redfish-core/include/redfish.hpp b/redfish-core/include/redfish.hpp
-index 540bb070c7..cca700986e 100644
---- a/redfish-core/include/redfish.hpp
-+++ b/redfish-core/include/redfish.hpp
-@@ -39,8 +39,11 @@
- #include "pcie.hpp"
- #include "pcie_slots.hpp"
- #include "power.hpp"
-+#include "power_distribution.hpp"
-+#include "power_equipment.hpp"
- #include "power_subsystem.hpp"
- #include "power_supply.hpp"
-+#include "power_supply_metrics.hpp"
- #include "processor.hpp"
- #include "redfish_sessions.hpp"
- #include "redfish_v1.hpp"
-@@ -92,9 +95,12 @@ class RedfishService
- #endif
- #ifdef BMCWEB_NEW_POWERSUBSYSTEM_THERMALSUBSYSTEM
-         requestRoutesEnvironmentMetrics(app);
-+        requestRoutesPowerDistributionCollection(app);
-+        requestRoutesPowerEquipment(app);
-         requestRoutesPowerSubsystem(app);
-         requestRoutesPowerSupply(app);
-         requestRoutesPowerSupplyCollection(app);
-+        requestRoutesPowerSupplyMetricsCollection(app);
-         requestRoutesThermalSubsystem(app);
-         requestRoutesFan(app);
-         requestRoutesFanCollection(app);
 diff --git a/redfish-core/lib/power_distribution.hpp b/redfish-core/lib/power_distribution.hpp
 new file mode 100644
-index 0000000000..6a590031fe
+index 0000000000..3f3c333b2a
 --- /dev/null
 +++ b/redfish-core/lib/power_distribution.hpp
-@@ -0,0 +1,575 @@
+@@ -0,0 +1,576 @@
 +#pragma once
 +
 +#include "app.hpp"
@@ -500,8 +472,9 @@ index 0000000000..6a590031fe
 +        return;
 +    }
 +
-+    const std::string& pdId =
-+        boost::replace_all_copy(powerdistributionId, "powerdistribution", "PD");
++    std::string escaped(powerdistributionId);
++    escaped.replace(escaped.begin(), escaped.end()-1, "PD");
++    const std::string& pdId = std::move(escaped);
 +
 +    if (sensorName.find(pdId) == std::string::npos)
 +    {
@@ -1297,7 +1270,7 @@ index f59ed57d5f..c7d97e6e17 100644
  } // namespace redfish
 diff --git a/redfish-core/lib/power_supply_metrics.hpp b/redfish-core/lib/power_supply_metrics.hpp
 new file mode 100644
-index 0000000000..dab8730001
+index 0000000000..9b4933b155
 --- /dev/null
 +++ b/redfish-core/lib/power_supply_metrics.hpp
 @@ -0,0 +1,261 @@
@@ -1311,7 +1284,6 @@ index 0000000000..dab8730001
 +#include "utils/dbus_utils.hpp"
 +#include "utils/json_utils.hpp"
 +
-+#include <boost/algorithm/string/replace.hpp>
 +#include <boost/url/format.hpp>
 +
 +#include <memory>
@@ -1398,8 +1370,9 @@ index 0000000000..dab8730001
 +        return;
 +    }
 +
-+    const std::string& psuId =
-+        boost::replace_all_copy(powerSupplyId, "powersupply", "PSU");
++    std::string escaped(powerSupplyId);
++    escaped.replace(escaped.begin(), escaped.end()-1, "PSU");
++    const std::string& psuId = std::move(escaped);
 +
 +    if (sensorName.find(psuId) == std::string::npos)
 +    {
@@ -1413,7 +1386,7 @@ index 0000000000..dab8730001
 +    id += sensorName;
 +
 +    if (sensorName.find("Energy_kWh") != std::string::npos)
-+    {
++     {
 +        getPowerSupplyReading(asyncResp, chassisId, powerSupplyPath,
 +                              id, "EnergykWh", false);
 +    }
@@ -1563,10 +1536,10 @@ index 0000000000..dab8730001
 +
 +} // namespace redfish
 diff --git a/redfish-core/lib/service_root.hpp b/redfish-core/lib/service_root.hpp
-index 6ae16c3780..b9578e47f4 100644
+index 2fc35150dd..a4d9cd887f 100644
 --- a/redfish-core/lib/service_root.hpp
 +++ b/redfish-core/lib/service_root.hpp
-@@ -86,6 +86,8 @@ inline void handleServiceRootGetImpl(
+@@ -87,6 +87,8 @@ inline void handleServiceRootGetImpl(
      asyncResp->res.jsonValue["TelemetryService"]["@odata.id"] =
          "/redfish/v1/TelemetryService";
      asyncResp->res.jsonValue["Cables"]["@odata.id"] = "/redfish/v1/Cables";
@@ -1575,6 +1548,35 @@ index 6ae16c3780..b9578e47f4 100644
  
      asyncResp->res.jsonValue["Links"]["ManagerProvidingService"]["@odata.id"] =
          "/redfish/v1/Managers/bmc";
+diff --git a/redfish-core/src/redfish.cpp b/redfish-core/src/redfish.cpp
+index 47d6fc2d07..ae4485417a 100644
+--- a/redfish-core/src/redfish.cpp
++++ b/redfish-core/src/redfish.cpp
+@@ -26,8 +26,11 @@
+ #include "network_protocol.hpp"
+ #include "pcie.hpp"
+ #include "power.hpp"
++#include "power_distribution.hpp"
++#include "power_equipment.hpp"
+ #include "power_subsystem.hpp"
+ #include "power_supply.hpp"
++#include "power_supply_metrics.hpp"
+ #include "processor.hpp"
+ #include "redfish_sessions.hpp"
+ #include "redfish_v1.hpp"
+@@ -71,9 +74,12 @@ RedfishService::RedfishService(App& app)
+     if constexpr (BMCWEB_REDFISH_NEW_POWERSUBSYSTEM_THERMALSUBSYSTEM)
+     {
+         requestRoutesEnvironmentMetrics(app);
++        requestRoutesPowerDistributionCollection(app);
++        requestRoutesPowerEquipment(app);
+         requestRoutesPowerSubsystem(app);
+         requestRoutesPowerSupply(app);
+         requestRoutesPowerSupplyCollection(app);
++        requestRoutesPowerSupplyMetricsCollection(app);
+         requestRoutesThermalMetrics(app);
+         requestRoutesThermalSubsystem(app);
+         requestRoutesFan(app);
 -- 
 2.34.1
 
