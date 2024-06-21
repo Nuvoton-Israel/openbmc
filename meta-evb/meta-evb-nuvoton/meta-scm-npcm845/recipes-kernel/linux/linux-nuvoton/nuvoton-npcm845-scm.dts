@@ -18,7 +18,7 @@
 		serial3 = &serial3;
 		serial4 = &serial4;
 		serial5 = &serial5;
-		ethernet0 = &gmac1;
+		ethernet0 = &gmac0;
 		ethernet1 = &gmac2;
 		udc0 = &udc0;
 		udc1 = &udc1;
@@ -34,16 +34,18 @@
 		i2c2 = &i2c2;
 		i2c3 = &i2c3;
 		i2c4 = &i2c4;
-		i2c5 = &i2c5;
 		i2c6 = &i2c6;
 		i2c7 = &i2c7;
 		i2c8 = &i2c8;
-		i2c9 = &i2c9;
 		i2c10 = &i2c10;
 		i2c11 = &i2c11;
 		i2c12 = &i2c12;
+		i2c13 = &i2c13;
+		i2c14 = &i2c14;
 		i2c15 = &i2c15;
-		i2c19 = &i2c19;
+		i2c16 = &i2c16;
+		i2c22 = &i2c22;
+		i2c23 = &i2c23;
 		fiu0 = &fiu0;
 		fiu1 = &fiu3;
 		fiu2 = &fiux;
@@ -60,10 +62,8 @@
 
 	iio_hwmon {
 		compatible = "iio-hwmon";
-		io-channels = <&adc 0>, <&adc 1>, <&adc 2>,
-			      <&max11615 0>, <&max11615 1>, <&max11615 2>,
-			      <&max11615 3>, <&max11615 4>, <&max11615 5>,
-			      <&max11615 6>, <&max11615 7>;
+		io-channels = <&adc 0>, <&adc 1>, <&adc 2>, <&adc 3>,
+			<&adc 4>, <&adc 5>, <&adc 6>, <&adc 7>;
 	};
 
 	reserved-memory {
@@ -93,6 +93,11 @@
 
 	leds {
 		compatible = "gpio-leds";
+
+		heartbeat {
+			label = "heartbeat";
+			gpios = <&gpio2 19 GPIO_ACTIVE_LOW>; /* gpio83 */
+		};
 
 		identify {
 			label = "identify";
@@ -164,8 +169,9 @@
 		};
 
 
-		gmac1: eth@f0804000 {
-			phy-mode = "rgmii-id";
+		gmac0: eth@f0802000 {
+			phy-mode = "sgmii";
+			npcm,sgmii-an;
 			snps,eee-force-disable;
 			status = "okay";
 		};
@@ -571,7 +577,22 @@
 				&pin5_slew
 				&pin6_slew
 				&pin7_slew
-				&spix_pins>;
+				&spix_pins
+				&pin110_slew
+				&pin111_slew
+				&pin112_slew
+				&pin113_slew
+				&pin208_slew
+				&pin209_slew
+				&pin210_slew
+				&pin211_slew
+				&pin212_slew
+				&pin213_slew
+				&pin214_slew
+				&pin215_slew
+				&pin216_slew
+				&pin217_slew
+				&pin250_slew>;
 
 		gpio2: gpio@f0012000 {
 			/* P3V_BAT_EN=gpio83 */
@@ -619,14 +640,6 @@
 
 &i2c1 {
 	status = "okay";
-	sbrmi@3c {
-		compatible = "amd,sbrmi";
-		reg = <0x3c>;
-	};
-	sbtsi@4c {
-                compatible = "amd,sbtsi";
-                reg = <0x4c>;
-	};
 };
 
 &i2c2 {
@@ -635,317 +648,79 @@
 
 &i2c3 {
 	status = "okay";
-	vrm@61 {
-		compatible = "pmbus";
-		reg = <0x61>;
-	};
-
-	vrm@62 {
-		compatible = "pmbus";
-		reg = <0x62>;
-	};
-
-	vrm@63 {
-		compatible = "pmbus";
-		reg = <0x63>;
-	};
 };
 
 &i2c4 {
 	status = "okay";
-	max31790@20 {
-		compatible = "maxim,max31790";
-		reg = <0x20>;
-	};
-	max31790@23 {
-		compatible = "maxim,max31790";
-		reg = <0x23>;
-	};
-	tmp75@4b {
-		compatible = "ti,tmp75";
-		reg = <0x4b>;
-	};
-	tmp75@4d {
-		compatible = "ti,tmp75";
-		reg = <0x4d>;
-	};
-};
 
-&i2c5 {
-	status = "okay";
-	gpioex1: pca9557@19 {
-		compatible = "nxp,pca9557";
-		reg = <0x19>;
-		gpio-controller;
-		#gpio-cells = <2>;
-		Ex1_P0 {
-			gpio-hog;
-			gpios = <0 0>;
-			input;
-			line-name = "CPU_VR_MAIN_2ND_1";
-		};
-		Ex1_P1 {
-			gpio-hog;
-			gpios = <1 0>;
-			input;
-			line-name = "SMB_M2_S2_ALERT_N";
-		};
-		Ex1_P2 {
-			gpio-hog;
-			gpios = <2 0>;
-			input;
-			line-name = "SMB_M2_S1_ALERT_N";
-		};
-		Ex1_P3 {
-			gpio-hog;
-			gpios = <3 0>;
-			output-low;
-			line-name = "P3V3_M2_S2_BMC_EN_N";
-		};
-		Ex1_P4 {
-			gpio-hog;
-			gpios = <4 0>;
-			output-low;
-			line-name = "P3V3_M2_S1_BMC_EN_N";
-		};
-		Ex1_P5 {
-			gpio-hog;
-			gpios = <5 0>;
-			input;
-			line-name = "RTM1_INT_N";
-		};
-		Ex1_P6 {
-			gpio-hog;
-			gpios = <6 0>;
-			input;
-			line-name = "RTM2_INT_N";
-		};
-		Ex1_P7 {
-			gpio-hog;
-			gpios = <7 0>;
-			input;
-			line-name = "CPU_VR_MAIN_2ND_2";
-		};
-	};
-	gpioex2: pca9557@1a {
-		compatible = "nxp,pca9557";
-		reg = <0x1a>;
-		gpio-controller;
-		#gpio-cells = <2>;
-		Ex2_P1 {
-			gpio-hog;
-			gpios = <1 0>;
-			output-high;
-			line-name = "SMB_ES1_RST_N";
-		};
-		Ex2_P2 {
-			gpio-hog;
-			gpios = <2 0>;
-			output-high;
-			line-name = "SMB_ES2_RST_N";
-		};
-		Ex2_P3 {
-			gpio-hog;
-			gpios = <3 0>;
-			output-high;
-			line-name = "SMB_ES3_RST_N";
-		};
-		Ex2_P4 {
-			gpio-hog;
-			gpios = <4 0>;
-			output-high;
-			line-name = "SMB_ES4_RST_N";
-		};
-		Ex2_P5 {
-			gpio-hog;
-			gpios = <5 0>;
-			output-high;
-			line-name = "SMB_ES5_RST_N";
-		};
-		Ex2_P6 {
-			gpio-hog;
-			gpios = <6 0>;
-			output-low;
-			line-name = "P5V_USB_INT1_EN_N";
-		};
-		Ex2_P7 {
-			gpio-hog;
-			gpios = <7 0>;
-			input;
-			line-name = "FM_USB_INT1_LVC3_OC_N";
-		};
-	};
-	eeprom@50 {
-		compatible = "atmel,24c64";
-		reg = <0x50>;
+	eeprom@52 {
+		compatible = "atmel,24c04";
+		reg = <0x52>;
 	};
 };
 
 &i2c6 {
 	status = "okay";
-	max11615: max11615@33 {
-		compatible = "maxim,max11615";
-		#io-channel-cells = <1>;
-		reg = <0x33>;
-	};
-	gpioex3: pca9557@1b {
-		compatible = "nxp,pca9557";
-		reg = <0x1b>;
-		gpio-controller;
-		#gpio-cells = <2>;
-		Ex3_P0 {
-			gpio-hog;
-			gpios = <0 0>;
-			output-high;
-			line-name = "NIC_POWER_EN";
-		};
-		Ex3_P1 {
-			gpio-hog;
-			gpios = <1 0>;
-			output-high;
-			line-name = "SMB_ES6_RST_N";
-		};
-		Ex3_P2 {
-			gpio-hog;
-			gpios = <2 0>;
-			output-high;
-			line-name = "SMB_ES7_RST_N";
-		};
-		Ex3_P3 {
-			gpio-hog;
-			gpios = <3 0>;
-			output-high;
-			line-name = "SMB_ES8_RST_N";
-		};
-		Ex3_P4 {
-			gpio-hog;
-			gpios = <4 0>;
-			output-high;
-			line-name = "SMB_ES9_RST_N";
-		};
-		Ex3_P5 {
-			gpio-hog;
-			gpios = <5 0>;
-			output-high;
-			line-name = "SMB_ES10_RST_N";
-		};
-		Ex3_P6 {
-			gpio-hog;
-			gpios = <6 0>;
-			output-high;
-			line-name = "SMB_NIC_RST_N";
-		};
-		Ex3_P7 {
-			gpio-hog;
-			gpios = <7 0>;
-			output-high;
-			line-name = "SMB_SLOT3X16_RST_N";
-		};
-	};
-	tmp75@48 {
-		compatible = "ti,tmp75";
-		reg = <0x48>;
-	};
-	tmp75@49 {
-		compatible = "ti,tmp75";
-		reg = <0x49>;
-	};
-	tmp75@4a {
-		compatible = "ti,tmp75";
-		reg = <0x4a>;
-	};
 };
 
 &i2c7 {
 	status = "okay";
-	adm1278@11 {
-		compatible = "adi,adm1278";
-		reg = <0x11>;
-	};
-	pmbus@58 {
-		compatible = "p2011";
-		reg = <0x58>;
+
+	tmp75@4b {
+		compatible = "ti,tmp75";
+		reg = <0x4b>;
 	};
 };
 
 &i2c8 {
 	status = "okay";
-	adm1278@24 {
-		compatible = "adi,adm1278";
-		reg = <0x24>;
-	};
-};
-
-&i2c9 {
-	status = "okay";
-	i2c-switch@70 {
-		compatible = "nxp,pca9548";
-		reg = <0x70>;
-	};
 };
 
 &i2c10 {
 	status = "okay";
-	i2c-switch@71 {
-		compatible = "nxp,pca9548";
-		reg = <0x71>;
-		bus10_mux33: i2c@5 {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <5>;
-			tmp461@4c {
-				compatible = "ti,tmp461";
-				reg = <0x4c>;
-			};
-			max16550@42 {
-				compatible = "max16550";
-				reg = <0x42>;
-			};
-		};
-	};
 };
 
 &i2c11 {
 	status = "okay";
-	i2c-switch@72 {
-		compatible = "nxp,pca9546";
-		reg = <0x72>;
-	};
 };
 
 &i2c12 {
 	status = "okay";
-	i2c-switch@73 {
-		compatible = "nxp,pca9546";
-		reg = <0x73>;
-	};
+};
+
+&i2c13 {
+	status = "okay";
+};
+
+&i2c14 {
+	status = "okay";
 };
 
 &i2c15 {
 	status = "okay";
-	tmp75@48 {
-		compatible = "ti,tmp75";
-		reg = <0x48>;
-	};
+};
 
-	eeprom@54 {
-		compatible = "atmel,24c64";
-		reg = <0x54>;
-	};
+&i2c16 {
+	status = "okay";
+};
+
+&i2c22 {
+	status = "okay";
 
 	rtc0: rtc@6f {
 		compatible = "nuvoton,nct3018y";
 		reg = <0x6f>;
 		#clock-cells = <0>;
 
-		interrupt-parent = <&gpio3>;
-		interrupts = <1 IRQ_TYPE_EDGE_FALLING>; /* gpio 97 */
+		interrupt-parent = <&gpio2>;
+		interrupts = <5 IRQ_TYPE_EDGE_FALLING>; /* gpio 37 */
 		interrupt-names = "irq";
 		wakeup-source;
 	};
 };
 
-&i2c19 {
+&i2c23 {
+	pinctrl-0 = <&smb23b_pins>;
 	status = "okay";
 };
 
