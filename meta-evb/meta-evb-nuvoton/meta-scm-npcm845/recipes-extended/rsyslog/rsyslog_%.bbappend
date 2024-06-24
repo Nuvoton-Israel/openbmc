@@ -7,7 +7,7 @@ SRC_URI += "file://rsyslog.conf \
            file://rsyslog-override.conf \
 "
 
-SRC_URI:append:scm-npcm845 = " file://bmc-health-sel-rollover.sh"
+SRC_URI:append = " file://bmc-health-sel-rollover.sh"
 
 FILES:${PN} += "${systemd_system_unitdir}/rsyslog.service.d/rsyslog-override.conf"
 

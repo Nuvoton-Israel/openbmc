@@ -1,4 +1,4 @@
-FILESEXTRAPATHS:prepend:scm-npcm845 := "${THISDIR}/${PN}:"
+FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 
-SRC_URI:append:scm-npcm845 = " file://sol-default.override.yml"
-SRC_URI:append:scm-npcm845 = " file://chassis-poh.override.yml"
+SRC_URI:append = " file://sol-default.override.yml"
+SRC_URI:append = " file://chassis-poh.override.yml"

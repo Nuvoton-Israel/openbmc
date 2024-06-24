@@ -1,1 +1,1 @@
-PACKAGECONFIG:append:scm-npcm845 = " log-watchdog log-threshold"
+PACKAGECONFIG:append = " log-watchdog log-threshold"

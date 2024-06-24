@@ -3,16 +3,16 @@ FILESEXTRAPATHS:prepend:m1120-c2195 := "${THISDIR}/${PN}/m1120:"
 
 inherit image_version
 
-SRC_URI:append:scm-npcm845 = " file://channel_config.json"
-SRC_URI:append:scm-npcm845 = " file://dev_id.json"
-SRC_URI:append:scm-npcm845 = " file://fw.json"
-SRC_URI:append:scm-npcm845 = " file://system_guid.json"
-SRC_URI:append:scm-npcm845 = " file://power_reading.json"
+SRC_URI:append = " file://channel_config.json"
+SRC_URI:append = " file://dev_id.json"
+SRC_URI:append = " file://fw.json"
+SRC_URI:append = " file://system_guid.json"
+SRC_URI:append = " file://power_reading.json"
 
-FILES:${PN}:append:scm-npcm845 = " ${datadir}/ipmi-providers/fw.json"
-FILES:${PN}:append:scm-npcm845 = " ${datadir}/ipmi-providers/system_guid.json"
+FILES:${PN}:append = " ${datadir}/ipmi-providers/fw.json"
+FILES:${PN}:append = " ${datadir}/ipmi-providers/system_guid.json"
 
-do_install:append:scm-npcm845() {
+do_install:append() {
     install -m 0644 -D ${WORKDIR}/channel_config.json \
         ${D}${datadir}/ipmi-providers/channel_config.json
     install -m 0644 -D ${WORKDIR}/dev_id.json \

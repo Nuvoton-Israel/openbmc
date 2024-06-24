@@ -1,15 +1,15 @@
-FILESEXTRAPATHS:prepend:scm-npcm845 := "${THISDIR}/${PN}:"
-SRC_URI:append:scm-npcm845 = " file://config.json \
-                       file://phosphor-pid-control.service \
-                     "
+FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
+SRC_URI:append = " file://config.json \
+                   file://phosphor-pid-control.service \
+                 "
 
-FILES:${PN}:append:scm-npcm845 = " ${datadir}/swampd/config.json"
+FILES:${PN}:append = " ${datadir}/swampd/config.json"
 
 RDEPENDS:${PN} += "bash"
 
-SYSTEMD_SERVICE:${PN}:append:scm-npcm845 = " phosphor-pid-control.service"
+SYSTEMD_SERVICE:${PN}:append = " phosphor-pid-control.service"
 
-do_install:append:scm-npcm845() {
+do_install:append() {
     install -d ${D}/${bindir}
 
     install -d ${D}${datadir}/swampd

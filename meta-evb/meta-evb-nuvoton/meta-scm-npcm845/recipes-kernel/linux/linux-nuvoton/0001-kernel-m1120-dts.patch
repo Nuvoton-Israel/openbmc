@@ -1,23 +1,20 @@
-From f0ae647acb3cdf3f2af1dbd4c192ca5485fdf913 Mon Sep 17 00:00:00 2001
+From 48359f2176d88afcdfcd0dac07a9cdca00c98ed2 Mon Sep 17 00:00:00 2001
 From: Joseph Liu <kwliu@nuvoton.com>
 Date: Mon, 7 Mar 2022 16:26:54 +0800
 Subject: [PATCH] kernel: m1120 dts
 
 Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
 ---
- arch/arm64/boot/dts/nuvoton/Makefile | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/nuvoton/Makefile | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm64/boot/dts/nuvoton/Makefile b/arch/arm64/boot/dts/nuvoton/Makefile
-index 94e0a37c994c..68c9a4ba1ec6 100644
+index a99dab90472a..f99dff38f708 100644
 --- a/arch/arm64/boot/dts/nuvoton/Makefile
 +++ b/arch/arm64/boot/dts/nuvoton/Makefile
-@@ -1,3 +1,4 @@
+@@ -1,2 +1,3 @@
  # SPDX-License-Identifier: GPL-2.0
  dtb-$(CONFIG_ARCH_NPCM) += nuvoton-npcm845-evb.dtb
--dtb-$(CONFIG_ARCH_NPCM) += nuvoton-npcm845-scm.dtb
-\ No newline at end of file
-+dtb-$(CONFIG_ARCH_NPCM) += nuvoton-npcm845-scm.dtb
 +dtb-$(CONFIG_ARCH_NPCM) += m1120-c219b.dtb
 -- 
 2.34.1

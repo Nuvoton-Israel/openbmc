@@ -1,10 +1,10 @@
-FILESEXTRAPATHS:prepend:scm-npcm845  := "${THISDIR}/${PN}:"
+FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 
-SRC_URI:append:scm-npcm845  = " file://service-override.conf"
+SRC_URI:append = " file://service-override.conf"
 
-FILES:${PN}:append:scm-npcm845  = " ${systemd_system_unitdir}/xyz.openbmc_project.LED.GroupManager.service.d/service-override.conf"
+FILES:${PN}:append = " ${systemd_system_unitdir}/xyz.openbmc_project.LED.GroupManager.service.d/service-override.conf"
 
-do_install:append:scm-npcm845 () {
+do_install:append () {
     rm -rf ${D}${datadir}/${PN}/*
 
     install -d ${D}${systemd_system_unitdir}/xyz.openbmc_project.LED.GroupManager.service.d
