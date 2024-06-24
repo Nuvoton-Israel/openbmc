@@ -28,6 +28,7 @@ do_generate_static[depends] += " \
     npcm8xx-bootloader:do_deploy \
     ${PN}:do_clean_image_uboot \
 "
+do_generate_static_tar[depends] += "npcm8xx-bootloader:do_deploy"
 do_generate_static_norootfs[depends] += "npcm8xx-bootloader:do_deploy"
 do_generate_ext4_tar[depends] += "npcm8xx-bootloader:do_deploy"
 
