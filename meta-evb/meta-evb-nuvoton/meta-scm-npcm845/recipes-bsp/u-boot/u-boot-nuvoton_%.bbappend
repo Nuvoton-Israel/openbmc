@@ -6,6 +6,7 @@ SRC_URI:append:scm-npcm845 = " file://nuvoton-npcm845-scm-pincfg.dtsi;subdir=git
 SRC_URI:append:scm-npcm845 = " file://nuvoton-npcm845-scm.dts;subdir=git/arch/arm/dts/"
 SRC_URI:append:scm-npcm845 = " file://0001-add-w25q512nw-support.patch"
 SRC_URI:append:scm-npcm845 = " file://0012-Enable-DVO-HSYNC-DDC-i2c-port-and-don-t-reset-GPIO1-.patch"
+SRC_URI:append:scm-npcm845 = " file://0002-add-i2c-voltage-1.8v-support.patch"
 
 SRC_URI:append:scm-npcm845 = " file://0001-uboot-scm-dts.patch"
 SRC_URI:append:scm-npcm845 = " \

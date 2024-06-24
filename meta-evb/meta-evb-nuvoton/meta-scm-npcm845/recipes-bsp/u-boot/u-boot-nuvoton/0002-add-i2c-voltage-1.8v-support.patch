@@ -1,0 +1,56 @@
+From 360193543d1da61a3f4404990ec35f52a9887de1 Mon Sep 17 00:00:00 2001
+From: Mia Lin <mimi05633@gmail.com>
+Date: Mon, 24 Jun 2024 13:33:13 +0800
+Subject: [PATCH] add i2c voltage 1.8v support
+
+Signed-off-by: Mia Lin <mimi05633@gmail.com>
+---
+ drivers/i2c/i2c-npcm.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/drivers/i2c/i2c-npcm.c b/drivers/i2c/i2c-npcm.c
+index 8f260714ca..36d241baa9 100644
+--- a/drivers/i2c/i2c-npcm.c
++++ b/drivers/i2c/i2c-npcm.c
+@@ -54,6 +54,9 @@
+ #define SMBFIF_CTL_FIFO_EN	BIT(4)
+ #define SMBCTL3_BNK_SEL		BIT(5)
+ 
++/* Voltage Supply Report Register */
++#define VSRCR_VSBV1	BIT(0)
++
+ enum {
+ 	I2C_ERR_NACK = 1,
+ 	I2C_ERR_BER,
+@@ -604,6 +607,20 @@ static int npcm_i2c_probe(struct udevice *dev)
+ 	return 0;
+ }
+ 
++static int npcm_i2c_bind(struct udevice *dev)
++{
++	struct npcm_gcr *gcr = (struct npcm_gcr *)NPCM_GCR_BA;
++	u32 val;
++
++	if (dev_read_bool(dev, "nuvoton,volt-1.8v")) {
++		/* Power voltage select setup */
++		val = readl(&gcr->vsrcr);
++		writel(val | VSRCR_VSBV1, &gcr->vsrcr);
++	}
++
++	return 0;
++}
++
+ static const struct dm_i2c_ops nuvoton_i2c_ops = {
+ 	.xfer		    = npcm_i2c_xfer,
+ 	.set_bus_speed	= npcm_i2c_set_bus_speed,
+@@ -620,6 +637,7 @@ U_BOOT_DRIVER(npcm_i2c_bus) = {
+ 	.id = UCLASS_I2C,
+ 	.of_match = nuvoton_i2c_of_match,
+ 	.probe = npcm_i2c_probe,
++	.bind = npcm_i2c_bind,
+ 	.priv_auto = sizeof(struct npcm_i2c_bus),
+ 	.ops = &nuvoton_i2c_ops,
+ };
+-- 
+2.34.1
+
