@@ -305,6 +305,13 @@ Forth, set PSU address in power-supply-monitor-*.conf.
 <img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/BUV_phosphor-power_50_psu1_conf.png">
   
 Then, the PSU0 and PSU1 should work fine, you are able to see these two PSUs on WebUI/Redfish/DBus.
+## Two PSUs info
+|  | **Inventory-Manager** | **Entity-Manager** |
+| --- | --- | --- |
+| **Dbus** | <img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/buv_two_psu_IM_psu_dbus.png"> | <img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/buv_two_psu_EM_psu_dbus.png">  |
+| **ipmitool sdr** | <img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/buv_two_psu_IM_ipmitool_sdr.png"> | <img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/buv_two_psu_EM_ipmitool_sdr.png"> |
+| **WebUi sensors** | <img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/buv_two_psu_IM_webui_sensors.png"> | <img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/buv_two_psu_EM_webui_sensors.png"> |
+| **Redfish** | <img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/buv_two_psu_IM_redfish.png"> | <img align="top" width="%" src="https://raw.githubusercontent.com/NTC-CCBG/snapshots/master/openbmc/buv_two_psu_EM_redfish.png"> |
   
 # PSU Hot Plug
 This feature is based on phosphor-gpio-monitor. When the PSU is removed/inserted, the PSU present pin state is low-to-high/hight-to-low. We monitor the PSU present pin state to implement PSU hot plug actions, including WebUI/Redfish logs, unbind/bind PSU driver, switch Present/Functional property of PSU DBus interface. The flow of inventory-manager/entity-manager PSU hot plug is the same basically, only need to notice the senor relatedd part and DBus interface, we will descript it in the following.
