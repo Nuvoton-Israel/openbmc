@@ -270,6 +270,7 @@
 			&gpio9oh_pins
 			&gpio10i_pins
 			&gpio11oh_pins
+			&gpio16i_pins
 			&gpio17i_pins
 			&gpio18oh_pins
 			&gpio19oh_pins
@@ -280,6 +281,7 @@
 			&gpio37i_pins
 			&gpio38oh_pins
 			&gpio59oh_pins
+			&gpio60ol_pins
 			&gpio63i_pins
 			&gpio64i_pins
 			&gpio65i_pins
@@ -297,12 +299,14 @@
 			&gpio77oh_pins
 			&gpio78i_pins
 			&gpio82i_pins
-			&gpio83ol_pins
+			&gpio83oh_pins
 			&gpio93i_pins
 			&gpio94i_pins
 			&gpio96i_pins
 			&gpio97oh_pins
 			&gpio98i_pins
+			&gpio99ol_pins
+			&gpio100ol_pins
 			&gpio101i_pins
 			&gpio114i_pins
 			&gpio115oh_pins
@@ -310,7 +314,11 @@
 			&gpio124i_pins
 			&gpio125i_pins
 			&gpio127i_pins
-			&gpio142i_pins
+			&gpio141i_pins
+			&gpio142oh_pins
+			&gpio143i_pins
+			&gpio145ol_pins
+			&gpio146ol_pins
 			&gpio147i_pins
 			&gpio194i_pins
 			&gpio195i_pins

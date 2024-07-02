@@ -13,6 +13,7 @@
 			pins = "GPIO9/LKGPO2/TP_GPIO1";
 			bias-disable;
 			output-high;
+			drive-open-drain;
 			persist-enable;
 		};
 		gpio10i_pins: gpio10i-pins {
@@ -25,12 +26,13 @@
 			pins = "GPIO11/IOXH_CK/SMB6D_SDA/SMB16_SDA";
 			bias-disable;
 			output-high;
+			drive-open-drain;
 			persist-enable;
 		};
-		gpio16oh_pins: gpio16oh-pins {
+		gpio16i_pins: gpio16i-pins {
 			pins = "GPIO16/SMB7B_SDA/LKGPO0/TP_GPIO2";
 			bias-disable;
-			output-high;
+			input-enable;
 			persist-enable;
 		};
 		gpio17i_pins: gpio16i-pins {
@@ -43,6 +45,7 @@
 			pins = "GPIO18/PSPI_D0/SMB4B_SDA";
 			bias-disable;
 			output-high;
+			drive-open-drain;
 			persist-enable;
 		};
 		gpio19oh_pins: gpio19oh-pins {
@@ -85,6 +88,7 @@
 			pins = "GPIO38/SMB3C_SCL/SMB23_SCL";
 			bias-disable;
 			output-high;
+			drive-open-drain;
 			persist-enable;
 		};
 		gpio47oh_pins: gpio47oh-pins {
@@ -163,6 +167,7 @@
 			pins = "GPIO71/FANIN7";
 			bias-disable;
 			output-high;
+			drive-open-drain;
 			persist-enable;
 		};
 		gpio72i_pins: gpio72i-pins {
@@ -213,10 +218,10 @@
 			input-enable;
 			persist-enable;
 		};
-		gpio83ol_pins: gpio83ol-pins {
+		gpio83oh_pins: gpio83oh-pins {
 			pins = "GPIO83/PWM3";
 			bias-disable;
-			output-low;
+			output-high;
 			persist-enable;
 		};
 		gpio93i_pins: gpio93i-pins {
@@ -283,6 +288,7 @@
 			pins = "GPIO123/SMB2B_SCL";
 			bias-disable;
 			output-high;
+			drive-open-drain;
 			persist-enable;
 		};
 		gpio124i_pins: gpio124i-pins {
@@ -303,16 +309,16 @@
 			input-enable;
 			persist-enable;
 		};
-		gpio141ol_pins: gpio141ol-pins {
+		gpio141i_pins: gpio141i-pins {
 			pins = "GPIO141/SMB7B_SCL";
 			bias-disable;
-			output-low;
+			input-enable;
 			persist-enable;
 		};
-		gpio142i_pins: gpio142i-pins {
+		gpio142oh_pins: gpio142oh-pins {
 			pins = "GPIO142/SMB7D_SCL/TPSMB1_SCL";
 			bias-disable;
-			input-enable;
+			output-high;
 			persist-enable;
 		};
 		gpio143i_pins: gpio143i-pins {

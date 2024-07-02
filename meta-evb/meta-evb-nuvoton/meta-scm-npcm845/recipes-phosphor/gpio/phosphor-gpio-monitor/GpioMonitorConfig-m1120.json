@@ -1,8 +1,8 @@
 [
     {
-        "Name": "DP_INTP_3V3_R",
-        "GpioNum": 18,
-        "ChipId": "gpiochip3",
+        "Name": "DP_INTP_BMC",
+        "GpioNum": 29,
+        "ChipId": "gpiochip1",
         "EventMon": "FALLING",
         "Target": "dp_hotplug.service",
         "Continue": true

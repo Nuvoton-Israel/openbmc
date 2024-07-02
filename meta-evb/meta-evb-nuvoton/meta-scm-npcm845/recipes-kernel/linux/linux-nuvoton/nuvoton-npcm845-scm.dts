@@ -38,14 +38,14 @@
 		i2c7 = &i2c7;
 		i2c8 = &i2c8;
 		i2c10 = &i2c10;
-		i2c11 = &i2c11;
 		i2c12 = &i2c12;
 		i2c13 = &i2c13;
 		i2c14 = &i2c14;
 		i2c15 = &i2c15;
-		i2c16 = &i2c16;
+		i2c16 = &i2c23;
+		i2c17 = &i2c11;
 		i2c22 = &i2c22;
-		i2c23 = &i2c23;
+		i2c23 = &i2c16;
 		fiu0 = &fiu0;
 		fiu1 = &fiu3;
 		fiu2 = &fiux;
@@ -427,17 +427,23 @@
 
 			sgpio2: sgpio@102000 {
 				status = "okay";
-				bus-frequency = <8000000>;
-				nuvoton,input-ngpios = <38>;
-				nuvoton,output-ngpios = <13>;
 				gpio-line-names =
-					"BMC_SPI_CPLD_FPGA_SEL","TPM_BMC_ALERT_N","BMC_PCH_FNM","FM_UV_ADR_TRIGGER_EN","FM_SPD_SWITCH_CTRL_N","SMB_SLIVER_RST_BMC_N","PWRBRK_SLI_OE_N","FM_ME_RECOVERY_N",
-					"FM_BIOS_RECOVERY","FM_BIOS_MRC_DEBUG_MSG_DIS_N","RST_BMC_RTCRST","NMI_OUT","FM_BMC_ONCTL_N",
-					"BMC_NODE_ID_0","BMC_NODE_ID_1","BMC_NODE_ID_2","BMC_NODE_ID_3","BMC_NODE_ID_4","BMC_NODE_ID_5","P0_SKTOCC_N","P1_SKTOCC_N",
-					"P0_PROCHOT_N","P1_PROCHOT_N","FM_CPU0_THERMTRIP_LATCH_LVT3_N","FM_CPU1_THERMTRIP_LATCH_LVT3_N","H_CPU0_MEMHOT_OUT_LVC1_N","H_CPU1_MEMHOT_OUT_LVC1_N","P0_MEM_VRHOT_N","P1_MEM_VRHOT_N",
-					"P0_BMC_MEMTRIP_N","P1_BMC_MEMTRIP_N","FM_CPU0_ERR0_LVT3_N","FM_CPU0_ERR1_LVT3_N","FM_CPU0_ERR2_LVT3_N","SMB_BMC_ALERT1_N","SMB_BMC_ALERT2_N","SMB_BMC_ALERT3_N",
-					"SMB_BMC_ALERT4_N","SMB_BMC_ALERT5_N","SMB_BMC_ALERT6_N","SMB_BMC_ALERT7_N","SMB_BMC_ALERT8_N","SMB_BMC_ALERT9_N","SMB_BMC_ALERT10_N","SMB_BMC_ALERT11_N",
-					"SMB_BMC_ALERT12_N","FM_CPU_MSMI_CATERR_LVT3_N","POST_COMPLETE","FM_ADR_COMPLETE_BMC","IRQ_HSC1_FAULT_N","FM_DBP_PRESENT_N";
+					"","","","","","","","",
+					"","","","","","","","",
+					"","","","","","","","",
+					"","","","","","","","",
+					"","","","","","","","",
+					"","","","","","","","",
+					"","","","","","","","",
+					"","","","","","","","",
+					"","","","","","","","",
+					"","","","","","","","",
+					"","","","","","","","",
+					"","","","","","","","",
+					"","","","","","","","",
+					"","","","","","","","",
+					"","","","","","","","",
+					"","","","","","","","";
 			};
 
 			jtm1: jtm@208000 {
@@ -464,98 +470,12 @@
 				status = "okay";
 				i2c-scl-hz = <400000>;
 				i3c-scl-hz = <4000000>;
-				jedec,jesd403;
-				/* JCN 2 */
-				ts@0x10 {
-					reg = <0x10 0x4cc 0x51110000>;
-				};
-				pmic@0x48 {
-					reg = <0x48 0x4cc 0x89000000>;
-				};
-				/* JCN 4 */
-				ts@0x11 {
-					reg = <0x11 0x4cc 0x51110001>;
-				};
-				pmic@0x49 {
-					reg = <0x49 0x4cc 0x89000001>;
-				};
-				/* JCN 6 */
-				ts@0x12 {
-					reg = <0x12 0x4cc 0x51110002>;
-				};
-				pmic@0x4a {
-					reg = <0x4a 0x4cc 0x89000002>;
-				};
-				/* JCN 8 */
-				ts@0x13 {
-					reg = <0x13 0x4cc 0x51110003>;
-				};
-				pmic@0x4b {
-					reg = <0x4b 0x4cc 0x89000003>;
-				};
-				/* JCN 10 */
-				ts@0x14 {
-					reg = <0x14 0x4cc 0x51110004>;
-				};
-				pmic@0x4c {
-					reg = <0x4c 0x4cc 0x89000004>;
-				};
-				/* JCN 12 */
-				ts@0x15 {
-					reg = <0x15 0x4cc 0x51110005>;
-				};
-				pmic@0x4d {
-					reg = <0x4d 0x4cc 0x89000005>;
-				};
 			};
 
 			i3c3: i3c@fff13000 {
 				status = "okay";
 				i2c-scl-hz = <400000>;
 				i3c-scl-hz = <4000000>;
-				jedec,jesd403;
-				/* JCN 14 */
-				ts@0x10 {
-					reg = <0x10 0x4cc 0x51110000>;
-				};
-				pmic@0x48 {
-					reg = <0x48 0x4cc 0x89000000>;
-				};
-				/* JCN 16 */
-				ts@0x11 {
-					reg = <0x11 0x4cc 0x51110001>;
-				};
-				pmic@0x49 {
-					reg = <0x49 0x4cc 0x89000001>;
-				};
-				/* JCN 18 */
-				ts@0x12 {
-					reg = <0x12 0x4cc 0x51110002>;
-				};
-				pmic@0x4a {
-					reg = <0x4a 0x4cc 0x89000002>;
-				};
-				/* JCN 20 */
-				ts@0x13 {
-					reg = <0x13 0x4cc 0x51110003>;
-				};
-				pmic@0x4b {
-					reg = <0x4b 0x4cc 0x89000003>;
-				};
-				/* JCN 22 */
-				ts@0x14 {
-					reg = <0x14 0x4cc 0x51110004>;
-				};
-				pmic@0x4c {
-					reg = <0x4c 0x4cc 0x89000004>;
-				};
-				/* JCN 24 */
-				ts@0x15 {
-					reg = <0x15 0x4cc 0x51110005>;
-				};
-				pmic@0x4d {
-					reg = <0x4d 0x4cc 0x89000005>;
-				};
 			};
 		};
 	};
@@ -614,7 +534,7 @@
 			/*96-127*/
 			"NMI_BUTTON","","","","","","","",
 			"","","","","","","","",
-			"","","","","","","","",
+			"","","DP_INTP_3V3_R","RST_DP_N","","","","",
 			"","","","","","","","";
 		};
 		gpio5: gpio@f0015000 {
@@ -682,6 +602,11 @@
 
 &i2c11 {
 	status = "okay";
+	slave_eeprom: slave_eeprom@40000050 {
+		compatible = "slave-24c02";
+		reg = <0x40000050>;
+		status = "okay";
+	};
 };
 
 &i2c12 {
@@ -730,4 +655,13 @@
 
 &mdio1 {
 	status = "disabled";
+};
+
+&peci {
+	cmd-timeout-ms = <1000>;
+	npcm,pull-down = <0>;
+	npcm,host-neg-bit-rate = <15>;
+	#address-cells = <1>;
+	#size-cells = <0>;
+	status = "okay";
 };
