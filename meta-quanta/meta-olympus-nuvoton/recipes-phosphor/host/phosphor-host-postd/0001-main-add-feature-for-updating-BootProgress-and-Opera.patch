@@ -1,7 +1,7 @@
-From 60a965f0dc838537a23e733c357cf78526e85fa5 Mon Sep 17 00:00:00 2001
+From 5546455c0f8f7323b15438bf3d23fcd7470a2557 Mon Sep 17 00:00:00 2001
 From: Eason Yang <yhyang2@nuvoton.com>
-Date: Wed, 8 Feb 2023 14:32:27 +0800
-Subject: [PATCH] main: add feature for updating BootProgress and
+Date: Thu, 4 Jul 2024 13:23:15 +0800
+Subject: [PATCH 1/1] main: add feature for updating BootProgress and
  OperatingSystemState properties when host power on
 
 Due to BootProgress and OperatingSystemState of Host state didn't be updated correctly.
@@ -64,7 +64,7 @@ index 9d11ac3..02b91a6 100644
  using ServerObject = typename sdbusplus::server::object_t<T...>;
  using PostInterface = sdbusplus::xyz::openbmc_project::State::Boot::server::Raw;
 diff --git a/main.cpp b/main.cpp
-index d84a5aa..8371813 100644
+index 4785044..237c250 100644
 --- a/main.cpp
 +++ b/main.cpp
 @@ -14,6 +14,9 @@
@@ -220,7 +220,7 @@ index d84a5aa..8371813 100644
 +                return;
 +        }
 +
-         // read depends on old data being cleared since it doens't always read
+         // read depends on old data being cleared since it doesn't always read
          // the full code size
          code = 0;
 @@ -322,6 +450,11 @@ int main(int argc, char* argv[])
