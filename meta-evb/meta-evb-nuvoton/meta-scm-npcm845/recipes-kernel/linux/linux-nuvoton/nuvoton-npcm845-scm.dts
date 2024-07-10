@@ -425,25 +425,57 @@
 				status = "okay";
 			};
 
-			sgpio2: sgpio@102000 {
+			sgpio1: sgpio@101000 {
 				status = "okay";
 				gpio-line-names =
+					/* output pin */
+					"LED_CPU0_CHG_DIMM1_FAULT","LED_CPU0_CHG_DIMM2_FAULT","LED_CPU0_CHH_DIMM1_FAULT","LED_CPU0_CHH_DIMM2_FAULT","LED_CPU1_CHG_DIMM1_FAULT","LED_CPU1_CHG_DIMM2_FAULT","LED_CPU1_CHH_DIMM1_FAULT","LED_CPU1_CHH_DIMM2_FAULT",
+					"","","","","","","","",
+					"LED_CPU0_CHI_DIMM1_FAULT","LED_CPU0_CHI_DIMM2_FAULT","LED_CPU0_CHJ_DIMM1_FAULT","LED_CPU0_CHJ_DIMM2_FAULT","LED_CPU0_CHK_DIMM1_FAULT","LED_CPU0_CHK_DIMM2_FAULT","LED_CPU0_CHL_DIMM1_FAULT","LED_CPU0_CHL_DIMM2_FAULT",
+					"LED_CPU1_CHI_DIMM1_FAULT","LED_CPU1_CHI_DIMM2_FAULT","LED_CPU1_CHJ_DIMM1_FAULT","LED_CPU1_CHJ_DIMM2_FAULT","LED_CPU1_CHK_DIMM1_FAULT","LED_CPU1_CHK_DIMM2_FAULT","LED_CPU1_CHL_DIMM1_FAULT","LED_CPU1_CHL_DIMM2_FAULT",
+					"SURPRISE_RESET","FM_CPU1_INTR_CLK_CONFDONE","FM_GLOBAL_RESET","FM_BMC_INIT_DONE","IRQ_BMC_CPU_NMI_P0","IRQ_BMC_CPU_NMI_P1","","",
 					"","","","","","","","",
 					"","","","","","","","",
 					"","","","","","","","",
+					/* input pin */
+					"FM_CPU0_PKGID0","FM_CPU0_PKGID1","FM_CPU0_PKGID2","H_CPU0_MEMTRIP_LVC1_N","FM_CPU1_PKGID0","FM_CPU1_PKGID1","FM_CPU1_PKGID2","H_CPU1_MEMTRIP_LVC1_N",
 					"","","","","","","","",
-					"","","","","","","","",
-					"","","","","","","","",
-					"","","","","","","","",
-					"","","","","","","","",
-					"","","","","","","","",
-					"","","","","","","","",
-					"","","","","","","","",
-					"","","","","","","","",
-					"","","","","","","","",
+					"FM_BOARD_REV_ID0","FM_BOARD_REV_ID1","FM_BOARD_REV_ID2","FM_BOARD_SKU_ID0","FM_BOARD_SKU_ID1","FM_BOARD_SKU_ID2","FM_BOARD_SKU_ID3","FM_BOARD_SKU_ID4",
+					"FM_BOARD_SKU_ID5","FM_VAL_DBG_JUMPER_EN","FM_SERIAL_BOOT","","PWRGD_S0_PWROK_CPU0","","","",
+					"","","","FM_1200VA_OC","","","","",
 					"","","","","","","","",
 					"","","","","","","","",
 					"","","","","","","","";
+
+				FM_BMC_INIT_DONE-hog {
+					gpio-hog;
+					gpios = <35 GPIO_ACTIVE_HIGH>;
+					output-high;
+					line-name = "FM_BMC_INIT_DONE";
+				};
+			};
+
+			sgpio2: sgpio@102000 {
+				status = "okay";
+				gpio-line-names =
+					/* output pin */
+					"BIOS_POST_CODE_LED_0","BIOS_POST_CODE_LED_1","BIOS_POST_CODE_LED_2","BIOS_POST_CODE_LED_3","BIOS_POST_CODE_LED_4","BIOS_POST_CODE_LED_5","BIOS_POST_CODE_LED_6","BIOS_POST_CODE_LED_7",
+					"LED_CPU0_CHA_DIMM1_FAULT","LED_CPU0_CHA_DIMM2_FAULT","LED_CPU0_CHB_DIMM1_FAULT","LED_CPU0_CHB_DIMM2_FAULT","LED_CPU0_CHC_DIMM1_FAULT","LED_CPU0_CHC_DIMM2_FAULT","LED_CPU0_CHD_DIMM1_FAULT","LED_CPU0_CHD_DIMM2_FAULT",
+					"LED_CPU0_CHE_DIMM1_FAULT","LED_CPU0_CHE_DIMM2_FAULT","LED_CPU0_CHF_DIMM1_FAULT","LED_CPU0_CHF_DIMM2_FAULT","","","","",
+					"","","","","LED_CPU1_CHA_DIMM1_FAULT","LED_CPU1_CHA_DIMM2_FAULT","LED_CPU1_CHB_DIMM1_FAULT","LED_CPU1_CHB_DIMM2_FAULT",
+					"LED_CPU1_CHC_DIMM1_FAULT","LED_CPU1_CHC_DIMM2_FAULT","LED_CPU1_CHD_DIMM1_FAULT","LED_CPU1_CHD_DIMM2_FAULT","LED_CPU1_CHE_DIMM1_FAULT","LED_CPU1_CHE_DIMM2_FAULT","LED_CPU1_CHF_DIMM1_FAULT","LED_CPU1_CHF_DIMM2_FAULT",
+					"","","","","","","","",
+					"","","","","","","","",
+					"","","","","","","","",
+					/* input pin */
+					"FM_CPU0_SKTOCC_LVT3_PLD_N","H_CPU0_THERMTRIP_LVC1_N","IRQ_CPU0_VRHOT_N","H_CPU0_MON_FAIL_PLD_LVC1_N","IRQ_CPU0_MEM_VRHOT_N","H_CPU0_MEMHOT_OUT_LVC1_N","FM_CPU0_PROC_ID0","FM_CPU0_PROC_ID1",
+					"CPU_MISMATCH","","FM_CPU1_SKTOCC_LVT3_PLD_N","H_CPU1_THERMTRIP_LVC1_N","IRQ_CPU1_VRHOT_N","H_CPU1_MON_FAIL_PLD_LVC1_N","IRQ_CPU1_MEM_VRHOT_N","H_CPU1_MEMHOT_OUT_LVC1_N",
+					"FM_CPU1_PROC_ID0","FM_CPU1_PROC_ID1","CPU_MISMATCH","","","","","",
+					"","","","","","","","",
+					"","","","","","","","FM_S3M_CPU0_CPLD_CRC_ERROR",
+					"FM_S3M_CPU1_CPLD_CRC_ERROR","H_CPU0_CATERR_LVC1_ENCODE[1]","H_CPU0_CATERR_LVC1_ENCODE[0]","H_CPU1_CATERR_LVC1_ENCODE[1]","H_CPU1_CATERR_LVC1_ENCODE[0]","","","",
+					"","","","","","","","",
+					"","MEM_PWR_FLT","CPU_PWR_FLT","P3V3_FAULT","PSU_PWR_FLT","","","CPU_AUX_PWR_FLT";
 			};
 
 			jtm1: jtm@208000 {
