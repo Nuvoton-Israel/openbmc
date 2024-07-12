@@ -163,11 +163,10 @@
 			input-enable;
 			persist-enable;
 		};
-		gpio71oh_pins: gpio71oh-pins {
+		gpio71ol_pins: gpio71ol-pins {
 			pins = "GPIO71/FANIN7";
 			bias-disable;
-			output-high;
-			drive-open-drain;
+			output-low;
 			persist-enable;
 		};
 		gpio72i_pins: gpio72i-pins {

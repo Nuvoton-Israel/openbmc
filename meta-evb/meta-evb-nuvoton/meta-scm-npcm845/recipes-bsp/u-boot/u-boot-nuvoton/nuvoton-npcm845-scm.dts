@@ -290,7 +290,7 @@
 			&gpio68i_pins
 			&gpio69i_pins
 			&gpio70i_pins
-			&gpio71oh_pins
+			&gpio71ol_pins
 			&gpio72i_pins
 			&gpio73oh_pins
 			&gpio74i_pins
