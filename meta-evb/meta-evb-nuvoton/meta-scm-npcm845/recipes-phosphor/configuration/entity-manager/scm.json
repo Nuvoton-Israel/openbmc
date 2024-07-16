@@ -1,0 +1,151 @@
+{
+    "Exposes": [
+        {
+            "Index": 0,
+            "EntityId": 7,
+            "EntityInstance": 6,
+            "Name": "P12V_AUX_SCM",
+            "PowerState": "Always",
+            "ScaleFactor": 0.13,
+            "Thresholds": [
+                {
+                    "Direction": "greater than",
+                    "Name": "upper critical",
+                    "Severity": 1,
+                    "Value": 13.800
+                },
+                {
+                    "Direction": "greater than",
+                    "Name": "upper non critical",
+                    "Severity": 0,
+                    "Value": 13.200
+                },
+                {
+                    "Direction": "less than",
+                    "Name": "lower non critical",
+                    "Severity": 0,
+                    "Value": 10.800
+                },
+                {
+                    "Direction": "less than",
+                    "Name": "lower critical",
+                    "Severity": 1,
+                    "Value": 10.230
+                }
+            ],
+            "Type": "ADC"
+        },
+        {
+            "Index": 1,
+            "EntityId": 7,
+            "EntityInstance": 6,
+            "Name": "P5V_AUX_SCM",
+            "PowerState": "Always",
+            "ScaleFactor": 0.33,
+            "Thresholds": [
+                {
+                    "Direction": "greater than",
+                    "Name": "upper critical",
+                    "Severity": 1,
+                    "Value": 5.500
+                },
+                {
+                    "Direction": "greater than",
+                    "Name": "upper non critical",
+                    "Severity": 0,
+                    "Value": 5.300
+                },
+                {
+                    "Direction": "less than",
+                    "Name": "lower non critical",
+                    "Severity": 0,
+                    "Value": 4.700
+                },
+                {
+                    "Direction": "less than",
+                    "Name": "lower critical",
+                    "Severity": 1,
+                    "Value": 4.500
+                }
+            ],
+            "Type": "ADC"
+        },
+        {
+            "Index": 2,
+            "EntityId": 7,
+            "EntityInstance": 6,
+            "Name": "P3V3_AUX_SCM",
+            "PowerState": "Always",
+            "ScaleFactor": 0.5,
+            "Thresholds": [
+                {
+                    "Direction": "greater than",
+                    "Name": "upper critical",
+                    "Severity": 1,
+                    "Value": 3.630
+                },
+                {
+                    "Direction": "greater than",
+                    "Name": "upper non critical",
+                    "Severity": 0,
+                    "Value": 3.500
+                },
+                {
+                    "Direction": "less than",
+                    "Name": "lower non critical",
+                    "Severity": 0,
+                    "Value": 3.100
+                },
+                {
+                    "Direction": "less than",
+                    "Name": "lower critical",
+                    "Severity": 1,
+                    "Value": 2.970
+                }
+            ],
+            "Type": "ADC"
+        },
+        {
+            "Address": "0x4b",
+            "Bus": 7,
+            "EntityId": 7,
+            "EntityInstance": 3,
+            "Name": "Temp_Inlet_SCM",
+            "PollRate": 1.0,
+            "Thresholds": [
+                {
+                    "Direction": "greater than",
+                    "Name": "upper critical",
+                    "Severity": 1,
+                    "Value": 40.000
+                },
+                {
+                    "Direction": "greater than",
+                    "Name": "upper non critical",
+                    "Severity": 0,
+                    "Value": 37.000
+                }
+            ],
+            "Type": "TMP75"
+        }
+    ],
+    "Name": "Nuvoton",
+    "Probe": "xyz.openbmc_project.FruDevice({'BOARD_PRODUCT_NAME': 'DCSCM-BMC'})",
+    "Type": "Board",
+    "xyz.openbmc_project.Inventory.Decorator.Asset": {
+        "Manufacturer": "$BOARD_MANUFACTURER",
+        "Model": "$BOARD_PRODUCT_NAME",
+        "PartNumber": "$BOARD_PART_NUMBER",
+        "SerialNumber": "$BOARD_SERIAL_NUMBER"
+    },
+    "xyz.openbmc_project.Inventory.Decorator.Ipmi": {
+        "EntityId": "0x10",
+        "EntityInstance": 1
+    },
+    "xyz.openbmc_project.Inventory.Decorator.I2CDevice": {
+        "Bus": "$BUS",
+        "Address": "$ADDRESS",
+        "Name": "$BOARD_PRODUCT_NAME"
+    },
+    "xyz.openbmc_project.Inventory.Item.System": {}
+}
