@@ -260,6 +260,7 @@
 
 &host_intf {
 	type = "espi";
+	ioaddr = <0x2e>;
 	channel-support = <0xf>;
 };
 
