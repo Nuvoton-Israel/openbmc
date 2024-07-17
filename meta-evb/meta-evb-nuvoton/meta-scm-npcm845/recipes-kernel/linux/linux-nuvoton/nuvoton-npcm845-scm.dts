@@ -377,7 +377,6 @@
 			lpc_host: lpc_host@7000 {
 				lpc_bpc: lpc_bpc@40 {
 					monitor-ports = <0x80>;
-					bpc-en-dwcapture;
 					status = "okay";
 				};
 			};
