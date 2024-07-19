@@ -160,6 +160,20 @@
 		status = "okay";
 	};
 
+	seven-seg-gpio {
+		compatible = "seven-seg-gpio-dev";
+		refresh-interval-ms = <500>;
+		seven-gpios = <&sgpio2 0 0>,
+			      <&sgpio2 1 0>,
+			      <&sgpio2 2 0>,
+			      <&sgpio2 3 0>,
+			      <&sgpio2 4 0>,
+			      <&sgpio2 5 0>,
+			      <&sgpio2 6 0>,
+			      <&sgpio2 7 0>;
+		status = "okay";
+	};
+
 	ahb {
 		mc: memory-controller@f0824000 {
 			compatible = "nuvoton,npcm8xx-sdram-edac";

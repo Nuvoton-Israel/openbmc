@@ -1,3 +1,4 @@
 SNOOP_DEVICE = "npcm7xx-lpc-bpc0"
 POST_CODE_BYTES:scm-npcm845 = "1"
 POST_CODE_BYTES:m1120-c2195 = "4"
+PACKAGECONFIG = "7seg"

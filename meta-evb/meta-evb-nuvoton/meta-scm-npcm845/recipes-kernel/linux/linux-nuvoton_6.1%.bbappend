@@ -8,6 +8,8 @@ SRC_URI:append:scm-npcm845 = " file://0001-add-w25q512nwfiq-support.patch"
 SRC_URI:append:scm-npcm845 = " file://0006-Add-DVO-slew-rate-and-remove-smb11-default-pinctrl.patch"
 SRC_URI:append:scm-npcm845 = " file://scm-npcm845.cfg"
 SRC_URI:append:scm-npcm845 = " file://enable-v4l2.cfg"
+SRC_URI:append:scm-npcm845 = " file://0008-driver-misc-seven-segment-display-gpio-driver.patch"
+SRC_URI:append:scm-npcm845 = " file://0009-driver-misc-seven_seg-Support-8-pins-to-display.patch"
 
 SRC_URI:append:m1120-c2195 = " file://m1120-c219b.dts;subdir=git/arch/${ARCH}/boot/dts/nuvoton"
 SRC_URI:append:m1120-c2195 = " file://0001-kernel-m1120-dts.patch"

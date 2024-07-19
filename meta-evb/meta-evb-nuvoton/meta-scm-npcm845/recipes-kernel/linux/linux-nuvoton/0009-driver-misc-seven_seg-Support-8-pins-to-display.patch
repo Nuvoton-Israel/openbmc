@@ -1,0 +1,127 @@
+From 7956f3f2f5bc7c1bd5f32743e0fe707c0911f328 Mon Sep 17 00:00:00 2001
+From: Mia Lin <mimi05633@gmail.com>
+Date: Fri, 19 Jul 2024 09:22:28 +0800
+Subject: driver: misc: seven_seg: Support 8 pins to display
+
+Signed-off-by: Mia Lin <mimi05633@gmail.com>
+---
+ drivers/misc/seven_seg_disp.c | 12 ++++++------
+ drivers/misc/seven_seg_disp.h |  6 +++---
+ drivers/misc/seven_seg_gpio.c | 16 ++++++++--------
+ 3 files changed, 17 insertions(+), 17 deletions(-)
+
+diff --git a/drivers/misc/seven_seg_disp.c b/drivers/misc/seven_seg_disp.c
+index eedcfed592f4..cc9704c45f15 100644
+--- a/drivers/misc/seven_seg_disp.c
++++ b/drivers/misc/seven_seg_disp.c
+@@ -71,15 +71,15 @@ static int seven_seg_disp_close(struct inode *inode, struct file *filp)
+ 	return 0;
+ }
+ 
+-static u16 convert_to_disp_data(char *buf)
++static u8 convert_to_disp_data(char *buf)
+ {
+ 	u8 low_display;
+ 	u8 high_display;
+-	u16 led_value;
++	u8 led_value;
+ 	
+-	high_display = seven_seg_bits[hex_to_bin(buf[1])];
+-	low_display = seven_seg_bits[hex_to_bin(buf[2])];
+-	led_value = low_display | (high_display << 8);
++	high_display = hex_to_bin(buf[1]);
++	low_display = hex_to_bin(buf[2]);
++	led_value = low_display | (high_display << 4);
+ 
+ 	return led_value;
+ }
+@@ -134,7 +134,7 @@ void seven_seg_rem_cdev(struct seven_seg_disp_dev *disp_dev)
+ }
+ 
+ int seven_seg_setup_cdev(struct seven_seg_disp_dev *disp_dev,
+-	void (*update_disp_data)(struct device *, u16 data))
++	void (*update_disp_data)(struct device *, u8 data))
+ {
+ 	struct device *dev;
+ 	int err;
+diff --git a/drivers/misc/seven_seg_disp.h b/drivers/misc/seven_seg_disp.h
+index 12a9505b2ac0..e6b2863d1a7b 100644
+--- a/drivers/misc/seven_seg_disp.h
++++ b/drivers/misc/seven_seg_disp.h
+@@ -18,17 +18,17 @@
+ 
+ struct seven_seg_disp_dev {
+ 	bool disp_data_valid;
+-	u16 current_seven_seg_disp_data;
++	u8 current_seven_seg_disp_data;
+ 	char seven_seg_disp_data_array[MAX_DISP_CHAR_SIZE];
+ 	int seven_seg_array[2];
+ 	struct device parent;
+ 	struct device *dev;
+ 	struct cdev cdev;
+-	void (*update_seven_seg_data)(struct device *, u16 data);
++	void (*update_seven_seg_data)(struct device *, u8 data);
+ };
+ 
+ int seven_seg_setup_cdev(struct seven_seg_disp_dev *disp_dev,
+-	void (*update_disp_data)(struct device *, u16 data));
++	void (*update_disp_data)(struct device *, u8 data));
+ 
+ void seven_seg_rem_cdev(struct seven_seg_disp_dev *disp_dev);
+ 
+diff --git a/drivers/misc/seven_seg_gpio.c b/drivers/misc/seven_seg_gpio.c
+index 4eed6579123e..997a92b7c2b5 100644
+--- a/drivers/misc/seven_seg_gpio.c
++++ b/drivers/misc/seven_seg_gpio.c
+@@ -29,12 +29,12 @@ struct gpio_pins {
+ };
+ 
+ struct seven_seg_gpio_info {
+-	u16 curr_disp_value;
++	u8 curr_disp_value;
+ 	u16 refresh_interval;
+-	struct gpio_pins pins[16];
++	struct gpio_pins pins[8];
+ };
+ 
+-static void update_seven_seg_gpio_data(struct device *dev, u16 data)
++static void update_seven_seg_gpio_data(struct device *dev, u8 data)
+ {
+ 	struct platform_device *pdev;
+ 	struct seven_seg_gpio_info *gpio_info;
+@@ -53,10 +53,10 @@ static void update_seven_seg_gpio_data(struct device *dev, u16 data)
+ 	}
+ 	gpio_info->curr_disp_value = data;
+ 
+-	for (i = 0; i <16 ; i++)
++	for (i = 0; i <8 ; i++)
+ 		gpiod_set_value(gpio_info->pins[i].gpiod, 0);
+ 	mdelay(gpio_info->refresh_interval/10);
+-	for (i = 0; i <16 ; i++) 
++	for (i = 0; i <8 ; i++)
+ 	{
+ 		if (data & 0x01)
+ 			gpiod_set_value(gpio_info->pins[i].gpiod, 1);
+@@ -66,7 +66,7 @@ static void update_seven_seg_gpio_data(struct device *dev, u16 data)
+ 		data >>= 1;
+ 	}
+ 	mdelay(gpio_info->refresh_interval);
+-	for (i = 0; i <16 ; i++)
++	for (i = 0; i <8 ; i++)
+ 		gpiod_set_value(gpio_info->pins[i].gpiod, 0);
+ }
+ 
+@@ -105,8 +105,8 @@ static int seven_seg_gpio_probe(struct platform_device *pdev)
+ 
+ 	gpio_info->refresh_interval = result ? DEFAULT_REFRESH_INTERVAL_MS :interval;
+ 	pr_err("refresh_interval=%d\n",gpio_info->refresh_interval);
+-	
+-	for (i = 0; i < 16; i++) {
++
++	for (i = 0; i < 8; i++) {
+ 		gpiod = gpiod_get_index(&pdev->dev, "seven",
+ 			i, GPIOD_OUT_HIGH);
+ 		if (IS_ERR(gpiod))
+-- 
+2.34.1
+
