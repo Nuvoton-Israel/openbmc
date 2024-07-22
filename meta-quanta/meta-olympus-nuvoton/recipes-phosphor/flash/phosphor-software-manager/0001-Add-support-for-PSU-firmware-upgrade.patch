@@ -1,6 +1,6 @@
-From eea4e5c5ebc78d333551d555464917d52e71f635 Mon Sep 17 00:00:00 2001
-From: Joseph Liu <kwliu@nuvoton.com>
-Date: Thu, 25 Apr 2024 16:30:05 +0800
+From 0516734d32a29b16928a1f8d014f818e2bd5c34f Mon Sep 17 00:00:00 2001
+From: Eason Yang <yhyang2@nuvoton.com>
+Date: Mon, 22 Jul 2024 13:19:21 +0800
 Subject: [PATCH] Add support for PSU firmware upgrade
 
 Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
@@ -8,13 +8,13 @@ Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
  activation.cpp   | 79 ++++++++++++++++++++++++++++++++++++++++++++++++
  activation.hpp   |  5 +++
  item_updater.cpp | 61 +++++++++++++++++++++++++++++++++++++
- item_updater.hpp | 21 ++++++++++++-
+ item_updater.hpp | 20 ++++++++++++
  meson.build      |  7 +++++
  meson.options    |  9 ++++++
- 6 files changed, 181 insertions(+), 1 deletion(-)
+ 6 files changed, 181 insertions(+)
 
 diff --git a/activation.cpp b/activation.cpp
-index 8f4c4c0..476d1ce 100644
+index cd44cc0..da49555 100644
 --- a/activation.cpp
 +++ b/activation.cpp
 @@ -143,6 +143,19 @@ auto Activation::activation(Activations value) -> Activations
@@ -118,11 +118,11 @@ index 8f4c4c0..476d1ce 100644
  {
      auto method = bus.new_method_call(SYSTEMD_BUSNAME, SYSTEMD_PATH,
 diff --git a/activation.hpp b/activation.hpp
-index f813886..9f666dc 100644
+index 22e0445..5655d07 100644
 --- a/activation.hpp
 +++ b/activation.hpp
-@@ -247,6 +247,11 @@ class Activation : public ActivationInherit, public Flash
-     void onStateChangesBios(sdbusplus::message_t&);
+@@ -254,6 +254,11 @@ class Activation : public ActivationInherit, public Flash
+     void onStateChangesBios(sdbusplus::message_t& /*msg*/);
  #endif
  
 +#ifdef PSU_UPGRADE
@@ -131,10 +131,10 @@ index f813886..9f666dc 100644
 +#endif
 +
      /** @brief Overloaded function that acts on service file state changes */
-     void onStateChanges(sdbusplus::message_t&) override;
+     void onStateChanges(sdbusplus::message_t& /*msg*/) override;
  
 diff --git a/item_updater.cpp b/item_updater.cpp
-index c68d058..e567f61 100644
+index 634951d..58e121b 100644
 --- a/item_updater.cpp
 +++ b/item_updater.cpp
 @@ -71,6 +71,9 @@ void ItemUpdater::createActivation(sdbusplus::message_t& msg)
@@ -147,7 +147,7 @@ index c68d058..e567f61 100644
  #endif
                          value == VersionPurpose::System)
                      {
-@@ -901,6 +904,64 @@ void ItemUpdater::createBIOSObject()
+@@ -912,6 +915,64 @@ void ItemUpdater::createBIOSObject()
  }
  #endif
  
@@ -213,21 +213,20 @@ index c68d058..e567f61 100644
  {
      // Check /run/media/slot to get the slot number
 diff --git a/item_updater.hpp b/item_updater.hpp
-index d4c5bdb..87ea7bf 100644
+index f850492..c4ae76d 100644
 --- a/item_updater.hpp
 +++ b/item_updater.hpp
-@@ -90,7 +90,9 @@ class ItemUpdater : public ItemUpdaterInherit
+@@ -89,6 +89,9 @@ class ItemUpdater : public ItemUpdaterInherit
+         restoreFieldModeStatus();
  #ifdef HOST_BIOS_UPGRADE
          createBIOSObject();
- #endif
--
++#endif
 +#ifdef PSU_UPGRADE
 +        createPSUObject();
-+#endif
-         if (minimum_ship_level::enabled())
-         {
-             minimumVersionObject = std::make_unique<MinimumVersion>(bus, path);
-@@ -313,6 +315,23 @@ class ItemUpdater : public ItemUpdaterInherit
+ #endif
+         emit_object_added();
+     };
+@@ -305,6 +308,23 @@ class ItemUpdater : public ItemUpdaterInherit
      std::unique_ptr<VersionClass> biosVersion;
  #endif
  
@@ -252,7 +251,7 @@ index d4c5bdb..87ea7bf 100644
      void getRunningSlot();
  };
 diff --git a/meson.build b/meson.build
-index cd80064..ce55060 100644
+index 2ae8c66..5029314 100644
 --- a/meson.build
 +++ b/meson.build
 @@ -57,6 +57,8 @@ conf.set_quoted('UPDATEABLE_REV_ASSOCIATION', 'software_version')
@@ -284,7 +283,7 @@ index cd80064..ce55060 100644
  
  boost_dep = dependency('boost')
 diff --git a/meson.options b/meson.options
-index b088a8d..787d27f 100644
+index 605786d..9f4e6e2 100644
 --- a/meson.options
 +++ b/meson.options
 @@ -12,6 +12,9 @@ option('bmc-layout', type: 'combo',
@@ -297,7 +296,7 @@ index b088a8d..787d27f 100644
  option('sync-bmc-files', type: 'feature', value: 'enabled',
      description: 'Enable sync of filesystem files.')
  
-@@ -115,6 +118,12 @@ option(
+@@ -119,6 +122,12 @@ option(
      description: 'The BIOS DBus object path.',
  )
  
