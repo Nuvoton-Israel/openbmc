@@ -1,6 +1,0 @@
-ACTION=="remove", GOTO="persistent_net_end"
-SUBSYSTEM!="net", GOTO="persistent_net_end"
-
-ENV{ID_NET_NAME_ONBOARD}!="", NAME="eth%n"
-
-LABEL="persistent_net_end"
