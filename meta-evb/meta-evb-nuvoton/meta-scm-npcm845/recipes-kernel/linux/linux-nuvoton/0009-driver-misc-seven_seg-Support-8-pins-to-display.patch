@@ -1,14 +1,16 @@
-From 7956f3f2f5bc7c1bd5f32743e0fe707c0911f328 Mon Sep 17 00:00:00 2001
+From 7db59bf20032d15b67200ab17acf5dcfc78082de Mon Sep 17 00:00:00 2001
 From: Mia Lin <mimi05633@gmail.com>
 Date: Fri, 19 Jul 2024 09:22:28 +0800
-Subject: driver: misc: seven_seg: Support 8 pins to display
+Subject: [PATCH 1/1] driver: misc: seven_seg: Support 8 pins to display
+
+- Keep the status of post code
 
 Signed-off-by: Mia Lin <mimi05633@gmail.com>
 ---
  drivers/misc/seven_seg_disp.c | 12 ++++++------
  drivers/misc/seven_seg_disp.h |  6 +++---
- drivers/misc/seven_seg_gpio.c | 16 ++++++++--------
- 3 files changed, 17 insertions(+), 17 deletions(-)
+ drivers/misc/seven_seg_gpio.c | 17 +++++++----------
+ 3 files changed, 16 insertions(+), 19 deletions(-)
 
 diff --git a/drivers/misc/seven_seg_disp.c b/drivers/misc/seven_seg_disp.c
 index eedcfed592f4..cc9704c45f15 100644
@@ -70,7 +72,7 @@ index 12a9505b2ac0..e6b2863d1a7b 100644
  void seven_seg_rem_cdev(struct seven_seg_disp_dev *disp_dev);
  
 diff --git a/drivers/misc/seven_seg_gpio.c b/drivers/misc/seven_seg_gpio.c
-index 4eed6579123e..997a92b7c2b5 100644
+index 4eed6579123e..8cc921180adf 100644
 --- a/drivers/misc/seven_seg_gpio.c
 +++ b/drivers/misc/seven_seg_gpio.c
 @@ -29,12 +29,12 @@ struct gpio_pins {
@@ -102,16 +104,17 @@ index 4eed6579123e..997a92b7c2b5 100644
  	{
  		if (data & 0x01)
  			gpiod_set_value(gpio_info->pins[i].gpiod, 1);
-@@ -66,7 +66,7 @@ static void update_seven_seg_gpio_data(struct device *dev, u16 data)
+@@ -65,9 +65,6 @@ static void update_seven_seg_gpio_data(struct device *dev, u16 data)
+ 
  		data >>= 1;
  	}
- 	mdelay(gpio_info->refresh_interval);
+-	mdelay(gpio_info->refresh_interval);
 -	for (i = 0; i <16 ; i++)
-+	for (i = 0; i <8 ; i++)
- 		gpiod_set_value(gpio_info->pins[i].gpiod, 0);
+-		gpiod_set_value(gpio_info->pins[i].gpiod, 0);
  }
  
-@@ -105,8 +105,8 @@ static int seven_seg_gpio_probe(struct platform_device *pdev)
+ 
+@@ -105,8 +102,8 @@ static int seven_seg_gpio_probe(struct platform_device *pdev)
  
  	gpio_info->refresh_interval = result ? DEFAULT_REFRESH_INTERVAL_MS :interval;
  	pr_err("refresh_interval=%d\n",gpio_info->refresh_interval);
