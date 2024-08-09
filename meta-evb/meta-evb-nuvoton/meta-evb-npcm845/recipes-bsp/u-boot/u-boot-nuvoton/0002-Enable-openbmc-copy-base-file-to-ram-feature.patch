@@ -1,7 +1,7 @@
-From 57e3fe1720c8f33e6ae78656665290e996bdf60b Mon Sep 17 00:00:00 2001
+From 76277af200896efc3064516786d311114612ec34 Mon Sep 17 00:00:00 2001
 From: Brian Ma <chma0@nuvoton.com>
 Date: Thu, 9 May 2024 16:44:56 +0800
-Subject: [PATCH 2/2] Enable openbmc copy base file to ram feature
+Subject: [PATCH] Enable openbmc copy base file to ram feature
 
 Signed-off-by: Brian Ma <chma0@nuvoton.com>
 ---
@@ -9,13 +9,13 @@ Signed-off-by: Brian Ma <chma0@nuvoton.com>
  1 file changed, 1 insertion(+)
 
 diff --git a/include/configs/arbel.h b/include/configs/arbel.h
-index bee8d21b41..1f49bcfc4c 100644
+index 0dd1f87661..cb0927fbde 100644
 --- a/include/configs/arbel.h
 +++ b/include/configs/arbel.h
-@@ -45,6 +45,7 @@
- 		"tftptimeout=1000\0" \
+@@ -46,6 +46,7 @@
  		"tftptimeoutcountmax=50\0" \
  		"bootpretryperiod=60000\0" \
+ 		"stopwdt=wdt dev watchdog@901c; wdt stop\0" \
 +		"openbmcinit=copy-base-filesystem-to-ram\0" \
  		"\0"
  
