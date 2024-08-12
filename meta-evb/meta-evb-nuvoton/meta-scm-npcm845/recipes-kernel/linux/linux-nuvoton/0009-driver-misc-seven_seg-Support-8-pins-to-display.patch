@@ -1,4 +1,4 @@
-From 7db59bf20032d15b67200ab17acf5dcfc78082de Mon Sep 17 00:00:00 2001
+From 53204b7fae6064c6f28d19047e4aaf1407a05f68 Mon Sep 17 00:00:00 2001
 From: Mia Lin <mimi05633@gmail.com>
 Date: Fri, 19 Jul 2024 09:22:28 +0800
 Subject: [PATCH 1/1] driver: misc: seven_seg: Support 8 pins to display
@@ -9,8 +9,8 @@ Signed-off-by: Mia Lin <mimi05633@gmail.com>
 ---
  drivers/misc/seven_seg_disp.c | 12 ++++++------
  drivers/misc/seven_seg_disp.h |  6 +++---
- drivers/misc/seven_seg_gpio.c | 17 +++++++----------
- 3 files changed, 16 insertions(+), 19 deletions(-)
+ drivers/misc/seven_seg_gpio.c | 21 +++++++--------------
+ 3 files changed, 16 insertions(+), 23 deletions(-)
 
 diff --git a/drivers/misc/seven_seg_disp.c b/drivers/misc/seven_seg_disp.c
 index eedcfed592f4..cc9704c45f15 100644
@@ -72,7 +72,7 @@ index 12a9505b2ac0..e6b2863d1a7b 100644
  void seven_seg_rem_cdev(struct seven_seg_disp_dev *disp_dev);
  
 diff --git a/drivers/misc/seven_seg_gpio.c b/drivers/misc/seven_seg_gpio.c
-index 4eed6579123e..8cc921180adf 100644
+index 4eed6579123e..af3a86421f8a 100644
 --- a/drivers/misc/seven_seg_gpio.c
 +++ b/drivers/misc/seven_seg_gpio.c
 @@ -29,12 +29,12 @@ struct gpio_pins {
@@ -91,20 +91,19 @@ index 4eed6579123e..8cc921180adf 100644
  {
  	struct platform_device *pdev;
  	struct seven_seg_gpio_info *gpio_info;
-@@ -53,10 +53,10 @@ static void update_seven_seg_gpio_data(struct device *dev, u16 data)
+@@ -53,10 +53,7 @@ static void update_seven_seg_gpio_data(struct device *dev, u16 data)
  	}
  	gpio_info->curr_disp_value = data;
  
 -	for (i = 0; i <16 ; i++)
-+	for (i = 0; i <8 ; i++)
- 		gpiod_set_value(gpio_info->pins[i].gpiod, 0);
- 	mdelay(gpio_info->refresh_interval/10);
+-		gpiod_set_value(gpio_info->pins[i].gpiod, 0);
+-	mdelay(gpio_info->refresh_interval/10);
 -	for (i = 0; i <16 ; i++) 
 +	for (i = 0; i <8 ; i++)
  	{
  		if (data & 0x01)
  			gpiod_set_value(gpio_info->pins[i].gpiod, 1);
-@@ -65,9 +65,6 @@ static void update_seven_seg_gpio_data(struct device *dev, u16 data)
+@@ -65,9 +62,6 @@ static void update_seven_seg_gpio_data(struct device *dev, u16 data)
  
  		data >>= 1;
  	}
@@ -114,7 +113,7 @@ index 4eed6579123e..8cc921180adf 100644
  }
  
  
-@@ -105,8 +102,8 @@ static int seven_seg_gpio_probe(struct platform_device *pdev)
+@@ -105,10 +99,10 @@ static int seven_seg_gpio_probe(struct platform_device *pdev)
  
  	gpio_info->refresh_interval = result ? DEFAULT_REFRESH_INTERVAL_MS :interval;
  	pr_err("refresh_interval=%d\n",gpio_info->refresh_interval);
@@ -123,8 +122,19 @@ index 4eed6579123e..8cc921180adf 100644
 +
 +	for (i = 0; i < 8; i++) {
  		gpiod = gpiod_get_index(&pdev->dev, "seven",
- 			i, GPIOD_OUT_HIGH);
+-			i, GPIOD_OUT_HIGH);
++			i, GPIOD_ASIS);
  		if (IS_ERR(gpiod))
+ 			return PTR_ERR(gpiod);
+ 		else
+@@ -116,7 +110,6 @@ static int seven_seg_gpio_probe(struct platform_device *pdev)
+ 			chip = gpiod_to_chip(gpiod);
+ 			gpio_info->pins[i].gpiod=gpiod;
+ 			gpio_info->pins[i].bit_offset = desc_to_gpio(gpiod)- chip->base;
+-			gpiod_set_value(gpio_info->pins[i].gpiod, 0);
+ 		}
+ 	}
+ 			
 -- 
 2.34.1
 
