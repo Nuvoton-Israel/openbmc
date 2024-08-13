@@ -1,0 +1,26 @@
+From 6c89e08dd2b893538bb8780c804b1022768c0b36 Mon Sep 17 00:00:00 2001
+From: Mia Lin <mimi05633@gmail.com>
+Date: Tue, 13 Aug 2024 11:15:29 +0800
+Subject: [PATCH 1/1] Clean the reset control bit of SIOX1/2
+
+Signed-off-by: Mia Lin <mimi05633@gmail.com>
+---
+ Sources/source/images.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/Sources/source/images.c b/Sources/source/images.c
+index c98074b..4b1aa29 100755
+--- a/Sources/source/images.c
++++ b/Sources/source/images.c
+@@ -278,6 +278,8 @@ void update_reset_indication (void)
+ 		SET_VAR_FIELD (rcr1, WD0RCR_GPIOM5, 0);
+ 		SET_VAR_FIELD (rcr1, WD0RCR_GPIOM6, 0);
+ 		SET_VAR_FIELD (rcr1, WD0RCR_GPIOM7, 0);
++		SET_VAR_FIELD (rcr1, WD0RCR_SIOX1, 0);
++		SET_VAR_FIELD (rcr1, WD0RCR_SIOX2, 0);
+ 		SET_VAR_FIELD (rcr1, WD0RCR_SPIBMC, 0);
+ 		SET_VAR_FIELD (rcr1, WD0RCR_SPER, 0);
+ 		SET_VAR_FIELD (rcr1, WD0RCR_PWM, 0);
+-- 
+2.34.1
+
