@@ -618,6 +618,16 @@
 	};
 };
 
+&gcr {
+	mux-controller {
+		compatible = "mmio-mux";
+		#mux-control-cells = <1>;
+
+		mux-reg-masks = <0x38 0x07>; // 0: reg 0x38, bits 2:0
+		idle-states = <0>; // UART switch mode 1
+	};
+};
+
 &i2c1 {
 	status = "okay";
 };
