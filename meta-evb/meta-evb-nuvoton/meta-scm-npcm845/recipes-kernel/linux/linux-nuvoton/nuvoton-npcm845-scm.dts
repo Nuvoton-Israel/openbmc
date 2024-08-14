@@ -603,6 +603,21 @@
 	};
 };
 
+&rstc {
+	mux-controller {
+		compatible = "mmio-mux";
+		#mux-control-cells = <1>;
+
+		/* Clean SIOX1/2 reset bits of WD0RCR/WD1RCR/WD2RCR/SWRSTC1/SWRSTC2/SWRSTC3/CORSTC/TIPRSTC */
+		mux-reg-masks = <0x38 0x3000000>, <0x3c 0x3000000>, <0x40 0x3000000>,
+				<0x44 0x3000000>, <0x48 0x3000000>, <0x4c 0x3000000>,
+				<0x5c 0x3000000>, <0x50 0x3000000>;
+		idle-states = <0>, <0>, <0>,
+			      <0>, <0>, <0>,
+			      <0>, <0>;
+	};
+};
+
 &i2c1 {
 	status = "okay";
 };

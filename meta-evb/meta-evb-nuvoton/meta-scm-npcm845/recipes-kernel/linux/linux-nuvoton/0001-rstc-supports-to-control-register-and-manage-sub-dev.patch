@@ -1,0 +1,27 @@
+From 1620e0e4d99dbe744e9136af94d39b0085962199 Mon Sep 17 00:00:00 2001
+From: Mia Lin <mimi05633@gmail.com>
+Date: Wed, 14 Aug 2024 16:34:08 +0800
+Subject: [PATCH 1/1] rstc supports to control register and manage sub-device
+
+Signed-off-by: Mia Lin <mimi05633@gmail.com>
+---
+ arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi b/arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi
+index c0e2320dcc1e..59a03d9a315b 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi
+@@ -67,7 +67,8 @@ ahb {
+ 		ranges;
+ 
+ 		rstc: reset-controller@f0801000 {
+-			compatible = "nuvoton,npcm845-reset";
++			compatible = "nuvoton,npcm845-reset",
++				     "syscon", "simple-mfd";
+ 			reg = <0x0 0xf0801000 0x0 0x78>;
+ 			#reset-cells = <2>;
+ 			nuvoton,sysgcr = <&gcr>;
+-- 
+2.34.1
+
