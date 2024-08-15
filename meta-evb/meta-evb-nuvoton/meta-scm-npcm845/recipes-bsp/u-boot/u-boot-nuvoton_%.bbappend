@@ -10,7 +10,7 @@ SRC_URI:append:scm-npcm845 = " file://0002-add-i2c-voltage-1.8v-support.patch"
 
 SRC_URI:append:scm-npcm845 = " file://0001-uboot-scm-dts.patch"
 SRC_URI:append:scm-npcm845 = " \
-	${@emmc_enabled(d, 'file://1111-boot-openbmc-form-emmc.patch')}"
+	${@emmc_enabled(d, 'file://1111-boot-openbmc-form-emmc.patch file://mmc-boot.cfg')}"
 
 SRC_URI:append:m1120-c2195 = " file://m1120.dts;subdir=git/arch/arm/dts/"
 SRC_URI:append:m1120-c2195 = " file://m1120-pincfg.dtsi;subdir=git/arch/arm/dts/"
