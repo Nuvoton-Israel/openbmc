@@ -1,16 +1,17 @@
-From 53204b7fae6064c6f28d19047e4aaf1407a05f68 Mon Sep 17 00:00:00 2001
+From b7a6c4451fbecf1979e247f287dc567752dbd271 Mon Sep 17 00:00:00 2001
 From: Mia Lin <mimi05633@gmail.com>
 Date: Fri, 19 Jul 2024 09:22:28 +0800
 Subject: [PATCH 1/1] driver: misc: seven_seg: Support 8 pins to display
 
 - Keep the status of post code
+- Fix unbind panic and bind fail issue
 
 Signed-off-by: Mia Lin <mimi05633@gmail.com>
 ---
- drivers/misc/seven_seg_disp.c | 12 ++++++------
- drivers/misc/seven_seg_disp.h |  6 +++---
- drivers/misc/seven_seg_gpio.c | 21 +++++++--------------
- 3 files changed, 16 insertions(+), 23 deletions(-)
+ drivers/misc/seven_seg_disp.c | 12 +++++-----
+ drivers/misc/seven_seg_disp.h |  6 ++---
+ drivers/misc/seven_seg_gpio.c | 41 ++++++++++++++++++++---------------
+ 3 files changed, 32 insertions(+), 27 deletions(-)
 
 diff --git a/drivers/misc/seven_seg_disp.c b/drivers/misc/seven_seg_disp.c
 index eedcfed592f4..cc9704c45f15 100644
@@ -72,10 +73,10 @@ index 12a9505b2ac0..e6b2863d1a7b 100644
  void seven_seg_rem_cdev(struct seven_seg_disp_dev *disp_dev);
  
 diff --git a/drivers/misc/seven_seg_gpio.c b/drivers/misc/seven_seg_gpio.c
-index 4eed6579123e..af3a86421f8a 100644
+index 4eed6579123e..fcc1c08c733a 100644
 --- a/drivers/misc/seven_seg_gpio.c
 +++ b/drivers/misc/seven_seg_gpio.c
-@@ -29,12 +29,12 @@ struct gpio_pins {
+@@ -29,12 +29,13 @@ struct gpio_pins {
  };
  
  struct seven_seg_gpio_info {
@@ -84,6 +85,7 @@ index 4eed6579123e..af3a86421f8a 100644
  	u16 refresh_interval;
 -	struct gpio_pins pins[16];
 +	struct gpio_pins pins[8];
++	struct seven_seg_disp_dev *disp_dev;
  };
  
 -static void update_seven_seg_gpio_data(struct device *dev, u16 data)
@@ -91,7 +93,7 @@ index 4eed6579123e..af3a86421f8a 100644
  {
  	struct platform_device *pdev;
  	struct seven_seg_gpio_info *gpio_info;
-@@ -53,10 +53,7 @@ static void update_seven_seg_gpio_data(struct device *dev, u16 data)
+@@ -53,10 +54,7 @@ static void update_seven_seg_gpio_data(struct device *dev, u16 data)
  	}
  	gpio_info->curr_disp_value = data;
  
@@ -103,7 +105,7 @@ index 4eed6579123e..af3a86421f8a 100644
  	{
  		if (data & 0x01)
  			gpiod_set_value(gpio_info->pins[i].gpiod, 1);
-@@ -65,9 +62,6 @@ static void update_seven_seg_gpio_data(struct device *dev, u16 data)
+@@ -65,9 +63,6 @@ static void update_seven_seg_gpio_data(struct device *dev, u16 data)
  
  		data >>= 1;
  	}
@@ -113,7 +115,7 @@ index 4eed6579123e..af3a86421f8a 100644
  }
  
  
-@@ -105,10 +99,10 @@ static int seven_seg_gpio_probe(struct platform_device *pdev)
+@@ -105,10 +100,10 @@ static int seven_seg_gpio_probe(struct platform_device *pdev)
  
  	gpio_info->refresh_interval = result ? DEFAULT_REFRESH_INTERVAL_MS :interval;
  	pr_err("refresh_interval=%d\n",gpio_info->refresh_interval);
@@ -127,7 +129,7 @@ index 4eed6579123e..af3a86421f8a 100644
  		if (IS_ERR(gpiod))
  			return PTR_ERR(gpiod);
  		else
-@@ -116,7 +110,6 @@ static int seven_seg_gpio_probe(struct platform_device *pdev)
+@@ -116,7 +111,6 @@ static int seven_seg_gpio_probe(struct platform_device *pdev)
  			chip = gpiod_to_chip(gpiod);
  			gpio_info->pins[i].gpiod=gpiod;
  			gpio_info->pins[i].bit_offset = desc_to_gpio(gpiod)- chip->base;
@@ -135,6 +137,39 @@ index 4eed6579123e..af3a86421f8a 100644
  		}
  	}
  			
+@@ -125,17 +119,28 @@ static int seven_seg_gpio_probe(struct platform_device *pdev)
+ 	disp_dev = devm_kzalloc(dev, sizeof(struct seven_seg_disp_dev),GFP_KERNEL);
+ 	disp_dev->parent = *dev;
+ 	seven_seg_setup_cdev(disp_dev, &update_seven_seg_gpio_data);
+-	
++	gpio_info->disp_dev = disp_dev;
++
+ 	return 0;
+ }
+ 
+ static int seven_seg_gpio_remove(struct platform_device *pdev)
+ {
+-	struct seven_seg_disp_dev *disp_dev =
+-				container_of(&pdev->dev,
+-				struct seven_seg_disp_dev, parent);
++	struct seven_seg_gpio_info *gpio_info;
++	struct seven_seg_disp_dev *disp_dev;
++
++	gpio_info = platform_get_drvdata(pdev);
++	disp_dev = gpio_info->disp_dev;
++
+ 	seven_seg_rem_cdev(disp_dev);
++
++	/* Release gpio */
++	for (int i=0; i < 8; i++) {
++		gpiod_put(gpio_info->pins[i].gpiod);
++	}
++
+ 	platform_set_drvdata(pdev, NULL);
++
+ 	return 0;
+ }
+ 
 -- 
 2.34.1
 
