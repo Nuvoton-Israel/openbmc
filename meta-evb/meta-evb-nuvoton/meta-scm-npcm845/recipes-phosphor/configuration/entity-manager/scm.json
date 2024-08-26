@@ -127,7 +127,62 @@
                 }
             ],
             "Type": "TMP75"
-        }
+        },
+        {
+                "BMC_DEBUG_EN_N": {
+                    "PinType": "PIN_NONE"
+                },
+                "BMC_PWR_DEBUG_N": {
+                    "PinType": "PIN_NONE"
+                },
+                "BMC_RSMRST_B": {
+                    "PinType": "PIN_NONE"
+                },
+                "BMC_SYSPWROK": {
+                    "PinName": "FM_BMC_CPU_FBRK_OUT_R_N"
+                },
+                "BMC_XDP_PRST_IN": {
+                    "PinName": "DBP_PRESENT_IN_R2_N"
+                },
+                "BMC_PWRGD2": {
+                    "PinName": "S0_PWROK"
+                },
+                "BMC_PWRGD3": {
+                    "PinName": "PWRGD_CPU0_AUXPWRGD"
+                },
+		"BMC_PREQ_N":{
+                    "PinName": "DBP_ASD_BMC_PREQ_R_N"
+                },
+                "BMC_TCK_MUX_SEL" :{
+                    "PinType": "PIN_NONE"
+                },
+                "BMC_PRDY_N" :{
+                     "PinName": "DBP_ASD_BMC_PRDY_R_N"
+                },
+                "BMC_PLTRST_B":{
+                     "PinType": "PIN_NONE"
+                },
+                "BusConfig": [
+                    {
+                        "BusNum": 0,
+                        "BusType": "BUS_CONFIG_I3C"
+                    },
+                    {
+                        "BusNum": 1,
+                        "BusType": "BUS_CONFIG_I3C"
+                    },
+                    {
+                        "BusNum": 2,
+                        "BusType": "BUS_CONFIG_I3C"
+                    },
+                    {
+                        "BusNum": 3,
+                        "BusType": "BUS_CONFIG_I3C"
+                    }
+                ],
+                "Name": "ASD",
+                "Type": "ASD"
+          }
     ],
     "Name": "Nuvoton",
     "Probe": "xyz.openbmc_project.FruDevice({'BOARD_PRODUCT_NAME': 'DCSCM-BMC'})",

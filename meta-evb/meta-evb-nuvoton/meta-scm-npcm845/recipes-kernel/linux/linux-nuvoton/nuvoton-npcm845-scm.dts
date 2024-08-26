@@ -454,7 +454,7 @@
 					"FM_CPU0_PKGID0","FM_CPU0_PKGID1","FM_CPU0_PKGID2","H_CPU0_MEMTRIP_LVC1_N","FM_CPU1_PKGID0","FM_CPU1_PKGID1","FM_CPU1_PKGID2","H_CPU1_MEMTRIP_LVC1_N",
 					"","","","","","","","",
 					"FM_BOARD_REV_ID0","FM_BOARD_REV_ID1","FM_BOARD_REV_ID2","FM_BOARD_SKU_ID0","FM_BOARD_SKU_ID1","FM_BOARD_SKU_ID2","FM_BOARD_SKU_ID3","FM_BOARD_SKU_ID4",
-					"FM_BOARD_SKU_ID5","FM_VAL_DBG_JUMPER_EN","FM_SERIAL_BOOT","","PWRGD_S0_PWROK_CPU0","","","",
+					"FM_BOARD_SKU_ID5","FM_VAL_DBG_JUMPER_EN","FM_SERIAL_BOOT","","S0_PWROK","","","",
 					"","","","FM_1200VA_OC","","","","",
 					"","","","","","","","",
 					"","","","","","","","",
@@ -557,39 +557,94 @@
 				&pin215_slew
 				&pin216_slew
 				&pin217_slew
-				&pin250_slew>;
-
+				&pin250_slew
+				&gpio93_pins
+				&gpio61_pins
+				&gpio101_pins
+				&gpio202_pins
+				&gpio65_pins
+				&gpio76_pins
+				&gpio77_pins
+				&gpio72_pins
+				&gpio73_pins
+				&gpio17_pins
+				&gpio27_pins
+				&gpio142_pins
+				&gpio143_pins>;
+		gpio0: gpio@f0010000{
+			/* SIO_POWER_GOOD=gpio17 */
+			interrupt-controller;
+			#interrupt-cells = <2>;
+			gpio-line-names =
+			/*0-31*/
+			"","","","","","","","",
+			"","","","","","","","",
+			"","SIO_POWER_GOOD","","","","","","SIO_S5",
+			"","","","","","","","";
+		};
+		gpio1: gpio@f0011000 {
+			/* FM_BMC_CPU_FBRK_OUT_R_N=gpio61 */
+			interrupt-controller;
+			#interrupt-cells = <2>;
+			gpio-line-names =
+			/*32-63*/
+			"","","","","","","","",
+			"","","","","","","","",
+			"","","","","","","","",
+			"","","","","","FM_BMC_CPU_FBRK_OUT_R_N","","";
+		};
 		gpio2: gpio@f0012000 {
-			/* P3V_BAT_EN=gpio83 */
+			/* NMI_BUTTON=gpio65 RESET_BUTTON=gpio72
+			RESET_OUT=gpio73  POWER_BUTTON=gpio76 POWER_OUT=gpio77
+			P3V_BAT_EN=gpio83 PWRGD_CPU0_AUXPWRGD=gpio93*/
 			interrupt-controller;
 			#interrupt-cells = <2>;
 			gpio-line-names =
 			/*64-95*/
-			"","","","","","","","",
-			"","","","","","","","",
+			"","NMI_BUTTON","","","","","","",
+			"RESET_BUTTON","RESET_OUT","","","POWER_BUTTON","POWER_OUT","","",
 			"","","","P3V_BAT_EN","","","","",
-			"","","","","","","","";
+			"","","","","","PWRGD_CPU0_AUXPWRGD","","";
 		};
 
 		gpio3: gpio@f0013000 {
-			/* NMI_BUTTON=gpio96 */
+			/* DBP_PRESENT_IN_R2_N=gpio101 */
 			interrupt-controller;
 			#interrupt-cells = <2>;
 			gpio-line-names =
 			/*96-127*/
-			"NMI_BUTTON","","","","","","","",
+			"","","","","","DBP_PRESENT_IN_R2_N","","",
 			"","","","","","","","",
 			"","","DP_INTP_3V3_R","RST_DP_N","","","","",
 			"","","","","","","","";
 		};
+		gpio4: gpio@f0014000 {
+			/* DBP_ASD_BMC_PREQ_R_N=gpio142 gpio143=DBP_ASD_BMC_PRDY_R_N=gpio143 */
+			interrupt-controller;
+			#interrupt-cells = <2>;
+			gpio-line-names =
+			/*128-159*/
+			"","","","","","","","",
+			"","","","","","","DBP_ASD_BMC_PREQ_R_N","DBP_ASD_BMC_PRDY_R_N",
+			"","","","","","","","",
+			"","","","","","","","";
+		};
 		gpio5: gpio@f0015000 {
-			/* POWER_OUT=gpio190 */
 			gpio-line-names =
 			/*160-191*/
 			"","","","","","","","",
 			"","","","","","","","",
 			"","","","","","","","",
-			"","","","","","","POWER_OUT","";
+			"","","","","","","","";
+		};
+		gpio6: gpio@f0016000{
+			/* ID_BUTTON=gpio202 */
+			gpio-line-names =
+			/*192-223*/
+			"","","","","","","","",
+			"","","ID_BUTTON","","","","","",
+			"","","","","","","","",
+			"","","","","","","","";
 		};
 		gpio7: gpio@f0017000 {
 			/* PS_PWROK=gpio233, RESET_BUTTON=gpio234, RESET_OUT=gpio235 */
@@ -600,7 +655,77 @@
 			"","","","","","","","",
 			"","","","","","","","";
 		};
-	};
+		gpio17_pins: gpio17-pins{
+			pins = "GPIO17/PSPI_DI/CP1_GPIO5";
+			bias-disable;
+			input-enable;
+		};
+		gpio27_pins: gpio27-pins{
+			pins = "GPIO27/SMB5_SCL";
+			bias-disable;
+			input-enable;
+		};
+		gpio61_pins: gpio61-pins {
+			pins = "GPIO61/SI1_nDTR_BOUT";
+			bias-disable;
+			output-low;
+		};
+		gpio62_pins: gpio62-pins{
+			pins = "GPIO62/SI1_nRTS/BU1_nRTS/CP_TDO_SWO/TP_TDO_SWO/CP_TP_TDO_SWO";
+			bias-disable;
+			input-enable;
+		};
+		gpio65_pins: gpio65-pins{
+			pins = "GPIO65/FANIN1";
+			bias-disable;
+			input-enable;
+		};
+		gpio72_pins: gpio72-pins{
+			pins = "GPIO72/FANIN8";
+			bias-disable;
+			input-enable;
+		};
+		gpio73_pins: gpio73-pins{
+			pins = "GPIO73/FANIN9";
+			bias-disable;
+			output-high;
+		};
+		gpio76_pins: gpio76-pins{
+			pins = "GPIO76/FANIN12";
+			bias-disable;
+			input-enable;
+		};
+		gpio77_pins: gpio77-pins{
+			pins = "GPIO77/FANIN13";
+			bias-disable;
+			output-high;
+		};
+		gpio93_pins: gpio93-pins {
+			pins = "GPIO93/GA20/SMB5D_SCL";
+			bias-disable;
+			input-enable;
+		};
+		gpio101_pins: gpio101-pins {
+			pins = "GPIO101/CP1_GPIO2/BU5_RXD/TP_GPIO2";
+			bias-disable;
+			input-enable;
+		};
+		gpio142_pins: gpio142-pins{
+			pins = "GPIO142/SMB7D_SCL/TPSMB1_SCL";
+			bias-disable;
+			output-high;
+		};
+		gpio143_pins: gpio143-pins{
+			pins = "GPIO143/SMB7D_SDA/TPSMB1_SDA";
+			bias-disable;
+			output-high;
+		};
+		gpio202_pins: gpio202-pins{
+			pins = "GPIO202/SMB0C_SDA/FM0_CSI";
+			bias-disable;
+			input-enable;
+		};
+	};	
 };
 
 &rstc {
