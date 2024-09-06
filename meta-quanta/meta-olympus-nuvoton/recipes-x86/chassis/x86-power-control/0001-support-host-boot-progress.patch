@@ -1,18 +1,28 @@
-From 76c9ebf21cf7dcff80d62b3f3673bcd49f37da72 Mon Sep 17 00:00:00 2001
-From: Joseph Liu <kwliu@nuvoton.com>
-Date: Mon, 11 Jan 2021 18:24:09 +0800
+From 688be8265da0f7d25557cf972190e300a58b94f8 Mon Sep 17 00:00:00 2001
+From: Eason Yang <yhyang2@nuvoton.com>
+Date: Fri, 6 Sep 2024 11:54:46 +0800
 Subject: [PATCH] support host boot progress
 
 Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+
+Signed-off-by: Eason Yang <yhyang2@nuvoton.com>
 ---
- src/power_control.cpp | 95 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 95 insertions(+)
+ src/power_control.cpp | 96 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 96 insertions(+)
 
 diff --git a/src/power_control.cpp b/src/power_control.cpp
-index bba7088..1fdcf66 100644
+index c73810c..d90e6c4 100644
 --- a/src/power_control.cpp
 +++ b/src/power_control.cpp
-@@ -112,6 +112,7 @@ static std::string buttonDbusName = "xyz.openbmc_project.Chassis.Buttons";
+@@ -33,6 +33,7 @@
+ #include <optional>
+ #include <regex>
+ #include <string_view>
++#include <iostream>
+ 
+ namespace power_control
+ {
+@@ -117,6 +118,7 @@ static std::string buttonDbusName = "xyz.openbmc_project.Chassis.Buttons";
  static std::string nmiDbusName = "xyz.openbmc_project.Control.Host.NMI";
  static std::string rstCauseDbusName =
      "xyz.openbmc_project.Control.Host.RestartCause";
@@ -20,7 +30,7 @@ index bba7088..1fdcf66 100644
  static std::shared_ptr<sdbusplus::asio::dbus_interface> hostIface;
  static std::shared_ptr<sdbusplus::asio::dbus_interface> chassisIface;
  #ifdef CHASSIS_SYSTEM_RESET
-@@ -259,6 +260,16 @@ static void setOperatingSystemState(const OperatingSystemStateStage stage)
+@@ -264,6 +266,16 @@ static void setOperatingSystemState(const OperatingSystemStateStage stage)
                getOperatingSystemStateStage(stage));
  }
  
@@ -37,7 +47,7 @@ index bba7088..1fdcf66 100644
  enum class PowerState
  {
      on,
-@@ -506,6 +517,40 @@ static uint64_t getCurrentTimeMs()
+@@ -511,6 +523,40 @@ static uint64_t getCurrentTimeMs()
      return currentTimeMs;
  }
  
@@ -65,7 +75,8 @@ index bba7088..1fdcf66 100644
 +            return "xyz.openbmc_project.State.Boot.Progress.ProgressStages.Unspecified";
 +            break;
 +    }
-+};
++}
++
 +static void setBootProgress(const BootProgressStage stage)
 +{
 +    bootIface->set_property("BootProgress",
@@ -74,11 +85,10 @@ index bba7088..1fdcf66 100644
 +            << std::string(getBootProgressStage(stage)) << "\" stage.\n";
 +}
 +
-+
  static constexpr std::string_view getHostState(const PowerState state)
  {
      switch (state)
-@@ -1583,6 +1628,11 @@ static void currentHostStateMonitor()
+@@ -1589,6 +1635,11 @@ static void currentHostStateMonitor()
      else
      {
          pohCounterTimer.cancel();
@@ -90,16 +100,16 @@ index bba7088..1fdcf66 100644
          // Set the restart cause set for this restart
          setRestartCause();
      }
-@@ -1645,6 +1695,8 @@ static void currentHostStateMonitor()
-             // if HostState is trurned to OFF.
-             setOperatingSystemState(OperatingSystemStateStage::Inactive);
+@@ -1652,6 +1703,8 @@ static void currentHostStateMonitor()
+                 // if HostState is trurned to OFF.
+                 setOperatingSystemState(OperatingSystemStateStage::Inactive);
  
-+            setBootProgress(BootProgressStage::Unspecified);
++		setBootProgress(BootProgressStage::Unspecified);
 +
-             // Set the restart cause set for this restart
-             setRestartCause();
+                 // Set the restart cause set for this restart
+                 setRestartCause();
  #ifdef USE_ACBOOT
-@@ -2283,11 +2335,13 @@ static void postCompleteHandler(bool state)
+@@ -2305,11 +2358,13 @@ static void postCompleteHandler(bool state)
      {
          sendPowerControlEvent(Event::postCompleteAssert);
          setOperatingSystemState(OperatingSystemStateStage::Standby);
@@ -113,7 +123,7 @@ index bba7088..1fdcf66 100644
      }
  }
  
-@@ -2933,6 +2987,47 @@ int main(int argc, char* argv[])
+@@ -3002,6 +3057,47 @@ int main(int argc, char* argv[])
      lg2::info("Initializing power state.");
      logStateTransition(powerState);
  
