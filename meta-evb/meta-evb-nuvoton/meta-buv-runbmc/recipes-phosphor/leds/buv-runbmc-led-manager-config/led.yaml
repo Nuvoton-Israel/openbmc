@@ -3,19 +3,26 @@ BmcBooted:
         Action: 'Blink'
         DutyOn: 50
         Period: 1000
+        Priority: 'Blink'
+
 PowerOn:
     identify:
         Action: 'On'
         DutyOn: 50
         Period: 0
+        Priority: 'On'
+
 EnclosureFault:
     identify:
         Action: 'On'
         DutyOn: 50
         Period: 0
+        Priority: 'On'
+
 EnclosureIdentify:
     identify:
         Action: 'Blink'
         DutyOn: 50
         Period: 1000
+        Priority: 'On'
 
