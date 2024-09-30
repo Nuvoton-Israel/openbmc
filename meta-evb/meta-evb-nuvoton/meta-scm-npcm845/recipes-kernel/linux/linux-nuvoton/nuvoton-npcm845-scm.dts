@@ -647,11 +647,11 @@
 			"","","","","","","","";
 		};
 		gpio7: gpio@f0017000 {
-			/* PS_PWROK=gpio233, RESET_BUTTON=gpio234, RESET_OUT=gpio235 */
+			/* PS_PWROK=gpio233 */
 			gpio-line-names =
 			/*224-255*/
 			"","","","","","","","",
-			"","PS_PWROK","RESET_BUTTON","RESET_OUT","","","","",
+			"","PS_PWROK","","","","","","",
 			"","","","","","","","",
 			"","","","","","","","";
 		};
@@ -768,6 +768,11 @@
 &i2c4 {
 	status = "okay";
 
+	eeprom@50 {
+		compatible = "atmel,24c04";
+		reg = <0x50>;
+	};
+
 	eeprom@52 {
 		compatible = "atmel,24c04";
 		reg = <0x52>;
@@ -776,6 +781,107 @@
 
 &i2c6 {
 	status = "okay";
+
+	scm_ocp_12aux@39{
+		compatible = "adi,adm1293";
+		reg = <0x39>;
+	};
+
+	cpu0_norvr@31{
+		compatible = "adi,adm1293";
+		reg = <0x31>;
+	};
+
+	cpu0_souvr@32{
+		compatible = "adi,adm1293";
+		reg = <0x32>;
+	};
+
+	cpu0_vnnehv@33{
+		compatible = "adi,adm1293";
+		reg = <0x33>;
+	};
+
+	cpu1_norvr@35{
+		compatible = "adi,adm1293";
+		reg = <0x35>;
+	};
+
+	cpu1_souvr@36{
+		compatible = "adi,adm1293";
+		reg = <0x36>;
+	};
+
+	cpu1_vnnehv@37{
+		compatible = "adi,adm1293";
+		reg = <0x37>;
+	};
+
+	pcie12v@3a{
+		compatible = "adi,adm1293";
+		reg = <0x3a>;
+	};
+
+	pcie3_3v@3b{
+		compatible = "adi,adm1293";
+		reg = <0x3b>;
+	};
+
+	sys_fanse_12v@43{
+		compatible = "ti,ina219";
+		reg = <0x43>;
+	};
+
+	sys_fansw_12v@42{
+		compatible = "ti,ina219";
+		reg = <0x42>;
+	};
+
+	hsbp12v@40{
+		compatible = "ti,ina219";
+		reg = <0x40>;
+	};
+
+	cpu0_pvccin@60{
+		compatible = "isil,raa229004";
+		reg = <0x60>;
+	};
+
+	cpu0_pvccinfaon@62{
+		compatible = "isil,isl69260";
+		reg = <0x62>;
+	};
+
+	cpu0_pvccd@72{
+		compatible = "isil,isl69260";
+		reg = <0x72>;
+	};
+
+	cpu0_pvnn@75{
+		compatible = "isil,isl69260";
+		reg = <0x75>;
+	};
+
+	cpu1_pvccin@61{
+		compatible = "isil,raa229004";
+		reg = <0x61>;
+	};
+
+	cpu1_pvccinfaon@63{
+		compatible = "isil,isl69260";
+		reg = <0x63>;
+	};
+
+	cpu1_pvccd@74{
+		compatible = "isil,isl69260";
+		reg = <0x74>;
+	};
+
+	cpu1_pvnn@76{
+		compatible = "isil,isl69260";
+		reg = <0x76>;
+	};
+
 };
 
 &i2c7 {
@@ -785,10 +891,62 @@
 		compatible = "ti,tmp75";
 		reg = <0x4b>;
 	};
+
+	tmp75@48 {
+		compatible = "ti,tmp75";
+		reg = <0x48>;
+	};
+
+	tmp75@49 {
+		compatible = "ti,tmp75";
+		reg = <0x49>;
+	};
+
+	tmp75@4a {
+		compatible = "ti,tmp75";
+		reg = <0x4a>;
+	};
+
+	tmp75@4c {
+		compatible = "ti,tmp75";
+		reg = <0x4c>;
+	};
+
+	tmp75@4d {
+		compatible = "ti,tmp75";
+		reg = <0x4d>;
+	};
+
+	tmp75@4e {
+		compatible = "ti,tmp75";
+		reg = <0x4e>;
+	};
+
+	tmp75@4f {
+		compatible = "ti,tmp75";
+		reg = <0x4f>;
+	};
+
+	max31790@2c{
+		compatible = "max31790";
+		reg = <0x2c>;
+	};
+
+	max31790@2f{
+		compatible = "max31790";
+		reg = <0x2f>;
+	};
+
 };
 
 &i2c8 {
 	status = "okay";
+
+	psu@58 {
+		compatible = "pmbus";
+		reg = <0x58>;
+	};
+
 };
 
 &i2c10 {

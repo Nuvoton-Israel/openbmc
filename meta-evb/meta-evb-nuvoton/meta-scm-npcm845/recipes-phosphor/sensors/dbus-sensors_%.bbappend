@@ -16,6 +16,7 @@ PACKAGECONFIG = "\
     nvmesensor \
     dimmsensor \
     mcutempsensor \
+	intelcpusensor \
     "
 
 PACKAGECONFIG[dimmsensor] = "-Ddimm=enabled, -Ddimm=disabled"
