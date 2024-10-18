@@ -12,7 +12,7 @@ IGPS_BRANCH ?= "main"
 SRC_URI = " \
     git://github.com/Nuvoton-Israel/igps-npcm8xx;branch=${IGPS_BRANCH};protocol=https \
 "
-SRCREV = "c36a02060f9f1cdb1382629bd1f54e43676bdebb"
+SRCREV = "4d04003852fa4e970bf96bd697dbe78f0832667a"
 
 S = "${WORKDIR}/git"
 
