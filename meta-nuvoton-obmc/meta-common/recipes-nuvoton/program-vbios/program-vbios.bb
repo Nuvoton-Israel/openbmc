@@ -17,6 +17,9 @@ SRC_URI += " file://program-vbios.service \
              file://dontload.conf \
            "
 
+S = "${WORKDIR}/sources"
+UNPACKDIR = "${S}"
+
 SYSTEMD_PACKAGES = "${PN}"
 SYSTEMD_SERVICE:${PN} = "program-vbios.service"
 SYSTEMD_ENVIRONMENT_FILE:${PN} +="obmc/vbios/program_vbios"

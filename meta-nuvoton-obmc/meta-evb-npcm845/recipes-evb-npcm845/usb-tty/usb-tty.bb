@@ -9,6 +9,9 @@ RDEPENDS:${PN} += "bash"
 SRC_URI += "file://usb_tty.sh \
            file://usb_tty.service"
 
+S = "${WORKDIR}/sources"
+UNPACKDIR = "${S}"
+
 do_install() {
     install -d ${D}/${sbindir}
     install -m 0755 ${UNPACKDIR}/usb_tty.sh ${D}/${sbindir}

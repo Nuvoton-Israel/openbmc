@@ -9,6 +9,9 @@ RDEPENDS:${PN} += "bash"
 SRC_URI += "file://usb_loopback.sh \
            file://usb_loopback.service"
 
+S = "${WORKDIR}/sources"
+UNPACKDIR = "${S}"
+
 do_install() {
     install -d ${D}/${sbindir}
     install -m 0755 ${UNPACKDIR}/usb_loopback.sh ${D}/${sbindir}

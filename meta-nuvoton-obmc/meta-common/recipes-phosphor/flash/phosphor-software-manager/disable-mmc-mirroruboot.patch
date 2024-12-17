@@ -1,10 +1,18 @@
+From e5fc2cf05370a58e003a18db1348a065ff1cbb93 Mon Sep 17 00:00:00 2001
+From: Brian Ma <chma0@nuvoton.com>
+Date: Tue, 17 Dec 2024 09:19:15 +0800
+Subject: [PATCH] disable mmc mirroruboot
+
 Upstream-Status: Inappropriate [oe-specific]
+---
+ obmc-flash-bmc | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/obmc-flash-bmc b/obmc-flash-bmc
-index 032096a..187f231 100644
+index 5e4c1e2..e51a589 100644
 --- a/obmc-flash-bmc
 +++ b/obmc-flash-bmc
-@@ -647,6 +647,7 @@ function mmc_setprimary() {
+@@ -650,6 +650,7 @@ function mmc_setprimary() {
  }
  
  function mmc_mirroruboot() {
@@ -12,3 +20,6 @@ index 032096a..187f231 100644
      # Get current boot device; 0-primary_bootdev device; 1 - alt_bootdev
      bootdev=$(cat /sys/kernel/debug/aspeed/sbc/abr_image)
      if [[ "${bootdev}" == "0" ]]; then
+-- 
+2.34.1
+

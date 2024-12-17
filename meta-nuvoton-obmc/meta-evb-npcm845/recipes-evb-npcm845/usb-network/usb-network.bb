@@ -10,6 +10,9 @@ SRC_URI += "file://usb_network.sh \
            file://usb_network.service \
            file://00-bmc-usb0.network"
 
+S = "${WORKDIR}/sources"
+UNPACKDIR = "${S}"
+
 do_install() {
     install -d ${D}/${sbindir}
     install -m 0755 ${UNPACKDIR}/usb_network.sh ${D}/${sbindir}
