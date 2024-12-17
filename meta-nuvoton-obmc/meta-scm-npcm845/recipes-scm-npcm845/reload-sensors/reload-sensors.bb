@@ -13,6 +13,9 @@ SRC_URI = " file://reload-sensors.sh \
             file://reload-sensors.service \
           "
 
+S = "${WORKDIR}/sources"
+UNPACKDIR = "${S}"
+
 do_install() {
     install -d ${D}${bindir}
     install -m 0755 ${UNPACKDIR}/reload-sensors.sh ${D}${bindir}/

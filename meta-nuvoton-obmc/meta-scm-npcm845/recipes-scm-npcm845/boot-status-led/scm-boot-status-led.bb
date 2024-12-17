@@ -1,4 +1,4 @@
-SUMMARY = "OpenBMC Quanta Boot Status LED Service"
+SUMMARY = "OpenBMC Boot Status LED Service"
 DESCRIPTION = "OpenBMC Quanta Boot Status LED Daemon."
 PR = "r1"
 LICENSE = "Apache-2.0"
@@ -12,6 +12,9 @@ RDEPENDS:${PN} += "bash"
 SRC_URI = " file://boot-status-led.sh \
             file://boot-status-led.service \
           "
+
+S = "${WORKDIR}/sources"
+UNPACKDIR = "${S}"
 
 do_install() {
     install -d ${D}${bindir}

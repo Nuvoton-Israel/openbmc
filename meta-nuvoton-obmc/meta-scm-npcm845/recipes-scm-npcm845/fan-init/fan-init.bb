@@ -6,12 +6,14 @@ SRC_URI:append:= " file://fan_init.service"
 
 FILES:${PN} = " ${bindir}/fan_init.sh"
 
+S = "${WORKDIR}/sources"
+UNPACKDIR = "${S}"
+
 DEPENDS += "systemd"
 RDEPENDS:${PN} += "bash"
 
 SYSTEMD_PACKAGES = "${PN}"
 SYSTEMD_SERVICE:${PN} = " fan_init.service"
-
 
 do_install() {
     install -d ${D}/${bindir}

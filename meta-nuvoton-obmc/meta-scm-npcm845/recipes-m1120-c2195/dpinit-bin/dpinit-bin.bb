@@ -14,6 +14,10 @@ INSANE_SKIP:${PN}:append = " already-stripped"
 SRC_URI = "file://dpinit \
            file://dpinit.service \
           "
+
+S = "${WORKDIR}/sources"
+UNPACKDIR = "${S}"
+
 SYSTEMD_SERVICE:${PN} = "dpinit.service"
 
 do_install() {

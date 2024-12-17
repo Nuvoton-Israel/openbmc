@@ -17,6 +17,9 @@ SRC_URI += " file://bios-verify.sh \
              file://config-bios.json \
            "
 
+S = "${WORKDIR}/sources"
+UNPACKDIR = "${S}"
+
 FILES:${PN} += "${datadir}/phosphor-ipmi-flash/config-bios.json"
 
 do_install() {

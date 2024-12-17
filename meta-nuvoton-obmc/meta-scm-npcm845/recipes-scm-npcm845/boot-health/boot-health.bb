@@ -9,6 +9,9 @@ SRC_URI = "file://scm-boot-health.service file://scm-warm-reset-sel.service"
 SYSTEMD_PACKAGES = "${PN}"
 SYSTEMD_SERVICE:${PN} = "scm-boot-health.service scm-warm-reset-sel.service"
 
+S = "${WORKDIR}/sources"
+UNPACKDIR = "${S}"
+
 do_install() {
     install -D -m 0644 ${UNPACKDIR}/scm-boot-health.service \
         ${D}${systemd_unitdir}/system/scm-boot-health.service

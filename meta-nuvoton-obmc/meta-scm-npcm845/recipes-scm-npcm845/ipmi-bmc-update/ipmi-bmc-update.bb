@@ -10,6 +10,9 @@ SRC_URI = "file://bmc-verify.sh \
            file://config-bmc.json \
           "
 
+S = "${WORKDIR}/sources"
+UNPACKDIR = "${S}"
+
 FILES:${PN} += "${datadir}/phosphor-ipmi-flash/config-bmc.json"
 
 DEPENDS += "systemd"

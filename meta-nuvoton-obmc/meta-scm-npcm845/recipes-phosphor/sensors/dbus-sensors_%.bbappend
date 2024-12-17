@@ -14,7 +14,6 @@ PACKAGECONFIG = "\
     adcsensor \
     intrusionsensor \
     nvmesensor \
-    dimmsensor \
     mcutempsensor \
 	intelcpusensor \
     "
