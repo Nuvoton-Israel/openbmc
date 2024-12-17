@@ -31,6 +31,6 @@ SYSTEMD_ENVIRONMENT_FILE:${PN} += " \
 
 do_install:append() {
         install -d ${D}${bindir}
-        install -m 0755 ${WORKDIR}/start_hwmon.sh ${D}${bindir}
+        install -m 0755 ${UNPACKDIR}/start_hwmon.sh ${D}${bindir}
 }
 
