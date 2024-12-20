@@ -61,8 +61,16 @@ RDEPENDS:${PN}-system:append = " \
 RDEPENDS:${PN}-system:append = " \
         ${@entity_enabled(d, 'phosphor-power-monitor-em', 'phosphor-power-monitor')} \
         "
+
+KDUMP_PACKAGES = " \
+  kexec-tools \
+  vmcore-dmesg \
+  kdump \
+  makedumpfile \
+  "
+
 RDEPENDS:${PN}-system:append = " \
-    ${@distro_enabled(d, 'kdump', 'kexec-tools vmcore-dmesg kdump makedumpfile')}"
+  ${@bb.utils.contains('DISTRO_FEATURES', 'kdump', '${KDUMP_PACKAGES}', '', d)}"
 
 
 SUMMARY:${PN}-entity = "BUV RunBMC entity"

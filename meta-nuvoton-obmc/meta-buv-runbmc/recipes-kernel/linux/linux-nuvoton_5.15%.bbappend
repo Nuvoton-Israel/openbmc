@@ -12,4 +12,4 @@ SRC_URI:append:buv-runbmc = " \
   "
 
 SRC_URI:append:buv-runbmc = " \
-  ${@distro_enabled(d, 'kdump', 'file://kdump.cfg')}"
+  ${@bb.utils.contains('DISTRO_FEATURES', 'kdump', 'file://kdump.cfg', '', d)}"
