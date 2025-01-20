@@ -1,4 +1,4 @@
-From 0ae6399847a0245d3b97cf776fc03757f5996cd9 Mon Sep 17 00:00:00 2001
+From abbe9e4ec63ecaee724241c58712abc18ab34ca0 Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Mon, 9 Sep 2024 11:12:35 +0800
 Subject: [PATCH] uboot: add espi master emulator
@@ -6,12 +6,11 @@ Subject: [PATCH] uboot: add espi master emulator
 Signed-off-by: Stanley Chu <yschu@nuvoton.com>
 Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
 ---
- arch/arm/dts/nuvoton-npcm845-evb.dts     |    4 +
- arch/arm/dts/nuvoton-npcm845-pincfg.dtsi |   45 +
- cmd/Kconfig                              |    5 +
- cmd/Makefile                             |    1 +
- cmd/espi.c                               | 1531 ++++++++++++++++++++++
- 5 files changed, 1586 insertions(+)
+ arch/arm/dts/nuvoton-npcm845-evb.dts |    4 +
+ cmd/Kconfig                          |    5 +
+ cmd/Makefile                         |    1 +
+ cmd/espi.c                           | 1649 ++++++++++++++++++++++++++
+ 4 files changed, 1659 insertions(+)
  create mode 100644 cmd/espi.c
 
 diff --git a/arch/arm/dts/nuvoton-npcm845-evb.dts b/arch/arm/dts/nuvoton-npcm845-evb.dts
@@ -29,61 +28,6 @@ index 3007d04267..5640554df3 100644
  &pinctrl {
          pinctrl-names = "default";
          pinctrl-0 = <
-diff --git a/arch/arm/dts/nuvoton-npcm845-pincfg.dtsi b/arch/arm/dts/nuvoton-npcm845-pincfg.dtsi
-index 65de96b1f5..c7f8bf68ef 100644
---- a/arch/arm/dts/nuvoton-npcm845-pincfg.dtsi
-+++ b/arch/arm/dts/nuvoton-npcm845-pincfg.dtsi
-@@ -2003,5 +2003,50 @@
- 			bias-disable;
- 			output-high;
- 		};
-+		gpio235o_pins: gpio235o-pins {
-+			pins = "GPIO235/PWM11/SMB20_SDA";
-+			bias-disable;
-+			output-high;
-+		};
-+		gpio240o_pins: gpio240o-pins {
-+			pins = "GPIO240/I3C0_SCL";
-+			bias-disable;
-+			output-high;
-+		};
-+		gpio241o_pins: gpio241o-pins {
-+			pins = "GPIO241/I3C0_SDA";
-+			bias-disable;
-+			output-high;
-+		};
-+		gpio242o_pins: gpio242o-pins {
-+			pins = "GPIO242/I3C1_SCL";
-+			bias-disable;
-+			output-high;
-+		};
-+		gpio243o_pins: gpio243o-pins {
-+			pins = "GPIO243/I3C1_SDA";
-+			bias-disable;
-+			output-high;
-+		};
-+		gpio244o_pins: gpio244o-pins {
-+			pins = "GPIO244/I3C2_SCL";
-+			bias-disable;
-+			output-high;
-+		};
-+		gpio245o_pins: gpio245o-pins {
-+			pins = "GPIO245/I3C2_SDA";
-+			bias-disable;
-+			output-high;
-+		};
-+		gpio246o_pins: gpio246o-pins {
-+			pins = "GPIO246/I3C3_SCL";
-+			bias-disable;
-+			output-high;
-+		};
-+		gpio247o_pins: gpio247o-pins {
-+			pins = "GPIO247/I3C3_SDA";
-+			bias-disable;
-+			output-high;
-+		};
- 	};
- };
 diff --git a/cmd/Kconfig b/cmd/Kconfig
 index d7d4e37b5e..61da330132 100644
 --- a/cmd/Kconfig
@@ -114,10 +58,10 @@ index afb8c5f61c..6a6b0cf9b8 100644
  obj-$(CONFIG_CMD_EXT2) += ext2.o
 diff --git a/cmd/espi.c b/cmd/espi.c
 new file mode 100644
-index 0000000000..e0ff9b1522
+index 0000000000..0c6cd64900
 --- /dev/null
 +++ b/cmd/espi.c
-@@ -0,0 +1,1531 @@
+@@ -0,0 +1,1649 @@
 +#include <stdlib.h>
 +#include <command.h>
 +#include <common.h>
@@ -129,7 +73,8 @@ index 0000000000..e0ff9b1522
 +#include <linux/delay.h>
 +#include <linux/bitfield.h>
 +#include <u-boot/crc.h>
-+
++#include <console.h>
++#include <display_options.h>
 +
 +/* SIO base address */
 +#define SIO_IDX		0x4e
@@ -170,6 +115,8 @@ index 0000000000..e0ff9b1522
 +#define	CMD_PUT_FLASH_NP 0x0A
 +#define	CMD_GET_FLASH_C	0xB
 +#define CYCLE_FLASH_READ	0x00
++#define CYCLE_FLASH_WRITE	0x01
++#define CYCLE_FLASH_ERASE	0x02
 +
 +// Peripheral Channel Commands
 +#define CMD_PUT_PC		0x00
@@ -342,7 +289,7 @@ index 0000000000..e0ff9b1522
 +	u8 addr_23_16;
 +	u8 addr_15_8;
 +	u8 addr_7_0;
-+	u8 crc;
++	u8 data[FLASH_R_LENGTH + 1]; // FLASH_R_LENGTH bytes data + 1 byte crc
 +} __attribute__((__packed__));
 +
 +
@@ -488,7 +435,7 @@ index 0000000000..e0ff9b1522
 +	espi_recv_byte_single(); // read crc
 +}
 +
-+static u16 respi_read_response(u8 *resp, int len)
++static u16 espi_read_response(u8 *resp, int len)
 +{
 +	u16 status = STATUS_OK;
 +	int i;
@@ -539,7 +486,7 @@ index 0000000000..e0ff9b1522
 +
 +	espi_send((u8 *)&req, sizeof(req));
 +	espi_tar();
-+	respi_read_response((u8 *)&resp, sizeof(resp));
++	espi_read_response((u8 *)&resp, sizeof(resp));
 +	espi_port_set(eSPI_nCS);
 +
 +	debug("resp.code 0x%x\n", resp.code);
@@ -551,12 +498,11 @@ index 0000000000..e0ff9b1522
 +}
 +
 +
-+static u8 espi_get_flash_c(int len, u32 dest)
++static int espi_get_flash_c(int len, u32 dest)
 +{
 +	struct get_flash_c_req req = {0};
 +	struct  get_flash_c_resp resp = {0};
-+	u8 *addr = (u8 *)dest;
-+	int ret;
++	u8 *addr = (u8 *)(uintptr_t)dest;
 +	u16 status;
 +
 +	req.cmd = CMD_GET_FLASH_C;
@@ -569,7 +515,7 @@ index 0000000000..e0ff9b1522
 +	espi_port_update(eSPI_IO0, eSPI_nCS | eSPI_CLK);
 +	espi_send((u8 *)&req, sizeof(req));
 +	espi_tar();
-+	status = respi_read_response((u8 *)&resp, sizeof(resp) - (FLASH_R_LENGTH - len));
++	status = espi_read_response((u8 *)&resp, sizeof(resp) - (FLASH_R_LENGTH - len));
 +	espi_port_set(eSPI_nCS);
 +
 +	debug("resp.code 0x%x\n", resp.code);
@@ -579,8 +525,8 @@ index 0000000000..e0ff9b1522
 +
 +	if (resp.cycle_type == 0xf) {
 +		memcpy(addr, resp.data, len);
-+	} else {
-+		printf("flash cycle type error\n");
++	} else if (resp.cycle_type != 6){
++		printf("flash cycle type error (type=%d)\n", resp.cycle_type);
 +		return STATUS_ERR;
 +	}
 +
@@ -592,22 +538,47 @@ index 0000000000..e0ff9b1522
 +	return STATUS_OK;
 +}
 +
-+static int espi_put_flash_np(u32 addr, int count)
++static int espi_put_flash_np(u8 type, u32 addr, int len, u32 data_addr)
 +{
 +	struct put_flash_np req;
 +	struct espi_common_resp resp;
-+	u8 tag = 0;
++	u8 tag = 0, crc;
 +	u16 status;
++	int loop = 1000000;
++	int req_len;
++	u8 *data = (u8 *)(uintptr_t)data_addr;
++
++	do {
++		status = espi_get_status();
++		if (status & BIT(9)) {
++			break;
++		}
++
++		if (loop-- == 0) {
++			printf("wait for FLASH_NP_FREE timeout\n");
++			return -ETIMEDOUT;
++		}
++		udelay(1);
++	} while (1);
 +
 +	req.cmd = CMD_PUT_FLASH_NP;
-+	req.cycle_type = CYCLE_FLASH_READ;
-+	req.tag_len_11_8 = (tag << 4) | ((count & 0xf00) >> 8);
-+	req.len_7_0 =  count & 0xff;
++	req.cycle_type = type;
++	req.tag_len_11_8 = (tag << 4) | ((len & 0xf00) >> 8);
++	req.len_7_0 =  len & 0xff;
 +	req.addr_7_0= addr & 0xff;
 +	req.addr_15_8 = (addr & 0x0000FF00) >> 8;
 +	req.addr_23_16 = (addr & 0x00FF0000) >> 16;
 +	req.addr_31_24 = (addr & 0xFF000000) >> 24;
-+	req.crc = crc8(0, (u8 *)&req, sizeof(req) - 1);
++	if (type == CYCLE_FLASH_READ || type == CYCLE_FLASH_ERASE) {
++		crc = crc8(0, (u8 *)&req, sizeof(req) - FLASH_R_LENGTH - 1);
++		req.data[0] = crc;
++		req_len = sizeof(req) - FLASH_R_LENGTH;
++	} else if (type == CYCLE_FLASH_WRITE) {
++		memcpy(req.data, data, len);
++		crc = crc8(0, (u8 *)&req, sizeof(req)  + len - FLASH_R_LENGTH - 1);
++		req.data[len] = crc;
++		req_len = sizeof(req) + len - FLASH_R_LENGTH;
++	}
 +
 +	debug("req.cmd 0x%x\n", req.cmd);
 +	debug("req.cycle_type 0x%x\n", req.cycle_type);
@@ -617,14 +588,14 @@ index 0000000000..e0ff9b1522
 +	debug("req.addr_15_8 0x%x\n", req.addr_15_8);
 +	debug("req.addr_23_16 0x%x\n", req.addr_23_16);
 +	debug("req.addr_31_24 0x%x\n", req.addr_31_24);
-+	debug("req.crc 0x%x\n", req.crc);
++	debug("req.crc 0x%x\n", crc);
 +
 +	//CS_low, CLK_low, IO0
 +	espi_port_update(eSPI_IO0, eSPI_nCS | eSPI_CLK);
 +
-+	espi_send((u8 *)&req, sizeof(req));
++	espi_send((u8 *)&req, req_len);
 +	espi_tar();
-+	status = respi_read_response((u8 *)&resp, sizeof(resp));
++	status = espi_read_response((u8 *)&resp, sizeof(resp));
 +	espi_port_set(eSPI_nCS);
 +
 +	debug("resp.code 0x%x\n", resp.code);
@@ -676,7 +647,8 @@ index 0000000000..e0ff9b1522
 +			printf("\nwait_for_flash_c_avail timeout\n");
 +			return -ETIMEDOUT;
 +		}
-+		udelay(100);
++		//udelay(100);
++		udelay(1);
 +	} while (1);
 +
 +	return -ETIMEDOUT;
@@ -684,9 +656,7 @@ index 0000000000..e0ff9b1522
 +
 +static int espi_flash_read(u32 addr, int count, u32 dest)
 +{
-+	u16 status;
-+	int i, index = 0, len, retry = 0;
-+
++	int i, index = 0, len;
 +	static ulong time_start;
 +
 +	time_start = get_timer(0);
@@ -703,25 +673,9 @@ index 0000000000..e0ff9b1522
 +			len = count % FLASH_R_LENGTH;
 +		else
 +			len = FLASH_R_LENGTH;
-+		
-+		if (espi_put_flash_np(addr + i * FLASH_R_LENGTH, len))
-+			return STATUS_ERR;
 +
-+/*
-+		while (retry < 3) {
-+			if (espi_put_flash_np(addr + i * FLASH_R_LENGTH, len))
-+				continue;
-+			else
-+				break;
-+			retry++;
-+		}
-+		if (retry == 3) {
-+			printf("espi_put_flash_np error\n");
++		if (espi_put_flash_np(CYCLE_FLASH_READ, addr + i * FLASH_R_LENGTH, len, 0))
 +			return STATUS_ERR;
-+		}
-+
-+		retry = 0;
-+*/
 +
 +		if (wait_alert())
 +			return STATUS_ERR;
@@ -732,15 +686,14 @@ index 0000000000..e0ff9b1522
 +		if (espi_get_flash_c(len, dest + i * FLASH_R_LENGTH))
 +			return STATUS_ERR;
 +
++		//status = espi_get_status();
++		//printf("status = 0x%x\n", status);
 +		putc('#');
-+
 +		if ((i % FLASH_R_LENGTH) == 0 && i > 0)
 +			puts("\n\t ");
 +
-+		udelay(20);
++		//udelay(20);
 +	}
-+
-+
 +	time_start = get_timer(time_start);
 +	if (time_start > 0) {
 +		puts("\n\t ");	/* Line up with "Loading: " */
@@ -752,6 +705,96 @@ index 0000000000..e0ff9b1522
 +	return STATUS_OK;
 +}
 +
++static int espi_flash_write(u32 addr, int count, u32 data_addr)
++{
++	int i, index = 0, len;
++	static ulong time_start;
++	//u32 *data = (u32 *)(uintptr_t)data_addr;
++
++	time_start = get_timer(0);
++
++	printf("Save mem address 0x%x to flash address 0x%x\n", data_addr, addr);
++	printf("Saving..\n");
++
++	index = count /FLASH_R_LENGTH;
++	if (count % FLASH_R_LENGTH)
++		index++;
++
++	for (i = 0; i < index; i ++) {
++		if ((i == index - 1) && (count % FLASH_R_LENGTH))
++			len = count % FLASH_R_LENGTH;
++		else
++			len = FLASH_R_LENGTH;
++
++		if (espi_put_flash_np(CYCLE_FLASH_WRITE, addr + i * FLASH_R_LENGTH, len, data_addr))
++			return STATUS_ERR;
++
++		if (wait_alert())
++			return STATUS_ERR;
++
++		if (wait_for_flash_c_avail())
++			return STATUS_ERR;
++
++		if (espi_get_flash_c(0, 0))
++			return STATUS_ERR;
++
++		data_addr += len;
++		putc('#');
++		if ((i % FLASH_R_LENGTH) == 0 && i > 0)
++			puts("\n\t ");
++	}
++	time_start = get_timer(time_start);
++	if (time_start > 0) {
++		puts("\n\t ");	/* Line up with "Loading: " */
++		print_size(count / time_start * 1000, "/s");
++	}
++
++	printf("\ndone\n");
++
++	return STATUS_OK;
++}
++
++static int espi_flash_erase(u32 addr)
++{
++	u16 status;
++	int loop = 1000000;
++
++	static ulong time_start;
++
++	time_start = get_timer(0);
++
++	printf("Erase address: 0x%x\n", addr);
++
++	time_start = get_timer(time_start);
++	do {
++		status = espi_get_status();
++		if (status & BIT(9)) {
++			break;
++		}
++
++		if (loop-- == 0) {
++			printf("\%s:wait for FLASH_NP_FREE timeout\n", __func__);
++			return -ETIMEDOUT;
++		}
++		udelay(1);
++	} while (1);
++
++	if (espi_put_flash_np(CYCLE_FLASH_ERASE, addr, 0, 0))
++		return STATUS_ERR;
++
++	if (wait_alert())
++		return STATUS_ERR;
++
++	if (wait_for_flash_c_avail())
++		return STATUS_ERR;
++
++	if (espi_get_flash_c(0, 0))
++		return STATUS_ERR;
++
++	printf("\ndone\n");
++
++	return STATUS_OK;
++}
 +
 +static int espi_get_configuration(u16 addr, u8 *in)
 +{
@@ -769,7 +812,7 @@ index 0000000000..e0ff9b1522
 +
 +	espi_send((u8 *)&req, sizeof(req));
 +	espi_tar();
-+	status = respi_read_response((u8 *)resp, sizeof(*resp));
++	status = espi_read_response((u8 *)resp, sizeof(*resp));
 +	espi_port_set(eSPI_nCS);
 +
 +	if (status) {
@@ -805,7 +848,7 @@ index 0000000000..e0ff9b1522
 +
 +	espi_send((u8 *)&req, sizeof(req));
 +	espi_tar();
-+	status = respi_read_response((u8 *)resp, sizeof(*resp));
++	status = espi_read_response((u8 *)resp, sizeof(*resp));
 +	espi_port_set(eSPI_nCS);
 +	if (status) {
 +		printf("%s: espi response error: code=0x%02x, status=0x%04x\n",
@@ -831,7 +874,7 @@ index 0000000000..e0ff9b1522
 +
 +	espi_send((u8 *)&req, sizeof(req));
 +	espi_tar();
-+	status = respi_read_response((u8 *)resp, sizeof(*resp));
++	status = espi_read_response((u8 *)resp, sizeof(*resp));
 +	espi_port_set(eSPI_nCS);
 +
 +	if (status) {
@@ -865,7 +908,7 @@ index 0000000000..e0ff9b1522
 +
 +	espi_send((u8 *)&req, sizeof(req));
 +	espi_tar();
-+	status = respi_read_response((u8 *)resp, sizeof(*resp));
++	status = espi_read_response((u8 *)resp, sizeof(*resp));
 +	espi_port_set(eSPI_nCS);
 +	if (status) {
 +		printf("%s: espi response error: code=0x%02x, status=0x%04x\n",
@@ -887,7 +930,7 @@ index 0000000000..e0ff9b1522
 +		printf("IO wr: addr(0x%x)=", addr);
 +		for (i = count - 1; i >= 0; i--)
 +			printf("%02x", data[i]);
-+		printf("\n"); 
++		printf("\n");
 +	}
 +
 +	req.cmd = CMD_PUT_IOWR_SHORT | ((count - 1) & 0x3);
@@ -902,7 +945,7 @@ index 0000000000..e0ff9b1522
 +
 +	espi_send((u8 *)&req, count + 4);
 +	espi_tar();
-+	status = respi_read_response((u8 *)resp, sizeof(*resp));
++	status = espi_read_response((u8 *)resp, sizeof(*resp));
 +	espi_port_set(eSPI_nCS);
 +	if (status) {
 +		printf("%s: espi response error: code=0x%02x, status=0x%04x\n",
@@ -929,7 +972,7 @@ index 0000000000..e0ff9b1522
 +
 +	espi_send((u8 *)&req, sizeof(req));
 +	espi_tar();
-+	status = respi_read_response((u8 *)resp, count + 4);
++	status = espi_read_response((u8 *)resp, count + 4);
 +	espi_port_set(eSPI_nCS);
 +
 +	if (status) {
@@ -1377,9 +1420,23 @@ index 0000000000..e0ff9b1522
 +		space = hextoul(argv[4], NULL);
 +		if (count < 1)
 +			return CMD_RET_USAGE;
-+		debug = true;
 +		espi_flash_read(addr, count, space);
-+		debug = false;
++	} else if (!strcmp(argv[1], "flash_write")) {
++		if (argc < 5)
++			return CMD_RET_USAGE;
++
++		addr = hextoul(argv[2], NULL);
++		count = hextoul(argv[3], NULL);
++		space = hextoul(argv[4], NULL);
++		if (count < 1)
++			return CMD_RET_USAGE;
++		espi_flash_write(addr, count, space);
++	} else if (!strcmp(argv[1], "flash_erase")) {
++		if (argc < 3)
++			return CMD_RET_USAGE;
++
++		addr = hextoul(argv[2], NULL);
++		espi_flash_erase(addr);
 +	}else {
 +		rc = CMD_RET_USAGE;
 +	}
@@ -1555,7 +1612,7 @@ index 0000000000..e0ff9b1522
 +	return 0;
 +}
 +
-+do_espi_uart_command(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
++static int do_espi_uart_command(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 +{
 +	int i;
 +	u8 resp[MAX_RESP_LEN];
@@ -1575,7 +1632,6 @@ index 0000000000..e0ff9b1522
 +	}
 +
 +	if (strcmp(argv[1], "manual") == 0) {
-+		char *endp;
 +		ulong addr;
 +		ulong len;
 +
@@ -1627,7 +1683,13 @@ index 0000000000..e0ff9b1522
 +	" flash_read - flash_read.\n"
 +	"  	<argument1> - flash offset\n"
 +	"  	<argument2> - data len (bytes)\n"
-+	"  	<argument3> - address\n"
++	"  	<argument3> - memory address to receive\n"
++	" flash_write - flash_write.\n"
++	"  	<argument1> - flash offset\n"
++	"  	<argument2> - data len (bytes)\n"
++	"  	<argument3> - memory address to write\n"
++	" flash_erase - erase flash 4KB.\n"
++	"  	<argument1> - flash offset\n"
 +);
 +
 +U_BOOT_CMD(
@@ -1650,5 +1712,5 @@ index 0000000000..e0ff9b1522
 +	"  	<argument2> - data len (bytes)\n"
 +);
 -- 
-2.43.0
+2.34.1
 
