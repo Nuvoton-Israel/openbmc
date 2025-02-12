@@ -1,0 +1,57 @@
+From 3d53bace5e0cedd4fc46a47c73c68ef9da1813e3 Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Thu, 13 Oct 2022 17:10:51 +0800
+Subject: [PATCH] i3c: master: svc: fix invalid IBI issue
+
+1. Cancel AUTOIBI when polling for IBIWON timeout
+2. Clear SLVSTART status to prevent invalid IBI event.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ drivers/i3c/master/svc-i3c-master.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/i3c/master/svc-i3c-master.c b/drivers/i3c/master/svc-i3c-master.c
+index 35c51ff28c10..d0808546dbc8 100644
+--- a/drivers/i3c/master/svc-i3c-master.c
++++ b/drivers/i3c/master/svc-i3c-master.c
+@@ -476,7 +476,8 @@ static void svc_i3c_master_ibi_work(struct work_struct *work)
+ 					 SVC_I3C_MSTATUS_IBIWON(val), 0, 1000);
+ 	if (ret) {
+ 		dev_err(master->dev, "Timeout when polling for IBIWON\n");
+-		svc_i3c_master_emit_stop(master);
++		/* Cancel AUTOIBI */
++		writel(0, master->regs + SVC_I3C_MCTRL);
+ 		svc_i3c_master_clear_merrwarn(master);
+ 		goto reenable_ibis;
+ 	}
+@@ -1358,8 +1359,14 @@ static int svc_i3c_master_xfer(struct svc_i3c_master *master,
+ 
+ 	writel(SVC_I3C_MINT_COMPLETE, master->regs + SVC_I3C_MSTATUS);
+ 
+-	if (!continued)
++	if (!continued) {
+ 		svc_i3c_master_emit_stop(master);
++		/*
++		 * Workaround: clear the invalid SlaveStart event under
++		 * bad signals condition.
++		 */
++		writel(SVC_I3C_MINT_SLVSTART, master->regs + SVC_I3C_MSTATUS);
++	}
+ 
+ 	return 0;
+ 
+@@ -1747,6 +1754,8 @@ static int svc_i3c_master_enable_ibi(struct i3c_dev_desc *dev)
+ 	}
+ 
+ 	master->enabled_events++;
++	/* Clear the interrupt status */
++	writel(SVC_I3C_MINT_SLVSTART, master->regs + SVC_I3C_MSTATUS);
+ 	svc_i3c_master_enable_interrupts(master, SVC_I3C_MINT_SLVSTART);
+ 
+ 	return i3c_master_enec_locked(m, dev->info.dyn_addr, I3C_CCC_EVENT_SIR);
+-- 
+2.43.0
+

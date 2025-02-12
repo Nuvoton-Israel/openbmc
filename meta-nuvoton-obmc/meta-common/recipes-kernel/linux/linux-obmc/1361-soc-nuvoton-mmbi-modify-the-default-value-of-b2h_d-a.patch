@@ -1,0 +1,30 @@
+From 98230e42cab0972b516e6b5fe11831805f35b054 Mon Sep 17 00:00:00 2001
+From: Ban Feng <kcfeng0@nuvoton.com>
+Date: Mon, 23 Sep 2024 10:59:13 +0800
+Subject: [PATCH 2/2] soc: nuvoton: mmbi: modify the default value of b2h_d and
+ h2b_d
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
+---
+ drivers/soc/nuvoton/npcm-espi-mmbi.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/soc/nuvoton/npcm-espi-mmbi.c b/drivers/soc/nuvoton/npcm-espi-mmbi.c
+index 46844ebe1050..733a71610cb0 100644
+--- a/drivers/soc/nuvoton/npcm-espi-mmbi.c
++++ b/drivers/soc/nuvoton/npcm-espi-mmbi.c
+@@ -922,8 +922,8 @@ static void mmbi_desc_init(struct npcm_mmbi_channel *channel,
+ 	ch_desc.nex_inst_base_addr = 0;
+ 	ch_desc.b2h_ba = sizeof(struct mmbi_cap_desc) + sizeof(struct host_rop);
+ 	ch_desc.h2b_ba = b2h_size + sizeof(struct host_rwp);
+-	ch_desc.b2h_d = (b2h_size - (sizeof(struct mmbi_cap_desc) + sizeof(struct host_rop))) / 16;
+-	ch_desc.h2b_d = (b2h_size - sizeof(struct host_rwp)) / 16; /* 32KB = 0x800 * 16 */
++	ch_desc.b2h_d = b2h_size / 16;
++	ch_desc.h2b_d = b2h_size / 16; /* 32KB = 0x800 * 16 */
+ 
+ 	ch_desc.buffer_type = 0x01; /* VMSCB */
+ 	ch_desc.bt_desc.host_rop_p = sizeof(struct mmbi_cap_desc);
+-- 
+2.43.0
+

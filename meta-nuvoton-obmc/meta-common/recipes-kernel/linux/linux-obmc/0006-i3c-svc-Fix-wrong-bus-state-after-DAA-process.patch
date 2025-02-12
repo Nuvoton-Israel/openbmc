@@ -1,0 +1,33 @@
+From af528e9715f11653062c593187cb6821e032c472 Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Wed, 15 Nov 2023 08:12:24 +0800
+Subject: [PATCH 06/16] i3c: svc: Fix wrong bus state after DAA process
+
+Send stop symbol to let bus back to idle state if no
+i3c devices attached during DAA.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ drivers/i3c/master/svc-i3c-master.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/i3c/master/svc-i3c-master.c b/drivers/i3c/master/svc-i3c-master.c
+index 5cf5ca2a854b..5cb327363fe8 100644
+--- a/drivers/i3c/master/svc-i3c-master.c
++++ b/drivers/i3c/master/svc-i3c-master.c
+@@ -987,8 +987,10 @@ static int svc_i3c_master_do_daa_locked(struct svc_i3c_master *master,
+ 				break;
+ 			} else if (SVC_I3C_MSTATUS_NACKED(reg)) {
+ 				/* No I3C devices attached */
+-				if (dev_nb == 0)
++				if (dev_nb == 0) {
++					svc_i3c_master_emit_stop(master);
+ 					break;
++				}
+ 
+ 				/*
+ 				 * A slave device nacked the address, this is
+-- 
+2.43.0
+

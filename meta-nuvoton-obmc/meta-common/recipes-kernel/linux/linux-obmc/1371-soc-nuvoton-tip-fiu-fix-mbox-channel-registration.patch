@@ -1,0 +1,29 @@
+From 3c736c220b5a52634fed6ad5717e970f76e3bff2 Mon Sep 17 00:00:00 2001
+From: Tomer Maimon <tmaimon77@gmail.com>
+Date: Thu, 22 Aug 2024 16:24:00 +0300
+Subject: [PATCH 2/2] soc: nuvoton: tip-fiu: fix mbox channel registration
+
+Return failure if the box channel registration fails.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Tomer Maimon <tmaimon77@gmail.com>
+---
+ drivers/soc/nuvoton/npcm_fiu_tip.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/soc/nuvoton/npcm_fiu_tip.c b/drivers/soc/nuvoton/npcm_fiu_tip.c
+index 51ff8432d06e..ce1bf7291bb5 100644
+--- a/drivers/soc/nuvoton/npcm_fiu_tip.c
++++ b/drivers/soc/nuvoton/npcm_fiu_tip.c
+@@ -325,7 +325,7 @@ static int npcm_fiu_tip_probe(struct platform_device *pdev)
+ 	head->chan = mbox_request_channel_byname(&head->cl, "fiu_tip");
+ 	if (IS_ERR(head->chan)) {
+ 		dev_err(dev, "mbox channel request failed\n");
+-		ret = PTR_ERR(head->chan);
++		return PTR_ERR(head->chan);
+ 	}
+ 
+ 	platform_set_drvdata(pdev, head);
+-- 
+2.43.0
+

@@ -1,0 +1,437 @@
+From b97be3505c172697e8a8034ac363e42496751659 Mon Sep 17 00:00:00 2001
+From: Tomer Maimon <tmaimon77@gmail.com>
+Date: Thu, 5 Dec 2024 17:00:10 +0200
+Subject: [PATCH 3/3] usb: chipidea: add SRAM allocation support
+
+Due to a sync issue when using the DDR for the QH and TD, this patch
+adds SRAM allocation support for the QH and TD.
+
+The QH and TD are defined in the device tree structure:
+- QH memory address should be aligned to 0x800
+  - UDC0-7 QH size is 0x180
+  - UDC8-9 QH size is 0x380
+
+- TD memory address should be aligned to 0x40.
+
+Until we receive direction from the maintainer on how to add the SRAM
+allocation support to the Chipidea support, the SRAM allocation support
+is enabled if the NPCM_CHIPIDEA_SRAM_ALLOC definition is defined in
+the ch.h file.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Tomer Maimon <tmaimon77@gmail.com>
+---
+ .../boot/dts/nuvoton/nuvoton-npcm845.dtsi     | 30 ++++--
+ drivers/usb/chipidea/ci.h                     | 23 ++++-
+ drivers/usb/chipidea/core.c                   | 21 ++++
+ drivers/usb/chipidea/udc.c                    | 95 ++++++++++++++++++-
+ 4 files changed, 157 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845.dtsi b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845.dtsi
+index 5918f9522319..60c8ec339a5d 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845.dtsi
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845.dtsi
+@@ -98,7 +98,8 @@ mc: memory-controller@f0824000 {
+ 		udc0:udc@f0830000 {
+ 			compatible = "nuvoton,npcm845-udc";
+ 			reg = <0x0 0xf0830000 0x0 0x1000
+-			       0x0 0xfffeb000 0x0 0x800>;
++			       0x0 0xfffe6000 0x0 0x180
++			       0x0 0xfffe6180 0x0 0xE80>;
+ 			interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clk NPCM8XX_CLK_SU>;
+ 			clock-names = "clk_usb_bridge";
+@@ -112,7 +113,8 @@ udc0:udc@f0830000 {
+ 		udc1:udc@f0831000 {
+ 			compatible = "nuvoton,npcm845-udc";
+ 			reg = <0x0 0xf0831000 0x0 0x1000
+-			       0x0 0xfffeb800 0x0 0x800>;
++			       0x0 0xfffe7000 0x0 0x180
++			       0x0 0xfffe7180 0x0 0xE80>;
+ 			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clk NPCM8XX_CLK_SU>;
+ 			clock-names = "clk_usb_bridge";
+@@ -126,7 +128,8 @@ udc1:udc@f0831000 {
+ 		udc2:udc@f0832000 {
+ 			compatible = "nuvoton,npcm845-udc";
+ 			reg = <0x0 0xf0832000 0x0 0x1000
+-			       0x0 0xfffec000 0x0 0x800>;
++			       0x0 0xfffe8000 0x0 0x180
++			       0x0 0xfffe8180 0x0 0xE80>;
+ 			interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clk NPCM8XX_CLK_SU>;
+ 			clock-names = "clk_usb_bridge";
+@@ -140,7 +143,8 @@ udc2:udc@f0832000 {
+ 		udc3:udc@f0833000 {
+ 			compatible = "nuvoton,npcm845-udc";
+ 			reg = <0x0 0xf0833000 0x0 0x1000
+-			       0x0 0xfffec800 0x0 0x800>;
++			       0x0 0xfffe9000 0x0 0x180
++			       0x0 0xfffe9180 0x0 0xE80>;
+ 			interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clk NPCM8XX_CLK_SU>;
+ 			clock-names = "clk_usb_bridge";
+@@ -154,7 +158,8 @@ udc3:udc@f0833000 {
+ 		udc4:udc@f0834000 {
+ 			compatible = "nuvoton,npcm845-udc";
+ 			reg = <0x0 0xf0834000 0x0 0x1000
+-			       0x0 0xfffed000 0x0 0x800>;
++			       0x0 0xfffea000 0x0 0x180
++			       0x0 0xfffea180 0x0 0xE80>;
+ 			interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clk NPCM8XX_CLK_SU>;
+ 			clock-names = "clk_usb_bridge";
+@@ -168,7 +173,8 @@ udc4:udc@f0834000 {
+ 		udc5:udc@f0835000 {
+ 			compatible = "nuvoton,npcm845-udc";
+ 			reg = <0x0 0xf0835000 0x0 0x1000
+-			       0x0 0xfffed800 0x0 0x800>;
++			       0x0 0xfffeb000 0x0 0x180
++			       0x0 0xfffeb180 0x0 0xE80>;
+ 			interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clk NPCM8XX_CLK_SU>;
+ 			clock-names = "clk_usb_bridge";
+@@ -182,7 +188,8 @@ udc5:udc@f0835000 {
+ 		udc6:udc@f0836000 {
+ 			compatible = "nuvoton,npcm845-udc";
+ 			reg = <0x0 0xf0836000 0x0 0x1000
+-			       0x0 0xfffee000 0x0 0x800>;
++			       0x0 0xfffec000 0x0 0x180
++			       0x0 0xfffec180 0x0 0xE80>;
+ 			interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clk NPCM8XX_CLK_SU>;
+ 			clock-names = "clk_usb_bridge";
+@@ -196,7 +203,8 @@ udc6:udc@f0836000 {
+ 		udc7:udc@f0837000 {
+ 			compatible = "nuvoton,npcm845-udc";
+ 			reg = <0x0 0xf0837000 0x0 0x1000
+-			       0x0 0xfffee800 0x0 0x800>;
++			       0x0 0xfffed000 0x0 0x180
++			       0x0 0xfffed180 0x0 0xE80>;
+ 			interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clk NPCM8XX_CLK_SU>;
+ 			clock-names = "clk_usb_bridge";
+@@ -210,7 +218,8 @@ udc7:udc@f0837000 {
+ 		udc8:udc@f0838000 {
+ 			compatible = "nuvoton,npcm845-udc";
+ 			reg = <0x0 0xf0838000 0x0 0x1000
+-			       0x0 0xfffef000 0x0 0x800>;
++			       0x0 0xfffee000 0x0 0x380
++			       0x0 0xfffee380 0x0 0xC80>;
+ 			interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clk NPCM8XX_CLK_SU>;
+ 			clock-names = "clk_usb_bridge";
+@@ -225,7 +234,8 @@ udc8:udc@f0838000 {
+ 		udc9:udc@f0839000 {
+ 			compatible = "nuvoton,npcm845-udc";
+ 			reg = <0x0 0xf0839000 0x0 0x1000
+-			       0x0 0xfffef800 0x0 0x800>;
++			       0x0 0xfffef000 0x0 0x380
++			       0x0 0xfffef380 0x0 0xC80>;
+ 			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clk NPCM8XX_CLK_SU>;
+ 			clock-names = "clk_usb_bridge";
+diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
+index 2a38e1eb6546..16ee22a8ead0 100644
+--- a/drivers/usb/chipidea/ci.h
++++ b/drivers/usb/chipidea/ci.h
+@@ -27,6 +27,7 @@
+ #define ENDPT_MAX          32
+ #define CI_MAX_BUF_SIZE	(TD_PAGE_COUNT * CI_HDRC_PAGE_SIZE)
+ 
++#define NPCM_CHIPIDEA_SRAM_ALLOC /* enable SRAM allocation use for qh and td */
+ /******************************************************************************
+  * REGISTERS
+  *****************************************************************************/
+@@ -101,7 +102,11 @@ struct ci_hw_ep {
+ 	/* global resources */
+ 	struct ci_hdrc				*ci;
+ 	spinlock_t				*lock;
++#ifdef NPCM_CHIPIDEA_SRAM_ALLOC
++	mempool_t				*td_pool;
++#else
+ 	struct dma_pool				*td_pool;
++#endif
+ 	struct td_node				*pending_td;
+ };
+ 
+@@ -229,9 +234,13 @@ struct ci_hdrc {
+ 	struct work_struct		work;
+ 	struct work_struct		power_lost_work;
+ 	struct workqueue_struct		*wq;
+-
++	
++#ifdef NPCM_CHIPIDEA_SRAM_ALLOC
++	mempool_t			*td_pool;
++#else
+ 	struct dma_pool			*qh_pool;
+ 	struct dma_pool			*td_pool;
++#endif
+ 
+ 	struct usb_gadget		gadget;
+ 	struct usb_gadget_driver	*driver;
+@@ -265,6 +274,18 @@ struct ci_hdrc {
+ 	bool				wakeup_int;
+ 	enum ci_revision		rev;
+ 	struct mutex                    mutex;
++
++#ifdef NPCM_CHIPIDEA_SRAM_ALLOC
++	resource_size_t 		td_start;
++	void __iomem			*td_baseram;
++	size_t 				td_blocksize;
++	int 				td_offset;
++
++	resource_size_t 		qh_start;
++	void __iomem			*qh_baseram;
++	size_t 				qh_blocksize;
++	int 				qh_offset;
++#endif
+ };
+ 
+ static inline struct ci_role_driver *ci_role(struct ci_hdrc *ci)
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index ca71df4f32e4..175cf003950a 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -1050,6 +1050,9 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 	void __iomem	*base;
+ 	int		ret;
+ 	enum usb_dr_mode dr_mode;
++#ifdef NPCM_CHIPIDEA_SRAM_ALLOC
++	void __iomem	*baseram;
++#endif
+ 
+ 	if (!dev_get_platdata(dev)) {
+ 		dev_err(dev, "platform data missing\n");
+@@ -1064,6 +1067,24 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 	if (!ci)
+ 		return -ENOMEM;
+ 
++#ifdef NPCM_CHIPIDEA_SRAM_ALLOC
++	/* alloc SRAM for QH */
++	baseram = devm_platform_get_and_ioremap_resource(pdev, 1, &res);
++	if (IS_ERR(baseram)) 
++		return PTR_ERR(baseram);
++	ci->qh_baseram = baseram;
++	ci->qh_start = res->start;
++	ci->qh_blocksize = res->end - res->start + 1;
++
++	/* alloc SRAM for TD */
++	baseram = devm_platform_get_and_ioremap_resource(pdev, 2, &res);
++	if (IS_ERR(baseram))
++		return PTR_ERR(baseram);
++	ci->td_baseram = baseram;
++	ci->td_start = res->start;
++	ci->td_blocksize = res->end - res->start + 1;
++#endif
++
+ 	spin_lock_init(&ci->lock);
+ 	mutex_init(&ci->mutex);
+ 	INIT_WORK(&ci->power_lost_work, ci_power_lost_work);
+diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+index f5bcf455a8ae..6c573d6262e3 100644
+--- a/drivers/usb/chipidea/udc.c
++++ b/drivers/usb/chipidea/udc.c
+@@ -9,7 +9,11 @@
+ 
+ #include <linux/delay.h>
+ #include <linux/device.h>
++#ifdef NPCM_CHIPIDEA_SRAM_ALLOC
++#include <linux/mempool.h>
++#else
+ #include <linux/dmapool.h>
++#endif
+ #include <linux/err.h>
+ #include <linux/irqreturn.h>
+ #include <linux/kernel.h>
+@@ -49,6 +53,50 @@ ctrl_endpt_in_desc = {
+ 	.wMaxPacketSize  = cpu_to_le16(CTRL_PAYLOAD_MAX),
+ };
+ 
++#ifdef NPCM_CHIPIDEA_SRAM_ALLOC
++static void *udc_alloc_sram_qh(struct ci_hdrc *ci, dma_addr_t *dma)
++{
++	void *ptr;
++
++	if ((ci->qh_offset + 64) > ci->qh_blocksize)
++		return NULL;
++
++	ptr = (void*)(ci->qh_baseram + ci->qh_offset);
++	*dma = (dma_addr_t)((void *)(ci->qh_start + ci->qh_offset));
++	ci->qh_offset += 64;
++
++	return ptr;
++}
++
++static void udc_free_sram_qh(struct ci_hdrc *ci)
++{
++	if (ci->qh_offset > 0)
++		ci->qh_offset = ci->qh_offset - 64;
++}
++
++static void *udc_alloc_sram_td(gfp_t gfp_mask, void *pool_data)
++{
++	struct ci_hdrc *ci = pool_data;
++	void *ptr;
++
++	if ((ci->td_offset + 64) > ci->td_blocksize)
++		return NULL;
++
++	ptr = (void*)(ci->td_baseram + ci->td_offset);
++	ci->td_offset += 64;
++
++	return ptr;
++}
++
++static void udc_free_sram_td(void *element, void *pool_data)
++{
++	struct ci_hdrc *ci = pool_data;
++
++	if (ci->td_offset)
++		ci->td_offset = ci->td_offset - 64;
++}
++#endif
++
+ static int reprime_dtd(struct ci_hdrc *ci, struct ci_hw_ep *hwep,
+ 		       struct td_node *node);
+ /**
+@@ -370,8 +418,12 @@ static int add_td_to_list(struct ci_hw_ep *hwep, struct ci_hw_req *hwreq,
+ 
+ 	if (node == NULL)
+ 		return -ENOMEM;
+-
++#ifdef NPCM_CHIPIDEA_SRAM_ALLOC
++	node->ptr = mempool_alloc(hwep->ci->td_pool, GFP_ATOMIC);
++	node->dma = (dma_addr_t)((void *)hwep->ci->td_start + ((void *)node->ptr - (void *)hwep->ci->td_baseram));
++#else
+ 	node->ptr = dma_pool_zalloc(hwep->td_pool, GFP_ATOMIC, &node->dma);
++#endif
+ 	if (node->ptr == NULL) {
+ 		kfree(node);
+ 		return -ENOMEM;
+@@ -652,7 +704,11 @@ static void free_pending_td(struct ci_hw_ep *hwep)
+ {
+ 	struct td_node *pending = hwep->pending_td;
+ 
++#ifdef NPCM_CHIPIDEA_SRAM_ALLOC
++	mempool_free(pending->ptr, hwep->ci->td_pool);
++#else
+ 	dma_pool_free(hwep->td_pool, pending->ptr, pending->dma);
++#endif
+ 	hwep->pending_td = NULL;
+ 	kfree(pending);
+ }
+@@ -770,7 +826,11 @@ __acquires(hwep->lock)
+ 						     struct ci_hw_req, queue);
+ 
+ 		list_for_each_entry_safe(node, tmpnode, &hwreq->tds, td) {
++#ifdef NPCM_CHIPIDEA_SRAM_ALLOC
++			mempool_free(node->ptr, hwep->ci->td_pool);
++#else
+ 			dma_pool_free(hwep->td_pool, node->ptr, node->dma);
++#endif
+ 			list_del_init(&node->td);
+ 			node->ptr = NULL;
+ 			kfree(node);
+@@ -1511,7 +1571,11 @@ static void ep_free_request(struct usb_ep *ep, struct usb_request *req)
+ 	spin_lock_irqsave(hwep->lock, flags);
+ 
+ 	list_for_each_entry_safe(node, tmpnode, &hwreq->tds, td) {
++#ifdef NPCM_CHIPIDEA_SRAM_ALLOC
++		mempool_free(node->ptr, hwep->td_pool);
++#else
+ 		dma_pool_free(hwep->td_pool, node->ptr, node->dma);
++#endif
+ 		list_del_init(&node->td);
+ 		node->ptr = NULL;
+ 		kfree(node);
+@@ -1569,7 +1633,11 @@ static int ep_dequeue(struct usb_ep *ep, struct usb_request *req)
+ 		hw_ep_flush(hwep->ci, hwep->num, hwep->dir);
+ 
+ 	list_for_each_entry_safe(node, tmpnode, &hwreq->tds, td) {
++#ifdef NPCM_CHIPIDEA_SRAM_ALLOC
++		mempool_free(node->ptr, hwep->td_pool);
++#else
+ 		dma_pool_free(hwep->td_pool, node->ptr, node->dma);
++#endif
+ 		list_del(&node->td);
+ 		kfree(node);
+ 	}
+@@ -1893,8 +1961,12 @@ static int init_eps(struct ci_hdrc *ci)
+ 			usb_ep_set_maxpacket_limit(&hwep->ep, (unsigned short)~0);
+ 
+ 			INIT_LIST_HEAD(&hwep->qh.queue);
++#ifdef NPCM_CHIPIDEA_SRAM_ALLOC
++			hwep->qh.ptr = (struct ci_hw_qh *)udc_alloc_sram_qh(ci, &hwep->qh.dma);
++#else
+ 			hwep->qh.ptr = dma_pool_zalloc(ci->qh_pool, GFP_KERNEL,
+ 						       &hwep->qh.dma);
++#endif
+ 			if (hwep->qh.ptr == NULL)
+ 				retval = -ENOMEM;
+ 
+@@ -1927,7 +1999,11 @@ static void destroy_eps(struct ci_hdrc *ci)
+ 
+ 		if (hwep->pending_td)
+ 			free_pending_td(hwep);
++#ifdef NPCM_CHIPIDEA_SRAM_ALLOC
++		udc_free_sram_qh(ci);
++#else
+ 		dma_pool_free(ci->qh_pool, hwep->qh.ptr, hwep->qh.dma);
++#endif
+ 	}
+ }
+ 
+@@ -2120,6 +2196,14 @@ static int udc_start(struct ci_hdrc *ci)
+ 	INIT_LIST_HEAD(&ci->gadget.ep_list);
+ 
+ 	/* alloc resources */
++#ifdef NPCM_CHIPIDEA_SRAM_ALLOC
++	ci->td_pool = mempool_create(ci->td_blocksize / 0x40, udc_alloc_sram_td,
++				     udc_free_sram_td, ci);
++	if (ci->td_pool == NULL) {
++		retval = -ENOMEM;
++		goto free_pools;
++	}
++#else
+ 	ci->qh_pool = dma_pool_create("ci_hw_qh", dev->parent,
+ 				       sizeof(struct ci_hw_qh),
+ 				       64, CI_HDRC_PAGE_SIZE);
+@@ -2133,6 +2217,7 @@ static int udc_start(struct ci_hdrc *ci)
+ 		retval = -ENOMEM;
+ 		goto free_qh_pool;
+ 	}
++#endif
+ 
+ 	retval = init_eps(ci);
+ 	if (retval)
+@@ -2149,9 +2234,13 @@ static int udc_start(struct ci_hdrc *ci)
+ destroy_eps:
+ 	destroy_eps(ci);
+ free_pools:
++#ifdef NPCM_CHIPIDEA_SRAM_ALLOC
++	mempool_destroy(ci->td_pool);
++#else
+ 	dma_pool_destroy(ci->td_pool);
+ free_qh_pool:
+ 	dma_pool_destroy(ci->qh_pool);
++#endif
+ 	return retval;
+ }
+ 
+@@ -2169,8 +2258,12 @@ void ci_hdrc_gadget_destroy(struct ci_hdrc *ci)
+ 
+ 	destroy_eps(ci);
+ 
++#ifdef NPCM_CHIPIDEA_SRAM_ALLOC
++	mempool_destroy(ci->td_pool);
++#else
+ 	dma_pool_destroy(ci->td_pool);
+ 	dma_pool_destroy(ci->qh_pool);
++#endif
+ }
+ 
+ static int udc_id_switch_for_device(struct ci_hdrc *ci)
+-- 
+2.43.0
+

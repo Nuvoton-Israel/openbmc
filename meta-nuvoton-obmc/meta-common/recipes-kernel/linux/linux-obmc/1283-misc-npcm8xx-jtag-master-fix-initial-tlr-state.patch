@@ -1,0 +1,47 @@
+From 64a8bf83e53740ab0c381b545d00b379cea4f011 Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Mon, 8 Jul 2024 09:21:06 +0800
+Subject: [PATCH 4/5] misc: npcm8xx-jtag-master: fix initial tlr state
+
+The first tlr state switching might not be performed.
+Always reset the state if the end state is tlr.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ drivers/misc/npcm8xx-jtag-master.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/misc/npcm8xx-jtag-master.c b/drivers/misc/npcm8xx-jtag-master.c
+index 4edffae8da1d..e1b2e867e550 100644
+--- a/drivers/misc/npcm8xx-jtag-master.c
++++ b/drivers/misc/npcm8xx-jtag-master.c
+@@ -484,6 +484,12 @@ static int jtag_set_tapstate(struct npcm_jtm *jtag,
+ 	u8 count;
+ 	int ret;
+ 
++	jtag->end_tms_high = false;
++	if (to == jtagtlr) {
++		jtag_reset_tapstate(jtag);
++		return 0;
++	}
++
+ 	if (from == JTAG_STATE_CURRENT)
+ 		from = jtag->tapstate;
+ 
+@@ -493,12 +499,6 @@ static int jtag_set_tapstate(struct npcm_jtm *jtag,
+ 	if (from > JTAG_STATE_CURRENT || to > JTAG_STATE_CURRENT)
+ 		return -1;
+ 
+-	jtag->end_tms_high = false;
+-	if (to == jtagtlr) {
+-		jtag_reset_tapstate(jtag);
+-		return 0;
+-	}
+-
+ 	tms[0] = tmscyclelookup[from][to].tmsbits;
+ 	count   = tmscyclelookup[from][to].count;
+ 
+-- 
+2.43.0
+

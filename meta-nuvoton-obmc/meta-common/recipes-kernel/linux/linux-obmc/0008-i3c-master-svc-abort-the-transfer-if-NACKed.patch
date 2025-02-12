@@ -1,0 +1,36 @@
+From 9cf7f110c4962d32da8905d2fa3ce6efe00e6230 Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Wed, 2 Nov 2022 11:18:45 +0800
+Subject: [PATCH 08/16] i3c: master: svc: abort the transfer if NACKed
+
+If NACK after emitting start/addr, abort the transfer.
+Otherwise, the subsequent process will waste time polling
+for nothing.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ drivers/i3c/master/svc-i3c-master.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/drivers/i3c/master/svc-i3c-master.c b/drivers/i3c/master/svc-i3c-master.c
+index 9c0b14b7e136..f026df0a5b92 100644
+--- a/drivers/i3c/master/svc-i3c-master.c
++++ b/drivers/i3c/master/svc-i3c-master.c
+@@ -1313,6 +1313,13 @@ static int svc_i3c_master_xfer(struct svc_i3c_master *master,
+ 		goto emit_stop;
+ 	}
+ 
++	reg = readl(master->regs + SVC_I3C_MSTATUS);
++	if (SVC_I3C_MSTATUS_NACKED(reg)) {
++		dev_dbg(master->dev, "addr 0x%x NACK\n", addr);
++		ret = -EIO;
++		goto emit_stop;
++	}
++
+ 	if (rnw)
+ 		ret = svc_i3c_master_read(master, in, xfer_len);
+ 	else
+-- 
+2.43.0
+

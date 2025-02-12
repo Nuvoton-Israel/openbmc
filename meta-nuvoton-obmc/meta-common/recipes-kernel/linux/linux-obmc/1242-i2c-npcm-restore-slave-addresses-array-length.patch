@@ -1,0 +1,45 @@
+From 6ab6fe55ad655b9c1ffb896a55a69f713d11da1e Mon Sep 17 00:00:00 2001
+From: Tyrone Ting <kfting@nuvoton.com>
+Date: Fri, 30 Aug 2024 11:46:34 +0800
+Subject: [PATCH 2/8] i2c: npcm: restore slave addresses array length
+
+The smatch check warning is "buffer overflow 'npcm_i2caddr' 2 <= 9".
+The original design supports 10 target addresses although only 2
+addresses are required for current implementation.
+
+Restore the npcm_i2caddr array length to fix the smatch warning.
+
+Upstream-Status: Backport [https://github.com/torvalds/linux/commit/8f65c4552d5d968572162bf1a65e53a80b72f937]
+
+Reported-by: Dan Carpenter <dan.carpenter@linaro.org>
+Closes: https://lore.kernel.org/r/202408130818.FgDP5uNm-lkp@intel.com/
+Signed-off-by: Tyrone Ting <kfting@nuvoton.com>
+Reviewed-by: Andi Shyti <andi.shyti@kernel.org>
+Signed-off-by: Andi Shyti <andi.shyti@kernel.org>
+---
+ drivers/i2c/busses/i2c-npcm7xx.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-npcm7xx.c b/drivers/i2c/busses/i2c-npcm7xx.c
+index a28699b680f7..83a7b7577dcc 100644
+--- a/drivers/i2c/busses/i2c-npcm7xx.c
++++ b/drivers/i2c/busses/i2c-npcm7xx.c
+@@ -136,11 +136,13 @@ enum i2c_addr {
+  * Since the addr regs are sprinkled all over the address space,
+  * use this array to get the address or each register.
+  */
+-#define I2C_NUM_OWN_ADDR 2
++#define I2C_NUM_OWN_ADDR 10
+ #define I2C_NUM_OWN_ADDR_SUPPORTED 2
+ 
+ static const int npcm_i2caddr[I2C_NUM_OWN_ADDR] = {
+-	NPCM_I2CADDR1, NPCM_I2CADDR2,
++	NPCM_I2CADDR1, NPCM_I2CADDR2, NPCM_I2CADDR3, NPCM_I2CADDR4,
++	NPCM_I2CADDR5, NPCM_I2CADDR6, NPCM_I2CADDR7, NPCM_I2CADDR8,
++	NPCM_I2CADDR9, NPCM_I2CADDR10,
+ };
+ #endif
+ 
+-- 
+2.43.0
+

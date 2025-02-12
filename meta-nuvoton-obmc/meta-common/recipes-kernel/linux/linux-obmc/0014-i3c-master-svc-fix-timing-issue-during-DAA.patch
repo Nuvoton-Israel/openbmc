@@ -1,0 +1,60 @@
+From abff1af0f167f2383fe12c3ea3985a92e0809c67 Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Tue, 11 Feb 2025 14:38:56 +0800
+Subject: [PATCH] i3c: master: svc: fix timing issue during DAA
+
+Set SKEW bit to 1 before initiating a DAA, set SKEW bit to 0
+after DAA is completed.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ drivers/i3c/master/svc-i3c-master.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/drivers/i3c/master/svc-i3c-master.c b/drivers/i3c/master/svc-i3c-master.c
+index 71c0873acb33..0d9828fae7af 100644
+--- a/drivers/i3c/master/svc-i3c-master.c
++++ b/drivers/i3c/master/svc-i3c-master.c
+@@ -33,6 +33,7 @@
+ #define   SVC_I3C_MCONFIG_ODBAUD(x) FIELD_PREP(GENMASK(23, 16), (x))
+ #define   SVC_I3C_MCONFIG_ODHPP(x) FIELD_PREP(BIT(24), (x))
+ #define   SVC_I3C_MCONFIG_SKEW(x) FIELD_PREP(GENMASK(27, 25), (x))
++#define   SVC_I3C_MCONFIG_SKEW_MASK GENMASK(27, 25)
+ #define   SVC_I3C_MCONFIG_I2CBAUD(x) FIELD_PREP(GENMASK(31, 28), (x))
+ 
+ #define SVC_I3C_MCTRL        0x084
+@@ -285,6 +286,15 @@ static bool svc_i3c_master_error(struct svc_i3c_master *master)
+ 	return false;
+ }
+ 
++static void svc_i3c_master_set_sda_skew(struct svc_i3c_master *master, int skew)
++{
++	u32 val;
++
++	val = readl(master->regs + SVC_I3C_MCONFIG) & ~SVC_I3C_MCONFIG_SKEW_MASK;
++	val |= SVC_I3C_MCONFIG_SKEW(skew);
++	writel(val, master->regs + SVC_I3C_MCONFIG);
++}
++
+ static void svc_i3c_master_enable_interrupts(struct svc_i3c_master *master, u32 mask)
+ {
+ 	writel(mask, master->regs + SVC_I3C_MINTSET);
+@@ -1112,7 +1122,14 @@ static int svc_i3c_master_do_daa(struct i3c_master_controller *m)
+ 	}
+ 
+ 	spin_lock_irqsave(&master->xferqueue.lock, flags);
++	/*
++	 * Fix SCL/SDA timing issue during DAA.
++	 * Set SKEW bit to 1 before initiating a DAA, set SKEW bit to 0
++	 * after DAA is completed.
++	 */
++	svc_i3c_master_set_sda_skew(master, 1);
+ 	ret = svc_i3c_master_do_daa_locked(master, addrs, &dev_nb);
++	svc_i3c_master_set_sda_skew(master, 0);
+ 	spin_unlock_irqrestore(&master->xferqueue.lock, flags);
+ 	if (ret) {
+ 		svc_i3c_master_emit_stop(master);
+-- 
+2.43.0
+

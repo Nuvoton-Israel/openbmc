@@ -1,0 +1,340 @@
+From 5c3824b53e9dcc7c41260e9f9e875a6142b08f66 Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Wed, 3 Apr 2024 15:28:03 +0800
+Subject: [PATCH 3/5] misc: npcm8xx-jtag-master: Meet requirements for AMD
+ remote debug
+
+Increase max transfer size and support running tcks
+in the JTAG_SIOCSTAT ioctl.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ drivers/misc/npcm8xx-jtag-master.c | 137 +++++++++++++++++------------
+ 1 file changed, 79 insertions(+), 58 deletions(-)
+
+diff --git a/drivers/misc/npcm8xx-jtag-master.c b/drivers/misc/npcm8xx-jtag-master.c
+index 432c68bced2d..4edffae8da1d 100644
+--- a/drivers/misc/npcm8xx-jtag-master.c
++++ b/drivers/misc/npcm8xx-jtag-master.c
+@@ -38,7 +38,7 @@
+ #define NPCM_JTM_DEFAULT_RATE	(1000000)
+ #define NPCM_JTM_FIFO_SIZE		128
+ #define NPCM_JTM_TIMEOUT_MS		10000
+-#define JTAG_MAX_XFER_DATA_LEN	65535
++#define JTAG_MAX_XFER_DATA_LEN		0xFFFFFFFF
+ #define JTAG_TLR_TMS_COUNT		9
+ 
+ struct tck_bitbang {
+@@ -96,7 +96,6 @@ enum jtag_reset {
+ enum jtag_xfer_type {
+ 	JTAG_SIR_XFER = 0,
+ 	JTAG_SDR_XFER = 1,
+-	JTAG_RUNTEST_XFER = 2,
+ };
+ 
+ enum jtag_xfer_direction {
+@@ -113,7 +112,6 @@ enum jtag_xfer_direction {
+ #define JTAG_GIOCSTATUS _IOWR(__JTAG_IOCTL_MAGIC, 4, enum jtagstates)
+ #define JTAG_SIOCMODE	_IOW(__JTAG_IOCTL_MAGIC, 5, unsigned int)
+ #define JTAG_IOCBITBANG	_IOW(__JTAG_IOCTL_MAGIC, 6, unsigned int)
+-#define JTAG_RUNTEST    _IOW(__JTAG_IOCTL_MAGIC, 7, unsigned int)
+ 
+ static DEFINE_IDA(jtag_ida);
+ static DEFINE_SPINLOCK(jtag_file_lock);
+@@ -430,10 +428,13 @@ static int npcm_jtm_shift(struct npcm_jtm *priv, char *jtm_tdo,
+ 	ret = wait_for_completion_timeout(&priv->xfer_done,
+ 					     msecs_to_jiffies
+ 					     (NPCM_JTM_TIMEOUT_MS));
+-	if (ret == 0)
++	if (ret == 0) {
++		dev_err(priv->dev, "%s: timeout, remaining tx %u rx %u\n",
++			__func__, priv->tx_len, priv->rx_len);
+ 		ret = -ETIMEDOUT;
+-	else
++	} else {
+ 		ret = 0;
++	}
+ 
+ 	/* disable module and interrupt */
+ 	val &= ~(JTM_CTL_JTM_EN | JTM_CTL_DONE_IE);
+@@ -449,25 +450,43 @@ static void npcm_jtm_reset_hw(struct npcm_jtm *priv)
+ 	reset_control_deassert(priv->reset);
+ }
+ 
+-static void npcm_jtm_set_baudrate(struct npcm_jtm *priv, unsigned int speed)
++static u32 npcm_jtm_set_baudrate(struct npcm_jtm *priv, unsigned int speed)
+ {
+ 	u32 ckdiv;
+ 	u32 regtemp;
++	u32 freq;
+ 
+-	ckdiv = DIV_ROUND_CLOSEST(clk_get_rate(priv->clk), (2 * speed)) - 1;
++	freq = clk_get_rate(priv->clk);
++	ckdiv = DIV_ROUND_CLOSEST(freq, (2 * speed)) - 1;
+ 
+ 	regtemp = readl(priv->base + JTM_CTL);
+ 	regtemp &= ~JTM_CTL_CKDV;
+ 	writel(regtemp | (ckdiv << 16), priv->base + JTM_CTL);
++
++	return (freq / ((ckdiv + 1) * 2));
++}
++
++static void jtag_reset_tapstate(struct npcm_jtm *jtag)
++{
++	u8 tms[2];
++
++	dev_dbg(jtag->miscdev.parent, "reset tapstate\n");
++	tms[0] = 0xff;
++	tms[1] = 0x01;
++	npcm_jtm_shift(jtag, NULL, NULL, tms, JTAG_TLR_TMS_COUNT);
++	jtag->tapstate = jtagtlr;
+ }
+ 
+ static int jtag_set_tapstate(struct npcm_jtm *jtag,
+ 				     enum jtagstates from, enum jtagstates to)
+ {
+-	u8 tdo[2], tdi[2], tms[2];
++	u8 tms[2];
+ 	u8 count;
+ 	int ret;
+ 
++	if (from == JTAG_STATE_CURRENT)
++		from = jtag->tapstate;
++
+ 	if (from == to || to == JTAG_STATE_CURRENT)
+ 		return 0;
+ 
+@@ -476,25 +495,17 @@ static int jtag_set_tapstate(struct npcm_jtm *jtag,
+ 
+ 	jtag->end_tms_high = false;
+ 	if (to == jtagtlr) {
+-		tms[0] = 0xff;
+-		tms[1] = 0x01;
+-		tdo[0] = tdo[1] = 0;
+-		ret = npcm_jtm_shift(jtag, tdo, tdi, tms, JTAG_TLR_TMS_COUNT);
+-		jtag->tapstate = jtagtlr;
+-		return ret;
++		jtag_reset_tapstate(jtag);
++		return 0;
+ 	}
+ 
+-	if (from == JTAG_STATE_CURRENT)
+-		from = jtag->tapstate;
+-
+ 	tms[0] = tmscyclelookup[from][to].tmsbits;
+ 	count   = tmscyclelookup[from][to].count;
+ 
+ 	if (count == 0)
+ 		return 0;
+ 
+-	tdo[0] = 0;
+-	ret = npcm_jtm_shift(jtag, tdo, tdi, tms, count);
++	ret = npcm_jtm_shift(jtag, NULL, NULL, tms, count);
+ 	pr_debug("jtag: change state %d -> %d\n", from, to);
+ 	jtag->tapstate = to;
+ 
+@@ -531,18 +542,14 @@ static int jtag_transfer(struct npcm_jtm *jtag,
+ 	if (xfer->length == 0)
+ 		return 0;
+ 
+-	if (xfer->type != JTAG_RUNTEST_XFER) {
+-		jtm_tdi = kzalloc(bytes, GFP_KERNEL);
+-		if (!jtm_tdi)
+-			return -ENOMEM;
+-	}
++	jtm_tdi = kzalloc(bytes, GFP_KERNEL);
++	if (!jtm_tdi)
++		return -ENOMEM;
+ 
+ 	if (xfer->type == JTAG_SIR_XFER)
+ 		jtag_set_tapstate(jtag, xfer->from, jtagshfir);
+ 	else if (xfer->type == JTAG_SDR_XFER)
+ 		jtag_set_tapstate(jtag, xfer->from, jtagshfdr);
+-	else if (xfer->type == JTAG_RUNTEST_XFER)
+-		jtag_set_tapstate(jtag, xfer->from, jtagrti);
+ 
+ 	/* SIR/SDR: the last bit should be shifted with TMS high */
+ 	if ((xfer->type == JTAG_SIR_XFER && xfer->endstate != jtagshfir) ||
+@@ -556,29 +563,23 @@ static int jtag_transfer(struct npcm_jtm *jtag,
+ 	ret = npcm_jtm_shift(jtag, jtm_tdo, jtm_tdi, NULL, xfer->length);
+ 	jtag_set_tapstate(jtag, JTAG_STATE_CURRENT, xfer->endstate);
+ 
+-	if (xfer->type != JTAG_RUNTEST_XFER) {
+-		if (jtm_tdo && !ret)
+-			memcpy(jtm_tdo, jtm_tdi, bytes);
+-		kfree(jtm_tdi);
+-	}
++	if (jtm_tdo && !ret)
++		memcpy(jtm_tdo, jtm_tdi, bytes);
++	kfree(jtm_tdi);
+ 
+ 	return ret;
+ }
+ 
+-/* Run in rti state for specific number of tcks */
+-static int jtag_runtest(struct npcm_jtm *jtag, unsigned int tcks)
++/* Run in specified state for a specfied number of tcks */
++static int jtag_run_state(struct npcm_jtm *jtag, enum jtagstates run_state,
++			  unsigned int tcks)
+ {
+-	struct jtag_xfer xfer;
+-	u32 bytes = DIV_ROUND_UP(tcks, BITS_PER_BYTE);
+ 	int ret;
+ 
+-	xfer.type = JTAG_RUNTEST_XFER;
+-	xfer.direction = JTAG_WRITE_XFER;
+-	xfer.from = JTAG_STATE_CURRENT;
+-	xfer.endstate = jtagrti;
+-	xfer.length = tcks;
+-
+-	ret = jtag_transfer(jtag, &xfer, NULL, bytes);
++	dev_dbg(jtag->miscdev.parent, "run test: tcks %u\n", tcks);
++	jtag_set_tapstate(jtag, JTAG_STATE_CURRENT, run_state);
++	jtag->end_tms_high = false;
++	ret = npcm_jtm_shift(jtag, NULL, NULL, NULL, tcks);
+ 
+ 	return ret;
+ }
+@@ -591,7 +592,7 @@ static long jtag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 	struct bitbang_packet bitbang;
+ 	struct tck_bitbang *bitbang_data;
+ 	u8 *xfer_data;
+-	u32 data_size;
++	u32 data_size, print_size;
+ 	u32 value;
+ 	int ret = 0;
+ 
+@@ -600,14 +601,17 @@ static long jtag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		if (get_user(value, (__u32 __user *)arg))
+ 			return -EFAULT;
+ 		if (value <= NPCM_JTM_MAX_RATE) {
+-			priv->freq = value;
+-			npcm_jtm_set_baudrate(priv, priv->freq);
++			priv->freq = npcm_jtm_set_baudrate(priv, value);
++			dev_dbg(priv->miscdev.parent, "JTAG_SIOCFREQ: freq %u",
++				priv->freq);
+ 		} else {
+ 			dev_err(priv->dev, "invalid jtag freq %u\n", value);
+ 			ret = -EINVAL;
+ 		}
+ 		break;
+ 	case JTAG_GIOCFREQ:
++		dev_dbg(priv->miscdev.parent, "JTAG_GIOCFREQ: freq %u",
++			priv->freq);
+ 		if (put_user(priv->freq, (__u32 __user *)arg))
+ 			return -EFAULT;
+ 		break;
+@@ -625,6 +629,8 @@ static long jtag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		if (IS_ERR(bitbang_data))
+ 			return -EFAULT;
+ 
++		dev_dbg(priv->miscdev.parent, "JTAG_IOCBITBANG: len %u",
++			bitbang.length);
+ 		ret = jtag_bitbangs(priv, &bitbang, bitbang_data);
+ 		if (ret) {
+ 			kfree(bitbang_data);
+@@ -649,17 +655,30 @@ static long jtag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 
+ 		if (tapstate.reset > JTAG_FORCE_RESET)
+ 			return -EINVAL;
++
++		dev_dbg(priv->miscdev.parent,
++			"JTAG_SIOCSTATE(curr %d): from %d to %d reset %d tck %d",
++			priv->tapstate,
++			tapstate.from, tapstate.endstate,
++			tapstate.reset, tapstate.tck);
+ 		if (tapstate.reset == JTAG_FORCE_RESET)
+-			jtag_set_tapstate(priv, JTAG_STATE_CURRENT,
+-						  jtagtlr);
++			jtag_reset_tapstate(priv);
+ 		jtag_set_tapstate(priv, tapstate.from,
+ 					  tapstate.endstate);
++		if (tapstate.endstate == JTAG_STATE_CURRENT)
++			tapstate.endstate = priv->tapstate;
++		if (tapstate.tck && (tapstate.endstate == jtagtlr ||
++		    tapstate.endstate == jtagrti ||
++		    tapstate.endstate == jtagpaudr ||
++		    tapstate.endstate == jtagpauir))
++			jtag_run_state(priv, tapstate.endstate, tapstate.tck);
+ 		break;
+ 	case JTAG_GIOCSTATUS:
++		dev_dbg(priv->miscdev.parent, "JTAG_GIOCSTATUS: state %d",
++			priv->tapstate);
+ 		ret = put_user(priv->tapstate, (__u32 __user *)arg);
+ 		break;
+ 	case JTAG_IOCXFER:
+-
+ 		if (copy_from_user(&xfer, (const void __user *)arg,
+ 			sizeof(struct jtag_xfer)))
+ 			return -EFAULT;
+@@ -679,16 +698,27 @@ static long jtag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		if (xfer.endstate > JTAG_STATE_CURRENT)
+ 			return -EINVAL;
+ 
++		dev_dbg(priv->miscdev.parent,
++			"JTAG_IOCXFER: type %s, dir %d, state %d to %d, padding %d, len 0x%x\n",
++			xfer.type ? "DR" : "IR", xfer.direction,
++			xfer.from, xfer.endstate, xfer.padding, xfer.length);
++
+ 		data_size = DIV_ROUND_UP(xfer.length, BITS_PER_BYTE);
+ 		xfer_data = memdup_user((void __user *)xfer.tdio, data_size);
+ 		if (IS_ERR(xfer_data))
+ 			return -EFAULT;
+ 
++		print_size = data_size > 128 ? 128 : data_size;
++		print_hex_dump_debug("I:", DUMP_PREFIX_NONE, 16, 1, xfer_data,
++				     print_size, false);
+ 		ret = jtag_transfer(priv, &xfer, xfer_data, data_size);
+ 		if (ret) {
+ 			kfree(xfer_data);
+ 			return -EIO;
+ 		}
++
++		print_hex_dump_debug("O:", DUMP_PREFIX_NONE, 16, 1, xfer_data,
++				     print_size, false);
+ 		ret = copy_to_user((void __user *)xfer.tdio,
+ 				   (void *)xfer_data, data_size);
+ 		kfree(xfer_data);
+@@ -701,9 +731,6 @@ static long jtag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		break;
+ 	case JTAG_SIOCMODE:
+ 		break;
+-	case JTAG_RUNTEST:
+-		ret = jtag_runtest(priv, (unsigned int)arg);
+-		break;
+ 	default:
+ 		return -EINVAL;
+ 	}
+@@ -727,8 +754,6 @@ static int jtag_open(struct inode *inode, struct file *file)
+ 	file->private_data = jtag;
+ 	spin_unlock(&jtag_file_lock);
+ 
+-	jtag_set_tapstate(jtag, JTAG_STATE_CURRENT, jtagtlr);
+-
+ 	return 0;
+ }
+ 
+@@ -790,7 +815,6 @@ static int jtag_register_device(struct npcm_jtm *jtag)
+ static int npcm_jtm_probe(struct platform_device *pdev)
+ {
+ 	struct npcm_jtm *priv;
+-	unsigned long clk_hz;
+ 	u32 val;
+ 	int irq;
+ 	int ret;
+@@ -843,10 +867,7 @@ static int npcm_jtm_probe(struct platform_device *pdev)
+ 
+ 	init_completion(&priv->xfer_done);
+ 
+-	clk_hz = clk_get_rate(priv->clk);
+-
+-	priv->freq = NPCM_JTM_DEFAULT_RATE;
+-	npcm_jtm_set_baudrate(priv, NPCM_JTM_DEFAULT_RATE);
++	priv->freq = npcm_jtm_set_baudrate(priv, NPCM_JTM_DEFAULT_RATE);
+ 
+ 	/* Deassert TRST for normal operation */
+ 	val = readl(priv->base + JTM_CTL);
+-- 
+2.43.0
+

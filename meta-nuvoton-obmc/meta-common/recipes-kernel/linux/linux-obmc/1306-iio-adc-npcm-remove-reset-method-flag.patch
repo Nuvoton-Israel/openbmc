@@ -1,0 +1,41 @@
+From c535a0b495894cde6289372a13db90eaff61e102 Mon Sep 17 00:00:00 2001
+From: Jim Liu <JJLIU0@nuvoton.com>
+Date: Thu, 9 Jan 2025 13:29:49 +0800
+Subject: [PATCH 2/2] iio: adc: npcm: remove reset method flag
+
+Remove the flag to allow the method to work on both NPCM7xx and NPCM8xx.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Jim Liu <JJLIU0@nuvoton.com>
+---
+ drivers/iio/adc/npcm_adc.c | 14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/iio/adc/npcm_adc.c b/drivers/iio/adc/npcm_adc.c
+index 8ce5d85e2327..d0807957e8ce 100644
+--- a/drivers/iio/adc/npcm_adc.c
++++ b/drivers/iio/adc/npcm_adc.c
+@@ -440,14 +440,12 @@ static int npcm_adc_probe(struct platform_device *pdev)
+ 		goto err_disable_clk;
+ 	}
+ 
+-	if (of_device_is_compatible(dev->of_node, "nuvoton,npcm845-adc")) {
+-		reg_con = ioread32(info->regs + NPCM_ADCCON);
+-		iowrite32(reg_con | NPCM_ADCCON_ADC_EN, info->regs + NPCM_ADCCON);
+-		reset_control_assert(info->reset);
+-		udelay(1);
+-		reset_control_deassert(info->reset);
+-		udelay(1);
+-	}
++	reg_con = ioread32(info->regs + NPCM_ADCCON);
++	iowrite32(reg_con | NPCM_ADCCON_ADC_EN, info->regs + NPCM_ADCCON);
++	reset_control_assert(info->reset);
++	udelay(1);
++	reset_control_deassert(info->reset);
++	udelay(1);
+ 
+ 	ret = devm_request_irq(&pdev->dev, irq, npcm_adc_isr, 0,
+ 			       "NPCM_ADC", indio_dev);
+-- 
+2.43.0
+

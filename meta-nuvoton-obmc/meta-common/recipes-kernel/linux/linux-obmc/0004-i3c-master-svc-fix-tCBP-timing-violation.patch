@@ -1,0 +1,31 @@
+From b51f2c7e5a6efa5cf344440f1a043a78e260403d Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Tue, 11 Feb 2025 18:09:46 +0800
+Subject: [PATCH] i3c: master: svc: fix tCBP timing violation
+
+Use open-drain STOP to enlarge tCBP.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ drivers/i3c/master/svc-i3c-master.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/i3c/master/svc-i3c-master.c b/drivers/i3c/master/svc-i3c-master.c
+index 17b383d1dcd8..55d1a0f7096c 100644
+--- a/drivers/i3c/master/svc-i3c-master.c
++++ b/drivers/i3c/master/svc-i3c-master.c
+@@ -678,6 +678,10 @@ static int svc_i3c_master_bus_init(struct i3c_master_controller *m)
+ 		goto rpm_out;
+ 	}
+ #else
++
++	/* Use open-drain STOP to enlarge tCBP */
++	odstop = 1;
++
+ 	/*
+ 	 * Configure for Push-Pull mode.
+ 	 */
+-- 
+2.43.0
+

@@ -1,0 +1,45 @@
+From 0bcadec1ac5832dc5778e3db4f1ae176f6e3b5ed Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Tue, 29 Aug 2023 11:51:03 +0800
+Subject: [PATCH 02/16] i3c: master: svc: set master pid info
+
+The PID info is used for AF_MCTP I3C's hardware address
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ drivers/i3c/master/svc-i3c-master.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/drivers/i3c/master/svc-i3c-master.c b/drivers/i3c/master/svc-i3c-master.c
+index fdd2582164d2..37dd6bea5d5c 100644
+--- a/drivers/i3c/master/svc-i3c-master.c
++++ b/drivers/i3c/master/svc-i3c-master.c
+@@ -125,6 +125,12 @@
+ #define   SVC_MDYNADDR_VALID BIT(0)
+ #define   SVC_MDYNADDR_ADDR(x) FIELD_PREP(GENMASK(7, 1), (x))
+ 
++#if defined(CONFIG_ARCH_NPCM)
++#define SVC_I3C_PARTNO       0x06C
++#define SVC_I3C_VENDORID     0x074
++#define   SVC_I3C_VENDORID_VID(x) FIELD_GET(GENMASK(14, 0), (x))
++#endif
++
+ #define SVC_I3C_MAX_DEVS 32
+ #define SVC_I3C_PM_TIMEOUT_MS 1000
+ 
+@@ -671,6 +677,10 @@ static int svc_i3c_master_bus_init(struct i3c_master_controller *m)
+ 		goto rpm_out;
+ 
+ 	info.dyn_addr = ret;
++#if defined(CONFIG_ARCH_NPCM)
++	reg = readl(master->regs + SVC_I3C_VENDORID);
++	info.pid = (SVC_I3C_VENDORID_VID(reg) << 33 ) | readl(master->regs + SVC_I3C_PARTNO);
++#endif
+ 
+ 	writel(SVC_MDYNADDR_VALID | SVC_MDYNADDR_ADDR(info.dyn_addr),
+ 	       master->regs + SVC_I3C_MDYNADDR);
+-- 
+2.43.0
+

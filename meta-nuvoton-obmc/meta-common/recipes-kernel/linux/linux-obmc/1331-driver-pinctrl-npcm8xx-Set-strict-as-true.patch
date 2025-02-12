@@ -1,0 +1,29 @@
+From 7968ad998f1cfa51b501748f8abe815dd06de638 Mon Sep 17 00:00:00 2001
+From: Brian Ma <chma0@nuvoton.com>
+Date: Wed, 2 Oct 2024 19:08:46 +0800
+Subject: [PATCH] driver: pinctrl-npcm8xx: Set strict as true
+
+Set strict as true in pinmux for libgpiod shows pin is used by kernel
+once it set other function than gpio.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Brian Ma <chma0@nuvoton.com>
+---
+ drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c b/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
+index b95c3f6725df..c6958a850f31 100644
+--- a/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
++++ b/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
+@@ -2092,6 +2092,7 @@ static const struct pinmux_ops npcm8xx_pinmux_ops = {
+ 	.gpio_request_enable = npcm8xx_gpio_request_enable,
+ 	.gpio_disable_free = npcm8xx_gpio_request_free,
+ 	.gpio_set_direction = npcm_gpio_set_direction,
++	.strict = true,
+ };
+ 
+ static int debounce_timing_setting(struct npcm8xx_gpio *bank, u32 gpio,
+-- 
+2.43.0
+

@@ -1,0 +1,38 @@
+From 2031304711630cce0bb86ccec4be99545b6a5569 Mon Sep 17 00:00:00 2001
+From: cpchiang <cpchiang1@nuvoton.com>
+Date: Tue, 5 Dec 2023 11:34:08 +0800
+Subject: [PATCH 12/16] i3c: master: svc: remove wait i3c bus idle after emit
+ stop
+
+SDA may hold by slave immediately after bus become idle,
+remove wait to increase i3c bus usage after emit stop.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: cpchiang <cpchiang1@nuvoton.com>
+---
+ drivers/i3c/master/svc-i3c-master.c | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
+
+diff --git a/drivers/i3c/master/svc-i3c-master.c b/drivers/i3c/master/svc-i3c-master.c
+index 69f71e06177a..d897576981ca 100644
+--- a/drivers/i3c/master/svc-i3c-master.c
++++ b/drivers/i3c/master/svc-i3c-master.c
+@@ -1339,14 +1339,9 @@ static int svc_i3c_master_xfer(struct svc_i3c_master *master,
+ 
+ 	writel(SVC_I3C_MINT_COMPLETE, master->regs + SVC_I3C_MSTATUS);
+ 
+-	if (!continued) {
++	if (!continued)
+ 		svc_i3c_master_emit_stop(master);
+ 
+-		/* Wait idle if stop is sent. */
+-		readl_poll_timeout(master->regs + SVC_I3C_MSTATUS, reg,
+-				   SVC_I3C_MSTATUS_STATE_IDLE(reg), 0, 1000);
+-	}
+-
+ 	return 0;
+ 
+ emit_stop:
+-- 
+2.43.0
+

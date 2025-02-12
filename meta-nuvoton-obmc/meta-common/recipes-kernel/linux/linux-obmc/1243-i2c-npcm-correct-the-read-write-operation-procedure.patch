@@ -1,0 +1,54 @@
+From 1ff5fc7bd49c093c02e52a7bffa1053412ea7e1d Mon Sep 17 00:00:00 2001
+From: Tyrone Ting <kfting@nuvoton.com>
+Date: Tue, 1 Oct 2024 14:28:50 +0800
+Subject: [PATCH 3/8] i2c: npcm: correct the read/write operation procedure
+
+Originally the driver uses the XMIT bit in SMBnST register to decide
+the upcoming i2c transaction. If XMIT bit is 1, then it will be an i2c
+write operation. If it's 0, then a read operation will be executed.
+
+In slave mode the XMIT bit can simply be used directly to set the state.
+XMIT bit can be used as an indication to the current state of the state
+machine during slave operation. (meaning XMIT = 1 during writing and
+XMIT = 0 during reading).
+
+In master operation XMIT is valid only if there are no bus errors.
+For example: in a multi master where the same module is switching from
+master to slave at runtime, and there are collisions, the XMIT bit
+cannot be trusted.
+
+However the maser already "knows" what the bus state is, so this bit
+is not needed and the driver can just track what it is currently doing.
+
+Upstream-Status: Backport [https://github.com/torvalds/linux/commit/e365422cef1ca2c964e25d26536120aab17991e2]
+
+Signed-off-by: Tyrone Ting <kfting@nuvoton.com>
+Reviewed-by: Tali Perry <tali.perry1@gmail.com>
+Signed-off-by: Andi Shyti <andi.shyti@kernel.org>
+---
+ drivers/i2c/busses/i2c-npcm7xx.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-npcm7xx.c b/drivers/i2c/busses/i2c-npcm7xx.c
+index 83a7b7577dcc..608dc14593e2 100644
+--- a/drivers/i2c/busses/i2c-npcm7xx.c
++++ b/drivers/i2c/busses/i2c-npcm7xx.c
+@@ -1629,13 +1629,10 @@ static void npcm_i2c_irq_handle_sda(struct npcm_i2c *bus, u8 i2cst)
+ 			npcm_i2c_wr_byte(bus, bus->dest_addr | BIT(0));
+ 	/* SDA interrupt, after start\restart */
+ 	} else {
+-		if (NPCM_I2CST_XMIT & i2cst) {
+-			bus->operation = I2C_WRITE_OPER;
++		if (bus->operation == I2C_WRITE_OPER)
+ 			npcm_i2c_irq_master_handler_write(bus);
+-		} else {
+-			bus->operation = I2C_READ_OPER;
++		else if (bus->operation == I2C_READ_OPER)
+ 			npcm_i2c_irq_master_handler_read(bus);
+-		}
+ 	}
+ }
+ 
+-- 
+2.43.0
+

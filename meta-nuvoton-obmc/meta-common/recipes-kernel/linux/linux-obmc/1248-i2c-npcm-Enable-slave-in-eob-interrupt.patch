@@ -1,0 +1,46 @@
+From 50dd425c51b0b53cc7b0c601acad4fc04ebae553 Mon Sep 17 00:00:00 2001
+From: Charles Boyer <Charles.Boyer@fii-usa.com>
+Date: Thu, 19 Dec 2024 17:08:59 +0800
+Subject: [PATCH 8/8] i2c: npcm: Enable slave in eob interrupt
+
+Nuvoton slave enable was in user space API call master_xfer, so it is
+subject to delays from the OS scheduler. If the BMC is not enabled for
+slave mode in time for master to send response, then it will NAK the
+address match. Then the PLDM request timeout occurs.
+
+If the slave enable is moved to the EOB interrupt service routine, then
+the BMC can be ready in slave mode by the time it needs to receive a
+response.
+
+Upstream-Status: Backport [https://github.com/torvalds/linux/commit/8b56f98b28e6238bcfe00de743b4361d26a7f980]
+
+Signed-off-by: Charles Boyer <Charles.Boyer@fii-usa.com>
+Signed-off-by: Vivekanand Veeracholan <vveerach@google.com>
+Signed-off-by: Tyrone Ting <kfting@nuvoton.com>
+Reviewed-by: Tali Perry <tali.perry1@gmail.com>
+Link: https://lore.kernel.org/r/20241219090859.18722-5-kfting@nuvoton.com
+Signed-off-by: Andi Shyti <andi.shyti@kernel.org>
+---
+ drivers/i2c/busses/i2c-npcm7xx.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/i2c/busses/i2c-npcm7xx.c b/drivers/i2c/busses/i2c-npcm7xx.c
+index 81f6dc95aced..706a9d64e481 100644
+--- a/drivers/i2c/busses/i2c-npcm7xx.c
++++ b/drivers/i2c/busses/i2c-npcm7xx.c
+@@ -1926,6 +1926,12 @@ static int npcm_i2c_int_master_handler(struct npcm_i2c *bus)
+ 	    (FIELD_GET(NPCM_I2CCST3_EO_BUSY,
+ 		       ioread8(bus->reg + NPCM_I2CCST3)))) {
+ 		npcm_i2c_irq_handle_eob(bus);
++#if IS_ENABLED(CONFIG_I2C_SLAVE)
++		/* reenable slave if it was enabled */
++		if (bus->slave)
++			iowrite8(bus->slave->addr | NPCM_I2CADDR_SAEN,
++				 bus->reg + NPCM_I2CADDR1);
++#endif
+ 		return 0;
+ 	}
+ 
+-- 
+2.43.0
+

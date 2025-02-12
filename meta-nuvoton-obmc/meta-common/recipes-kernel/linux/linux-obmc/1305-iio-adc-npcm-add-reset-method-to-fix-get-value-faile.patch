@@ -1,0 +1,46 @@
+From 7be92a0cbc87f7ba5dd7402503f31eb8b82c6770 Mon Sep 17 00:00:00 2001
+From: Jim Liu <JJLIU0@nuvoton.com>
+Date: Tue, 17 Dec 2024 17:30:31 +0800
+Subject: [PATCH 1/2] iio: adc: npcm: add reset method to fix get value failed
+
+Add a reset method to handle the issue
+of not being able to obtain ADC values at some marginal timings.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Jim Liu <JJLIU0@nuvoton.com>
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ drivers/iio/adc/npcm_adc.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/drivers/iio/adc/npcm_adc.c b/drivers/iio/adc/npcm_adc.c
+index aa5123cb3a5d..8ce5d85e2327 100644
+--- a/drivers/iio/adc/npcm_adc.c
++++ b/drivers/iio/adc/npcm_adc.c
+@@ -17,6 +17,7 @@
+ #include <linux/spinlock.h>
+ #include <linux/uaccess.h>
+ #include <linux/reset.h>
++#include <linux/of.h>
+ 
+ struct npcm_adc_info {
+ 	u32 data_mask;
+@@ -439,6 +440,15 @@ static int npcm_adc_probe(struct platform_device *pdev)
+ 		goto err_disable_clk;
+ 	}
+ 
++	if (of_device_is_compatible(dev->of_node, "nuvoton,npcm845-adc")) {
++		reg_con = ioread32(info->regs + NPCM_ADCCON);
++		iowrite32(reg_con | NPCM_ADCCON_ADC_EN, info->regs + NPCM_ADCCON);
++		reset_control_assert(info->reset);
++		udelay(1);
++		reset_control_deassert(info->reset);
++		udelay(1);
++	}
++
+ 	ret = devm_request_irq(&pdev->dev, irq, npcm_adc_isr, 0,
+ 			       "NPCM_ADC", indio_dev);
+ 	if (ret < 0) {
+-- 
+2.43.0
+

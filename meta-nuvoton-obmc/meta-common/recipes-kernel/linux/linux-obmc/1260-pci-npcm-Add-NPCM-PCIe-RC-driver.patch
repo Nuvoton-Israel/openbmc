@@ -1,0 +1,693 @@
+From 7334827d2af9db8ecc8cd8ab90d8831bb5290c61 Mon Sep 17 00:00:00 2001
+From: Tomer Maimon <tmaimon77@gmail.com>
+Date: Sun, 4 Aug 2024 18:37:00 +0300
+Subject: [PATCH] pci: npcm: Add NPCM PCIe-RC driver
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Tomer Maimon <tmaimon77@gmail.com>
+---
+ drivers/pci/controller/Kconfig     |   9 +
+ drivers/pci/controller/Makefile    |   1 +
+ drivers/pci/controller/pcie-npcm.c | 638 +++++++++++++++++++++++++++++
+ 3 files changed, 648 insertions(+)
+ create mode 100644 drivers/pci/controller/pcie-npcm.c
+
+diff --git a/drivers/pci/controller/Kconfig b/drivers/pci/controller/Kconfig
+index 46295c7beab6..49a6a7688a2e 100644
+--- a/drivers/pci/controller/Kconfig
++++ b/drivers/pci/controller/Kconfig
+@@ -249,6 +249,15 @@ config PCI_HYPERV_INTERFACE
+ 	  drivers to have a common interface with the Hyper-V PCI frontend
+ 	  driver.
+ 
++config PCIE_NPCM
++	tristate "NPCM PCIe controller"
++	depends on ARCH_NPCM || COMPILE_TEST
++	depends on OF
++	depends on PCI_MSI
++	help
++	  Say Y here if you want to enable PCIe controller support on
++	  Nuvoton BMC SoCs.
++
+ config PCI_TEGRA
+ 	bool "NVIDIA Tegra PCIe controller"
+ 	depends on ARCH_TEGRA || COMPILE_TEST
+diff --git a/drivers/pci/controller/Makefile b/drivers/pci/controller/Makefile
+index 0c97cb9ea904..ad50f1568856 100644
+--- a/drivers/pci/controller/Makefile
++++ b/drivers/pci/controller/Makefile
+@@ -32,6 +32,7 @@ obj-$(CONFIG_PCIE_ROCKCHIP) += pcie-rockchip.o
+ obj-$(CONFIG_PCIE_ROCKCHIP_EP) += pcie-rockchip-ep.o
+ obj-$(CONFIG_PCIE_ROCKCHIP_HOST) += pcie-rockchip-host.o
+ obj-$(CONFIG_PCIE_MEDIATEK) += pcie-mediatek.o
++obj-$(CONFIG_PCIE_NPCM) += pcie-npcm.o
+ obj-$(CONFIG_PCIE_MEDIATEK_GEN3) += pcie-mediatek-gen3.o
+ obj-$(CONFIG_PCIE_MICROCHIP_HOST) += pcie-microchip-host.o
+ obj-$(CONFIG_VMD) += vmd.o
+diff --git a/drivers/pci/controller/pcie-npcm.c b/drivers/pci/controller/pcie-npcm.c
+new file mode 100644
+index 000000000000..f944fc2a86cf
+--- /dev/null
++++ b/drivers/pci/controller/pcie-npcm.c
+@@ -0,0 +1,638 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <linux/irqchip/chained_irq.h>
++#include <linux/irqdomain.h>
++#include <linux/pci-ecam.h>
++#include <linux/delay.h>
++#include <linux/msi.h>
++#include <linux/of_address.h>
++#include <linux/regmap.h>
++#include <linux/mfd/syscon.h>
++#include <linux/reset.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/irqdomain.h>
++#include <linux/of_irq.h>
++#include <asm/irq.h>
++#include <asm/cputype.h>
++#include <linux/gpio.h>
++#include <linux/of_gpio.h>
++
++/* PCIe Root Complex Register */
++#define LINKSTAT			0x92
++#define RCCFGNUM			0x140
++#define IMSI_ADDR			0x190
++#define PCIERC_IMASK_LOCAL_ADDR		0x180
++#define PCIERC_ISTATUS_LOCAL_ADDR	0x184
++#define PCIERC_ISTATUS_MSI_ADDR		0x194
++#define PCIERC_AXI_ERROR_REPORT		0x3E0
++
++#define PCIERC_ISTATUS_LOCAL_MSI_BIT	BIT(28)
++#define PCIERC_ISTATUS_LOCAL_INTA_BIT	BIT(24)
++#define PCIERC_CFG_NO_SLVERR		BIT(0)
++
++#define NPCM_CORE_SELECT		(15)
++
++/* PCIe-to-AXI Window 0 and 1 Registers */
++#define RCPAnSAL(n) (0x600 + (0x100 * (n)))
++#define RCPAnSAH(n) (0x604 + (0x100 * (n)))
++#define RCPAnTAL(n) (0x608 + (0x100 * (n)))
++#define RCPAnTAH(n) (0x60C + (0x100 * (n)))
++#define RCPAnTP(n)  (0x610 + (0x100 * (n)))
++#define RCPAnTM(n)  (0x618 + (0x100 * (n)))
++
++/* AXI-to-PCIe Window 1 to 4 Registers */
++#define RCAPnSAL(n) (0x800 + (0x20 * (n)))
++#define RCAPnSAH(n) (0x804 + (0x20 * (n)))
++#define RCAPnTAL(n) (0x808 + (0x20 * (n)))
++#define RCAPnTAH(n) (0x80C + (0x20 * (n)))
++#define RCAPnTP(n)  (0x810 + (0x20 * (n)))
++
++/* RCAPnSAL register fields */
++#define CFG_SIZE_4K     11
++
++/* RCAPnTP register fields */
++#define TRSF_PARAM_MEMORY    (0L << 16)
++#define TRSF_PARAM_CONFIG    (1L << 16)
++#define TRSF_PARAM_IO        (2L << 16)
++#define TRSL_ID_PCIE_TX_RX   0 
++#define TRSL_ID_PCIE_CONFIG  1 
++#define RCA_WIN_EN	     BIT(0)
++
++#define PLDA_XPRESS_RICH_MEMORY_WINDOW		0
++#define PLDA_XPRESS_RICH_CONFIG_WINDOW		1
++#define PLDA_XPRESS_RICH_IO_WINDOW		2
++//#define PLDA_XPRESS_RICH_IO_WINDOW		1
++#define PLDA_XPRESS_RICH_MESSAGE_WINDOW		4
++
++#define PLDA_XPRESS_RICH_TARGET_PCI_TX_RX	0
++#define PLDA_XPRESS_RICH_TARGET_PCI_CONFIG	1
++#define PLDA_XPRESS_RICH_TARGET_AXI_MASTER	4
++
++#define PCI_RC_ATTR_WIN_EN_POS			0
++#define PCI_RC_ATTR_WIN_SIZE_POS		1
++#define PCI_RC_ATTR_AP_ADDR_L_POS		12
++
++#define PCI_RC_ATTR_TRSF_PARAM_POS		16
++#define PCI_RC_ATTR_TRSL_ID_POS			0
++
++#define IRQ_REQUEST
++#define PCI_BAR_REG 0x10
++#define PCI_CMD_STATUS_REG  0x4
++
++#define  PCI_COMMAND_IO		0x1
++#define  PCI_COMMAND_MEMORY	0x2
++#define  PCI_COMMAND_MASTER	0x4
++
++//#define DBG_DELAY
++
++/* Other rgister for initialzing root complex */
++#define MFSEL1			0x0C
++#define MFSEL3			0x64
++#define MFSEL3_PCIEPUSE_BIT	BIT(17)
++
++#define INTCR3			0x9c
++#define INTCRPCE3		0x128
++#define INTCR3_RCCORER_BIT	BIT(22)
++
++#define LINK_UP_FIELD		(0x3F << 20)
++#define LINK_RETRAIN_BIT	BIT(27)
++
++#define NPCM_MSI_MAX		32
++
++struct npcm_pci_info {
++	u32 axi_pci_win_max;
++	u32 pci_axi_win_max;
++};
++
++struct npcm_pcie {
++	u32 			irq;
++	u32 			bar0;
++	struct device		*dev;
++	struct resource 	*res;
++	spinlock_t		used_msi_lock;
++	void __iomem		*reg_base;
++	void __iomem		*config_base;
++	struct irq_domain 	*msi_domain;
++	struct reset_control	*reset;
++	struct regmap		*gcr_regmap;
++	int 			rst_rc_gpio;
++	int 			rst_ep_gpio;
++	const struct 		npcm_pci_info *data;
++	DECLARE_BITMAP(msi_irq_in_use, NPCM_MSI_MAX);
++};
++
++static const struct npcm_pci_info npxm7xx_pci_info = {
++	.axi_pci_win_max = 4,
++	.pci_axi_win_max = 1
++};
++
++static const struct npcm_pci_info npxm8xx_pci_info = {
++	.axi_pci_win_max = 5,
++	.pci_axi_win_max = 2
++};
++
++static void npcm_msi_isr(struct irq_desc *desc)
++{
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++	struct npcm_pcie *pcie = irq_desc_get_handler_data(desc);
++	unsigned long status, virq, idx;
++
++	chained_irq_enter(chip, desc);
++	spin_lock(&pcie->used_msi_lock);
++
++	status = ioread32(pcie->reg_base + PCIERC_ISTATUS_MSI_ADDR);
++	for_each_set_bit(idx, &status, 32) {
++		virq = irq_find_mapping(pcie->msi_domain, idx);
++		generic_handle_irq(virq);
++	}
++
++	spin_unlock(&pcie->used_msi_lock);
++	chained_irq_exit(chip, desc);
++}
++
++static void npcm_ack(struct irq_data *d)
++{
++	struct npcm_pcie *pcie = d->chip_data;
++	u32 bit = BIT(d->hwirq % 32);
++	u32 global_pcie_status = ioread32(pcie->reg_base + PCIERC_ISTATUS_LOCAL_ADDR);
++
++	iowrite32(bit, pcie->reg_base + PCIERC_ISTATUS_MSI_ADDR);
++	iowrite32(global_pcie_status, pcie->reg_base + PCIERC_ISTATUS_LOCAL_ADDR);
++}
++
++static void npcm_mask(struct irq_data *d)
++{
++	return;
++}
++
++static void npcm_unmask(struct irq_data *d)
++{
++	return;
++}
++
++static int npcm_set_affinity(struct irq_data *d, const struct cpumask *mask,
++			      bool force)
++{
++	return -EINVAL;
++}
++
++static void npcm_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
++{
++	struct npcm_pcie *pcie = d->chip_data;
++	int id;
++
++	msg->address_hi = 0x0;
++	msg->address_lo = (pcie->bar0 + IMSI_ADDR) & 0xfffffff0;
++	id = read_cpuid_id();
++	msg->data = (id << NPCM_CORE_SELECT) | d->hwirq;
++}
++
++static struct irq_chip npcm_chip = {
++	.irq_ack		= npcm_ack,
++	.irq_mask		= npcm_mask,
++	.irq_unmask		= npcm_unmask,
++	.irq_set_affinity	= npcm_set_affinity,
++	.irq_compose_msi_msg	= npcm_compose_msi_msg,
++};
++
++static void msi_ack(struct irq_data *d)
++{
++	irq_chip_ack_parent(d);
++}
++
++static void msi_mask(struct irq_data *d)
++{
++	pci_msi_mask_irq(d);
++	irq_chip_mask_parent(d);
++}
++
++static void msi_unmask(struct irq_data *d)
++{
++	pci_msi_unmask_irq(d);
++	irq_chip_unmask_parent(d);
++}
++
++static struct irq_chip msi_chip = {
++	.name = "MSI",
++	.irq_ack = msi_ack,
++	.irq_mask = msi_mask,
++	.irq_unmask = msi_unmask,
++};
++
++static struct msi_domain_info msi_dom_info = {
++	.flags = MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
++		MSI_FLAG_MULTI_PCI_MSI,
++	.chip	= &msi_chip,
++};
++
++static int npcm_irq_domain_alloc(struct irq_domain *dom, unsigned int virq,
++				  unsigned int nr_irqs, void *args)
++{
++	struct npcm_pcie *pcie = dom->host_data;
++	unsigned long flags;
++	int pos;
++
++	spin_lock_irqsave(&pcie->used_msi_lock, flags);
++	pos = find_first_zero_bit(pcie->msi_irq_in_use, NPCM_MSI_MAX);
++	if (pos >= NPCM_MSI_MAX) {
++		spin_unlock_irqrestore(&pcie->used_msi_lock, flags);
++		return -ENOSPC;
++	}
++	__set_bit(pos, pcie->msi_irq_in_use);
++	spin_unlock_irqrestore(&pcie->used_msi_lock, flags);
++	irq_domain_set_info(dom, virq, pos, &npcm_chip,
++			pcie, handle_edge_irq, NULL, NULL);
++
++	return 0;
++}
++
++static void npcm_irq_domain_free(struct irq_domain *dom, unsigned int virq,
++				  unsigned int nr_irqs)
++{
++	unsigned long flags;
++	struct irq_data *d = irq_domain_get_irq_data(dom, virq);
++	struct npcm_pcie *pcie = d->chip_data;
++
++	spin_lock_irqsave(&pcie->used_msi_lock, flags);
++	__clear_bit(d->hwirq, pcie->msi_irq_in_use);
++	spin_unlock_irqrestore(&pcie->used_msi_lock, flags);
++}
++
++static const struct irq_domain_ops dom_ops = {
++	.alloc	= npcm_irq_domain_alloc,
++	.free	= npcm_irq_domain_free,
++};
++
++static int npcm_pcie_rc_device_connected(struct npcm_pcie *pcie)
++{
++	u32 val;
++
++	/*
++	 * Check the Link status register on the bridge 
++	 * configuration space at:
++	 * Bus 0, Device 0, function 0 offset 0x92 bit 4
++	 */   
++	iowrite32(0x1F0000 , pcie->reg_base + RCCFGNUM);
++	val = ioread32(pcie->config_base + 0x90);
++	return  ((val & LINK_UP_FIELD) >> 20); 
++}
++
++static void npcm_initialize_as_root_complex(struct npcm_pcie *pcie, bool bmc_npcm7xx)
++{ 
++	/* put RC core to reset (write 0 to enter reset and 1 to release) */
++	regmap_write_bits(pcie->gcr_regmap, INTCR3, INTCR3_RCCORER_BIT, 0x0);
++
++	/* put RC to reset (write 1 to enter reset and 0 to enable module) */
++	reset_control_assert(pcie->reset);
++
++	if (bmc_npcm7xx)
++		regmap_write_bits(pcie->gcr_regmap, MFSEL3,
++				  MFSEL3_PCIEPUSE_BIT, MFSEL3_PCIEPUSE_BIT);
++
++	/* release RC from reset */
++	regmap_write_bits(pcie->gcr_regmap, INTCR3,
++			  INTCR3_RCCORER_BIT, INTCR3_RCCORER_BIT);
++
++	/* enable RC */
++	reset_control_deassert(pcie->reset);
++
++	/* Only for NPCM8XX set error report to no slave error */
++	iowrite32(PCIERC_CFG_NO_SLVERR, pcie->reg_base + PCIERC_AXI_ERROR_REPORT);
++}
++
++static int set_translation_window(struct npcm_pcie *pcie, u32 win_num,
++				  dma_addr_t source_addr, u32 size,dma_addr_t
++				  dest_addr,u8 win_type,u8 target)
++{
++	u8 win_size = 11 ;
++	u32 val;
++
++	if (size < 4096)
++		printk("%s : ERROR : window size should be greater then 4KB\n " , __FUNCTION__);
++
++	size=(size >> (win_size + 2));
++	while(size) {
++		size= (size >> 1);
++		win_size++;
++	}
++
++#ifdef __LP64__
++	writel(((uint64_t)source_addr & 0xffffffff) +
++			(win_size << PCI_RC_ATTR_WIN_SIZE_POS)+(1 << PCI_RC_ATTR_WIN_EN_POS) , pcie->reg_base + RCPAnSAL(win_num));
++	writel(((uint64_t)source_addr >> 32 ) & 0xffffffff ,pcie->reg_base + RCPAnSAH(win_num));
++	writel(((uint64_t)dest_addr & 0xffffffff) , pcie->reg_base + RCPAnTAL(win_num));
++	writel(((uint64_t)dest_addr >> 32 ) & 0xffffffff , pcie->reg_base + RCPAnTAH(win_num));
++#else
++	writel( ((u32)source_addr  ) +
++			(win_size << PCI_RC_ATTR_WIN_SIZE_POS)+(1 << PCI_RC_ATTR_WIN_EN_POS) , pcie->reg_base + RCPAnSAL(win_num));
++	writel(0 ,pcie->reg_base + RCPAnSAH(win_num));
++	writel((u32)dest_addr, pcie->reg_base + RCPAnTAL(win_num));
++	writel(0, pcie->reg_base + RCPAnTAH(win_num));
++#endif
++	val = (win_type << PCI_RC_ATTR_TRSF_PARAM_POS) + (target << PCI_RC_ATTR_TRSL_ID_POS);
++	writel(val, pcie->reg_base + RCPAnTP(win_num));
++
++	return 0;
++}
++
++static void npcm_pcie_rc_init_config_window(struct npcm_pcie *pcie)
++{	
++	struct of_pci_range range;
++	struct of_pci_range_parser parser;
++	struct device *dev = pcie->dev;
++	struct device_node *node = dev->of_node;
++	u32 start_win_num = 2;
++
++	if (of_pci_range_parser_init(&parser, node))
++		return;
++
++	/* Enable configuration window */
++	iowrite32((pcie->res->start & 0xFFFFF000) | (CFG_SIZE_4K << 1) | RCA_WIN_EN, pcie->reg_base + RCAPnSAL(1));
++	iowrite32(0, pcie->reg_base + RCAPnSAH(1));
++	iowrite32(pcie->res->start, pcie->reg_base + RCAPnTAL(1));
++	iowrite32(0, pcie->reg_base + RCAPnTAH(1));
++	iowrite32(TRSF_PARAM_CONFIG | TRSL_ID_PCIE_CONFIG, pcie->reg_base + RCAPnTP(1));
++
++	for_each_of_pci_range(&parser, &range) {
++		unsigned long size;
++		int bit_size;
++
++		if (start_win_num > pcie->data->axi_pci_win_max)
++			continue;
++
++		size = range.size;
++		bit_size = find_first_bit(&size, 32);
++		switch (range.flags & IORESOURCE_TYPE_BITS) {
++		case IORESOURCE_IO:
++			iowrite32(range.pci_addr, pcie->reg_base + RCAPnTAL(start_win_num));
++			iowrite32(0, pcie->reg_base + RCAPnTAH(start_win_num));
++			iowrite32(TRSF_PARAM_IO | TRSL_ID_PCIE_CONFIG, pcie->reg_base + RCAPnTP(start_win_num));
++			iowrite32(0, pcie->reg_base + RCAPnSAH(start_win_num));
++			iowrite32((range.cpu_addr & 0xFFFFF000) | ((bit_size - 1) << 1) | RCA_WIN_EN, pcie->reg_base + RCAPnSAL(start_win_num));
++			break;
++		case IORESOURCE_MEM:
++			iowrite32(range.pci_addr, pcie->reg_base + RCAPnTAL(start_win_num));
++			iowrite32(0, pcie->reg_base + RCAPnTAH(start_win_num));
++			iowrite32(TRSF_PARAM_MEMORY | TRSL_ID_PCIE_TX_RX, pcie->reg_base + RCAPnTP(start_win_num));
++			iowrite32(0, pcie->reg_base + RCAPnSAH(start_win_num));
++			iowrite32((range.cpu_addr & 0xFFFFF000) | ((bit_size - 1) << 1) | RCA_WIN_EN, pcie->reg_base + RCAPnSAL(start_win_num));
++			break;
++		}
++
++		start_win_num++;
++	}
++
++	if (of_pci_dma_range_parser_init(&parser, node))
++		return;
++
++	for_each_of_pci_range(&parser, &range) {
++		start_win_num = 0;
++
++		if (start_win_num > pcie->data->pci_axi_win_max)
++			continue;
++		set_translation_window(pcie, start_win_num, range.cpu_addr, 
++				       range.size , range.pci_addr,
++				       PLDA_XPRESS_RICH_MEMORY_WINDOW,
++				       PLDA_XPRESS_RICH_TARGET_AXI_MASTER);
++		start_win_num++;
++	}
++}
++
++static int npcm_config_read(struct pci_bus *bus, 
++                                     unsigned int devfn, 
++                                     int where, 
++                                     int size, 
++                                     u32 *value)
++{
++	struct npcm_pcie *pcie = bus->sysdata;
++	if (npcm_pcie_rc_device_connected(pcie) == 0) {
++		 pr_info("npcm_pcie_rc_config_read - NO LINK\n");        
++		 *value = 0xFFFFFFFF;
++		 return PCIBIOS_SUCCESSFUL;
++	}
++
++	if ((bus->number == 0) && (devfn == 0) && ((where & 0xFFFFFFFC) == 8)) {
++		*value = 0x6040001;
++	} else {		
++		iowrite32(0x1F0000 | (((unsigned int)(bus->number)) << 8) | (devfn & 0xFF), pcie->reg_base + RCCFGNUM);
++		*value = ioread32(pcie->config_base + (where & 0xFFFFFFFC));
++	}
++	 
++	if (size == 1)
++		*value = (*value >> (8 * (where & 3))) & 0xff;
++	else if (size == 2)
++		*value = (*value >> (8 * (where & 3))) & 0xffff;
++	//pr_info("npcm_pcie_rc_config_read (b:%d, df:%d, o:0x%x, v:0x%x) RCCFGNUM->0x%x \n",(int)(bus->number), devfn, where, *value, ioread32(pcie->reg_base + RCCFGNUM));        
++
++	return PCIBIOS_SUCCESSFUL;
++}
++
++static int npcm_config_write(struct pci_bus *bus, unsigned int devfn, 
++					int where, int size, u32 value)
++{
++	struct npcm_pcie *pcie = bus->sysdata;
++	u32 org_val, new_val;    
++	int ret = PCIBIOS_SUCCESSFUL;
++
++	if (((bus->number > 0) || ((bus->number == 0) && (devfn > 0))) && (npcm_pcie_rc_device_connected(pcie) == 0)) {
++		pr_info("npcm_pcie_rc_config_write - NO LINK\n");        
++		return ret;
++	}
++
++#ifdef CONFIG_PCI_MSI
++	if((bus->number == 0) && (devfn == 0) && (where == 0x10)) {
++		pcie->bar0 = value;
++		iowrite32(0x1F0000 ,pcie->reg_base + RCCFGNUM);
++		org_val = ioread32(pcie->config_base + PCI_CMD_STATUS_REG);
++		org_val |= (PCI_COMMAND_IO | PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER);
++		iowrite32(org_val , pcie->config_base + PCI_CMD_STATUS_REG);
++	}
++#endif
++
++	iowrite32(0x1F0000 | (((unsigned int)(bus->number)) << 8) |
++		     (devfn & 0xFF), pcie->reg_base + RCCFGNUM);
++
++	//pr_info("npcm_pcie_rc_config_write (b:%d, df:%d, o:0x%x, s:%d v:0x%x) RCCFGNUM->0x%x\n", (int)(bus->number), devfn, where, size, value, ioread32(pcie->reg_base + RCCFGNUM));
++
++	if (size == 4) 
++		iowrite32(value, pcie->config_base + (where & 0xFFFFFFFC));
++	else if (size == 2) {
++		org_val = ioread32(pcie->config_base + (where & 0xFFFFFFFC));
++		value   = (value & 0x0000FFFF) << ((where & 0x3) * 8);
++		new_val = (org_val & ~(0x0000FFFF << ((where & 0x3) * 8))) | value;
++		iowrite32(new_val, pcie->config_base + (where & 0xFFFFFFFC));
++	}
++	else if (size == 1) {
++		org_val = ioread32(pcie->config_base + (where & 0xFFFFFFFC));
++		value   = (value & 0x000000FF) << ((where & 0x3) * 8);
++		new_val = (org_val & ~(0x000000FF << ((where & 0x3) * 8))) | value;
++		iowrite32(new_val, pcie->config_base + (where & 0xFFFFFFFC));
++	}
++	else 
++		ret = PCIBIOS_BAD_REGISTER_NUMBER;
++
++	return ret;
++}
++
++static struct pci_ops npcm_pcie_ops = {
++	.read		= npcm_config_read,
++	.write		= npcm_config_write,
++	
++};
++
++static int npcm_pcie_init(struct device *dev, struct npcm_pcie *pcie)
++{
++	struct device_node *np = dev->of_node;
++	bool bmc_npcm7xx = false;
++	int ret;
++
++	if (of_device_is_compatible(np, "nuvoton,npcm750-pcie"))
++		bmc_npcm7xx = true;
++
++	if (bmc_npcm7xx) {
++		pcie->rst_rc_gpio = of_get_named_gpio(np, "npcm-pci-rc-rst", 0);
++		if (pcie->rst_rc_gpio < 0) {
++			dev_err(dev, "GPIO pci-rc-rst not found in device tree, NPCM PCIe failed %d\n", pcie->rst_rc_gpio);
++			return pcie->rst_rc_gpio;
++		} else {
++			ret = devm_gpio_request_one(dev, pcie->rst_rc_gpio,
++						    GPIOF_OUT_INIT_LOW, "rst-rc-pci");
++			if (ret) {
++				dev_err(dev, "unable to get reset rc GPIO %d\n", ret);
++				return ret;
++			}
++			gpio_set_value(pcie->rst_rc_gpio, 0);
++		}
++	}
++
++	pcie->rst_ep_gpio = of_get_named_gpio(np, "npcm-pci-ep-rst", 0);
++	if (pcie->rst_ep_gpio < 0) {
++		dev_warn(dev, "GPIO pci-ep-rst not found in device tree\n");
++	} else {
++		ret = devm_gpio_request_one(dev, pcie->rst_ep_gpio,
++					    GPIOF_OUT_INIT_LOW, "rst-ep-pci");
++		if (ret == -EBUSY) {
++			dev_info(dev, "reset ep gpio using reset rc gpio\n");
++			pcie->rst_ep_gpio = -1;
++		} else if (ret) {
++			dev_err(dev, "unable to get reset ep GPIO %d\n", ret);
++			return ret;
++		}
++		if (!ret)
++			gpio_set_value(pcie->rst_ep_gpio, 0);
++	}
++
++	npcm_initialize_as_root_complex(pcie, bmc_npcm7xx);
++	npcm_pcie_rc_init_config_window(pcie);
++	
++	if (bmc_npcm7xx && (pcie->rst_rc_gpio > 0)) {
++		gpio_set_value(pcie->rst_rc_gpio, 1);
++		gpio_free(pcie->rst_rc_gpio);
++		msleep(15);
++	}
++
++	if (pcie->rst_ep_gpio > 0) {
++		gpio_set_value(pcie->rst_ep_gpio, 1);
++		gpio_free(pcie->rst_ep_gpio);
++	}
++
++	return 0;
++}
++
++static int npcm_pcie_probe(struct platform_device *pdev)
++{
++	struct irq_domain *msi_dom, *irq_dom;
++	struct device *dev = &pdev->dev;
++	struct fwnode_handle *fwnode = of_node_to_fwnode(dev->of_node);
++	struct pci_host_bridge *bridge;
++	struct npcm_pcie *pcie;
++	int virq, ret;	
++
++	bridge = devm_pci_alloc_host_bridge(dev, sizeof(struct npcm_pcie));
++	if (!bridge)
++		return -ENODEV;
++
++	pcie = pci_host_bridge_priv(bridge);
++
++	pcie->dev = dev;
++
++	pcie->data = device_get_match_data(dev);
++	if (!pcie->data)
++		return -EINVAL;
++
++	pcie->reg_base = devm_platform_ioremap_resource(pdev, 0);
++	if (IS_ERR(pcie->reg_base))
++		return PTR_ERR(pcie->reg_base);
++
++	pcie->res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	pcie->config_base = ioremap(pcie->res->start, resource_size(pcie->res));
++	if (IS_ERR(pcie->config_base))
++		return PTR_ERR(pcie->config_base);
++
++	platform_set_drvdata(pdev, pcie);
++
++	virq = platform_get_irq(pdev, 0);
++	if (virq < 0)
++		return virq;
++
++	pcie->reset = devm_reset_control_get(&pdev->dev, NULL);
++	if (IS_ERR(pcie->reset))
++		return PTR_ERR(pcie->reset);
++
++	pcie->gcr_regmap = syscon_regmap_lookup_by_phandle(dev->of_node, "nuvoton,sysgcr");
++	if (IS_ERR(pcie->gcr_regmap)) {
++		dev_err(dev, "Failed to find gcr syscon\n");
++		return PTR_ERR(pcie->gcr_regmap);
++	}
++
++	ret = npcm_pcie_init(dev, pcie);
++	if (ret) {
++		dev_err(&pdev->dev, "Failed npcm_pcie_init function\n");
++		return ret;
++	}
++
++	spin_lock_init(&pcie->used_msi_lock);
++
++	bridge->sysdata = pcie;
++	bridge->ops = &npcm_pcie_ops;
++
++#ifdef CONFIG_PCI_MSI
++	iowrite32(PCIERC_ISTATUS_LOCAL_MSI_BIT , pcie->reg_base + PCIERC_IMASK_LOCAL_ADDR);
++
++	irq_dom = irq_domain_create_linear(fwnode, NPCM_MSI_MAX, &dom_ops, pcie);
++	if (!irq_dom) {
++		dev_err(dev, "Failed to create IRQ domain\n");
++		return -ENOMEM;
++	}
++
++	msi_dom = pci_msi_create_irq_domain(fwnode, &msi_dom_info, irq_dom);
++	if (!msi_dom) {
++		dev_err(dev, "Failed to create MSI domain\n");
++		irq_domain_remove(irq_dom);
++		return -ENOMEM;
++	}
++
++	pcie->msi_domain = irq_dom;
++	spin_lock_init(&pcie->used_msi_lock);
++	irq_set_chained_handler_and_data(virq, npcm_msi_isr, pcie);
++#endif
++	return pci_host_probe(bridge);
++
++	return 0;
++}
++
++static const struct of_device_id npcm_pcie_ids[] = {
++	{ .compatible = "nuvoton,npcm750-pcie", .data = &npxm7xx_pci_info },
++	{ .compatible = "nuvoton,npcm845-pcie", .data = &npxm8xx_pci_info },
++	{ },
++};
++
++static struct platform_driver npcm_pcie_driver = {
++	.probe	= npcm_pcie_probe,
++	.driver	= {
++		.name = KBUILD_MODNAME,
++		.of_match_table = npcm_pcie_ids,
++		.suppress_bind_attrs = true,
++	},
++};
++builtin_platform_driver(npcm_pcie_driver);
+-- 
+2.43.0
+

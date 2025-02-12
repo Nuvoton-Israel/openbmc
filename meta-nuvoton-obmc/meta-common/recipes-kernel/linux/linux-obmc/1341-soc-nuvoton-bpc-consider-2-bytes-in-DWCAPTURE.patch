@@ -1,0 +1,79 @@
+From cb9b9a4912aa7b28f0340c4c8387bebe9f662a37 Mon Sep 17 00:00:00 2001
+From: Ban Feng <kcfeng0@nuvoton.com>
+Date: Thu, 9 May 2024 16:33:02 +0800
+Subject: [PATCH 2/2] soc: nuvoton: bpc: consider 2 bytes in DWCAPTURE
+
+In DWord mode, we need to pad zero like 1 byte do.
+Besides, adding DWCAPTURE case when unbinding bpc driver.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
+---
+ drivers/soc/nuvoton/npcm-bpc.c | 19 +++++++++++--------
+ 1 file changed, 11 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/soc/nuvoton/npcm-bpc.c b/drivers/soc/nuvoton/npcm-bpc.c
+index cb5e5a11d6d8..b24072d0e97e 100644
+--- a/drivers/soc/nuvoton/npcm-bpc.c
++++ b/drivers/soc/nuvoton/npcm-bpc.c
+@@ -16,7 +16,6 @@
+ #define DEVICE_NAME	"npcm-bpc"
+ 
+ #define NUM_BPC_CHANNELS	2
+-#define DW_PAD_SIZE		3
+ 
+ /* BIOS POST Code FIFO Registers */
+ #define NPCM_BPCFA2L_REG	0x2 //BIOS POST Code FIFO Address 2 LSB
+@@ -124,7 +123,7 @@ static irqreturn_t npcm_bpc_irq(int irq, void *arg)
+ 	struct npcm_bpc *bpc = arg;
+ 	u8 fifo_st, host_st, data;
+ 	bool isr_flag = false;
+-	u8 last_addr_bit = 0;
++	u8 code_size = 0;
+ 	u8 padzero[3] = {0};
+ 	u8 addr_index = 0;
+ 
+@@ -134,7 +133,7 @@ static irqreturn_t npcm_bpc_irq(int irq, void *arg)
+ 		if (!bpc->en_dwcap)
+ 			addr_index = fifo_st & FIFO_ADDR_DECODE;
+ 		else
+-			last_addr_bit = fifo_st & FIFO_ADDR_DECODE;
++			code_size++;
+ 
+ 		/* Read data from FIFO to clear interrupt */
+ 		data = ioread8(bpc->base + NPCM_BPCFDATA_REG);
+@@ -145,14 +144,18 @@ static irqreturn_t npcm_bpc_irq(int irq, void *arg)
+ 			dev_warn(bpc->dev, "BIOS Post Codes FIFO Overflow\n");
+ 
+ 		fifo_st = ioread8(bpc->base + NPCM_BPCFSTAT_REG);
+-		if (bpc->en_dwcap && last_addr_bit) {
++		if (bpc->en_dwcap) {
+ 			if ((fifo_st & FIFO_ADDR_DECODE) ||
+ 			    ((FIFO_DATA_VALID & fifo_st) == 0)) {
+-				while (kfifo_avail(&bpc->ch[addr_index].fifo) < DW_PAD_SIZE)
++				while (kfifo_avail(&bpc->ch[addr_index].fifo) < (4 - code_size))
+ 					kfifo_skip(&bpc->ch[addr_index].fifo);
+-				kfifo_in(&bpc->ch[addr_index].fifo,
+-					 padzero, DW_PAD_SIZE);
++				if (4 - code_size > 0) {
++					kfifo_in(&bpc->ch[addr_index].fifo,
++						 padzero, 4 - code_size);
++				}
+ 			}
++			if (code_size == 4)
++				code_size = 0;
+ 		}
+ 		isr_flag = true;
+ 	}
+@@ -357,7 +360,7 @@ static int npcm_bpc_remove(struct platform_device *pdev)
+ 
+ 	reg_en = ioread8(bpc->base + NPCM_BPCFEN_REG);
+ 
+-	if (reg_en & FIFO_IOADDR1_ENABLE)
++	if ((reg_en & FIFO_IOADDR1_ENABLE) || (reg_en & FIFO_DWCAPTURE))
+ 		npcm_disable_bpc(bpc, 0);
+ 	if (reg_en & FIFO_IOADDR2_ENABLE)
+ 		npcm_disable_bpc(bpc, 1);
+-- 
+2.43.0
+

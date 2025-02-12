@@ -1,0 +1,30 @@
+From 6c56173c564e937e0fdffc7d3e056bb909e1f6f8 Mon Sep 17 00:00:00 2001
+From: Tomer Maimon <tmaimon77@gmail.com>
+Date: Thu, 12 Dec 2024 18:00:03 +0200
+Subject: [PATCH] pinctrl: npcm8xx: remove CTS and RTS pins from bmcuart1
+
+Remove unused BU1 CTS and BU1 RTS pins from bmcuart1 pin group, to add
+BU1 CTS and BU1 RTS pins the user should add nbu1crts pin group.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Tomer Maimon <tmaimon77@gmail.com>
+---
+ drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c b/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
+index 607960fdbc40..b95c3f6725df 100644
+--- a/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
++++ b/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
+@@ -546,7 +546,7 @@ static const int wdog2_pins[] = { 219 };
+ 
+ static const int bmcuart0a_pins[] = { 41, 42 };
+ static const int bmcuart0b_pins[] = { 48, 49 };
+-static const int bmcuart1_pins[] = { 43, 44, 62, 63 };
++static const int bmcuart1_pins[] = { 43, 63 };
+ 
+ static const int scipme_pins[] = { 169 };
+ static const int smi_pins[] = { 170 };
+-- 
+2.43.0
+

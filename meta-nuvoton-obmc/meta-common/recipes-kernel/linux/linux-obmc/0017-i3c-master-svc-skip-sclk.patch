@@ -1,0 +1,59 @@
+From dfa5fb27c0c049e80240d41a57e1716664f23f6a Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Tue, 11 Feb 2025 17:02:15 +0800
+Subject: [PATCH] i3c: master: svc: skip sclk
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ drivers/i3c/master/svc-i3c-master.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/i3c/master/svc-i3c-master.c b/drivers/i3c/master/svc-i3c-master.c
+index 9962a02b38c2..fd82f7533584 100644
+--- a/drivers/i3c/master/svc-i3c-master.c
++++ b/drivers/i3c/master/svc-i3c-master.c
+@@ -1857,14 +1857,14 @@ static int svc_i3c_master_prepare_clks(struct svc_i3c_master *master)
+ 		clk_disable_unprepare(master->pclk);
+ 		return ret;
+ 	}
+-
++#if !defined(CONFIG_ARCH_NPCM)
+ 	ret = clk_prepare_enable(master->sclk);
+ 	if (ret) {
+ 		clk_disable_unprepare(master->pclk);
+ 		clk_disable_unprepare(master->fclk);
+ 		return ret;
+ 	}
+-
++#endif
+ 	return 0;
+ }
+ 
+@@ -1872,7 +1872,9 @@ static void svc_i3c_master_unprepare_clks(struct svc_i3c_master *master)
+ {
+ 	clk_disable_unprepare(master->pclk);
+ 	clk_disable_unprepare(master->fclk);
++#if !defined(CONFIG_ARCH_NPCM)
+ 	clk_disable_unprepare(master->sclk);
++#endif
+ }
+ 
+ static int svc_i3c_master_probe(struct platform_device *pdev)
+@@ -1900,11 +1902,11 @@ static int svc_i3c_master_probe(struct platform_device *pdev)
+ 	master->fclk = devm_clk_get(dev, "fast_clk");
+ 	if (IS_ERR(master->fclk))
+ 		return PTR_ERR(master->fclk);
+-
++#if !defined(CONFIG_ARCH_NPCM)
+ 	master->sclk = devm_clk_get(dev, "slow_clk");
+ 	if (IS_ERR(master->sclk))
+ 		return PTR_ERR(master->sclk);
+-
++#endif
+ 	master->irq = platform_get_irq(pdev, 0);
+ 	if (master->irq < 0)
+ 		return master->irq;
+-- 
+2.43.0
+

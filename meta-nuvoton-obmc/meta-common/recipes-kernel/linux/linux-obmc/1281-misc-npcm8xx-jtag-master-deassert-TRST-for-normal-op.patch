@@ -1,0 +1,41 @@
+From ec3a77f2f5a473c498d04746207d2a3331da33a6 Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Thu, 23 Feb 2023 08:37:55 +0800
+Subject: [PATCH 2/5] misc: npcm8xx-jtag-master: deassert TRST for normal
+ operation
+
+Release JTAG reset for normal operation.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ drivers/misc/npcm8xx-jtag-master.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/misc/npcm8xx-jtag-master.c b/drivers/misc/npcm8xx-jtag-master.c
+index 4929b904868e..432c68bced2d 100644
+--- a/drivers/misc/npcm8xx-jtag-master.c
++++ b/drivers/misc/npcm8xx-jtag-master.c
+@@ -791,6 +791,7 @@ static int npcm_jtm_probe(struct platform_device *pdev)
+ {
+ 	struct npcm_jtm *priv;
+ 	unsigned long clk_hz;
++	u32 val;
+ 	int irq;
+ 	int ret;
+ 
+@@ -847,6 +848,11 @@ static int npcm_jtm_probe(struct platform_device *pdev)
+ 	priv->freq = NPCM_JTM_DEFAULT_RATE;
+ 	npcm_jtm_set_baudrate(priv, NPCM_JTM_DEFAULT_RATE);
+ 
++	/* Deassert TRST for normal operation */
++	val = readl(priv->base + JTM_CTL);
++	val |= JTM_CTL_TRST;
++	writel(val, priv->base + JTM_CTL);
++
+ 	ret = jtag_register_device(priv);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "failed to create device\n");
+-- 
+2.43.0
+

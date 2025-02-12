@@ -1,0 +1,132 @@
+From 8a37d1853ba281eae150d79d3dd353e8f37f621a Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Tue, 30 Apr 2024 13:56:01 +0800
+Subject: [PATCH] soc: nuvoton: Add serial port switch control driver
+
+Allow to change serial port mode via sysfs.
+
+Example: Set serial port switch to mode 3(SOL and takeover)
+echo 3 > /sys/devices/platform/soc/f0800038.spswc/sp_mode
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ drivers/soc/nuvoton/Kconfig        |  8 +++
+ drivers/soc/nuvoton/Makefile       |  1 +
+ drivers/soc/nuvoton/npcm-sp-ctrl.c | 78 ++++++++++++++++++++++++++++++
+ 3 files changed, 87 insertions(+)
+ create mode 100644 drivers/soc/nuvoton/npcm-sp-ctrl.c
+
+diff --git a/drivers/soc/nuvoton/Kconfig b/drivers/soc/nuvoton/Kconfig
+index ebd162633942..ad14fca42ae7 100644
+--- a/drivers/soc/nuvoton/Kconfig
++++ b/drivers/soc/nuvoton/Kconfig
+@@ -22,4 +22,12 @@ config WPCM450_SOC
+ 	  This driver provides information such as the SoC model and
+ 	  revision.
+ 
++config NPCM_SERIAL_PORT_CONTROL
++	tristate "NPCM Serial Port Mode Control"
++	depends on ARCH_NPCM || COMPILE_TEST
++	help
++	  Provides a driver to control the serial port switch that
++	  enables the SoC to snoop and take over the serial interface.
++	  Allow users to change the serial port mode via sysfs interface.
++
+ endmenu
+diff --git a/drivers/soc/nuvoton/Makefile b/drivers/soc/nuvoton/Makefile
+index c6c96079c6e9..3cc3c955857c 100644
+--- a/drivers/soc/nuvoton/Makefile
++++ b/drivers/soc/nuvoton/Makefile
+@@ -1,3 +1,4 @@
+ # SPDX-License-Identifier: GPL-2.0-only
+ obj-$(CONFIG_NPCM_BPC)		+= npcm-bpc.o
+ obj-$(CONFIG_WPCM450_SOC)	+= wpcm450-soc.o
++obj-$(CONFIG_NPCM_SERIAL_PORT_CONTROL) += npcm-sp-ctrl.o
+diff --git a/drivers/soc/nuvoton/npcm-sp-ctrl.c b/drivers/soc/nuvoton/npcm-sp-ctrl.c
+new file mode 100644
+index 000000000000..534af3530d90
+--- /dev/null
++++ b/drivers/soc/nuvoton/npcm-sp-ctrl.c
+@@ -0,0 +1,78 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright (C) 2023 Nuvoton Technology Corporation.
++ */
++
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/of_device.h>
++
++#define SPMOD_MASK	GENMASK(2, 0)
++static void __iomem *ctrl_reg;
++
++static ssize_t sp_mode_show(struct device *dev, struct device_attribute *attr,
++			    char *buf)
++{
++	u32 val = readl(ctrl_reg) + 1;
++
++	return sprintf(buf, "%ld", val & SPMOD_MASK);
++}
++
++static ssize_t sp_mode_store(struct device *dev, struct device_attribute *attr,
++			     const char *buf, size_t count)
++{
++	u32 val;
++	u8 mode;
++
++	mode = buf[0] - 0x31;
++	if (mode >= 0 && mode <= 6) {
++		val = readl(ctrl_reg) & ~SPMOD_MASK;
++		val |= mode;
++		writel(mode, ctrl_reg);
++	}
++
++	return count;
++}
++
++static DEVICE_ATTR_RW(sp_mode);
++
++static int npcm_sp_ctrl_probe(struct platform_device *pdev)
++{
++	int ret;
++
++	ctrl_reg = devm_platform_ioremap_resource(pdev, 0);
++	if (IS_ERR(ctrl_reg))
++		return PTR_ERR(ctrl_reg);
++
++	ret = sysfs_create_file(&pdev->dev.kobj,
++				&dev_attr_sp_mode.attr);
++
++	return ret;
++}
++
++static int npcm_sp_ctrl_remove(struct platform_device *pdev)
++{
++	sysfs_remove_file(&pdev->dev.kobj, &dev_attr_sp_mode.attr);
++
++	return 0;
++}
++
++static const struct of_device_id npcm_sp_control_ids[] = {
++	{ .compatible = "nuvoton,npcm-sp-ctrl", },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, npcm_sp_control_ids);
++
++static struct platform_driver npcm_sp_control_driver = {
++	.driver = {
++		.name = "npcm-sp-control",
++		.of_match_table = npcm_sp_control_ids,
++	},
++	.probe = npcm_sp_ctrl_probe,
++	.remove = npcm_sp_ctrl_remove,
++};
++
++module_platform_driver(npcm_sp_control_driver);
++
++MODULE_LICENSE("GPL v2");
++MODULE_DESCRIPTION("Driver to configure serial port mode");
+-- 
+2.43.0
+

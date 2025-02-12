@@ -1,0 +1,29 @@
+From a734dc0ce4085c8af660b891a284aed45b9e9bb2 Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Tue, 11 Feb 2025 14:17:42 +0800
+Subject: [PATCH 09/16] i3c: master: svc: set MCONFIG.HKEEP to 3
+
+This is required for NPCM8XX
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ drivers/i3c/master/svc-i3c-master.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/i3c/master/svc-i3c-master.c b/drivers/i3c/master/svc-i3c-master.c
+index f026df0a5b92..2ad12a4e0146 100644
+--- a/drivers/i3c/master/svc-i3c-master.c
++++ b/drivers/i3c/master/svc-i3c-master.c
+@@ -733,7 +733,7 @@ static int svc_i3c_master_bus_init(struct i3c_master_controller *m)
+ 
+ 	reg = SVC_I3C_MCONFIG_MASTER_EN |
+ 	      SVC_I3C_MCONFIG_DISTO(0) |
+-	      SVC_I3C_MCONFIG_HKEEP(0) |
++	      SVC_I3C_MCONFIG_HKEEP(3) |
+ 	      SVC_I3C_MCONFIG_ODSTOP(odstop) |
+ 	      SVC_I3C_MCONFIG_PPBAUD(ppbaud) |
+ 	      SVC_I3C_MCONFIG_PPLOW(pplow) |
+-- 
+2.43.0
+

@@ -1,0 +1,61 @@
+From 2b2ef308d98d1cf398064ab1caa8a7714f4e7b17 Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Fri, 7 Oct 2022 15:15:59 +0800
+Subject: [PATCH 15/16] i3c: master: svc: fix IBI issue
+
+Support up to 8 bytes IBI payload
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ drivers/i3c/master/svc-i3c-master.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/i3c/master/svc-i3c-master.c b/drivers/i3c/master/svc-i3c-master.c
+index 3e33db91baae..35c51ff28c10 100644
+--- a/drivers/i3c/master/svc-i3c-master.c
++++ b/drivers/i3c/master/svc-i3c-master.c
+@@ -137,6 +137,7 @@
+ 
+ /* This parameter depends on the implementation and may be tuned */
+ #define SVC_I3C_FIFO_SIZE 16
++#define SVC_I3C_MAX_IBI_PAYLOAD_SIZE 8
+ 
+ #define SVC_I3C_EVENT_IBI	GENMASK(7, 0)
+ #define SVC_I3C_EVENT_HOTJOIN	BIT(31)
+@@ -408,10 +409,10 @@ static int svc_i3c_master_handle_ibi(struct svc_i3c_master *master,
+ 	}
+ 
+ 	while (SVC_I3C_MSTATUS_RXPEND(readl(master->regs + SVC_I3C_MSTATUS))  &&
+-	       slot->len < SVC_I3C_FIFO_SIZE) {
++	       slot->len < SVC_I3C_MAX_IBI_PAYLOAD_SIZE) {
+ 		mdatactrl = readl(master->regs + SVC_I3C_MDATACTRL);
+ 		count = SVC_I3C_MDATACTRL_RXCOUNT(mdatactrl);
+-		readsl(master->regs + SVC_I3C_MRDATAB, buf, count);
++		readsb(master->regs + SVC_I3C_MRDATAB, buf, count);
+ 		slot->len += count;
+ 		buf += count;
+ 	}
+@@ -476,6 +477,7 @@ static void svc_i3c_master_ibi_work(struct work_struct *work)
+ 	if (ret) {
+ 		dev_err(master->dev, "Timeout when polling for IBIWON\n");
+ 		svc_i3c_master_emit_stop(master);
++		svc_i3c_master_clear_merrwarn(master);
+ 		goto reenable_ibis;
+ 	}
+ 
+@@ -1688,9 +1690,9 @@ static int svc_i3c_master_request_ibi(struct i3c_dev_desc *dev,
+ 	unsigned long flags;
+ 	unsigned int i;
+ 
+-	if (dev->ibi->max_payload_len > SVC_I3C_FIFO_SIZE) {
++	if (dev->ibi->max_payload_len > SVC_I3C_MAX_IBI_PAYLOAD_SIZE) {
+ 		dev_err(master->dev, "IBI max payload %d should be < %d\n",
+-			dev->ibi->max_payload_len, SVC_I3C_FIFO_SIZE);
++			dev->ibi->max_payload_len, SVC_I3C_MAX_IBI_PAYLOAD_SIZE + 1);
+ 		return -ERANGE;
+ 	}
+ 
+-- 
+2.43.0
+

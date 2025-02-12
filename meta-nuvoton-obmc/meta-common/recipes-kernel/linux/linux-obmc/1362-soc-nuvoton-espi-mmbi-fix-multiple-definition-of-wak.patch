@@ -1,0 +1,31 @@
+From 84aa185ecb967b5c10484e639eadfc16ab6c9f4a Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Tue, 4 Feb 2025 17:20:14 +0800
+Subject: [PATCH 2/3] soc: nuvoton: espi mmbi: fix multiple definition of
+ `wake_up_device'
+
+- The pcie mmbi aslo defines a wake_up_device function.
+- Define the wake_up_device as a static function
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ drivers/soc/nuvoton/npcm-espi-mmbi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/soc/nuvoton/npcm-espi-mmbi.c b/drivers/soc/nuvoton/npcm-espi-mmbi.c
+index 733a71610cb0..8449fbeff30e 100644
+--- a/drivers/soc/nuvoton/npcm-espi-mmbi.c
++++ b/drivers/soc/nuvoton/npcm-espi-mmbi.c
+@@ -464,7 +464,7 @@ static bool check_host_reset_request(struct npcm_mmbi_channel *channel)
+ 	return true;
+ }
+ 
+-void wake_up_device(struct npcm_mmbi_channel *channel)
++static void wake_up_device(struct npcm_mmbi_channel *channel)
+ {
+ 	u32 req_data_len, unread_data_len;
+ 	u8 type;
+-- 
+2.43.0
+

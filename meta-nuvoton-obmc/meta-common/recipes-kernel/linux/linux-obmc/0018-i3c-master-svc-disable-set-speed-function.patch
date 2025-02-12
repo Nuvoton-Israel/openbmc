@@ -1,0 +1,46 @@
+From 66ed135789425c1c9491fac312ad1fa157b75d9d Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Tue, 11 Feb 2025 18:02:09 +0800
+Subject: [PATCH] i3c: master: svc: disable set speed function
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ drivers/i3c/master/svc-i3c-master.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/i3c/master/svc-i3c-master.c b/drivers/i3c/master/svc-i3c-master.c
+index fd82f7533584..14e8e1454a4e 100644
+--- a/drivers/i3c/master/svc-i3c-master.c
++++ b/drivers/i3c/master/svc-i3c-master.c
+@@ -569,7 +569,7 @@ static irqreturn_t svc_i3c_master_irq_handler(int irq, void *dev_id)
+ 
+ 	return IRQ_HANDLED;
+ }
+-
++#if !defined(CONFIG_ARCH_NPCM)
+ static int svc_i3c_master_set_speed(struct i3c_master_controller *m,
+ 				     enum i3c_open_drain_speed speed)
+ {
+@@ -617,7 +617,7 @@ static int svc_i3c_master_set_speed(struct i3c_master_controller *m,
+ 
+ 	return ret;
+ }
+-
++#endif
+ static int svc_i3c_master_bus_init(struct i3c_master_controller *m)
+ {
+ 	struct svc_i3c_master *master = to_svc_i3c_master(m);
+@@ -1841,7 +1841,9 @@ static const struct i3c_master_controller_ops svc_i3c_master_ops = {
+ 	.disable_ibi = svc_i3c_master_disable_ibi,
+ 	.enable_hotjoin = svc_i3c_master_enable_hotjoin,
+ 	.disable_hotjoin = svc_i3c_master_disable_hotjoin,
++#if !defined(CONFIG_ARCH_NPCM)
+ 	.set_speed = svc_i3c_master_set_speed,
++#endif
+ };
+ 
+ static int svc_i3c_master_prepare_clks(struct svc_i3c_master *master)
+-- 
+2.43.0
+
