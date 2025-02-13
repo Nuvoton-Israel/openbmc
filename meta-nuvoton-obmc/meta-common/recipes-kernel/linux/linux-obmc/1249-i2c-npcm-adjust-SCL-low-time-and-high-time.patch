@@ -1,0 +1,44 @@
+From 525d45ab78270dd83947c59b6a99585372cb0876 Mon Sep 17 00:00:00 2001
+From: Brian Ma <chma0@nuvoton.com>
+Date: Mon, 7 Oct 2024 14:42:47 +0800
+Subject: [PATCH 1/2] i2c: npcm: adjust SCL low time and high time
+
+Add properties to adjust I2C SCL low time and high time.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Brian Ma <chma0@nuvoton.com>
+---
+ drivers/i2c/busses/i2c-npcm7xx.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-npcm7xx.c b/drivers/i2c/busses/i2c-npcm7xx.c
+index 706a9d64e481..8adf70a70413 100644
+--- a/drivers/i2c/busses/i2c-npcm7xx.c
++++ b/drivers/i2c/busses/i2c-npcm7xx.c
+@@ -2073,6 +2073,7 @@ static int npcm_i2c_init_clk(struct npcm_i2c *bus, u32 bus_freq_hz)
+ {
+ 	struct  smb_timing_t *smb_timing;
+ 	u8   scl_table_cnt = 0, table_size = 0;
++	u8   scl_ht, scl_lt;
+ 	u8   fast_mode = 0;
+ 
+ 	bus->bus_freq = bus_freq_hz;
+@@ -2121,8 +2122,13 @@ static int npcm_i2c_init_clk(struct npcm_i2c *bus, u32 bus_freq_hz)
+ 		 * k1 = 2 * SCLLT7-0 -> Low Time  = k1 / 2
+ 		 * k2 = 2 * SCLLT7-0 -> High Time = k2 / 2
+ 		 */
+-		iowrite8(smb_timing[scl_table_cnt].scllt, bus->reg + NPCM_I2CSCLLT);
+-		iowrite8(smb_timing[scl_table_cnt].sclht, bus->reg + NPCM_I2CSCLHT);
++		if (of_property_read_u8(bus->dev->of_node, "npcm,i2cscllt", &scl_lt))
++			scl_lt = smb_timing[scl_table_cnt].scllt;
++		if (of_property_read_u8(bus->dev->of_node, "npcm,i2csclht", &scl_ht))
++			scl_ht = smb_timing[scl_table_cnt].sclht;
++		iowrite8(scl_lt, bus->reg + NPCM_I2CSCLLT);
++		iowrite8(scl_ht, bus->reg + NPCM_I2CSCLHT);
++		dev_info(bus->dev, "set SCLLT:%02X, SCLHT:%02X\n", scl_lt, scl_ht);
+ 
+ 		iowrite8(smb_timing[scl_table_cnt].dbcnt, bus->reg + NPCM_I2CCTL5);
+ 	}
+-- 
+2.43.0
+

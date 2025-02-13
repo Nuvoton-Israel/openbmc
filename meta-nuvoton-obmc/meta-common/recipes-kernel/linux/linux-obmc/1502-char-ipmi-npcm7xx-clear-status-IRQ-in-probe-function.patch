@@ -1,0 +1,39 @@
+From 8275681d89cc65d103c68ac800e8cbff687b78a6 Mon Sep 17 00:00:00 2001
+From: Tomer Maimon <tmaimon77@gmail.com>
+Date: Sun, 5 Feb 2023 16:25:28 +0200
+Subject: [PATCH 3/3] char: ipmi: npcm7xx: clear status IRQ in probe function
+
+Make sure the status IRQ is cleared before enabling the IRQ in
+the probe function.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Tomer Maimon <tmaimon77@gmail.com>
+---
+ drivers/char/ipmi/kcs_bmc_npcm7xx.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/char/ipmi/kcs_bmc_npcm7xx.c b/drivers/char/ipmi/kcs_bmc_npcm7xx.c
+index 0650eb418dfd..825f20514000 100644
+--- a/drivers/char/ipmi/kcs_bmc_npcm7xx.c
++++ b/drivers/char/ipmi/kcs_bmc_npcm7xx.c
+@@ -169,6 +169,7 @@ static int npcm7xx_kcs_probe(struct platform_device *pdev)
+ 	struct npcm7xx_kcs_bmc *priv;
+ 	struct kcs_bmc_device *kcs_bmc;
+ 	u32 chan;
++	u32 val;
+ 	int rc;
+ 
+ 	rc = of_property_read_u32(dev->of_node, "kcs_chan", &chan);
+@@ -198,6 +199,9 @@ static int npcm7xx_kcs_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, priv);
+ 
++	/* clear KCS status before enable the IRQ */
++	rc = regmap_read(priv->map, priv->reg->sts, &val);
++
+ 	rc = npcm7xx_kcs_config_irq(kcs_bmc, pdev);
+ 	if (rc)
+ 		return rc;
+-- 
+2.43.0
+

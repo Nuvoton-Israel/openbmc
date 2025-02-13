@@ -1,0 +1,40 @@
+From 819d41bb92f1acaf170edb207dcb61a788289819 Mon Sep 17 00:00:00 2001
+From: Jim Liu <JJLIU0@nuvoton.com>
+Date: Tue, 4 Feb 2025 10:24:57 +0800
+Subject: [PATCH 2/2] i2c: npcm: Add slave enable/disable function
+
+Add bmc slave enable/disable control function
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Jim Liu <JJLIU0@nuvoton.com>
+---
+ drivers/i2c/busses/i2c-npcm7xx.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/drivers/i2c/busses/i2c-npcm7xx.c b/drivers/i2c/busses/i2c-npcm7xx.c
+index 8adf70a70413..3b8dd51ba50a 100644
+--- a/drivers/i2c/busses/i2c-npcm7xx.c
++++ b/drivers/i2c/busses/i2c-npcm7xx.c
+@@ -2508,6 +2508,19 @@ static void npcm_i2c_init_debugfs(struct platform_device *pdev,
+ 	bus->debugfs = d;
+ }
+ 
++void npcm_i2c_client_slave_enable(struct i2c_client *client, bool enable)
++{
++	struct npcm_i2c *bus = i2c_get_adapdata(client->adapter);
++	unsigned long flags;
++
++	spin_lock_irqsave(&bus->lock, flags);
++
++	npcm_i2c_slave_enable(bus, I2C_SLAVE_ADDR1, client->addr, enable);
++
++	spin_unlock_irqrestore(&bus->lock, flags);
++}
++EXPORT_SYMBOL(npcm_i2c_client_slave_enable);
++
+ static int npcm_i2c_probe_bus(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+-- 
+2.43.0
+

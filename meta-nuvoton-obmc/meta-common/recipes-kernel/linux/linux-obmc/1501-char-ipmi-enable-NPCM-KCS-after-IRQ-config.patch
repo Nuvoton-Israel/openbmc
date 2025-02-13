@@ -1,0 +1,33 @@
+From 5048b402d271a79459e4654637e88e86852fc37f Mon Sep 17 00:00:00 2001
+From: Tomer Maimon <tmaimon77@gmail.com>
+Date: Sun, 17 Apr 2022 11:53:54 +0300
+Subject: [PATCH 2/3] char: ipmi: enable NPCM KCS after IRQ config
+
+NPCM KCS IRQ probe order caused a crash because
+the IRQ was enabled before the IRQ handler was linked.
+
+this commit Modify probe IRQ order in the NPCM KCS
+driver to first link a handler to the interrupt
+and then enable the KCS channel and the IRQ.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Tomer Maimon <tmaimon77@gmail.com>
+---
+ drivers/char/ipmi/kcs_bmc_npcm7xx.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/char/ipmi/kcs_bmc_npcm7xx.c b/drivers/char/ipmi/kcs_bmc_npcm7xx.c
+index 0f048dc869e5..0650eb418dfd 100644
+--- a/drivers/char/ipmi/kcs_bmc_npcm7xx.c
++++ b/drivers/char/ipmi/kcs_bmc_npcm7xx.c
+@@ -201,6 +201,7 @@ static int npcm7xx_kcs_probe(struct platform_device *pdev)
+ 	rc = npcm7xx_kcs_config_irq(kcs_bmc, pdev);
+ 	if (rc)
+ 		return rc;
++	npcm7xx_kcs_enable_channel(kcs_bmc, true);
+ 
+ 	npcm7xx_kcs_irq_mask_update(kcs_bmc, (KCS_BMC_EVENT_TYPE_IBF | KCS_BMC_EVENT_TYPE_OBE), 0);
+ 	npcm7xx_kcs_enable_channel(kcs_bmc, true);
+-- 
+2.43.0
+

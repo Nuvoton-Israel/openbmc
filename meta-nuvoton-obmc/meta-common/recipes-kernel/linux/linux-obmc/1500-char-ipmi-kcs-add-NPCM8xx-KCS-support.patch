@@ -1,0 +1,26 @@
+From 101f00e2b6bcacf32a57c959ffbbe409598c828c Mon Sep 17 00:00:00 2001
+From: Tomer Maimon <tmaimon77@gmail.com>
+Date: Tue, 4 May 2021 23:02:35 +0300
+Subject: [PATCH 1/3] char: ipmi: kcs: add NPCM8xx KCS support
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Tomer Maimon <tmaimon77@gmail.com>
+---
+ drivers/char/ipmi/kcs_bmc_npcm7xx.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/char/ipmi/kcs_bmc_npcm7xx.c b/drivers/char/ipmi/kcs_bmc_npcm7xx.c
+index 7961fec56476..0f048dc869e5 100644
+--- a/drivers/char/ipmi/kcs_bmc_npcm7xx.c
++++ b/drivers/char/ipmi/kcs_bmc_npcm7xx.c
+@@ -233,6 +233,7 @@ static int npcm7xx_kcs_remove(struct platform_device *pdev)
+ 
+ static const struct of_device_id npcm_kcs_bmc_match[] = {
+ 	{ .compatible = "nuvoton,npcm750-kcs-bmc" },
++	{ .compatible = "nuvoton,npcm845-kcs-bmc" },
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, npcm_kcs_bmc_match);
+-- 
+2.43.0
+

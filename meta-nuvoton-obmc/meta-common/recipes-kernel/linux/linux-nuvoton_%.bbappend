@@ -23,6 +23,8 @@ SRC_URI:append = " file://1231-usb-chipidea-add-SRAM-allocation-support.patch"
 
 # NPCM8XX i2c driver
 SRC_URI:append = " file://1240-i2c-npcm-disable-interrupt-enable-bit-before-devm_re.patch"
+SRC_URI:append = " file://1249-i2c-npcm-adjust-SCL-low-time-and-high-time.patch"
+SRC_URI:append = " file://1250-i2c-npcm-Add-slave-enable-disable-function.patch"
 
 # NPCM8XX PCEI driver
 SRC_URI:append = " file://1260-pci-npcm-Add-NPCM-PCIe-RC-driver.patch"
@@ -107,6 +109,11 @@ SRC_URI:append = " file://0013-i3c-master-svc-fix-invalid-SlvStart-event.patch"
 SRC_URI:append = " file://0014-i3c-master-svc-skip-sclk.patch"
 SRC_URI:append = " file://0015-i3c-master-svc-disable-set-speed-function.patch"
 SRC_URI:append = " file://0016-i3c-master-svc-update-actual-read-length.patch"
+
+# KCS
+SRC_URI:append = " file://1500-char-ipmi-kcs-add-NPCM8xx-KCS-support.patch"
+SRC_URI:append = " file://1501-char-ipmi-enable-NPCM-KCS-after-IRQ-config.patch"
+SRC_URI:append = " file://1502-char-ipmi-npcm7xx-clear-status-IRQ-in-probe-function.patch"
 
 # npcm845 evb
 SRC_URI:append = " file://2001-update-dts-for-evb.patch"
