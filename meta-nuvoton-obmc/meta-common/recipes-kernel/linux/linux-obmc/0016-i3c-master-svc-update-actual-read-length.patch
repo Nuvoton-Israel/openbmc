@@ -1,0 +1,34 @@
+From 27ffb556a873ba9d7464fb0533a2d3b3901fc623 Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Thu, 13 Feb 2025 11:02:46 +0800
+Subject: [PATCH] i3c: master: svc: update actual read length
+
+The actual read length can be shorter than requested.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ drivers/i3c/master/svc-i3c-master.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/drivers/i3c/master/svc-i3c-master.c b/drivers/i3c/master/svc-i3c-master.c
+index fbe947120733..6137ca4fe24b 100644
+--- a/drivers/i3c/master/svc-i3c-master.c
++++ b/drivers/i3c/master/svc-i3c-master.c
+@@ -1641,6 +1641,13 @@ static int svc_i3c_master_priv_xfers(struct i3c_dev_desc *dev,
+ 		svc_i3c_master_dequeue_xfer(master, xfer);
+ 	mutex_unlock(&master->lock);
+ 
++	/* Update actual read length */
++	for (i = 0; i < nxfers; i++) {
++		struct svc_i3c_cmd *cmd = &xfer->cmds[i];
++
++		if (xfers[i].rnw)
++			xfers[i].len = cmd->actual_len;
++	}
+ 	ret = xfer->ret;
+ 	svc_i3c_master_free_xfer(xfer);
+ 
+-- 
+2.34.1
+

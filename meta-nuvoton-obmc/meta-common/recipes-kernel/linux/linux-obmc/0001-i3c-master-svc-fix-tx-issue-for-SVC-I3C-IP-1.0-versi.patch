@@ -1,8 +1,7 @@
-From 9944f905eb1e177d3fb8d0a07153693c583d2750 Mon Sep 17 00:00:00 2001
+From 75b716a70e4e15ccd65cbb5460b07625e837702c Mon Sep 17 00:00:00 2001
 From: Joseph Liu <kwliu@nuvoton.com>
 Date: Tue, 11 Feb 2025 10:25:11 +0800
-Subject: [PATCH 01/16] i3c: master: svc: fix tx issue for SVC I3C IP 1.0
- version
+Subject: [PATCH] i3c: master: svc: fix tx issue for SVC I3C IP 1.0 version
 
 There is an HW issue in SVC I3C IP 1.0:
 - I3C HW stalls the write transfer if the transmit FIFO becomes empty,
@@ -15,11 +14,11 @@ Workaround:
 Upstream-Status: Pending [Not submitted to upstream yet]
 Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
 ---
- drivers/i3c/master/svc-i3c-master.c | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ drivers/i3c/master/svc-i3c-master.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
 diff --git a/drivers/i3c/master/svc-i3c-master.c b/drivers/i3c/master/svc-i3c-master.c
-index c5ab39f1e755..fdd2582164d2 100644
+index c5ab39f1e755..91f5ed527851 100644
 --- a/drivers/i3c/master/svc-i3c-master.c
 +++ b/drivers/i3c/master/svc-i3c-master.c
 @@ -102,6 +102,9 @@
@@ -32,7 +31,7 @@ index c5ab39f1e755..fdd2582164d2 100644
  #define   SVC_I3C_MDATACTRL_TXFULL BIT(30)
  #define   SVC_I3C_MDATACTRL_RXEMPTY BIT(31)
  
-@@ -1121,6 +1124,29 @@ static int svc_i3c_master_xfer(struct svc_i3c_master *master,
+@@ -1121,6 +1124,30 @@ static int svc_i3c_master_xfer(struct svc_i3c_master *master,
  	int retry = 2;
  	u32 reg;
  	int ret;
@@ -57,11 +56,12 @@ index c5ab39f1e755..fdd2582164d2 100644
 +				writel(out[0], master->regs + SVC_I3C_MWDATAB);
 +			out++;
 +		}
++		xfer_len -= count;
 +	}
 +#endif
  
  	/* clean SVC_I3C_MINT_IBIWON w1c bits */
  	writel(SVC_I3C_MINT_IBIWON, master->regs + SVC_I3C_MSTATUS);
 -- 
-2.43.0
+2.34.1
 

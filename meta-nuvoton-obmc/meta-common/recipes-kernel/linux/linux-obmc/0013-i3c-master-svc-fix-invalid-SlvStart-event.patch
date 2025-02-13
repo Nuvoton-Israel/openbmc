@@ -1,0 +1,72 @@
+From 4f455c2a044b49df6c8e097ba96ede25c6707478 Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Thu, 13 Oct 2022 17:10:51 +0800
+Subject: [PATCH] i3c: master: svc: fix invalid SlvStart event
+
+1. Clear SLVSTART status after emitting a STOP
+2. Sort out the false event in irq handler
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ drivers/i3c/master/svc-i3c-master.c | 22 ++++++++++++++++++----
+ 1 file changed, 18 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/i3c/master/svc-i3c-master.c b/drivers/i3c/master/svc-i3c-master.c
+index 30065a536ea3..5cb42bb1be0c 100644
+--- a/drivers/i3c/master/svc-i3c-master.c
++++ b/drivers/i3c/master/svc-i3c-master.c
+@@ -61,6 +61,7 @@
+ #define   SVC_I3C_MSTATUS_STATE(x) FIELD_GET(GENMASK(2, 0), (x))
+ #define   SVC_I3C_MSTATUS_STATE_DAA(x) (SVC_I3C_MSTATUS_STATE(x) == 5)
+ #define   SVC_I3C_MSTATUS_STATE_IDLE(x) (SVC_I3C_MSTATUS_STATE(x) == 0)
++#define   SVC_I3C_MSTATUS_STATE_SLVREQ(x) (SVC_I3C_MSTATUS_STATE(x) == 1)
+ #define   SVC_I3C_MSTATUS_BETWEEN(x) FIELD_GET(BIT(4), (x))
+ #define   SVC_I3C_MSTATUS_NACKED(x) FIELD_GET(BIT(5), (x))
+ #define   SVC_I3C_MSTATUS_IBITYPE(x) FIELD_GET(GENMASK(7, 6), (x))
+@@ -375,6 +376,11 @@ svc_i3c_master_dev_from_addr(struct svc_i3c_master *master,
+ static void svc_i3c_master_emit_stop(struct svc_i3c_master *master)
+ {
+ 	writel(SVC_I3C_MCTRL_REQUEST_STOP, master->regs + SVC_I3C_MCTRL);
++	/*
++	 * HW issue Workaround:
++	 * Clear the SlaveStart status after emitting a STOP
++	 */
++	writel(SVC_I3C_MINT_SLVSTART, master->regs + SVC_I3C_MSTATUS);
+ 
+ 	/*
+ 	 * This delay is necessary after the emission of a stop, otherwise eg.
+@@ -561,10 +567,16 @@ static irqreturn_t svc_i3c_master_irq_handler(int irq, void *dev_id)
+ 	/* Clear the interrupt status */
+ 	writel(SVC_I3C_MINT_SLVSTART, master->regs + SVC_I3C_MSTATUS);
+ 
+-	svc_i3c_master_disable_interrupts(master);
+-
+-	/* Handle the interrupt in a non atomic context */
+-	queue_work(master->base.wq, &master->ibi_work);
++	/*
++	 * HW issue workaround:
++	 * I3C HW may generate a invald SlvStart when emitting a STOP.
++	 * Check the state to sort out the false event.
++	 */
++	if (SVC_I3C_MSTATUS_STATE_SLVREQ(active)) {
++		svc_i3c_master_disable_interrupts(master);
++		/* Handle the interrupt in a non atomic context */
++		queue_work(master->base.wq, &master->ibi_work);
++	}
+ 
+ 	return IRQ_HANDLED;
+ }
+@@ -1748,6 +1760,8 @@ static int svc_i3c_master_enable_ibi(struct i3c_dev_desc *dev)
+ 	}
+ 
+ 	master->enabled_events++;
++	/* Clear the interrupt status */
++	writel(SVC_I3C_MINT_SLVSTART, master->regs + SVC_I3C_MSTATUS);
+ 	svc_i3c_master_enable_interrupts(master, SVC_I3C_MINT_SLVSTART);
+ 
+ 	return i3c_master_enec_locked(m, dev->info.dyn_addr, I3C_CCC_EVENT_SIR);
+-- 
+2.34.1
+
