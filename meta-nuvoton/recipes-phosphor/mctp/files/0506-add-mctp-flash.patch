@@ -1,0 +1,239 @@
+From 57a0b5ac092e9f40973794d4d95305d078e89b7b Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Fri, 14 Feb 2025 15:37:25 +0800
+Subject: [PATCH] add mctp-flash
+
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ meson.build      |   5 ++
+ src/mctp-flash.c | 202 +++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 207 insertions(+)
+ create mode 100644 src/mctp-flash.c
+
+diff --git a/meson.build b/meson.build
+index 7d605cb..d00db4e 100644
+--- a/meson.build
++++ b/meson.build
+@@ -34,6 +34,11 @@ executable('mctp',
+     install: true,
+ )
+ 
++executable('mctp-flash',
++    sources: ['src/mctp-flash.c'] + util_sources,
++    install: true,
++)
++
+ executable('mctp-req',
+     sources: ['src/mctp-req.c'] + util_sources,
+ )
+diff --git a/src/mctp-flash.c b/src/mctp-flash.c
+new file mode 100644
+index 0000000..5f2076d
+--- /dev/null
++++ b/src/mctp-flash.c
+@@ -0,0 +1,202 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <unistd.h>
++#include <err.h>
++#include <string.h>
++#include <sys/socket.h>
++#include <stdbool.h>
++
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <sys/ioctl.h>
++#include <fcntl.h>
++#include <mtd/mtd-user.h>
++
++#include "mctp.h"
++
++#define MCTP_MESSAGE_TYPE_OEM	0x5E
++/* MCTP flash command */
++#define MCTP_FLASH_READ         0
++#define MCTP_FLASH_WRITE        1
++#define MCTP_FLASH_ERASE        2
++#define MCTP_FLASH_CMD_MASK     0x7F
++#define MCTP_FLASH_CMD_RESP     0x80
++
++/* MCTP flash return code */
++#define MCTP_FLASH_RC_OK        0
++#define MCTP_FLASH_RC_FAIL      1
++
++#define MAX_READ_LEN		1024
++typedef struct __attribute__((packed)) {
++	uint8_t cmd;
++        uint32_t offset;
++        uint16_t len;
++	uint8_t data[];
++} mctp_flash_msg;
++
++char resp_buf[MAX_READ_LEN + 7];
++char *flash_cmd_str[] = { "READ", "WRITE", "ERASE" };
++
++int main(int argc, char **argv)
++{
++	struct sockaddr_mctp addr;
++	unsigned char *buf;
++	socklen_t addrlen;
++	size_t buflen;
++	ssize_t len;
++	int rc, sd;
++	char *endp, *optname, *optval;
++	unsigned int tmp;
++	bool valid_parse;
++	int i;
++	mctp_eid_t eid = MCTP_ADDR_ANY;
++	unsigned int net = MCTP_NET_ANY;
++	int flash_fd;
++	mctp_flash_msg *flash_resp = (mctp_flash_msg *)&resp_buf[0];
++	mctp_flash_msg *flash_req;
++	bool verbose = false;
++
++	if (!(argc % 2)) {
++		warnx("extra argument %s", argv[argc-1]);
++		return 255;
++	}
++
++	for (i = 1; i < argc; i += 2) {
++		optname = argv[i];
++		optval = argv[i+1];
++
++		tmp = strtoul(optval, &endp, 0);
++		valid_parse = (endp != optval);
++
++		if (!strcmp(optname, "eid")) {
++			if (tmp > 0xff)
++				errx(EXIT_FAILURE, "Bad eid");
++			eid = tmp;
++		} else if (!strcmp(optname, "net")) {
++			if (tmp > 0xff)
++				errx(EXIT_FAILURE, "Bad net");
++			net = tmp;
++		} else if (!strcmp(optname, "verbose")) {
++			verbose = true;
++		} else
++			errx(EXIT_FAILURE, "Unknown argument %s", optname);
++
++		// Handle bad integer etc.
++		if (!valid_parse) {
++			errx(EXIT_FAILURE, "invalid %s value %s",
++					optname, optval);
++		}
++	}
++	sd = socket(AF_MCTP, SOCK_DGRAM, 0);
++	if (sd < 0)
++		err(EXIT_FAILURE, "socket");
++
++	memset(&addr, 0, sizeof(addr));
++	addr.smctp_family = AF_MCTP;
++	addr.smctp_network = net;
++	addr.smctp_addr.s_addr = eid;
++	addr.smctp_type = MCTP_MESSAGE_TYPE_OEM;
++	addr.smctp_tag = MCTP_TAG_OWNER;
++
++	buflen = 0;
++	buf = NULL;
++
++	printf("bind on eid %d net %d\n", eid, net);
++	rc = bind(sd, (struct sockaddr *)&addr, sizeof(addr));
++	if (rc)
++		err(EXIT_FAILURE, "bind");
++
++	if ((flash_fd = open("/dev/mtd/by-name/npcm-espi-flash", O_RDWR)) < 0) {
++		err(EXIT_FAILURE, "open flash");
++	}
++
++	for (;;) {
++		len = recvfrom(sd, NULL, 0, MSG_PEEK | MSG_TRUNC, NULL, 0);
++		if (len < 0) {
++			warn("recvfrom(MSG_PEEK)");
++			continue;
++		}
++
++		if ((size_t)len > buflen) {
++			buflen = len;
++			buf = realloc(buf, buflen);
++			if (!buf)
++				err(EXIT_FAILURE, "realloc(%zd)", buflen);
++		}
++
++		addrlen = sizeof(addr);
++		len = recvfrom(sd, buf, buflen, 0,
++				(struct sockaddr *)&addr, &addrlen);
++		if (len < 0) {
++			warn("recvfrom");
++			continue;
++		}
++
++		if (addrlen != sizeof(addr)) {
++			warnx("unknown address length %d, exp %zd",
++				addrlen, sizeof(addr));
++			continue;
++		}
++
++		if (len < sizeof(mctp_flash_msg)) {
++			warn("invalid req");
++			continue;
++		}
++
++		flash_req = (mctp_flash_msg *)buf;
++		if (verbose)
++			printf("%s: offset 0x%x len %d\n", flash_cmd_str[flash_req->cmd],
++				flash_req->offset, flash_req->len);
++		if (flash_req->offset != lseek(flash_fd, flash_req->offset, SEEK_SET)) {
++			err(EXIT_FAILURE, "lseek(%x)", flash_req->offset);
++		}
++
++		flash_resp->cmd = flash_req->cmd | MCTP_FLASH_CMD_RESP;
++		flash_resp->offset = flash_req->offset;
++		if (flash_req->cmd == MCTP_FLASH_READ) {
++			if (flash_req->len > MAX_READ_LEN) {
++				err(EXIT_FAILURE, "invalid MCTP_FLASH_READ length %d", flash_req->len);
++			}
++			len = read(flash_fd, flash_resp->data, flash_req->len);
++			if (len <= 0) {
++				err(EXIT_FAILURE, "mctp_flash err(cmd %d)", (int)flash_req->cmd);
++			} else {
++				flash_resp->len = len;
++			}
++		} else if (flash_req->cmd == MCTP_FLASH_WRITE) {
++			len = write(flash_fd, flash_req->data, flash_req->len);
++			if (len < flash_req->len) {
++				err(EXIT_FAILURE, "mctp_flash err(cmd %d)", (int)flash_req->cmd);
++			} else {
++				flash_resp->len = len;
++			}
++		} else if (flash_req->cmd == MCTP_FLASH_ERASE) {
++			struct erase_info_user erase;
++			erase.start = flash_req->offset;
++			erase.length = 0x1000; // default 4K erase
++			//if (respLen == PLDM_OEM_META_FLASH_ERASE_64K)
++			//	erase.length = 0x10000;
++			rc = ioctl(flash_fd, MEMERASE, &erase);
++			if (rc < 0) {
++				err(EXIT_FAILURE, "mctp_flash err(cmd %d)", (int)flash_req->cmd);
++			} else {
++				flash_resp->len = flash_req->len;
++			}
++		} else {
++			err(EXIT_FAILURE, "mctp_flash err(cmd %d)", (int)flash_req->cmd);
++		}
++
++		addr.smctp_tag &= ~MCTP_TAG_OWNER;
++		rc = sendto(sd, resp_buf, len + sizeof(mctp_flash_msg), 0,
++				(struct sockaddr *)&addr, sizeof(addr));
++		if (rc != (int)(len + sizeof(mctp_flash_msg))) {
++			err(EXIT_FAILURE, "sendto(rc %d)", rc);
++		}
++	}
++	close(flash_fd);
++
++	return EXIT_SUCCESS;
++}
+-- 
+2.34.1
+
