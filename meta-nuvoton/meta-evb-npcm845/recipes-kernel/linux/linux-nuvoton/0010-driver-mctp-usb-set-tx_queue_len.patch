@@ -1,0 +1,25 @@
+From db4ad454af9ce39c77d4cea5e8c8e02bfe088111 Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Fri, 14 Feb 2025 15:32:45 +0800
+Subject: [PATCH] driver: mctp usb: set tx_queue_len
+
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ drivers/net/mctp/mctp-usb.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/net/mctp/mctp-usb.c b/drivers/net/mctp/mctp-usb.c
+index 1dd406ab0ebb..1b9517463391 100644
+--- a/drivers/net/mctp/mctp-usb.c
++++ b/drivers/net/mctp/mctp-usb.c
+@@ -277,6 +277,7 @@ static void mctp_usb_netdev_setup(struct net_device *dev)
+ 	dev->max_mtu = MCTP_USB_MTU_MAX;
+ 
+ 	dev->hard_header_len = sizeof(struct mctp_usb_hdr);
++	dev->tx_queue_len = DEFAULT_TX_QUEUE_LEN;
+ 	dev->addr_len = 0;
+ 	dev->flags = IFF_NOARP;
+ 	dev->netdev_ops = &mctp_usb_netdev_ops;
+-- 
+2.34.1
+

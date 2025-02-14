@@ -48,3 +48,4 @@ SRC_URI:append:evb-npcm845 = " file://0007-driver-mctp-usb-set-max-mtu-to-255.pa
 SRC_URI:append:evb-npcm845 = " file://0008-usb-gadget-f_mctp-fix-kernel-panic.patch"
 SRC_URI:append:evb-npcm845 = " file://0001-driver-soc-nuvoton-add-espi-slave-driver.patch"
 SRC_URI:append:evb-npcm845 = " file://0009-driver-mctp-usb-correct-statistics.patch"
+SRC_URI:append:evb-npcm845 = " file://0010-driver-mctp-usb-set-tx_queue_len.patch"
