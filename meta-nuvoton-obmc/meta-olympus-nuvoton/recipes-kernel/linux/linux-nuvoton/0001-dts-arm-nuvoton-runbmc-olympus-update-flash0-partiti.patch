@@ -1,0 +1,55 @@
+From e458a388855c6ddc700231a3e9be8bcf025b0056 Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Tue, 18 Feb 2025 17:07:35 +0800
+Subject: [PATCH] dts: arm: nuvoton: runbmc-olympus: update flash0 partition
+
+Upstream-Status: Inappropriate [oe-specific]
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts b/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts
+index d228403e7aef..bd0aca212967 100644
+--- a/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts
++++ b/arch/arm/boot/dts/nuvoton-npcm750-runbmc-olympus.dts
+@@ -157,18 +157,19 @@
+ 				reg = <0>;
+ 				spi-max-frequency = <50000000>;
+ 				spi-rx-bus-width = <2>;
++				spi-tx-bus-width = <2>;
++
+ 				partitions@80000000 {
+ 					compatible = "fixed-partitions";
+ 					#address-cells = <1>;
+ 					#size-cells = <1>;
+ 					bmc@0{
+ 						label = "bmc";
+-						reg = <0x000000 0x2000000>;
++						reg = <0x000000 0x4000000>;
+ 					};
+ 					u-boot@0 {
+ 						label = "u-boot";
+-						reg = <0x0000000 0xC0000>;
+-						read-only;
++						reg = <0x0000000 0xc0000>;
+ 					};
+ 					u-boot-env@100000{
+ 						label = "u-boot-env";
+@@ -180,11 +181,11 @@
+ 					};
+ 					rofs@800000 {
+ 						label = "rofs";
+-						reg = <0x800000 0x1500000>;
++						reg = <0x800000 0x3500000>;
+ 					};
+ 					rwfs@1d00000 {
+ 						label = "rwfs";
+-						reg = <0x1d00000 0x300000>;
++						reg = <0x3d00000 0x300000>;
+ 					};
+ 				};
+ 			};
+-- 
+2.43.0
+

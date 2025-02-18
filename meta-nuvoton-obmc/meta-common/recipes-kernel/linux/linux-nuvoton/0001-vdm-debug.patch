@@ -1,0 +1,401 @@
+From 3e33a16246ca7559e301cab2df75e91a358eb875 Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Tue, 18 Feb 2025 17:09:25 +0800
+Subject: [PATCH] vdm debug
+
+Upstream-Status: Inappropriate [oe-specific]
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ drivers/misc/npcm-vdm/vdm_common.c |  19 ++++--
+ drivers/misc/npcm-vdm/vdm_module.c | 105 ++++++++++++++++++++++-------
+ 2 files changed, 96 insertions(+), 28 deletions(-)
+
+diff --git a/drivers/misc/npcm-vdm/vdm_common.c b/drivers/misc/npcm-vdm/vdm_common.c
+index b622da52dda7..33a8ac0c0b77 100644
+--- a/drivers/misc/npcm-vdm/vdm_common.c
++++ b/drivers/misc/npcm-vdm/vdm_common.c
+@@ -16,6 +16,7 @@
+ #include "vdm_api.h"
+ #include "CircularBuffer.h"
+ 
++
+ extern void __iomem *vdm_virt_addr;
+ extern void __iomem *vdma_virt_addr;
+ extern struct regmap *gcr_regmap;
+@@ -45,7 +46,9 @@ void clear_reg_bit(int bit, void __iomem *reg)
+ 
+ uint32_t vdma_rx_buff_size_int,*vdma_rx_buff,*vdma_rx_buff_virt_addr;
+ static uint8_t ready_for_transmit=0;
++#ifndef CONFIG_ARM64
+ extern void nano_delay(uint32_t nsec);
++#endif
+ 
+ VDMA_STATUS_t vdma_is_data_ready(void)
+ {
+@@ -404,8 +407,11 @@ int vdm_SendMessage(uint8_t route_type, uint16_t aBDF,uint8_t  *apData,uint32_t
+ 			if((read_reg_bit(VDM_TX_DONE_BIT_POS, vdm_virt_addr + VDM_STAT_REG) == 1) || vdm_is_in_reset())
+ 				break;
+ 			else
++#ifndef CONFIG_ARM64
+ 				nano_delay(100);
+-
++#else
++				ndelay(100);
++#endif
+ 		}
+ 
+ 		iowrite32(1 << VDM_TX_DONE_BIT_POS, vdm_virt_addr + VDM_STAT_REG);// clear status
+@@ -502,6 +508,7 @@ int vdm_init_common(uint32_t *apVdma_rx_buff,uint32_t *apVdma_rx_buff_virt_addr,
+ #if LINUX_VERSION_CODE < KERNEL_VERSION(4,17,0)
+ 	unsigned long flags;
+ #endif
++#if 0
+ 	vdma_rx_buff	=	apVdma_rx_buff;
+ 	vdma_rx_buff_virt_addr = apVdma_rx_buff_virt_addr;
+ 
+@@ -512,9 +519,11 @@ int vdm_init_common(uint32_t *apVdma_rx_buff,uint32_t *apVdma_rx_buff_virt_addr,
+ 	}
+ 
+ 	vdma_rx_buff_size_int   = (buff_size_in_16kb * (16384))/sizeof(uint32_t);
+-
+-	regmap_update_bits(gcr_regmap, PHY_SELECT_FOR_PCIE_BRIDGE_REG,
+-			   BIT(PHY_SELECT_FOR_PCIE_BRIDGE_FIELD_POS), 0x0);
++#endif
++	if (gcr_regmap)
++		regmap_update_bits(gcr_regmap, PHY_SELECT_FOR_PCIE_BRIDGE_REG,
++				   BIT(PHY_SELECT_FOR_PCIE_BRIDGE_FIELD_POS),
++				   0x0);
+ 
+ 	/****** configure VDM Module *********/
+ 	/*************************************************/
+@@ -539,6 +548,7 @@ int vdm_init_common(uint32_t *apVdma_rx_buff,uint32_t *apVdma_rx_buff_virt_addr,
+ 	reg_val =  BIT(VDM_INT_EN_REG_RX_INT_BIT_POS) ;  // enable rx int
+ 	iowrite32(reg_val, vdm_virt_addr + VDM_INT_EN_REG);
+ 
++#if 0
+ 	/****** configure VDMA Module *********/
+ 	/*************************************************/
+ 	iowrite32(0x00, vdma_virt_addr + VDMA_CNT_REG);// disable
+@@ -570,6 +580,7 @@ int vdm_init_common(uint32_t *apVdma_rx_buff,uint32_t *apVdma_rx_buff_virt_addr,
+ 			BIT(VDMA_CNT_REG_ENABLE_POS) ;  		//  enable
+ 
+ 	iowrite32(reg_val, vdma_virt_addr + VDMA_CNT_REG);
++#endif
+ 
+ 	ready_for_transmit = 1;
+ 	return 0;
+diff --git a/drivers/misc/npcm-vdm/vdm_module.c b/drivers/misc/npcm-vdm/vdm_module.c
+index 1cdcab95e8ae..20d482004048 100644
+--- a/drivers/misc/npcm-vdm/vdm_module.c
++++ b/drivers/misc/npcm-vdm/vdm_module.c
+@@ -24,6 +24,7 @@
+ #include "CircularBuffer.h"
+ #include "vdm_common.h"
+ #include <linux/delay.h>
++#include <linux/kfifo.h>
+ 
+ #ifdef CONFIG_OF
+ #include <linux/of.h>
+@@ -39,8 +40,10 @@ void __iomem *vdm_virt_addr;
+ void __iomem *vdma_virt_addr;
+ 
+ 
++
+ static const struct of_device_id vdm_dt_npcm750_match[] = {
+        { .compatible = "nuvoton,npcm750-vdm" },
++       { .compatible = "nuvoton,npcm845-vdm" },
+        { /*sentinel*/ },
+ };
+ 
+@@ -52,7 +55,7 @@ static const struct of_device_id vdm_dt_npcm750_match[] = {
+ #define _128KB_ (128*1024)
+ 
+ //#DEBUG
+-
++static struct kfifo fifo;
+ static int majornum = 0;           /* default to dynamic major */
+ module_param(majornum, int, 0);
+ MODULE_PARM_DESC(majornum, "Major device number");
+@@ -123,20 +126,23 @@ static int dummy_vdma_dev;
+ 
+ static vdm_instance_t *pVDM_Instance_Default = NULL ;
+ 
+-static void vdm_tasklet_function( unsigned long data );
++//static void vdm_tasklet_function( unsigned long data );
+ static void vdm_tasklet_function_with_overflow( unsigned long data );
+ 
+ static void reset_poll_routine(struct work_struct *irrelevant);
+ static DECLARE_DELAYED_WORK(reset_poll_work, reset_poll_routine);
+ static uint32_t vdm_data_for_platform;
+ 
++#ifndef CONFIG_ARM64
+ extern void __loop_nanodelay(unsigned long usecs);
++#endif
+ 
+ /*VDM DEBUG MACRO*/
+ #define VDM_DEBUG_LOG(BDF, f, x...)                                                           \
+ 	if(vdm_debug_control && (BDF & vdm_bdf_debug_flag))                                   \
+             printk(KERN_DEBUG "%s():line %d: ox%X" f, __func__, __LINE__,BDF,## x);                   \
+ 
++#ifndef CONFIG_ARM64
+ /* function : ndelay
+  *
+  *
+@@ -146,6 +152,7 @@ void nano_delay(uint32_t nsec)
+ {
+ 	__loop_nanodelay(nsec);
+ }
++#endif
+ 
+ /* function : copy_to_user_wrapper
+  *
+@@ -227,13 +234,14 @@ static int _vdm_open(void)
+ 	{
+ 		if(vdm_init_common(vdma_buff, vdma_buff_virt_addr , VDMA_BUFF_BYTE_SIZE))
+ 			return -EINVAL;
+-
++#if 0
+ 		/*-----------------------------------------------------------------------------------------------------*/
+ 		/* Init tasklets.                                                                                      */
+ 		/*-----------------------------------------------------------------------------------------------------*/
+ 		tasklet_init(&vdm_tasklet, vdm_tasklet_function, 0);
+-		tasklet_init(&vdm_tasklet_with_overflow, vdm_tasklet_function_with_overflow, 0);
++#endif
+ 
++		tasklet_init(&vdm_tasklet_with_overflow, vdm_tasklet_function_with_overflow, 0);
+ 		vdm_status = VDM_STATUS_OPENED;
+ 	}
+ 
+@@ -248,8 +256,8 @@ static void _vdm_close(void)
+ 	vdm_exit_common();
+ 	if(VDM_STATUS_OPENED == vdm_status)
+ 	{
+-		tasklet_kill( &vdm_tasklet );
+-		tasklet_kill( &vdm_tasklet_with_overflow );
++		/*tasklet_kill( &vdm_tasklet );
++		tasklet_kill( &vdm_tasklet_with_overflow );*/
+ 
+ 		// reinit vdm_instances
+ 		list_for_each(pList, &vdm_instances_list)
+@@ -270,13 +278,14 @@ static ssize_t vdm_read(struct file *filp, char *buf, size_t count, loff_t *f_po
+ 	unsigned long flags;
+ 	uint32_t num_of_items_to_read_from_buff =0 ;//, StartPosToRead;
+         uint16_t tBDF = 0;
++	unsigned int copied;
+ 	vdm_instance_t *pVDM_Instance;
+ 	pVDM_Instance=filp->private_data;
+ 
+-	count = count/sizeof(uint32_t); // count is in bytes. we need to convert it to words
++	//count = count/sizeof(uint32_t); // count is in bytes. we need to convert it to words
+         tBDF = pVDM_Instance->mBDF;
+ 
+-	while(1)
++	//while(1)
+ 	{
+ 		spin_lock_irqsave(&lock, flags);
+ 		if(0 == pVDM_Instance->BDF_is_set)
+@@ -298,7 +307,8 @@ static ssize_t vdm_read(struct file *filp, char *buf, size_t count, loff_t *f_po
+ 			ret = -EINTR;
+ 			goto unlock_and_exit;
+ 		}
+-
++	
++#if 0
+ 		num_of_items_to_read_from_buff = cbRead(&pVDM_Instance->circularBuffer, buf, count);
+ 
+ 		ret = num_of_items_to_read_from_buff<<2;
+@@ -317,6 +327,11 @@ static ssize_t vdm_read(struct file *filp, char *buf, size_t count, loff_t *f_po
+ 				goto unlock_and_exit;
+ 			}
+ 		}
++#endif
++		if ((!kfifo_len(&fifo)) && (filp->f_flags & O_NONBLOCK)) {
++			ret = -EAGAIN;
++			goto unlock_and_exit;
++		}
+ 
+ 		if (vdm_is_in_reset())
+ 		{
+@@ -335,8 +350,10 @@ static ssize_t vdm_read(struct file *filp, char *buf, size_t count, loff_t *f_po
+ 		spin_unlock_irqrestore(&lock, flags);
+ 
+                 VDM_DEBUG_LOG(tBDF,"Going event interruptible state \n");
+-		wait_event_interruptible( pVDM_Instance->in_data_available_wait ,
+-				(vdm_is_in_reset() || ( 0 != cbGetNumOfElements(&pVDM_Instance->circularBuffer) ) ));
++		wait_event_interruptible(pVDM_Instance->in_data_available_wait,
++					 (vdm_is_in_reset() || (0 != kfifo_len(&fifo))));
++
++		ret = kfifo_to_user(&fifo, buf, count, &copied);
+ 	}
+ 
+ unlock_and_exit:
+@@ -344,8 +361,9 @@ static ssize_t vdm_read(struct file *filp, char *buf, size_t count, loff_t *f_po
+ 	if(pVDM_Instance->last_errors)
+ 		ret = -EIO;
+ 
+-	spin_unlock_irqrestore(&lock,   flags);
+-	return (ret);
++	spin_unlock_irqrestore(&lock, flags);
++
++	return ret ? ret : copied;
+ }
+ 
+ /* function : vdm_write
+@@ -781,6 +799,7 @@ found_instance :
+ 	}
+ }
+ 
++#if 0
+ /* function : vdm_tasklet_function
+  *
+  *
+@@ -794,7 +813,7 @@ static void vdm_tasklet_function( unsigned long data )
+ 	vdma_copy_packets_from_buffer(receive_packet_func);
+ 	spin_unlock_irqrestore(&lock,   flags);
+ }
+-
++#endif
+ /* function : vdm_tasklet_function
+  *
+  *
+@@ -805,10 +824,9 @@ static void vdm_tasklet_function_with_overflow( unsigned long data )
+ 	unsigned long flags;
+ 	//pr_debug("<1>vdm:vdm_tasklet_function with overflow\n");
+ 
+-	spin_lock_irqsave(&lock,   flags);
+-
+-	vdma_copy_packets_from_buffer_with_overflow(receive_packet_func);
+-	spin_unlock_irqrestore(&lock,   flags);
++	//spin_lock_irqsave(&lock,   flags);
++	vdm_init_common(vdma_buff, vdma_buff_virt_addr , VDMA_BUFF_BYTE_SIZE);
++	//spin_unlock_irqrestore(&lock,   flags);
+ 
+ }
+ 
+@@ -821,7 +839,35 @@ static irqreturn_t vdma_isr(int irq, void *dev_id)
+ {
+ 	struct list_head *pList;
+ 	vdm_instance_t *pVDM_Instance;
++	u32 status, rx_data;
++	int size, i;
++
++	status = ioread32(vdm_virt_addr + VDM_STAT_REG_ADDR);
++	iowrite32(status, vdm_virt_addr + VDM_STAT_REG_ADDR);
++	if (status & VDM_RX_FULL_BIT_POS) {
++		list_for_each(pList, &vdm_instances_list)
++		{
++			//pr_debug("<1>vdm:vdm fifo overflowed\n");
++			pVDM_Instance = list_entry(pList, vdm_instance_t, list);
++			pVDM_Instance->last_errors |= PCIE_VDM_ERR_HW_FIFO_OVERFLOW;
++			pr_info("vdma_isr FIFO drop 0x%x\n",status);
++			tasklet_schedule(&vdm_tasklet_with_overflow);
++		}
++		return IRQ_HANDLED;
++	}
++	if (status & VDM_RX_DONE_BIT_POS){
++		size = (status >> 16) & 0xFF;
++		for(i=0; i < size; i++) {
++			rx_data = ioread32(vdm_virt_addr + VDM_RXF_REG_ADDR);
++			kfifo_in(&fifo, &rx_data, sizeof(rx_data));
++		}
++		wake_up_interruptible(&pVDM_Instance->in_data_available_wait);
++		return IRQ_HANDLED;
++	}
++
++	return IRQ_NONE;
+ 
++#if 0
+ 	irqreturn_t irqreturn = IRQ_NONE;
+ 
+ 	VDMA_STATUS_t status  ;
+@@ -867,7 +913,7 @@ static irqreturn_t vdma_isr(int irq, void *dev_id)
+ 	irqreturn = IRQ_HANDLED;
+ 
+ 	return irqreturn;
+-
++#endif
+ }
+ 
+ //#define  _USE_VDMA_POLLING
+@@ -1038,6 +1084,7 @@ static int vdm_init(void)
+ 	struct resource res;
+ #endif
+ 
++	pr_info("\tvdm_init\n\n");
+ 	loops_per_jiffy_for_ndelay = loops_per_jiffy / 1000;
+ 	//printk("vdm : loops for ndelay %lu  \n",loops_per_jiffy_for_ndelay);
+ 
+@@ -1097,33 +1144,37 @@ static int vdm_init(void)
+ 		return -EINVAL;
+ 	}
+ 
+-	vdm_virt_addr = ioremap_nocache(res.start, resource_size(&res));
++	vdm_virt_addr = ioremap(res.start, resource_size(&res));
+ 	if (!vdm_virt_addr) {
+ 		pr_info("\t\t\t vdm_virt_addr fail \n");
+ 		return -ENOMEM;
+ 	}
+ 
++#if 0
+ 	ret = of_address_to_resource(np, 1, &res);
+ 	if (ret) {
+ 		pr_info("\t\t\t of_address_to_resource fail ret %d \n",ret);
+ 		return -EINVAL;
+ 	}
+-
+-	vdma_virt_addr = ioremap_nocache(res.start, resource_size(&res));
++ 
++	vdma_virt_addr = ioremap(res.start, resource_size(&res));
+ 
+ 	if (!vdma_virt_addr) {
+ 		pr_info("\t\t\t vdma_virt_addr fail \n");
+ 		return -ENOMEM;
+ 	}
+-
++#endif
+ 	if (of_device_is_compatible(np, "nuvoton,npcm750-vdm")) {
+ 		gcr_regmap = syscon_regmap_lookup_by_compatible("nuvoton,npcm750-gcr");
+ 		if (IS_ERR(gcr_regmap)) {
+ 			pr_info("Failed to find nuvoton,npcm750-gcr WD reset status not supported\n");
+ 		}
++	} else {
++		gcr_regmap = NULL;
+ 	}
+ #endif
+ 
++#if 0
+ 	vdma_buff_virt_addr = dma_alloc_coherent(&vdm_pdev->dev, VDMA_BUFF_BYTE_SIZE , (dma_addr_t*)&vdma_buff, GFP_KERNEL);
+ 	//printk( "<1>  vdm : dma_alloc_coherent virt_addr=0x%x ,phys_addr=0x%x   \n",(unsigned int)vdma_buff_virt_addr, (unsigned int)vdma_buff);
+ 	
+@@ -1133,6 +1184,7 @@ static int vdm_init(void)
+ 		ret = -EINVAL;
+ 		goto dma_alloc_coherent_failed ;
+ 	}
++#endif
+ 
+ 	spin_lock_init(&lock);
+ 
+@@ -1143,6 +1195,11 @@ static int vdm_init(void)
+         goto vdm_open_failed;
+ 	}
+ 
++	if (kfifo_alloc(&fifo, 1024, GFP_KERNEL)) {
++		/*cdev_del(&vdm_cdev);
++		unregister_chrdev_region(dev_num, 1);*/
++		return -1;
++	}
+ #ifdef _USE_VDMA_POLLING
+ 	my_workqueue = create_workqueue(MY_WORK_QUEUE_NAME);
+ 	queue_delayed_work(my_workqueue, &Task, 1000);
+@@ -1191,7 +1248,7 @@ static int vdm_init(void)
+         goto device_create_failed;
+ 	}
+ 
+-	pr_info("NPCM VDM driver probed\n");
++	pr_info("\tNPCM VDM driver probed\n\n");
+ 
+ 	return 0;
+ 
+-- 
+2.43.0
+

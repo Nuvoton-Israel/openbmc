@@ -68,6 +68,7 @@ RDEPENDS:${PN}-system = " \
         phosphor-power-utils \
         phosphor-power \
         gbmc-mac-config \
+        vdm-test \
         "
 #RDEPENDS:${PN}-system:append = " \
 #        ${@entity_enabled(d, '', 'first-boot-set-psu')} \

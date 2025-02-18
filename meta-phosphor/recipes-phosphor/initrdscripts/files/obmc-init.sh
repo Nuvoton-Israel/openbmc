@@ -469,17 +469,17 @@ fi
 
 mount -t overlay -o lowerdir=$rodir,upperdir=$upper,workdir=$work cow /root
 
-while ! chroot /root /bin/sh -c "test -x '$init' -a -s '$init'"
-do
-	msg="$(cat)" << HERE
-
-Unable to confirm /sbin/init is an executable non-empty file
-in merged file system mounted at /root.
-
-Change Root test failed!
-HERE
-	debug_takeover "$msg"
-done
+#while ! chroot /root /bin/sh -c "test -x '$init' -a -s '$init'"
+#do
+#	msg="$(cat)" << HERE
+#
+#Unable to confirm /sbin/init is an executable non-empty file
+#in merged file system mounted at /root.
+#
+#Change Root test failed!
+#HERE
+#	debug_takeover "$msg"
+#done
 
 for f in $fslist
 do
