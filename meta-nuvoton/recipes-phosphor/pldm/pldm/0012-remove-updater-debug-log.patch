@@ -1,0 +1,28 @@
+From 7b7df3f52e82e0dc5476bc12e9943a15b8192f3e Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Thu, 20 Feb 2025 15:43:21 +0800
+Subject: [PATCH] remove updater debug log
+
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ fw-update/device_updater.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/fw-update/device_updater.cpp b/fw-update/device_updater.cpp
+index c8f58b1d8..f5a949a93 100644
+--- a/fw-update/device_updater.cpp
++++ b/fw-update/device_updater.cpp
+@@ -397,8 +397,8 @@ Response DeviceUpdater::requestFwData(const pldm_msg* request,
+     const auto& comp = compImageInfos[applicableComponents[componentIndex]];
+     auto compOffset = std::get<5>(comp);
+     auto compSize = std::get<6>(comp);
+-    info("Decoded fw request data at offset '{OFFSET}' and length '{LENGTH}' ",
+-         "OFFSET", offset, "LENGTH", length);
++    //info("Decoded fw request data at offset '{OFFSET}' and length '{LENGTH}' ",
++    //     "OFFSET", offset, "LENGTH", length);
+     if (length < PLDM_FWUP_BASELINE_TRANSFER_SIZE || length > maxTransferSize)
+     {
+         rc = encode_request_firmware_data_resp(
+-- 
+2.34.1
+
