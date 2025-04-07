@@ -1,20 +1,20 @@
-From 86f6962c094cd899f712abbe6d41d3874dd678f6 Mon Sep 17 00:00:00 2001
-From: Joseph Liu <kwliu@nuvoton.com>
-Date: Tue, 26 Oct 2021 15:18:59 +0800
+From 6d2b30ba6385357d8a6f08cc53c2f9bcb36bf242 Mon Sep 17 00:00:00 2001
+From: Tim Lee <chli30@nuvoton.com>
+Date: Mon, 7 Apr 2025 14:57:37 +0800
 Subject: [PATCH] dts: nuvoton: evb-npcm845: support openbmc partition
 
 Upstream-Status: Inappropriate [oe-specific]
 
-Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+Signed-off-by: Tim Lee <chli30@nuvoton.com>
 ---
- .../boot/dts/nuvoton/nuvoton-npcm845-evb.dts  | 60 +++++++------------
- 1 file changed, 21 insertions(+), 39 deletions(-)
+ .../boot/dts/nuvoton/nuvoton-npcm845-evb.dts  | 63 +++++++------------
+ 1 file changed, 22 insertions(+), 41 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
-index 987668fb0dc7..b1088eda1eaf 100644
+index c0adfff31fb5..cd1f323cffc3 100644
 --- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
 +++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
-@@ -43,48 +43,30 @@
+@@ -187,48 +187,29 @@ partitions@80000000 {
  			compatible = "fixed-partitions";
  			#address-cells = <1>;
  			#size-cells = <1>;
@@ -31,25 +31,26 @@ index 987668fb0dc7..b1088eda1eaf 100644
 -			envparam@100000 {
 -				label = "env-param";
 -				reg = <0x0100000 0x40000>;
+-				read-only;
+-				};
+-			spare@140000 {
+-				label = "spare";
+-				reg = <0x0140000 0xC0000>;
+-				};
+-			kernel@200000 {
 +			bmc@0 {
 +				label = "bmc";
 +				reg = <0x00000000 0x04000000>;
 +			};
 +			u-boot@0 {
 +				label = "u-boot";
-+				reg = <0x00000000 0x003C0000>;
- 				read-only;
--				};
--			spare@140000 {
--				label = "spare";
--				reg = <0x0140000 0xC0000>;
--				};
++				reg = <0x00000000 0x007C0000>;
 +			};
-+			u-boot-env@3c0000 {
++			u-boot-env@7c0000 {
 +				label = "u-boot-env";
-+				reg = <0x003C0000 0x00040000>;
++				reg = <0x007C0000 0x00040000>;
 +			};
- 			kernel@200000 {
++			kernel@800000 {
  				label = "kernel";
 -				reg = <0x0200000 0x400000>;
 -				};
@@ -72,18 +73,18 @@ index 987668fb0dc7..b1088eda1eaf 100644
 -			spare4@1300000 {
 -				label = "spare4";
 -				reg = <0x1300000 0x0>;
-+				reg = <0x00400000 0x00800000>;
++				reg = <0x00800000 0x00800000>;
 +			};
-+			rofs@c00000 {
++			rofs@1000000 {
 +				label = "rofs";
-+				reg = <0x00C00000 0x03000000>;
++				reg = <0x01000000 0x02C00000>;
 +			};
 +			rwfs@3c00000 {
 +				label = "rwfs";
-+				reg = <0x3C00000 0x400000>;
++				reg = <0x03C00000 0x00400000>;
  			};
  		};
  	};
 -- 
-2.17.1
+2.34.1
 
