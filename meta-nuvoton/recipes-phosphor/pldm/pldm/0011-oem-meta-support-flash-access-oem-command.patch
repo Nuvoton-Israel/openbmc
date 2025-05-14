@@ -142,8 +142,8 @@ index 3a7e3472b..349440761 100644
  enum pldm_oem_meta_file_io_type : uint8_t
  {
      POST_CODE = 0x00,
-     VW_GPIO = 0x06,
-+    FLASH_ACCESS = 0x07,
+     VW_GPIO = 0x07,
++    FLASH_ACCESS = 0x08,
  };
  
  class FileHandler
