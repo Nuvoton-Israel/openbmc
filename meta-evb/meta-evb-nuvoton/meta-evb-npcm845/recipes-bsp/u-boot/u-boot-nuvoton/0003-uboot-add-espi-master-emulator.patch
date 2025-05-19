@@ -1,23 +1,24 @@
-From abbe9e4ec63ecaee724241c58712abc18ab34ca0 Mon Sep 17 00:00:00 2001
-From: Stanley Chu <yschu@nuvoton.com>
-Date: Mon, 9 Sep 2024 11:12:35 +0800
+From 4bdd0d5e4aff501980f25a96cf4f4b559e4790f9 Mon Sep 17 00:00:00 2001
+From: Ban Feng <kcfeng0@nuvoton.com>
+Date: Mon, 19 May 2025 11:56:28 +0800
 Subject: [PATCH] uboot: add espi master emulator
 
 Signed-off-by: Stanley Chu <yschu@nuvoton.com>
 Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
 ---
  arch/arm/dts/nuvoton-npcm845-evb.dts |    4 +
  cmd/Kconfig                          |    5 +
  cmd/Makefile                         |    1 +
- cmd/espi.c                           | 1649 ++++++++++++++++++++++++++
- 4 files changed, 1659 insertions(+)
+ cmd/espi.c                           | 1927 ++++++++++++++++++++++++++
+ 4 files changed, 1937 insertions(+)
  create mode 100644 cmd/espi.c
 
 diff --git a/arch/arm/dts/nuvoton-npcm845-evb.dts b/arch/arm/dts/nuvoton-npcm845-evb.dts
-index 3007d04267..5640554df3 100644
+index 3edb320c66..878f3f3eae 100644
 --- a/arch/arm/dts/nuvoton-npcm845-evb.dts
 +++ b/arch/arm/dts/nuvoton-npcm845-evb.dts
-@@ -359,6 +359,10 @@
+@@ -363,6 +363,10 @@
  	status = "okay";
  };
  
@@ -58,10 +59,10 @@ index afb8c5f61c..6a6b0cf9b8 100644
  obj-$(CONFIG_CMD_EXT2) += ext2.o
 diff --git a/cmd/espi.c b/cmd/espi.c
 new file mode 100644
-index 0000000000..0c6cd64900
+index 0000000000..2b9390d96b
 --- /dev/null
 +++ b/cmd/espi.c
-@@ -0,0 +1,1649 @@
+@@ -0,0 +1,1927 @@
 +#include <stdlib.h>
 +#include <command.h>
 +#include <common.h>
@@ -125,6 +126,8 @@ index 0000000000..0c6cd64900
 +#define CMD_GET_NP		0x03
 +#define CMD_PUT_IORD_SHORT	0x40
 +#define CMD_PUT_IOWR_SHORT	0x44
++#define CMD_PUT_MEMRD32_SHORT_1B	0x48
++#define CMD_PUT_MEMWR32_SHORT_1B	0x4C
 +
 +// eSPI response
 +#define RESP_DEFER		0x01
@@ -159,6 +162,19 @@ index 0000000000..0c6cd64900
 +#define KCS_CMD_READ		0x68
 +
 +#define FLASH_R_LENGTH		64
++
++struct get_pc_req {
++	u8 cmd;
++	u8 crc;
++};
++
++struct get_pc_resp {
++	u8 code;
++	u8 cycle_type;
++	u8 tag_len_11_8;
++	u8 len_7_0;
++	u8 data[4 + 3]; // 2 byte status, 1 byte crc
++} __attribute__((__packed__));
 +
 +struct get_flash_c_req {
 +	u8 cmd;
@@ -251,6 +267,25 @@ index 0000000000..0c6cd64900
 +	u8 crc;
 +} __attribute__((__packed__));
 +
++struct put_memwr32_req {
++	u8 cmd;
++	u8 addr[4];
++	u8 data_crc[5];
++} __attribute__((__packed__));
++
++struct put_memrd32_req {
++	u8 cmd;
++	u8 addr[4];
++	u8 crc;
++} __attribute__((__packed__));
++
++struct put_memrd32_resp {
++	u8 code;
++	u32 data;
++	u16 status;
++	u8 crc;
++} __attribute__((__packed__));
++
 +struct get_devid_resp {
 +	u8 netfn_lun;
 +	u8 cmd;
@@ -294,6 +329,7 @@ index 0000000000..0c6cd64900
 +
 +
 +static u32 espi_port_state = 0;
++static u8 wait_state = 16;
 +static bool debug = false;
 +
 +void inline espi_port_update(u32 set, u32 clear)
@@ -382,7 +418,7 @@ index 0000000000..0c6cd64900
 +
 +static u8 espi_recv_byte_single(void)
 +{
-+	// Clock start high -- ended at high. 
++	//Clock start high -- ended at high.
 +	int i;
 +	u32 val;
 +	u8 in = 0;
@@ -408,7 +444,7 @@ index 0000000000..0c6cd64900
 +
 +static int espi_wait_response(u8 *code)
 +{
-+	int count = 16;
++	int count = wait_state;
 +	int rc = 0;
 +
 +	do {
@@ -422,6 +458,9 @@ index 0000000000..0c6cd64900
 +			break;
 +		}
 +	} while (*code != RESP_ACCEPT && *code != RESP_DEFER);
++
++	if (count < 0 && *code == RESP_DEFER)
++		return -EINPROGRESS;
 +
 +	return rc;
 +}
@@ -438,12 +477,21 @@ index 0000000000..0c6cd64900
 +static u16 espi_read_response(u8 *resp, int len)
 +{
 +	u16 status = STATUS_OK;
-+	int i;
++	int i, rc, cnt;
 +
-+	if (espi_wait_response(resp)) {
-+		espi_read_status(&status);
-+		//printf("espi response error: code=0x%02x, status=0x%04x\n", *resp, status);
-+		return status;
++	rc = espi_wait_response(resp);
++
++	if (rc != 0) {
++		if (rc != -EINPROGRESS) {
++			espi_read_status(&status);
++			//printf("espi response error: code=0x%02x, status=0x%04x\n", *resp, status);
++			return status;
++		} else {
++			// case for PUT_MEMRD32_SHORT DEFER
++			cnt = (len % 4) ? (len % 4) : 4;
++			resp+=cnt;
++			len-=cnt;
++		}
 +	}
 +
 +	resp++;
@@ -843,6 +891,13 @@ index 0000000000..0c6cd64900
 +	req.data[3] = (data >> 24) & 0xFF;
 +	req.crc = crc8(0, (u8 *)&req, sizeof(req) - 1);
 +
++	if (addr == 0x8) {
++		wait_state = ((data >> 8) & 0xF0) >> 4;
++		if (wait_state ==0)
++			wait_state = 16;
++		printf("wait_state=0x%x\n", wait_state);
++	}
++
 +	//CS_low, CLK_low, IO0
 +	espi_port_update(eSPI_IO0, eSPI_nCS | eSPI_CLK);
 +
@@ -991,6 +1046,171 @@ index 0000000000..0c6cd64900
 +			printf("%08x\n", resp->data);
 +	}
 +	//printf("status=%02x%02x\n", resp.status[1], resp.status[0]);
++	return STATUS_OK;
++}
++
++static int espi_get_pc(int len)
++{
++	struct get_pc_req req = {0};
++	struct get_pc_resp resp = {0};
++	u16 status;
++
++	req.cmd = CMD_GET_PC;
++	req.crc = crc8(0, (u8 *)&req, sizeof(req) - 1);
++
++	debug("req.cmd 0x%x\n", req.cmd);
++	debug("req.crc 0x%x\n", req.crc);
++
++	//CS_low, CLK_low, IO0
++	espi_port_update(eSPI_IO0, eSPI_nCS | eSPI_CLK);
++	espi_send((u8 *)&req, sizeof(req));
++	espi_tar();
++	status = espi_read_response((u8 *)&resp, sizeof(resp) - (4 - len));
++	espi_port_set(eSPI_nCS);
++
++	if (resp.cycle_type == 0xf) {
++		debug("resp.code 0x%x\n", resp.code);
++		debug("resp.cycle_type 0x%x\n", resp.cycle_type);
++		debug("resp.tag_len_11_8 0x%x\n", resp.tag_len_11_8);
++		debug("resp.len_7_0 0x%x\n", resp.len_7_0);
++		for (int i=0; i<len; i++)
++			printf("resp.data%d 0x%x\n", i, resp.data[i]);
++		debug("resp.status %x\n", resp.data[len] | (resp.data[len + 1] << 8));
++		debug("resp.crc %x\n", resp.data[len + 2]);
++	} else if (resp.cycle_type != 6){
++		printf("pc cycle type error (type=%d)\n", resp.cycle_type);
++		return STATUS_ERR;
++	}
++
++	if (status) {
++		printf("espi response error: code=0x%02x, status=0x%04x\n", resp.code, status);
++		return STATUS_ERR;
++	}
++
++	return STATUS_OK;
++}
++
++static int wait_for_pc_avail(void)
++{
++	u16 status;
++	int count = 1000000;
++
++	do {
++		status = espi_get_status();
++		if (status & BIT(4)) {
++			debug("PC_AVAIL  count %d\n", count);
++			return 0;
++		}
++
++		if (count-- == 0) {
++			printf("\nwait_for_pc_avail timeout\n");
++			return -ETIMEDOUT;
++		}
++		//udelay(100);
++		udelay(1);
++	} while (1);
++
++	return -ETIMEDOUT;
++}
++
++static int espi_put_memwr32(u32 addr, u8 *data, int count, u8 *in)
++{
++	struct put_memwr32_req req;
++	struct espi_common_resp *resp = (struct espi_common_resp *)in;
++	u16 status;
++	int i;
++
++	if (debug) {
++		printf("MEM wr32: addr[0x%x]=", addr);
++		for (i = count - 1; i >= 0; i--)
++			printf("%02x", data[i]);
++		printf("\n");
++	}
++
++	req.cmd = CMD_PUT_MEMWR32_SHORT_1B | ((count - 1) & 0x3);
++	req.addr[0]= (addr & 0xFF000000) >> 24;
++	req.addr[1] = (addr & 0x00FF0000) >> 16;
++	req.addr[2] = (addr & 0x0000FF00) >> 8;
++	req.addr[3] = addr & 0xff;
++	for (i = 0; i < count; i++)
++		req.data_crc[i] = data[i];
++	req.data_crc[i] = crc8(0, (u8 *)&req, sizeof(req) - (4 - count) - 1);
++
++	//CS_low, CLK_low, IO0
++	espi_port_update(eSPI_IO0, eSPI_nCS | eSPI_CLK);
++
++	espi_send((u8 *)&req, count + 6);
++	espi_tar();
++	status = espi_read_response((u8 *)resp, sizeof(*resp));
++	espi_port_set(eSPI_nCS);
++	if (status) {
++		printf("%s: espi response error: code=0x%02x, status=0x%04x\n",
++		       __func__, resp->code, status);
++		resp->status = status;
++		return STATUS_ERR;
++	}
++
++	if (wait_alert())
++		return STATUS_ERR;
++
++	status = espi_get_status();
++	printf("%s: memwr32 status=0x%04x\n", __func__, status);
++
++	return STATUS_OK;
++}
++
++static int espi_put_memrd32(u32 addr, int count, u8 *in)
++{
++	struct put_memrd32_req req;
++	struct put_memrd32_resp *resp = (struct put_memrd32_resp *)in;
++	u16 status;
++
++	req.cmd = CMD_PUT_MEMRD32_SHORT_1B | ((count - 1) & 0x3);
++	req.addr[0]= (addr & 0xFF000000) >> 24;
++	req.addr[1] = (addr & 0x00FF0000) >> 16;
++	req.addr[2] = (addr & 0x0000FF00) >> 8;
++	req.addr[3] = addr & 0xff;
++	req.crc = crc8(0, (u8 *)&req, sizeof(req) - 1);
++
++	//CS_low, CLK_low, IO0
++	espi_port_update(eSPI_IO0, eSPI_nCS | eSPI_CLK);
++
++	espi_send((u8 *)&req, sizeof(req));
++	espi_tar();
++	status = espi_read_response((u8 *)resp, count + 4);
++	espi_port_set(eSPI_nCS);
++
++	if (debug) {
++		printf("MEM rd32: addr[0x%x]=", addr);
++		if (resp->code != RESP_DEFER) {
++			if (count == 1)
++				printf("%02x\n", resp->data & 0xFF);
++			else if (count == 2)
++				printf("%04x\n", resp->data & 0xFFFF);
++			else if (count == 4)
++				printf("%08x\n", resp->data);
++		}
++	}
++
++	if (status) {
++		printf("%s: espi response error: code=0x%02x, status=0x%04x\n",
++		       __func__, resp->code, status);
++		resp->status = status;
++		return STATUS_ERR;
++	}
++
++	if (resp->code == RESP_DEFER) {
++		printf("MEM rd32 DEFER\n");
++		if (wait_alert())
++			return STATUS_ERR;
++
++		if (wait_for_pc_avail())
++			return STATUS_ERR;
++
++		if (espi_get_pc(count))
++			return STATUS_ERR;
++	}
++
 +	return STATUS_OK;
 +}
 +
@@ -1326,6 +1546,37 @@ index 0000000000..0c6cd64900
 +	// enable LDN
 +	espi_iowr8(SIO_IDX, 0x30);
 +	espi_iowr8(SIO_DATA, 1);
++
++	printf("configure SHM\n");
++	// configure SHM
++	espi_iowr8(SIO_IDX, 0x7);
++	espi_iowr8(SIO_DATA, 0xF);
++	// disable LDN
++	espi_iowr8(SIO_IDX, 0x30);
++	espi_iowr8(SIO_DATA, 0x0);
++	// set io addr 700
++	espi_iowr8(SIO_IDX, 0x60);
++	espi_iowr8(SIO_DATA, 0x7);
++	espi_iowr8(SIO_IDX, 0x61);
++	espi_iowr8(SIO_DATA, 0x00);
++	// Interrupt Number
++	espi_iowr8(SIO_IDX, 0x70);
++	espi_iowr8(SIO_DATA, 0xF);
++	// SHAW1BA_0~3
++	espi_iowr8(SIO_IDX, 0xF4);
++	espi_iowr8(SIO_DATA, 0x00);
++	espi_iowr8(SIO_IDX, 0xF5);
++	espi_iowr8(SIO_DATA, 0x00);
++	espi_iowr8(SIO_IDX, 0xF6);
++	espi_iowr8(SIO_DATA, 0x00);
++	espi_iowr8(SIO_IDX, 0xF7);
++	espi_iowr8(SIO_DATA, 0x10);
++	// enable LDN
++	espi_iowr8(SIO_IDX, 0x30);
++	espi_iowr8(SIO_DATA, 0x1);
++	// set HOFS1L/HOFS1H
++	espi_iowr8(0x726, 0x00);
++	espi_iowr8(0x727, 0x08);
 +#endif
 +#if 0
 +	// configure sp2
@@ -1437,6 +1688,27 @@ index 0000000000..0c6cd64900
 +
 +		addr = hextoul(argv[2], NULL);
 +		espi_flash_erase(addr);
++	} else if (!strcmp(argv[1], "memrd32")) {
++		if (argc < 4)
++			return CMD_RET_USAGE;
++		addr=simple_strtoul(argv[2], NULL, 16);
++		count=simple_strtoul(argv[3], NULL, 16);
++		if (count < 1 || count > 4)
++			return CMD_RET_USAGE;
++		debug = true;
++		espi_put_memrd32(addr, count, resp);
++		debug = false;
++	} else if (!strcmp(argv[1], "memwr32")) {
++		if (argc < 5)
++			return CMD_RET_USAGE;
++		addr=simple_strtoul(argv[2], NULL, 16);
++		data=simple_strtoul(argv[3], NULL, 16);
++		count=simple_strtoul(argv[4], NULL, 16);
++		if (count < 1 || count > 4)
++			return CMD_RET_USAGE;
++		debug = true;
++		espi_put_memwr32(addr, (u8 *)&data, count, resp);
++		debug = false;
 +	}else {
 +		rc = CMD_RET_USAGE;
 +	}
@@ -1690,6 +1962,13 @@ index 0000000000..0c6cd64900
 +	"  	<argument3> - memory address to write\n"
 +	" flash_erase - erase flash 4KB.\n"
 +	"  	<argument1> - flash offset\n"
++	" memrd32 - put_memrd32_short.\n"
++	"       <argument1> - address\n"
++	"       <argument2> - data len (bytes)\n"
++	" memwr32 - put_memwr32_short.\n"
++	"       <argument1> - address\n"
++	"       <argument2> - data\n"
++	"       <argument3> - data len (bytes)\n"
 +);
 +
 +U_BOOT_CMD(
