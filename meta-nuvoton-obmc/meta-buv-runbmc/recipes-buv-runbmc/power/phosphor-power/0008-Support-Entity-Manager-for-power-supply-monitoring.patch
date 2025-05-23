@@ -1,10 +1,9 @@
-From 7db01e61630d5c50e6e9aee43ab1df66bb09ffd9 Mon Sep 17 00:00:00 2001
+From 051afa881262740bf572135cb42722726cf3430f Mon Sep 17 00:00:00 2001
 From: Ban Feng <kcfeng0@nuvoton.com>
-Date: Mon, 3 Mar 2025 11:53:26 +0800
-Subject: [PATCH] Support Entity-Manager for power supply monitoring
+Date: Fri, 3 Mar 2023 11:21:27 +0800
+Subject: [PATCH 08/10] Support Entity-Manager for power supply monitoring
 
 Upstream-Status: Inappropriate [oe-specific]
-
 Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
 ---
  meson.build                               |   4 +-
@@ -19,7 +18,7 @@ Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
  create mode 100644 services/power-supply-monitor-em@.service
 
 diff --git a/meson.build b/meson.build
-index d11437a6..872c5c2a 100644
+index d11437a6..f04835de 100644
 --- a/meson.build
 +++ b/meson.build
 @@ -109,6 +109,7 @@ servicedir = systemd.get_variable('systemdsystemunitdir')
@@ -30,14 +29,14 @@ index d11437a6..872c5c2a 100644
      ['sequencer-monitor', 'pseq-monitor-pgood.service'],
      ['sequencer-monitor', 'pseq-monitor.service'],
      ['supply-monitor-ng', 'phosphor-psu-monitor.service'],
-@@ -156,6 +157,7 @@ conf.set('SEQUENCER', sequencer_class)
+@@ -155,6 +156,7 @@ conf.set_quoted('PSU_JSON_PATH', '/usr/share/phosphor-power/psu.json')
+ conf.set('SEQUENCER', sequencer_class)
  conf.set10('DEVICE_ACCESS', get_option('device-access'))
  conf.set10('IBM_VPD', get_option('ibm-vpd'))
- conf.set('PGOOD_TIMEOUT', get_option('pgood-timeout-value'))
 +conf.set10('NUVOTON_ENTITY', get_option('nuvoton-entity'))
+ conf.set('PGOOD_TIMEOUT', get_option('pgood-timeout-value'))
  
  configure_file(output: 'config.h', configuration: conf)
- 
 @@ -202,7 +204,7 @@ endif
  if get_option('power-control')
      subdir('phosphor-power-sequencer')
@@ -48,11 +47,11 @@ index d11437a6..872c5c2a 100644
  endif
  if get_option('supply-monitor-ng')
 diff --git a/meson.options b/meson.options
-index c7019605..13c0111e 100644
+index c7019605..9bd96c3f 100644
 --- a/meson.options
 +++ b/meson.options
-@@ -46,6 +46,11 @@ option(
-     description: 'Setup for IBM VPD collection for inventory.',
+@@ -39,6 +39,11 @@ option(
+     description: 'Enable UCD90160 hardware access.',
  )
  
 +option(
@@ -61,19 +60,19 @@ index c7019605..13c0111e 100644
 +)
 +
  option(
-     'ucd90160-yaml',
-     type: 'string',
-@@ -68,6 +73,10 @@ option(
+     'ibm-vpd',
      type: 'boolean',
-     description: 'Enable support for power supply monitoring',
+@@ -52,6 +57,10 @@ option(
+     value: 'example/ucd90160.yaml',
+     description: 'The sequencer definition file to use.',
  )
 +option(
 +    'supply-monitor-em', type: 'boolean',
 +    description: 'Enable support for power supply monitoring'
 +)
  option(
-     'supply-monitor-ng',
-     type: 'boolean',
+     'oe-sdk',
+     type: 'feature',
 diff --git a/pmbus.cpp b/pmbus.cpp
 index 6021a268..8ef7ea51 100644
 --- a/pmbus.cpp
@@ -87,7 +86,7 @@ index 6021a268..8ef7ea51 100644
  }
  
 diff --git a/power-supply/power_supply.cpp b/power-supply/power_supply.cpp
-index e96c77fb..d9da2e97 100644
+index 6ceb2129..beb77dbe 100644
 --- a/power-supply/power_supply.cpp
 +++ b/power-supply/power_supply.cpp
 @@ -30,6 +30,12 @@
@@ -114,7 +113,7 @@ index e96c77fb..d9da2e97 100644
  
      // Get initial presence state.
      updatePresence();
-@@ -217,7 +225,7 @@ void PowerSupply::inventoryChanged(sdbusplus::message_t& msg)
+@@ -216,7 +224,7 @@ void PowerSupply::inventoryChanged(sdbusplus::message_t& msg)
  void PowerSupply::updatePresence()
  {
      // Use getProperty utility function to get presence status.
@@ -123,7 +122,7 @@ index e96c77fb..d9da2e97 100644
      util::getProperty(INVENTORY_IFACE, PRESENT_PROP, inventoryPath, service,
                        bus, this->present);
  }
-@@ -252,6 +260,7 @@ void PowerSupply::powerStateChanged(sdbusplus::message_t& msg)
+@@ -251,6 +259,7 @@ void PowerSupply::powerStateChanged(sdbusplus::message_t& msg)
  
  void PowerSupply::updatePowerState()
  {
@@ -131,7 +130,7 @@ index e96c77fb..d9da2e97 100644
      powerOn = true;
  }
  
-@@ -312,13 +321,23 @@ void PowerSupply::checkInputFault(const uint16_t statusWord)
+@@ -311,13 +320,23 @@ void PowerSupply::checkInputFault(const uint16_t statusWord)
              nv.add("STATUS_WORD", statusWord);
              captureCmd(nv, STATUS_INPUT, Type::Debug);
  
@@ -156,7 +155,7 @@ index e96c77fb..d9da2e97 100644
              faultFound = true;
          }
      }
-@@ -359,6 +378,16 @@ void PowerSupply::checkPGOrUnitOffFault(const uint16_t statusWord)
+@@ -358,6 +377,16 @@ void PowerSupply::checkPGOrUnitOffFault(const uint16_t statusWord)
              captureCmd(nv, STATUS_IOUT, Type::Debug);
              captureCmd(nv, STATUS_MFR, Type::Debug);
  
@@ -173,7 +172,7 @@ index e96c77fb..d9da2e97 100644
              using metadata =
                  org::open_power::Witherspoon::Fault::PowerSupplyShouldBeOn;
  
-@@ -366,6 +395,7 @@ void PowerSupply::checkPGOrUnitOffFault(const uint16_t statusWord)
+@@ -365,6 +394,7 @@ void PowerSupply::checkPGOrUnitOffFault(const uint16_t statusWord)
              report<PowerSupplyShouldBeOn>(
                  metadata::RAW_STATUS(nv.get().c_str()),
                  metadata::CALLOUT_INVENTORY_PATH(inventoryPath.c_str()));
@@ -181,7 +180,7 @@ index e96c77fb..d9da2e97 100644
          }
      }
  }
-@@ -399,13 +429,23 @@ void PowerSupply::checkCurrentOutOverCurrentFault(const uint16_t statusWord)
+@@ -398,13 +428,23 @@ void PowerSupply::checkCurrentOutOverCurrentFault(const uint16_t statusWord)
              captureCmd(nv, STATUS_IOUT, Type::Debug);
              captureCmd(nv, STATUS_MFR, Type::Debug);
  
@@ -206,7 +205,7 @@ index e96c77fb..d9da2e97 100644
              faultFound = true;
          }
      }
-@@ -440,13 +480,23 @@ void PowerSupply::checkOutputOvervoltageFault(const uint16_t statusWord)
+@@ -439,13 +479,23 @@ void PowerSupply::checkOutputOvervoltageFault(const uint16_t statusWord)
              captureCmd(nv, STATUS_IOUT, Type::Debug);
              captureCmd(nv, STATUS_MFR, Type::Debug);
  
@@ -231,7 +230,7 @@ index e96c77fb..d9da2e97 100644
              faultFound = true;
          }
      }
-@@ -480,13 +530,23 @@ void PowerSupply::checkFanFault(const uint16_t statusWord)
+@@ -479,13 +529,23 @@ void PowerSupply::checkFanFault(const uint16_t statusWord)
              captureCmd(nv, STATUS_TEMPERATURE, Type::Debug);
              captureCmd(nv, STATUS_FANS_1_2, Type::Debug);
  
@@ -256,7 +255,7 @@ index e96c77fb..d9da2e97 100644
              auto method = this->bus.new_method_call(
              "xyz.openbmc_project.LED.GroupManager", "/xyz/openbmc_project/led/groups/power_on",
              "org.freedesktop.DBus.Properties", "Set");
-@@ -543,13 +603,23 @@ void PowerSupply::checkTemperatureFault(const uint16_t statusWord)
+@@ -542,13 +602,23 @@ void PowerSupply::checkTemperatureFault(const uint16_t statusWord)
              nv.add("STATUS_TEMPERATURE", statusTemperature);
              captureCmd(nv, STATUS_FANS_1_2, Type::Debug);
  
@@ -281,7 +280,7 @@ index e96c77fb..d9da2e97 100644
              faultFound = true;
          }
      }
-@@ -625,6 +695,7 @@ void PowerSupply::resolveError(const std::string& callout,
+@@ -623,6 +693,7 @@ void PowerSupply::resolveError(const std::string& callout,
      }
  }
  
@@ -289,7 +288,7 @@ index e96c77fb..d9da2e97 100644
  void PowerSupply::createInventoryObj()
  {
      using namespace phosphor::pmbus;
-@@ -689,12 +760,47 @@ void PowerSupply::createInventoryObj()
+@@ -687,12 +758,47 @@ void PowerSupply::createInventoryObj()
          log<level::ERR>(e.what(), entry("PATH=%s", inventoryPath.c_str()));
      }
  }
@@ -337,9 +336,9 @@ index e96c77fb..d9da2e97 100644
      // Build the object map and send it to the inventory
      using Properties = std::map<std::string, std::variant<std::string, bool>>;
      using Interfaces = std::map<std::string, Properties>;
-@@ -759,6 +865,7 @@ void PowerSupply::updateInventory()
-     {
-         log<level::ERR>(e.what(), entry("PATH=%s", inventoryPath.c_str()));
+@@ -758,6 +864,7 @@ void PowerSupply::updateInventory()
+         lg2::error("Exception in updateInventory: {ERROR}, PATH={PATH}",
+                    "ERROR", e, "PATH", inventoryPath);
      }
 +#endif
  }
@@ -448,5 +447,5 @@ index 0e687dde..14240dc3 100644
      catch (const std::exception& e)
      {
 -- 
-2.43.0
+2.34.1
 

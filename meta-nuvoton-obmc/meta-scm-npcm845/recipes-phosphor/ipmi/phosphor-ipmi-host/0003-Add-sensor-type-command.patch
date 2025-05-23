@@ -1,4 +1,4 @@
-From 48f85c46ca34e270a11cd5d71c08673f3ff98c9a Mon Sep 17 00:00:00 2001
+From 59655cf689c5e8c42643bd08b5b8b12804fab2b6 Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Mon, 15 Aug 2022 17:23:50 +0800
 Subject: [PATCH] Add sensor type command
@@ -70,12 +70,12 @@ index 2ef33b98..07f4129c 100644
  }
  } // namespace ipmi
 diff --git a/sensorhandler.cpp b/sensorhandler.cpp
-index 134eaa68..d7c3635a 100644
+index e48d0ea9..1cdf164f 100644
 --- a/sensorhandler.cpp
 +++ b/sensorhandler.cpp
-@@ -1571,6 +1571,11 @@ void registerNetFnSenFunctions()
-     ipmi_register_callback(NETFUN_SENSOR, ipmi::sensor_event::cmdGetDeviceSdr,
-                            nullptr, ipmi_sen_get_sdr, PRIVILEGE_USER);
+@@ -1572,6 +1572,11 @@ void registerNetFnSenFunctions()
+                            ipmi::sensor_event::cmdGetDeviceSdr, nullptr,
+                            ipmi_sen_get_sdr, PRIVILEGE_USER);
  
 +    // <Get Sensor Type>
 +    ipmi::registerHandler(ipmi::prioOpenBmcBase, ipmi::netFnSensor,
@@ -85,9 +85,9 @@ index 134eaa68..d7c3635a 100644
  #endif
  
      // Common Handers used by both implementation.
-@@ -1579,10 +1584,5 @@ void registerNetFnSenFunctions()
-     ipmi_register_callback(NETFUN_SENSOR, ipmi::sensor_event::cmdPlatformEvent,
-                            nullptr, ipmicmdPlatformEvent, PRIVILEGE_OPERATOR);
+@@ -1581,10 +1586,5 @@ void registerNetFnSenFunctions()
+                            ipmi::sensor_event::cmdPlatformEvent, nullptr,
+                            ipmicmdPlatformEvent, PRIVILEGE_OPERATOR);
  
 -    // <Get Sensor Type>
 -    ipmi::registerHandler(ipmi::prioOpenBmcBase, ipmi::netFnSensor,
@@ -97,5 +97,5 @@ index 134eaa68..d7c3635a 100644
      return;
  }
 -- 
-2.43.0
+2.34.1
 
