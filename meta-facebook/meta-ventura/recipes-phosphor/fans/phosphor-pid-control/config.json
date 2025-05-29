@@ -105,13 +105,17 @@
             "accumulateSetPoint": true,
             "pids": [
                 {
-                    "name": "Fan Zore Zone",
+                    "name": "Fan Zero Zone",
                     "type": "fan",
                     "inputs": [
                         "FCB_0_FAN0_TACH_IL_SPEED_RPM",
                         "FCB_0_FAN0_TACH_OL_SPEED_RPM",
                         "FCB_0_FAN1_TACH_IL_SPEED_RPM",
-                        "FCB_0_FAN1_TACH_OL_SPEED_RPM"
+                        "FCB_0_FAN1_TACH_OL_SPEED_RPM",
+                        "FCB_1_FAN2_TACH_IL_SPEED_RPM",
+                        "FCB_1_FAN2_TACH_OL_SPEED_RPM",
+                        "FCB_1_FAN3_TACH_IL_SPEED_RPM",
+                        "FCB_1_FAN3_TACH_OL_SPEED_RPM"
                     ],
                     "setpoint": 0.0,
                     "pid": {
@@ -134,9 +138,7 @@
                 {
                     "name": "STEPWISE_INLET",
                     "type": "stepwise",
-                    "inputs": [
-                        "SCM_TEMP_C"
-                    ],
+                    "inputs": ["SCM_TEMP_C"],
                     "setpoint": 0.0,
                     "pid": {
                         "samplePeriod": 1,
@@ -162,9 +164,7 @@
                 {
                     "name": "STEPWISE_BRICK",
                     "type": "stepwise",
-                    "inputs": [
-                        "RMC_BRICK_TEMP_C"
-                    ],
+                    "inputs": ["RMC_BRICK_TEMP_C"],
                     "setpoint": 0.0,
                     "pid": {
                         "samplePeriod": 1,
@@ -186,9 +186,7 @@
                 {
                     "name": "PID_BRICK",
                     "type": "temp",
-                    "inputs": [
-                        "RMC_BRICK_TEMP_C"
-                    ],
+                    "inputs": ["RMC_BRICK_TEMP_C"],
                     "setpoint": 90.0,
                     "pid": {
                         "samplePeriod": 1,
@@ -252,9 +250,7 @@
                 {
                     "name": "STEPWISE_INLET",
                     "type": "stepwise",
-                    "inputs": [
-                        "SCM_TEMP_C"
-                    ],
+                    "inputs": ["SCM_TEMP_C"],
                     "setpoint": 0.0,
                     "pid": {
                         "samplePeriod": 1,
@@ -280,9 +276,7 @@
                 {
                     "name": "STEPWISE_BRICK",
                     "type": "stepwise",
-                    "inputs": [
-                        "RMC_BRICK_TEMP_C"
-                    ],
+                    "inputs": ["RMC_BRICK_TEMP_C"],
                     "setpoint": 0.0,
                     "pid": {
                         "samplePeriod": 1,
@@ -304,9 +298,7 @@
                 {
                     "name": "PID_BRICK",
                     "type": "temp",
-                    "inputs": [
-                        "RMC_BRICK_TEMP_C"
-                    ],
+                    "inputs": ["RMC_BRICK_TEMP_C"],
                     "setpoint": 90.0,
                     "pid": {
                         "samplePeriod": 1,
