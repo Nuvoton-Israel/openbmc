@@ -4,8 +4,6 @@ inherit obmc-phosphor-systemd systemd
 
 SERVICE_LIST = "power-good-assert@.service \
                 power-good-deassert@.service \
-                leak-detect-assert@.service \
-                leak-detect-deassert@.service \
                 rpu-ready-assert@.service \
                 rpu-ready-deassert@.service \
                 ac-power-good-assert@.service \
@@ -25,15 +23,13 @@ SRC_URI += "file://minerva-phosphor-multi-gpio-monitor.json \
             ${@compose_list(d, 'SERVICE_FILE_FMT', 'SERVICE_LIST')} \
             "
 
-RDEPENDS:${PN}:append: = " bash"
+RDEPENDS:${PN}:append = " bash"
 
 FILES:${PN} += "${systemd_system_unitdir}/*"
 
 SYSTEMD_SERVICE:${PN} += "${SERVICE_LIST}"
 
-SYSTEMD_AUTO_ENABLE = "enable"
-
-do_install:append:() {
+do_install:append() {
     install -d ${D}${datadir}/phosphor-gpio-monitor
     install -m 0644 ${UNPACKDIR}/minerva-phosphor-multi-gpio-monitor.json \
                     ${D}${datadir}/phosphor-gpio-monitor/phosphor-multi-gpio-monitor.json

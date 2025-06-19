@@ -11,11 +11,12 @@ DEPENDS = "boost \
            valijson \
            phosphor-dbus-interfaces \
 "
-SRCREV = "955c6ebb7d73417ebc1827b05513d3a281742e22"
-PACKAGECONFIG ??= "ipmi-fru"
+SRCREV = "70fcb95a4e8c3a599e8afd5b88ffa770a6d5a696"
+PACKAGECONFIG ??= "ipmi-fru gpio-presence"
 
-PACKAGECONFIG[ipmi-fru] = "-Dfru-device=true, -Dfru-device=false, i2c-tools,"
 PACKAGECONFIG[dts-vpd] = "-Ddevicetree-vpd=true, -Ddevicetree-vpd=false"
+PACKAGECONFIG[gpio-presence] = "-Dgpio-presence=true, -Dgpio-presence=false, libgpiod"
+PACKAGECONFIG[ipmi-fru] = "-Dfru-device=true, -Dfru-device=false, i2c-tools"
 PACKAGECONFIG[validate-json] = "\
     -Dvalidate-json=true, \
     -Dvalidate-json=false, \
@@ -31,14 +32,15 @@ SYSTEMD_PACKAGES = "${PN} ${EXTRA_ENTITY_MANAGER_PACKAGES}"
 SYSTEMD_SERVICE:${PN} = "xyz.openbmc_project.EntityManager.service"
 SYSTEMD_SERVICE:fru-device = "xyz.openbmc_project.FruDevice.service"
 SYSTEMD_SERVICE:devicetree-vpd = "devicetree-vpd-parser.service"
-SYSTEMD_AUTO_ENABLE:fru-device:ibm-power-cpu = "disable"
+SYSTEMD_SERVICE:gpio-presence = "xyz.openbmc_project.gpiopresence.service"
 
 inherit pkgconfig meson systemd python3native
 
 EXTRA_OEMESON = "-Dtests=disabled"
 EXTRA_ENTITY_MANAGER_PACKAGES = " \
-    ${@bb.utils.contains('PACKAGECONFIG', 'ipmi-fru', 'fru-device', '', d)} \
     ${@bb.utils.contains('PACKAGECONFIG', 'dts-vpd', 'devicetree-vpd', '', d)} \
+    ${@bb.utils.contains('PACKAGECONFIG', 'gpio-presence', 'gpio-presence', '', d)} \
+    ${@bb.utils.contains('PACKAGECONFIG', 'ipmi-fru', 'fru-device', '', d)} \
     "
 
 do_install:append() {
@@ -50,10 +52,12 @@ FILES:${PN} += " \
     "
 FILES:fru-device = "${bindir}/fru-device ${datadir}/${BPN}/blacklist.json"
 FILES:devicetree-vpd = "${bindir}/devicetree-vpd-parser"
+FILES:gpio-presence = "${bindir}/gpio-presence-sensor"
 
 RRECOMMENDS:${PN} = " \
-    ${@bb.utils.contains('PACKAGECONFIG', 'ipmi-fru', 'fru-device', '', d)} \
     ${@bb.utils.contains('PACKAGECONFIG', 'dts-vpd', 'devicetree-vpd', '', d)} \
+    ${@bb.utils.contains('PACKAGECONFIG', 'gpio-presence', 'gpio-presence', '', d)} \
+    ${@bb.utils.contains('PACKAGECONFIG', 'ipmi-fru', 'fru-device', '', d)} \
     "
 
 PACKAGE_BEFORE_PN = "${EXTRA_ENTITY_MANAGER_PACKAGES}"

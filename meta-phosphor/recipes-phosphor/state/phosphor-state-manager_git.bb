@@ -39,6 +39,7 @@ SYSTEMD_PACKAGES = "${PN}-discover \
 PACKAGECONFIG ??= " \
     only-run-apr-on-power-loss \
     only-allow-boot-when-bmc-ready \
+    run-apr-on-software-reset \
     install-utils \
     "
 
@@ -53,6 +54,15 @@ PACKAGECONFIG[only-run-apr-on-power-loss] = "-Donly-run-apr-on-power-loss=true,-
 
 # Only allow boot operations when BMC is in Ready state
 PACKAGECONFIG[only-allow-boot-when-bmc-ready] = "-Donly-allow-boot-when-bmc-ready=true,-Donly-allow-boot-when-bmc-ready=false"
+
+# Allow run APR when BMC has been rebooted due to pinhole action
+PACKAGECONFIG[run-apr-on-pinhole-reset] = "-Drun-apr-on-pinhole-reset=true,-Drun-apr-on-pinhole-reset=false"
+
+# Allow run APR when BMC has been rebooted due to watchdog
+PACKAGECONFIG[run-apr-on-watchdog-reset] = "-Drun-apr-on-watchdog-reset=true,-Drun-apr-on-watchdog-reset=false"
+
+# Allow run APR when BMC has been rebooted due to software request
+PACKAGECONFIG[run-apr-on-software-reset] = "-Drun-apr-on-software-reset=true,-Drun-apr-on-software-reset=false"
 
 # Enable host state GPIO
 PACKAGECONFIG[host-gpio] = "-Dhost-gpios=enabled,-Dhost-gpios=disabled,gpioplus"
@@ -274,6 +284,6 @@ SYSTEMD_LINK:${PN}-obmc-targets += "${@compose_list_zip(d, 'RESET_FMT_CTRL', 'OB
 SYSTEMD_LINK[vardeps] += "OBMC_CHASSIS_INSTANCES OBMC_HOST_INSTANCES"
 
 SRC_URI = "git://github.com/openbmc/phosphor-state-manager;branch=master;protocol=https"
-SRCREV = "ff85df60109ddfb9d56e2a887c6aed83d16c3e3c"
+SRCREV = "cc501b2873b6476ae8b2f8b6676c29cce537c16d"
 
 S = "${WORKDIR}/git"

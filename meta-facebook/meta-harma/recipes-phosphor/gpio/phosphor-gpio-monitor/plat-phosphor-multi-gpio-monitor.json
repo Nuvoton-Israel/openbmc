@@ -119,13 +119,12 @@
         "Continue": true
     },
     {
-        "Name": "leakage-detect-alert",
-        "ChipId": "0",
+        "Name": "power-asic-good",
+        "ChipId": "2",
         "GpioNum": 92,
-        "EventMon": "BOTH",
+        "EventMon": "RISING",
         "Targets": {
-            "RISING": ["leak-detect-deassert-log@0_leakage-detect-alert.service"],
-            "FALLING": ["leak-detect-assert-log@0_leakage-detect-alert.service"]
+            "RISING": ["fw-versions-ag-vr@0.service"]
         },
         "Continue": true
     },
@@ -169,10 +168,25 @@
         "EventMon": "BOTH",
         "Targets": {
             "RISING": [
-                "thermaltrip-deassert-log@2_cpu0-thermtrip-alert.service"
+                "thermtrip-deassert-log.service"
              ],
             "FALLING": [
-                "thermaltrip-assert-log@2_cpu0-thermtrip-alert.service"
+                "thermtrip-assert-log.service"
+             ]
+        },
+        "Continue": true
+    },
+    {
+        "Name": "cpu0-prochot-alert",
+        "ChipId": "2",
+        "GpioNum": 178,
+        "EventMon": "BOTH",
+        "Targets": {
+            "RISING": [
+                "prochot-deassert-log.service"
+             ],
+            "FALLING": [
+                "prochot-assert-log.service"
              ]
         },
         "Continue": true
@@ -228,12 +242,12 @@
         "Continue": true
     },
     {
-        "Name": "power-asic-good",
-        "ChipId": "2",
-        "GpioNum": 92,
+        "Name": "health-mmc",
+        "ChipId": "5",
+        "GpioNum": 7,
         "EventMon": "RISING",
         "Targets": {
-            "RISING": ["fw-versions-ag-vr@0.service"]
+            "RISING": ["mmc-recovery.service"]
         },
         "Continue": true
     }
