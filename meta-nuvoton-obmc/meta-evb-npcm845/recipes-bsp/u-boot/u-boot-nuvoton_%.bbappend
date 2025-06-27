@@ -12,3 +12,5 @@ SRC_URI:append = " file://evb-npcm845.cfg"
 
 SRC_URI:append = " file://0001-uart2-clock-source-to-24Mhz.patch"
 SRC_URI:append = " file://0002-Enable-openbmc-copy-base-file-to-ram-feature.patch"
+SRC_URI:append = " file://0012-Enable-DVO-HSYNC-DDC-i2c-port.patch"
+
