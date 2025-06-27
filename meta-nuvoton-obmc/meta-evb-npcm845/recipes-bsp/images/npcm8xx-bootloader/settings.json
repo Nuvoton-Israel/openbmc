@@ -4,7 +4,7 @@
         "MC_CONFIG": "0x04",
         "NoECC_Region_0_End": "0x1000000"
     },
-    "key_setting_edit_me.py":
+    "key_setting_edit_me.json":
     {
         "COMBO1_OFFSET": "2048*1024"
     },
