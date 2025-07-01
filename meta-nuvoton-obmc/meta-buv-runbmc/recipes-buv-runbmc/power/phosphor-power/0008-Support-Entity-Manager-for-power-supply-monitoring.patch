@@ -1,20 +1,21 @@
-From 051afa881262740bf572135cb42722726cf3430f Mon Sep 17 00:00:00 2001
-From: Ban Feng <kcfeng0@nuvoton.com>
-Date: Fri, 3 Mar 2023 11:21:27 +0800
+From 378f1989c2b6c91e33a45fdf184e2016a24cd192 Mon Sep 17 00:00:00 2001
+From: Eason Yang <j2anfernee@gmail.com>
+Date: Mon, 30 Jun 2025 17:07:52 +0800
 Subject: [PATCH 08/10] Support Entity-Manager for power supply monitoring
 
 Upstream-Status: Inappropriate [oe-specific]
 Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
+Signed-off-by: Eason Yang <j2anfernee@gmail.com>
 ---
  meson.build                               |   4 +-
  meson.options                             |   9 ++
  pmbus.cpp                                 |   1 +
- power-supply/power_supply.cpp             | 119 ++++++++++++++++++++--
+ power-supply/power_supply.cpp             | 121 ++++++++++++++++++++--
  power-supply/power_supply.hpp             |   2 +
  services/power-supply-monitor-em@.service |  15 +++
  types.hpp                                 |   8 +-
- utility.cpp                               |  15 ++-
- 8 files changed, 162 insertions(+), 11 deletions(-)
+ utility.cpp                               |  16 ++-
+ 8 files changed, 164 insertions(+), 12 deletions(-)
  create mode 100644 services/power-supply-monitor-em@.service
 
 diff --git a/meson.build b/meson.build
@@ -74,19 +75,19 @@ index c7019605..9bd96c3f 100644
      'oe-sdk',
      type: 'feature',
 diff --git a/pmbus.cpp b/pmbus.cpp
-index 6021a268..8ef7ea51 100644
+index 7bdda541..cf3cacd6 100644
 --- a/pmbus.cpp
 +++ b/pmbus.cpp
-@@ -394,6 +394,7 @@ void PMBus::findHwmonDir()
-                                      " DEVICE_PATH=" +
-                                      basePath.string())
-                              .c_str());
+@@ -379,6 +379,7 @@ void PMBus::findHwmonDir()
+         lg2::info("Unable to find hwmon directory in device base path "
+                   "DEVICE_PATH={DEVICE_PATH}",
+                   "DEVICE_PATH", basePath);
 +        throw ReadFailure();
      }
  }
  
 diff --git a/power-supply/power_supply.cpp b/power-supply/power_supply.cpp
-index 6ceb2129..beb77dbe 100644
+index 6ceb2129..98065302 100644
 --- a/power-supply/power_supply.cpp
 +++ b/power-supply/power_supply.cpp
 @@ -30,6 +30,12 @@
@@ -108,7 +109,8 @@ index 6ceb2129..beb77dbe 100644
  
 +#if (NUVOTON_ENTITY == 0)
      // Create /xyz/openbmc_project/inventory/system/chassis/motherboard/powersupply0 DBus object
-     createInventoryObj() ;
+-    createInventoryObj() ;
++    createInventoryObj();
 +#endif
  
      // Get initial presence state.
@@ -407,7 +409,7 @@ index 1f2cfe64..e554d8d6 100644
  constexpr auto INPUT_HISTORY = "input_history";
  
 diff --git a/utility.cpp b/utility.cpp
-index 0e687dde..14240dc3 100644
+index 0cee1bf4..fe40a336 100644
 --- a/utility.cpp
 +++ b/utility.cpp
 @@ -19,6 +19,8 @@
@@ -419,16 +421,17 @@ index 0e687dde..14240dc3 100644
  namespace phosphor
  {
  namespace power
-@@ -32,6 +34,8 @@ constexpr auto MAPPER_INTERFACE = "xyz.openbmc_project.ObjectMapper";
+@@ -32,6 +34,9 @@ constexpr auto MAPPER_INTERFACE = "xyz.openbmc_project.ObjectMapper";
  
- using namespace phosphor::logging;
  using json = nlohmann::json;
+ 
 +using PowerState =
 +    sdbusplus::xyz::openbmc_project::State::server::Chassis::PowerState;
- 
++
  std::string getService(const std::string& path, const std::string& interface,
                         sdbusplus::bus_t& bus, bool logError)
-@@ -192,8 +196,15 @@ bool isPoweredOn(sdbusplus::bus_t& bus, bool defaultState)
+ {
+@@ -183,8 +188,15 @@ bool isPoweredOn(sdbusplus::bus_t& bus, bool defaultState)
      {
          // When state = 1, system is powered on
          auto service = util::getService(POWER_OBJ_PATH, POWER_IFACE, bus);
