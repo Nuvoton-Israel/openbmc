@@ -14,7 +14,7 @@ DEPENDS = " \
     ${@bb.utils.contains('PTEST_ENABLED', '1', 'gtest', '', d)} \
     ${@bb.utils.contains('PTEST_ENABLED', '1', 'gmock', '', d)} \
 "
-SRCREV = "127afa70bfa236b2949f5c385704e00de99557e4"
+SRCREV = "06827463614f80eba8272c4b70f22ad708d50cf8"
 PV = "1.0+git${SRCPV}"
 
 SRC_URI = "git://github.com/openbmc/bmcweb.git;branch=master;protocol=https"
@@ -30,10 +30,10 @@ inherit useradd
 inherit pkgconfig meson ptest
 
 PACKAGECONFIG ??= "mutual-tls-auth"
-PACKAGECONFIG[insecure-redfish-expand]="-Dinsecure-enable-redfish-query=enabled"
-PACKAGECONFIG[mutual-tls-auth]="-Dmutual-tls-auth=enabled,-Dmutual-tls-auth=disabled"
+PACKAGECONFIG[insecure-redfish-expand] = "-Dinsecure-enable-redfish-query=enabled"
+PACKAGECONFIG[mutual-tls-auth] = "-Dmutual-tls-auth=enabled,-Dmutual-tls-auth=disabled"
 
-MUTUAL_TLS_PARSING="CommonName"
+MUTUAL_TLS_PARSING = "CommonName"
 
 EXTRA_OEMESON = " \
     --buildtype=minsize \
@@ -56,7 +56,8 @@ RDEPENDS:${PN} += " \
 FILES:${PN} += "${datadir}/** "
 
 USERADD_PACKAGES = "${PN}"
-# add a user called httpd for the server to assume
+
+# add a user called bmcweb for the server to assume
 USERADD_PARAM:${PN} = "-r -s /sbin/nologin bmcweb"
 
 GROUPADD_PARAM:${PN} = "web; redfish; hostconsole"

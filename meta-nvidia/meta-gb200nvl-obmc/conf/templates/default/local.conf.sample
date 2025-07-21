@@ -1,7 +1,7 @@
 MACHINE ??= "gb200nvl-obmc"
 DISTRO ?= "openbmc-phosphor"
 DISTRO_VERSION:append = ".${@time.time()}"
-PACKAGE_CLASSES ?= "package_rpm"
+PACKAGE_CLASSES ?= "package_ipk"
 SANITY_TESTED_DISTROS:append ?= " *"
 USER_CLASSES ?= "buildstats"
 PATCHRESOLVE = "noop"
@@ -16,8 +16,3 @@ BB_DISKMON_DIRS = "\
     HALT,/tmp,10M,1K"
 CONF_VERSION = "2"
 INHERIT += "extrausers"
-EXTRA_USERS_PARAMS = " \
-  usermod -p '\$1\$UGMqyqdG\$FZiylVFmRRfl9Z0Ue8G7e/' root; \
-  "
-
-require conf/machine/include/obmc-bsp-common.inc

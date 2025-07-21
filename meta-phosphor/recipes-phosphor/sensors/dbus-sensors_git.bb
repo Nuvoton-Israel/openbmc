@@ -11,7 +11,7 @@ DEPENDS = " \
     phosphor-logging \
     sdbusplus \
     "
-SRCREV = "7a28d492c8cf02a7c90cd34100c44e2378f3ca64"
+SRCREV = "bef4d4182d361c67482d33264a0d15ead6f4da34"
 PACKAGECONFIG ??= " \
     adcsensor \
     exitairtempsensor \
@@ -82,6 +82,9 @@ SYSTEMD_SERVICE:${PN} += "${@bb.utils.contains('PACKAGECONFIG', 'mctpreactor', \
                                                '', d)}"
 SYSTEMD_SERVICE:${PN} += "${@bb.utils.contains('PACKAGECONFIG', 'mcutempsensor', \
                                                'xyz.openbmc_project.mcutempsensor.service', \
+                                               '', d)}"
+SYSTEMD_SERVICE:${PN} += "${@bb.utils.contains('PACKAGECONFIG', 'nvidia-gpu', \
+                                               'xyz.openbmc_project.nvidiagpusensor.service', \
                                                '', d)}"
 SYSTEMD_SERVICE:${PN} += "${@bb.utils.contains('PACKAGECONFIG', 'nvmesensor', \
                                                'xyz.openbmc_project.nvmesensor.service', \
