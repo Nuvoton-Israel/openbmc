@@ -1,0 +1,28 @@
+From 171c3ab7d1b7a8cc0440529823f7e19f55bd61ea Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Mon, 28 Jul 2025 16:32:41 +0800
+Subject: [PATCH] dts: arm64: evb-ncpmn845: enable espi salve
+
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+index 1072dfbe14e1..e020e5f7e757 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+@@ -219,6 +219,10 @@ &espi_flash {
+ 	status = "okay";
+ };
+ 
++&espi_slave {
++	status = "okay";
++};
++
+ &tmps {
+ 	status = "okay";
+ };
+-- 
+2.43.0
+
