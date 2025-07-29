@@ -1,0 +1,10 @@
+[Unit]
+Description=Asserts BMC_BOOT_DONE
+
+[Service]
+Type=simple
+RemainAfterExit=true
+ExecStart=/usr/bin/bmc-boot-done.sh
+
+[Install]
+WantedBy=multi-user.target
