@@ -14,7 +14,7 @@ DEPENDS = " \
     ${@bb.utils.contains('PTEST_ENABLED', '1', 'gtest', '', d)} \
     ${@bb.utils.contains('PTEST_ENABLED', '1', 'gmock', '', d)} \
 "
-SRCREV = "06827463614f80eba8272c4b70f22ad708d50cf8"
+SRCREV = "d23d634532ab8ad7f2e4c784c92933535a06356e"
 PV = "1.0+git${SRCPV}"
 
 SRC_URI = "git://github.com/openbmc/bmcweb.git;branch=master;protocol=https"
@@ -29,9 +29,25 @@ inherit systemd
 inherit useradd
 inherit pkgconfig meson ptest
 
-PACKAGECONFIG ??= "mutual-tls-auth"
+PACKAGECONFIG ??= " \
+    http-zstd \
+    kvm \
+    mutual-tls-auth \
+    redfish-allow-deprecated-power-thermal \
+    redfish-bmc-journal \
+"
+
+PACKAGECONFIG[dbus-rest] = "-Drest=enabled,-Drest=disabled"
+PACKAGECONFIG[http-zstd] = "-Dhttp-zstd=enabled,-Dhttp-zstd=disabled,zstd"
 PACKAGECONFIG[insecure-redfish-expand] = "-Dinsecure-enable-redfish-query=enabled"
+PACKAGECONFIG[kvm] = "-Dkvm=enabled,-Dkvm=disabled"
 PACKAGECONFIG[mutual-tls-auth] = "-Dmutual-tls-auth=enabled,-Dmutual-tls-auth=disabled"
+PACKAGECONFIG[redfish-allow-deprecated-power-thermal] = "-Dredfish-allow-deprecated-power-thermal=enabled,-Dredfish-allow-deprecated-power-thermal=disabled"
+PACKAGECONFIG[redfish-bmc-journal] = "-Dredfish-bmc-journal=enabled,-Dredfish-bmc-journal=disabled"
+PACKAGECONFIG[redfish-cpu-log] = "-Dredfish-cpu-log=enabled,-Dredfish-cpu-log=disabled"
+PACKAGECONFIG[redfish-dbus-log] = "-Dredfish-dbus-log=enabled,-Dredfish-dbus-log=disabled"
+PACKAGECONFIG[redfish-dump-log] = "-Dredfish-dump-log=enabled,-Dredfish-dump-log=disabled"
+PACKAGECONFIG[redfish-host-logger] = "-Dredfish-host-logger=enabled,-Dredfish-host-logger=disabled"
 
 MUTUAL_TLS_PARSING = "CommonName"
 
