@@ -56,4 +56,5 @@ RDEPENDS:${PN}-system = " \
         phosphor-post-code-manager \    
         phosphor-ipmi-host \
         host-misc-comm-manager \
+        bmc-boot-done \
         "
