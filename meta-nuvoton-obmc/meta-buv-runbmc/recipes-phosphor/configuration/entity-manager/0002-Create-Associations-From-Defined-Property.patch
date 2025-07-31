@@ -39,9 +39,9 @@ Index: git/src/entity_manager/entity_manager.cpp
 +                        findPath->get<std::string>());
 +                }
 +            }
-+             std::shared_ptr<sdbusplus::asio::dbus_interface> ifacePtr = dbus_interface::createInterface(
++             std::shared_ptr<sdbusplus::asio::dbus_interface> ifacePtr = dbus_interface.createInterface(
 +                objServer, boardPath,
-+		"xyz.openbmc_project.Association.Definitions", boardNameOrig);
++		        "xyz.openbmc_project.Association.Definitions", boardNameOrig);
 +            ifacePtr->register_property("Associations", associations);
 +            ifacePtr->initialize();
 +        }

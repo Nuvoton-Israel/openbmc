@@ -18,11 +18,11 @@ EEPROMS_ESCAPED = "${@compose_list(d, 'EEPROM_ESCAPEDFMT', 'EEPROM_NAMES')}"
 
 ENVFMT = "obmc/eeproms/{0}"
 ENVF = "${@compose_list(d, 'ENVFMT', 'EEPROMS')}"
-SYSTEMD_ENVIRONMENT_FILE:${PN}:append:= " ${@entity_enabled(d, '', ' ${ENVF}')}"
+SYSTEMD_ENVIRONMENT_FILE:${PN}:append: = " ${@entity_enabled(d, '', ' ${ENVF}')}"
 
 TMPL = "obmc-read-eeprom@.service"
 TGT = "${SYSTEMD_DEFAULT_TARGET}"
 INSTFMT = "obmc-read-eeprom@{0}.service"
 FMT = "../${TMPL}:${TGT}.wants/${INSTFMT}"
 LINKS = "${@compose_list(d, 'FMT', 'EEPROMS_ESCAPED')}"
-SYSTEMD_LINK:${PN}:append:= " ${@entity_enabled(d, '', ' ${LINKS}')}"
+SYSTEMD_LINK:${PN}:append: = " ${@entity_enabled(d, '', ' ${LINKS}')}"

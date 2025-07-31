@@ -1,5 +1,5 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
-FILESEXTRAPATHS:prepend:m1120-c2195 := "${THISDIR}/${PN}/m1120:"
+FILESEXTRAPATHS:prepend:m1120-c2195 :=  "${THISDIR}/${PN}/m1120:"
 
 inherit image_version
 

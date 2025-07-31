@@ -3,7 +3,7 @@ inherit entity-utils
 
 FILESEXTRAPATHS:prepend:buv-runbmc := "${THISDIR}/${PN}:"
 
-DEPENDS:append:buv-runbmc= " \
+DEPENDS:append:buv-runbmc = " \
     ${@entity_enabled(d, '', 'buv-runbmc-yaml-config')}"
 
 IPMI_FRU_YAML:buv-runbmc = "${@entity_enabled(d, '', '${STAGING_DIR_HOST}${datadir}/buv-runbmc-yaml-config/ipmi-fru-read.yaml')}"

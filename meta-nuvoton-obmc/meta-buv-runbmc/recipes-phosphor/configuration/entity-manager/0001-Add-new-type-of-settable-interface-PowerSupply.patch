@@ -1,4 +1,4 @@
-From f567f670bbe0da360a3efd164a28f4c29bdb2acb Mon Sep 17 00:00:00 2001
+From 9ffb11bdd3b520900d9753c666ed7f45bac785ef Mon Sep 17 00:00:00 2001
 From: Ban Feng <kcfeng0@nuvoton.com>
 Date: Fri, 3 Mar 2023 11:17:05 +0800
 Subject: [PATCH] Add new type of settable interface - PowerSupply
@@ -12,10 +12,10 @@ Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
  1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/src/entity_manager/entity_manager.cpp b/src/entity_manager/entity_manager.cpp
-index 2b6560457..ac5116ba8 100644
+index 31e7ef4f4..bddb3ddba 100644
 --- a/src/entity_manager/entity_manager.cpp
 +++ b/src/entity_manager/entity_manager.cpp
-@@ -50,8 +50,8 @@
+@@ -51,8 +51,8 @@
  constexpr const char* tempConfigDir = "/tmp/configuration/";
  constexpr const char* lastConfiguration = "/tmp/configuration/last.json";
  
@@ -24,12 +24,12 @@ index 2b6560457..ac5116ba8 100644
 +static constexpr std::array<const char*, 7> settableInterfaces = {
 +    "FanProfile", "Pid", "Pid.Zone", "Stepwise", "Thresholds", "Polling", "PowerSupply"};
  
- // NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
- 
-@@ -144,7 +144,7 @@ void postToDbus(const nlohmann::json& newConfiguration,
+ const std::regex illegalDbusPathRegex("[^A-Za-z0-9_.]");
+ const std::regex illegalDbusMemberRegex("[^A-Za-z0-9_]");
+@@ -155,7 +155,7 @@ void EntityManager::postToDbus(const nlohmann::json& newConfiguration)
  
                  dbus_interface::populateInterfaceFromJson(
-                     systemConfiguration, jsonPointerPath + propName, iface,
+                     io, systemConfiguration, jsonPointerPath + propName, iface,
 -                    propValue, objServer);
 +                    propValue, objServer, getPermission(boardType));
              }

@@ -1,8 +1,8 @@
 LICENSE = "CLOSED"
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
-SRC_URI:append:= " file://fan_init.sh"
-SRC_URI:append:= " file://fan_init.service"
+SRC_URI:append: = " file://fan_init.sh"
+SRC_URI:append: = " file://fan_init.service"
 
 FILES:${PN} = " ${bindir}/fan_init.sh"
 

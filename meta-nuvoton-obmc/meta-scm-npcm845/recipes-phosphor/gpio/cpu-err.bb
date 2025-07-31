@@ -18,7 +18,7 @@ do_install() {
             ${D}${bindir}/toggle_caterr_led.sh
 }
 
-SYSTEMD_ENVIRONMENT_FILE:${PN} +="obmc/gpio/cpu_err"
+SYSTEMD_ENVIRONMENT_FILE:${PN} += "obmc/gpio/cpu_err"
 
 CPU_ERR_SERVICE = "cpu_err"
 

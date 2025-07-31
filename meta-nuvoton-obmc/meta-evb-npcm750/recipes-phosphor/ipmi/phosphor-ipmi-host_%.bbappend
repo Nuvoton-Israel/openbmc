@@ -1,6 +1,6 @@
 inherit entity-utils
 
-FILESEXTRAPATHS:append:= "${THISDIR}/${PN}:"
+FILESEXTRAPATHS:append: = "${THISDIR}/${PN}:"
 
 DEPENDS:append =" ${@entity_enabled(d, '', ' evb-npcm750-yaml-config')}"
 

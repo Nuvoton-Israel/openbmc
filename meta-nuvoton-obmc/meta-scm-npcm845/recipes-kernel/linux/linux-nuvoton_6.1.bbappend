@@ -1,5 +1,5 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/linux-nuvoton:"
-FILESEXTRAPATHS:prepend:m1120-c2195 := "${THISDIR}/${PN}/m1120:"
+FILESEXTRAPATHS:prepend:m1120-c2195 :=  "${THISDIR}/${PN}/m1120:"
 
 SRC_URI:append:scm-npcm845 = " file://nuvoton-npcm845-scm.dts;subdir=git/arch/${ARCH}/boot/dts/nuvoton "
 SRC_URI:append:scm-npcm845 = " file://0001-kernel-scm-dts.patch"

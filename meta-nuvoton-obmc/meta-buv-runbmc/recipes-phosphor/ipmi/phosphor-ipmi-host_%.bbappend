@@ -1,6 +1,6 @@
 inherit entity-utils
 
-DEPENDS:append:buv-runbmc= " \
+DEPENDS:append:buv-runbmc = " \
     ${@entity_enabled(d, '', ' buv-runbmc-yaml-config')}"
 
 EXTRA_OEMESON:append:buv-runbmc = " \

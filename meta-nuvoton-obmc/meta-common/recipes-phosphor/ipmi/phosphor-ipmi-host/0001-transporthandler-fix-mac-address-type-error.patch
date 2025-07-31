@@ -1,0 +1,35 @@
+From c7bc560b42569359cf4246aecf841a88ac47c676 Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Tue, 29 Jul 2025 20:40:20 +0800
+Subject: [PATCH] transporthandler: fix MAC address type error
+
+When setting the MAC address property, the code was using `stdplus::toStr(mac)`,
+which is not suitable for `stdplus::EtherAddr` type. This patch replaces it with
+`stdplus::ToStrHandle<stdplus::ToStr<stdplus::EtherAddr>> macToStr;` to correctly convert the MAC address to a string format.    
+
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+Upstream-Status: Inappropriate [oe-specific]
+
+---
+ transporthandler.cpp | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/transporthandler.cpp b/transporthandler.cpp
+index df4e3967..28a51b60 100644
+--- a/transporthandler.cpp
++++ b/transporthandler.cpp
+@@ -218,8 +218,10 @@ stdplus::EtherAddr getMACProperty(sdbusplus::bus_t& bus,
+ void setMACProperty(sdbusplus::bus_t& bus, const ChannelParams& params,
+                     stdplus::EtherAddr mac)
+ {
++    stdplus::ToStrHandle<stdplus::ToStr<stdplus::EtherAddr>> macToStr;
++    std::string macStr(macToStr(mac));
+     setDbusProperty(bus, params.service, params.ifPath, INTF_MAC, "MACAddress",
+-                    stdplus::toStr(mac));
++                    macStr);
+ }
+ 
+ void deleteObjectIfExists(sdbusplus::bus_t& bus, const std::string& service,
+-- 
+2.43.0
+

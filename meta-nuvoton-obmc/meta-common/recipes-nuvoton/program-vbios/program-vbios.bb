@@ -22,7 +22,7 @@ UNPACKDIR = "${S}"
 
 SYSTEMD_PACKAGES = "${PN}"
 SYSTEMD_SERVICE:${PN} = "program-vbios.service"
-SYSTEMD_ENVIRONMENT_FILE:${PN} +="obmc/vbios/program_vbios"
+SYSTEMD_ENVIRONMENT_FILE:${PN} += "obmc/vbios/program_vbios"
 FILES:${PN} += "/usr/share/vbios/vbios.bin"
 FILES:${PN} += "${sysconfdir}/modprobe.d/dontload.conf"
 
