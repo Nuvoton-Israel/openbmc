@@ -12,7 +12,7 @@ INSANE_SKIP:${PN} = "arch"
 INHIBIT_PACKAGE_DEBUG_SPLIT = "1"
 INHIBIT_PACKAGE_STRIP = "1"
 
-firmware_dir="${nonarch_base_libdir}/firmware/"
+firmware_dir = "${nonarch_base_libdir}/firmware/"
 
 do_install() {
 	install -d ${D}${firmware_dir}

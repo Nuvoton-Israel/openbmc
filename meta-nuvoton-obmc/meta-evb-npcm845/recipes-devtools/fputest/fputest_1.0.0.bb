@@ -7,7 +7,7 @@ SRC_URI = "file://${BPN}"
 
 S = "${WORKDIR}/${BPN}"
 
-LDFLAGS="-lm -lrt"
+LDFLAGS = "-lm -lrt"
 CFLAGS:remove = "-O2 "
 CXXFLAGS:remove = "-O2 "
 CFLAGS:prepend = "-O3 "

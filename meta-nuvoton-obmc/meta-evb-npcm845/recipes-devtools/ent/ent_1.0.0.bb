@@ -3,7 +3,7 @@ DESCRIPTION = "The program is useful for evaluating pseudorandom number generato
 HOMEPAGE = "https://www.fourmilab.ch/random/"
 
 DEPENDS += "busybox"
-LICENSE="MIT"
+LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${S}/ent.c;endline=24;md5=376f7f7194e74c2639d66ef5f0309ef7"
 SRC_URI = "file://ent.tar.bz2"
 
