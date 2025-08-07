@@ -30,3 +30,6 @@ SRC_URI:append = " file://0007-dts-evb-npcm845-enable-udc8.patch"
 # Enable ttyS1, ttyS2, ttyS3, ttyS4, ttyS5
 SRC_URI:append = " file://0001-arm64-dts-npcm845-evb-enable-more-serial-interfaces.patch"
 SRC_URI:append = " file://0001-arm64-dts-nuvoton-npcm845-set-gpio96-defaule-high.patch"
+
+# Set high slew rate for PSPI pins
+SRC_URI:append = " file://0008-dts-arm64-npcm845-evb-Set-high-slew-rate-for-PSPI-pi.patch"
