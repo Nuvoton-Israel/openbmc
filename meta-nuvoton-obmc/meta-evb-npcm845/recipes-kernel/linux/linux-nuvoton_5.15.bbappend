@@ -1,7 +1,7 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/linux-nuvoton-515:${THISDIR}/linux-nuvoton:"
 
 SRC_URI:append = " file://evb-npcm845-stage.cfg"
-SRC_URI:append = " file://enable-v4l2.cfg"
+SRC_URI:append = " file://enable-v4l2-kvm.cfg"
 SRC_URI:append = " file://luks.cfg"
 #SRC_URI:append = " file://enable-legacy-kvm.cfg"
 

@@ -1,9 +1,15 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/linux-nuvoton:"
 
 SRC_URI:append = " file://evb-npcm845-stage.cfg"
-SRC_URI:append = " file://enable-v4l2.cfg"
 SRC_URI:append = " file://luks.cfg"
 SRC_URI:append = " file://remove-svc-i3c.cfg"
+
+# enable v4l2 VCD/ECE driver
+SRC_URI:append = " file://enable-v4l2-kvm.cfg"
+
+# enable hdmi to usb video class, media support, video devic
+# User must disale enable-v4l2-kvm.cfg to prvent conflict with obmc kvm application
+# SRC_URI:append = " file://enable-usb-video.cfg"
 
 # enable legavcy kvm driver, mutex vl42 driver 
 # SRC_URI:append = " file://enable-legacy-kvm.cfg"

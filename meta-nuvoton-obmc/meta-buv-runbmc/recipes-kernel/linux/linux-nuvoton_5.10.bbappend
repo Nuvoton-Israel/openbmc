@@ -6,4 +6,4 @@ SRC_URI:append:buv-runbmc = " \
   file://0006-driver-SPI-add-w25q01jv-support.patch \
   file://0008-driver-misc-seven-segment-display-gpio-driver.patch \
   "
-SRC_URI:append:buv-runbmc = " file://enable-v4l2.cfg"
+SRC_URI:append:buv-runbmc = " file://enable-v4l2-kvm.cfg"
