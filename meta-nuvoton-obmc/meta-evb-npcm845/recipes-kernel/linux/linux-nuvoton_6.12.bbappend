@@ -9,11 +9,11 @@ SRC_URI:append = " file://enable-v4l2-kvm.cfg"
 
 # enable hdmi to usb video class, media support, video devic
 # User must disale enable-v4l2-kvm.cfg to prvent conflict with obmc kvm application
-# SRC_URI:append = " file://enable-usb-video.cfg"
+#SRC_URI:append = " file://enable-usb-video.cfg"
 
 # enable legavcy kvm driver, mutex vl42 driver 
-# SRC_URI:append = " file://enable-legacy-kvm.cfg"
-# SRC_URI:append = " file://0001-driver-misc-enable-the-FIFO-overrun-underrun-interru.patch"
+#SRC_URI:append = " file://enable-legacy-kvm.cfg"
+#SRC_URI:append = " file://0001-driver-misc-enable-the-FIFO-overrun-underrun-interru.patch"
 
 # support OpenBMC flash partition
 SRC_URI:append = " file://0001-dts-nuvoton-evb-npcm845-support-openbmc-partition.patch"
