@@ -4,7 +4,7 @@ RDEPENDS:${PN}-monitor = " \
     ${@entity_enabled(d, 'phosphor-power-monitor-em', 'phosphor-power-monitor')} \
     "
 
-is_entity="${@entity_enabled(d, 'yes', '')}"
+is_entity = "${@entity_enabled(d, 'yes', '')}"
 
 pkg_prerm:${PN}() {
         [ -z "${OBMC_POWER_SUPPLY_INSTANCES}" ] && echo "No power supply instance defined" && exit 1

@@ -1,7 +1,7 @@
-From 7426f00de372d6c53e95e7085fd630f66de86170 Mon Sep 17 00:00:00 2001
+From e20c15cf55d5de461776ccf881069eef6a057cef Mon Sep 17 00:00:00 2001
 From: Brian Ma <chma0@nuvoton.com>
 Date: Thu, 17 Feb 2022 08:50:52 +0800
-Subject: [PATCH] Support ignore update uboot with eMMC image
+Subject: [PATCH 2/3] Support ignore update uboot with eMMC image
 
 Upstream-Status: Inappropriate [oe-specific]
 
@@ -11,7 +11,7 @@ Signed-off-by: Brian Ma <chma0@nuvoton.com>
  1 file changed, 29 insertions(+), 12 deletions(-)
 
 diff --git a/bmc/obmc-flash-bmc b/bmc/obmc-flash-bmc
-index c72bece3..f8837336 100644
+index f9cc4e25..3f1be971 100644
 --- a/bmc/obmc-flash-bmc
 +++ b/bmc/obmc-flash-bmc
 @@ -1,6 +1,8 @@

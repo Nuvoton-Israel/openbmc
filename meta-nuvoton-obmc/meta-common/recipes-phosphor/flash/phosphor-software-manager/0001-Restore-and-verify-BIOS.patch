@@ -1,7 +1,7 @@
-From ca9069b4b11bf1274179c719b412998d07a2b82c Mon Sep 17 00:00:00 2001
+From 7ec5bb1d8dc2dd69e7925598b6c4521c87939934 Mon Sep 17 00:00:00 2001
 From: Brian Ma <chma0@nuvoton.com>
 Date: Wed, 15 Jun 2022 16:07:53 +0800
-Subject: [PATCH] Restore and verify BIOS
+Subject: [PATCH 1/3] Restore and verify BIOS
 
 Upstream-Status: Inappropriate [oe-specific]
 ---
@@ -23,10 +23,10 @@ index 687fff70..c99d70b5 100644
          fs::path(imageDirPath) / "image-hostfw.sig",
          fs::path(imageDirPath) / "image-kernel.sig",
 diff --git a/bmc/item_updater.cpp b/bmc/item_updater.cpp
-index 351fc4c4..cd9d81e5 100644
+index 02c20c7a..5d54baad 100644
 --- a/bmc/item_updater.cpp
 +++ b/bmc/item_updater.cpp
-@@ -944,6 +944,28 @@ bool ItemUpdater::checkImage(const std::string& filePath,
+@@ -945,6 +945,28 @@ bool ItemUpdater::checkImage(const std::string& filePath,
  }
  
  #ifdef HOST_BIOS_UPGRADE
@@ -55,7 +55,7 @@ index 351fc4c4..cd9d81e5 100644
  void ItemUpdater::createBIOSObject()
  {
      std::string path = BIOS_OBJPATH;
-@@ -960,7 +982,7 @@ void ItemUpdater::createBIOSObject()
+@@ -961,7 +983,7 @@ void ItemUpdater::createBIOSObject()
      createUpdateableAssociation(path);
  
      auto versionId = path.substr(pos + 1);
@@ -63,12 +63,12 @@ index 351fc4c4..cd9d81e5 100644
 +    auto version = restoreBIOSVersion();
      AssociationList assocs;
      biosActivation = std::make_unique<Activation>(
-         bus, path, *this, versionId, server::Activation::Activations::Active,
+         ctx, path, *this, versionId, server::Activation::Activations::Active,
 diff --git a/bmc/meson.build b/bmc/meson.build
-index 0ff1c178..45a3d4e0 100644
+index ba1d674d..2cb9377c 100644
 --- a/bmc/meson.build
 +++ b/bmc/meson.build
-@@ -33,6 +33,8 @@ conf.set_quoted('UPDATEABLE_REV_ASSOCIATION', 'software_version')
+@@ -42,6 +42,8 @@ conf.set_quoted('UPDATEABLE_REV_ASSOCIATION', 'software_version')
  conf.set_quoted('BMC_ROFS_PREFIX', get_option('media-dir') + '/rofs-')
  # The name of the BMC table of contents file
  conf.set_quoted('OS_RELEASE_FILE', '/etc/os-release')

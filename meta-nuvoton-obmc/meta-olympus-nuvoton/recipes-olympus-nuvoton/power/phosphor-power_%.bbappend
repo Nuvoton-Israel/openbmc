@@ -42,8 +42,9 @@ FILES:${PN}-monitor-em = " \
     ${@entity_enabled(d, '${bindir}/psu-monitor', '')} \
     "
 
+is_entity = "${@entity_enabled(d, 'yes', '')}"
+
 do_install:append(){
-    is_entity="${@entity_enabled(d, 'yes', '')}"
     install -d ${D}${datadir}/phosphor-power
     if [ -z "${is_entity}" ];then
         install -m 0644 -D ${UNPACKDIR}/psu.json \

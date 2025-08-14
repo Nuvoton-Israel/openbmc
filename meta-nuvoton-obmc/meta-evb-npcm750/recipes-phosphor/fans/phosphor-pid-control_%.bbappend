@@ -2,7 +2,7 @@ inherit entity-utils
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 
-SRC_URI:append =" \
+SRC_URI:append = " \
     file://config-evb-nuvoton.json \
     file://fan-default-speed.sh \
     file://fan-reboot-control.service \
@@ -11,14 +11,14 @@ SRC_URI:append =" \
     file://phosphor-pid-control_evb_entity.service \
     "
 
-FILES:${PN}:append =" \
+FILES:${PN}:append = " \
     ${bindir}/fan-default-speed.sh \
     ${datadir}/swampd/config.json \
     "
 
 RDEPENDS:${PN} += "bash"
 
-SYSTEMD_SERVICE:${PN}:append =" \
+SYSTEMD_SERVICE:${PN}:append = " \
     fan-reboot-control.service \
     fan-boot-control.service \
     "
@@ -50,4 +50,4 @@ do_install:append() {
         ${D}${systemd_unitdir}/system
 }
 
-EXTRA_OECONF:append =" --enable-configure-dbus=yes"
+EXTRA_OECONF:append = " --enable-configure-dbus=yes"

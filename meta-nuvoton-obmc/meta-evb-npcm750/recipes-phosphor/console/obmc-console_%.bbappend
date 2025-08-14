@@ -1,6 +1,6 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 
-SRC_URI:append =" file://80-evb-npcm750-sol.rules"
+SRC_URI:append = " file://80-evb-npcm750-sol.rules"
 
 do_install:append() {
         install -m 0755 -d ${D}${sysconfdir}/${BPN}

@@ -3,7 +3,7 @@ inherit entity-utils
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 
-DEPENDS:append =" \
+DEPENDS:append = " \
     ${@entity_enabled(d, '', 'evb-npcm750-yaml-config')}"
 
 IPMI_FRU_YAML = "${@entity_enabled(d, '', '${STAGING_DIR_HOST}${datadir}/evb-npcm750-yaml-config/ipmi-fru-read.yaml')}"

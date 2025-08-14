@@ -16,8 +16,9 @@ RDEPENDS:${PN} += "bash"
 
 FILES:${PN}:append = " ${datadir}/phosphor-gpio-monitor/"
 
+is_entity = "${@entity_enabled(d, 'yes', '')}"
+
 do_install:append:buv-runbmc() {
-    is_entity="${@entity_enabled(d, 'yes', '')}"
     install -d ${D}${datadir}/phosphor-gpio-monitor
     rm -f ${D}${datadir}/phosphor-gpio-monitor/*.json
     if [ -z "${is_entity}" ];then

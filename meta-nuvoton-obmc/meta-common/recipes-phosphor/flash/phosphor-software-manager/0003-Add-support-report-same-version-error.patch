@@ -1,7 +1,7 @@
-From bcfb99df768b3fc2f111b3918352cdab3007f4a3 Mon Sep 17 00:00:00 2001
+From b514e3b0c9042127a84b8900a2823d62f24b946f Mon Sep 17 00:00:00 2001
 From: Brian Ma <chma0@nuvoton.com>
 Date: Thu, 17 Feb 2022 08:55:45 +0800
-Subject: [PATCH] Add support report same version error
+Subject: [PATCH 3/3] Add support report same version error
 
 Upstream-Status: Inappropriate [oe-specific]
 

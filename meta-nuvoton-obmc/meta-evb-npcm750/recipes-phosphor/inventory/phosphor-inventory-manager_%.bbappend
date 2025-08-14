@@ -1,7 +1,7 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
-PACKAGECONFIG:append  =" associations"
+PACKAGECONFIG:append  = " associations"
 
-SRC_URI:append =" file://associations.json"
+SRC_URI:append = " file://associations.json"
 
 do_install:append() {
     install -d ${D}${base_datadir}

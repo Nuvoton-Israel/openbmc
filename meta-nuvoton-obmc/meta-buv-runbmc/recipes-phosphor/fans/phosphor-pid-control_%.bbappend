@@ -20,10 +20,11 @@ SYSTEMD_SERVICE:${PN}:append:buv-runbmc = " fan-reboot-control.service"
 SYSTEMD_SERVICE:${PN}:append:buv-runbmc = " fan-boot-control.service"
 # default recipe already include phosphor-pid-control.service
 
+is_entity = "${@entity_enabled(d, 'yes', '')}"
+
 do_install:append:buv-runbmc() {
     install -d ${D}/${bindir}
     install -m 0755 ${UNPACKDIR}/fan-default-speed.sh ${D}/${bindir}
-    is_entity="${@entity_enabled(d, 'yes', '')}"
 
     if [ -z "${is_entity}" ];then
         install -m 0644 -D ${UNPACKDIR}/config-buv-nuvoton.json \

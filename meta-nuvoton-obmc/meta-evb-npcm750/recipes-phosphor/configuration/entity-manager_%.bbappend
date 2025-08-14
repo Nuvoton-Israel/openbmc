@@ -1,8 +1,8 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 
-SRC_URI:append =" file://NUVOTON-POLEG-EVB.json"
-SRC_URI:append =" file://baseboard.fru.bin"
-SRC_URI:append =" file://blacklist.json"
+SRC_URI:append = " file://NUVOTON-POLEG-EVB.json"
+SRC_URI:append = " file://baseboard.fru.bin"
+SRC_URI:append = " file://blacklist.json"
 
 do_install:append() {
     rm -f ${D}/usr/share/entity-manager/configurations/*.json
