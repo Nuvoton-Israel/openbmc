@@ -8,9 +8,12 @@ PACKAGECONFIG:append = " no-warm-reboot"
 PACKAGECONFIG:remove = "only-run-apr-on-power-loss"
 
 HOST_DEFAULT_TARGETS:remove = " \
+    multi-user.target.wants/phosphor-discover-system-state@{}.service \
     obmc-host-reboot@{}.target.requires/obmc-host-shutdown@{}.target \
     obmc-host-reboot@{}.target.requires/phosphor-reboot-host@{}.service \
     "
+
+SYSTEMD_SERVICE:${PN}-host:remove = "phosphor-reboot-host@.service"
 
 CHASSIS_DEFAULT_TARGETS:remove = " \
     obmc-chassis-powerreset@{}.target.requires/phosphor-reset-chassis-on@{}.service \
@@ -30,6 +33,9 @@ SYSTEMD_SERVICE:${PN}-chassis:remove = "obmc-power-stop@.service"
 CHASSIS_DEFAULT_TARGETS:remove = " \
     obmc-host-shutdown@{}.target.requires/obmc-chassis-poweroff@{}.target \
     "
+HOST_DEFAULT_TARGETS:append = " \
+    multi-user.target.wants/obmc-chassis-poweron@{}.target \
+"
 
 CHASSIS_DEFAULT_TARGETS:append = " \
     obmc-chassis-powercycle@{}.target.wants/log-chassis-powercycle-sel@{}.service \
@@ -62,6 +68,8 @@ SRC_URI:append = " \
     file://check-i3c-hub \
     file://log-chassis-powercycle-sel \
     file://log-chassis-powercycle-sel@.service \
+    file://policy-chassis-poweron \
+    file://policy-chassis-poweron@.service \
     "
 
 RDEPENDS:${PN}:append = " bash"
@@ -86,6 +94,7 @@ do_install:append() {
     install -m 0755 ${UNPACKDIR}/rescan-cxl-eid ${D}${libexecdir}/${PN}/
     install -m 0755 ${UNPACKDIR}/check-i3c-hub ${D}${libexecdir}/${PN}/
     install -m 0755 ${UNPACKDIR}/log-chassis-powercycle-sel ${D}${libexecdir}/${PN}/
+    install -m 0755 ${UNPACKDIR}/policy-chassis-poweron ${D}${libexecdir}/${PN}/
 }
 
 FILES:${PN} += " ${systemd_system_unitdir}/*.service"
