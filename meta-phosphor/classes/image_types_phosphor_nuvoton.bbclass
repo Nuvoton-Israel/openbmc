@@ -40,3 +40,4 @@ do_make_ubi:append() {
 do_make_ubi[depends] += "${PN}:do_prepare_bootloaders"
 do_generate_ubi_tar[depends] += "${PN}:do_prepare_bootloaders"
 do_generate_static_tar[depends] += "${PN}:do_prepare_bootloaders"
+do_generate_ext4_tar[depends] += "${PN}:do_prepare_bootloaders"
