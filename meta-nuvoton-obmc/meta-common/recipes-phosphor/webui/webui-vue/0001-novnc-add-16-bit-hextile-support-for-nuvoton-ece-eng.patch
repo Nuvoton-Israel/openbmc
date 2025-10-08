@@ -1,7 +1,7 @@
-From b72e4d3fa1c62c9268dd21c5e4975114b39a707e Mon Sep 17 00:00:00 2001
+From f1256a42992544c0e0d70232bb37f404633a0779 Mon Sep 17 00:00:00 2001
 From: Joseph Liu <kwliu@nuvoton.com>
-Date: Mon, 4 Nov 2024 16:54:51 +0800
-Subject: [PATCH 1/4] novnc: add 16-bit hextile support for nuvoton ece engine
+Date: Wed, 8 Oct 2025 09:25:50 +0800
+Subject: [PATCH] novnc: add 16-bit hextile support for nuvoton ece engine
 
 Upstream-Status: Inappropriate [oe-specific]
 
@@ -11,18 +11,18 @@ Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/package-lock.json b/package-lock.json
-index 922db5b5..d21dc0e3 100644
+index fa0d5981..fa2c8c1d 100644
 --- a/package-lock.json
 +++ b/package-lock.json
-@@ -2928,7 +2928,7 @@
+@@ -2659,7 +2659,7 @@
          },
          "node_modules/@novnc/novnc": {
              "version": "1.3.0",
 -            "resolved": "https://registry.npmjs.org/@novnc/novnc/-/novnc-1.3.0.tgz",
 +            "resolved": "git+ssh://git@github.com/Nuvoton-Israel/novnc.git#openbmc-v1.3.0",
-             "integrity": "sha512-tR87mY5ADtaELadmZfW937JO/p8fRdz3wkPoqwhqB/vY1XnTQeLSWwkp4yMlr4iIDY0iCficfzFYX5EHMh4MHw=="
+             "integrity": "sha512-tR87mY5ADtaELadmZfW937JO/p8fRdz3wkPoqwhqB/vY1XnTQeLSWwkp4yMlr4iIDY0iCficfzFYX5EHMh4MHw==",
+             "license": "MPL-2.0"
          },
-         "node_modules/@nuxt/opencollective": {
 -- 
-2.34.1
+2.43.0
 
