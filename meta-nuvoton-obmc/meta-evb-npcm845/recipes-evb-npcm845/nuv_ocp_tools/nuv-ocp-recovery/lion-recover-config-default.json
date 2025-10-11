@@ -1,0 +1,9 @@
+{
+    "BusNumber": 16,
+    "MctpAddress": "0x41",
+    "OcpAddress": "0x69",
+    "RecoveryModeGpioChip": 5,
+    "RecoveryModeLineNumber": 9,
+    "ResetGpioChip": 0,
+    "ResetGpioLineNumber": 27
+}

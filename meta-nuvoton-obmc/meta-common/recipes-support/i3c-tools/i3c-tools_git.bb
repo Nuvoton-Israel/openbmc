@@ -10,3 +10,7 @@ S = "${WORKDIR}/git"
 
 inherit meson pkgconfig
 
+do_install:append() {
+        install -d ${D}${includedir}/i3c
+        install -m 0644 ${S}/include/i3c/* ${D}${includedir}/i3c/
+}
