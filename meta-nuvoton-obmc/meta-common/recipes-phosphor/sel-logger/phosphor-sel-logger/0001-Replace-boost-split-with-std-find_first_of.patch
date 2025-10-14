@@ -1,0 +1,110 @@
+Upstream-Status: Submitted [https://gerrit.openbmc.org/c/openbmc/phosphor-sel-logger/+/83467]
+
+From 1d79abe7ea4ca43bd31ae188b8a6f76d0d27a846 Mon Sep 17 00:00:00 2001
+From: Khang D Nguyen <khangng@os.amperecomputing.com>
+Date: Mon, 8 Sep 2025 14:43:34 +0700
+Subject: [PATCH] Replace boost::split with std::find_first_of
+
+Because we removed boost string processing headers, this function will
+fail to compile. It is not caught in CI because this function is gated
+behind sel-delete meson option.
+
+It is not a 1-1 replacement, because for some reason C++ stdlib does
+not include a convenient splitAny or tokenizeAny algorithm. The closest
+is views::split, but this one matches the while delimiter range, not
+any delimiters.
+
+Rewrote it to match the original behavior of parsing the first field and
+return 0 if there is too few fields or parsing error.
+
+Change-Id: I6a6a6964811052f2c445246c9af956d1b12339cf
+Signed-off-by: Khang D Nguyen <khangng@os.amperecomputing.com>
+---
+ src/sel_logger.cpp | 52 ++++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 43 insertions(+), 9 deletions(-)
+
+diff --git a/src/sel_logger.cpp b/src/sel_logger.cpp
+index 4666dd7..35c6cc3 100644
+--- a/src/sel_logger.cpp
++++ b/src/sel_logger.cpp
+@@ -33,11 +33,14 @@
+ #include <host_error_event_monitor.hpp>
+ #endif
+ 
++#include <algorithm>
++#include <charconv>
+ #include <filesystem>
+ #include <fstream>
+ #include <iomanip>
+ #include <iostream>
+ #include <sstream>
++#include <string_view>
+ 
+ struct DBusInternalError final : public sdbusplus::exception_t
+ {
+@@ -271,6 +274,45 @@ static void selDeleteRecord(const uint16_t& recordId)
+     saveClearSelTimestamp();
+ }
+ #else
++static unsigned int parseRecordIdFromEntry(std::string_view entry)
++{
++    unsigned int recordId = 0;
++    size_t fieldCount = 0;
++
++    for (auto fieldBegin = entry.begin(); fieldBegin != entry.end();)
++    {
++        auto fieldEnd = std::ranges::find_first_of(
++            std::string_view(fieldBegin, entry.end()), std::string_view(" ,"));
++
++        // handle consecutive delimiters by skipping empty field
++        if (fieldBegin != fieldEnd)
++        {
++            if (fieldCount == 0)
++            {
++                // first field of entry
++                auto [ptr,
++                      ec] = std::from_chars(fieldBegin, fieldEnd, recordId);
++                if (ptr != fieldEnd or ec != std::errc{})
++                {
++                    // parse failed
++                    return 0;
++                }
++            }
++            fieldCount += 1;
++        }
++
++        // skip past the delimiter itself, bounded by the end
++        fieldBegin = std::ranges::next(fieldEnd, 1, entry.end());
++    }
++
++    if (fieldCount < 4)
++    {
++        return 0;
++    }
++
++    return recordId;
++}
++
+ static unsigned int initializeRecordId()
+ {
+     std::vector<std::filesystem::path> selLogFiles;
+@@ -290,15 +332,7 @@ static unsigned int initializeRecordId()
+         newestEntry = line;
+     }
+ 
+-    std::vector<std::string> newestEntryFields;
+-    boost::split(newestEntryFields, newestEntry, boost::is_any_of(" ,"),
+-                 boost::token_compress_on);
+-    if (newestEntryFields.size() < 4)
+-    {
+-        return 0;
+-    }
+-
+-    return std::stoul(newestEntryFields[1]);
++    return parseRecordIdFromEntry(newestEntry);
+ }
+ 
+ static unsigned int recordId = initializeRecordId();
+-- 
+2.43.0
+

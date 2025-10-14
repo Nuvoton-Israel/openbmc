@@ -1,0 +1,3 @@
+FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
+
+SRC_URI:append = " file://0001-Replace-boost-split-with-std-find_first_of.patch"
