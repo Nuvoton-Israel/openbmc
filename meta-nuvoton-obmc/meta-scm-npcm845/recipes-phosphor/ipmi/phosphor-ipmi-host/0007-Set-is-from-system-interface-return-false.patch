@@ -1,4 +1,4 @@
-From 749fab81436e9238de43914d48d4bb899b31a323 Mon Sep 17 00:00:00 2001
+From cfc3d8d38a36094dd5792e22c33bd758aa0e78bd Mon Sep 17 00:00:00 2001
 From: Joseph Liu <kwliu@nuvoton.com>
 Date: Thu, 14 Aug 2025 10:03:02 +0800
 Subject: [PATCH] Set is from system interface return false
@@ -15,10 +15,10 @@ Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/sensorhandler.cpp b/sensorhandler.cpp
-index b62e00b8..f6dd1b3d 100644
+index 7c4c5ab6..b114fd15 100644
 --- a/sensorhandler.cpp
 +++ b/sensorhandler.cpp
-@@ -1442,7 +1442,7 @@ static bool isFromSystemChannel()
+@@ -1420,7 +1420,7 @@ static bool isFromSystemChannel()
      // TODO we could not figure out where the request is from based on IPMI
      // command handler parameters. because of it, we can not differentiate
      // request from SMS/SMM or IPMB channel
@@ -26,7 +26,7 @@ index b62e00b8..f6dd1b3d 100644
 +    return false;
  }
  
- ipmi::Cc ipmicmdPlatformEvent(ipmi_netfn_t, ipmi_cmd_t, ipmi_request_t request,
+ ipmi::RspType<> ipmicmdPlatformEvent(ipmi::Context::ptr& ctx,
 -- 
-2.43.0
+2.34.1
 

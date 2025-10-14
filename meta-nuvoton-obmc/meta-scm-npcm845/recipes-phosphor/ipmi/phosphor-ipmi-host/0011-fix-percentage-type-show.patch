@@ -1,21 +1,20 @@
-From eea77d6ec0d5cea89630959b90619adf94b92e33 Mon Sep 17 00:00:00 2001
+From 9f0b9d92c792434070efe5e728b06117c9dcbd3d Mon Sep 17 00:00:00 2001
 From: Joseph Liu <kwliu@nuvoton.com>
 Date: Tue, 3 Sep 2024 12:07:58 +0800
 Subject: [PATCH] fix percentage type show
 
 Upstream-Status: Inappropriate [oe-specific]
-
 ---
  dbus-sdr/sensorcommands.cpp | 21 ++++++++++++++++++++-
  1 file changed, 20 insertions(+), 1 deletion(-)
 
 diff --git a/dbus-sdr/sensorcommands.cpp b/dbus-sdr/sensorcommands.cpp
-index 9f37b8ff..16eb8810 100644
+index bd96ea28..582edc80 100644
 --- a/dbus-sdr/sensorcommands.cpp
 +++ b/dbus-sdr/sensorcommands.cpp
-@@ -1793,6 +1793,18 @@ void constructSensorSdrHeaderKey(uint16_t sensorNum, uint16_t recordID,
-     record.key.owner_lun = lun;
-     record.key.sensor_number = sensornumber;
+@@ -1789,6 +1789,18 @@ void constructSensorSdrHeaderKey(uint16_t sensorNum, uint16_t recordID,
+     record.key.ownerLun = lun;
+     record.key.sensorNumber = sensornumber;
  }
 +
 +bool isPercentage(DbusInterfaceMap& sensorMap)
@@ -32,18 +31,18 @@ index 9f37b8ff..16eb8810 100644
  bool constructSensorSdr(
      ipmi::Context::ptr ctx,
      const std::unordered_set<std::string>& ipmiDecoratorPaths,
-@@ -1902,7 +1914,14 @@ bool constructSensorSdr(
+@@ -1897,7 +1909,14 @@ bool constructSensorSdr(
  
      // Set the analog reading byte interpretation accordingly
-     record.body.sensor_units_1 = (bSigned ? 1 : 0) << 7;
+     record.body.sensorUnits1 = (bSigned ? 1 : 0) << 7;
 -
 +    if (isPercentage(sensorMap))
 +    {
-+        get_sdr::body::set_percentage(&record.body);
++        get_sdr::body::setPercentage(record.body);
 +    }
 +    else
 +    {
-+        record.body.sensor_units_1 = (bSigned ? 1 : 0) << 7;
++        record.body.sensorUnits1 = (bSigned ? 1 : 0) << 7;
 +    }
      // TODO(): Perhaps care about Tolerance, Accuracy, and so on
      // These seem redundant, but derivable from the above 5 attributes
