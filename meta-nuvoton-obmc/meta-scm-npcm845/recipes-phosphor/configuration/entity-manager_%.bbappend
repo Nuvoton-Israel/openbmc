@@ -10,7 +10,7 @@ do_install:append() {
     rm -f ${D}/usr/share/entity-manager/configurations/*.json
     install -d ${D}${datadir}/entity-manager
 	
-	install -m 0644 -D ${WORKDIR}/git/configurations/intel_front_panel.json \
+	install -m 0644 -D ${S}/configurations/intel/intel_front_panel.json \
         ${D}${datadir}/entity-manager/configurations/intel_front_panel.json
 	install -m 0644 -D ${UNPACKDIR}/is162f22.json \
 		${D}${datadir}/entity-manager/configurations/is162f22.json
