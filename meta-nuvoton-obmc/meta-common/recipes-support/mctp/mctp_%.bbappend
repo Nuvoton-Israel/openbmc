@@ -5,6 +5,6 @@ FILESEXTRAPATHS:prepend:nuvoton := "${THISDIR}/${PN}:"
 # SRC_URI = "git://github.com/khangng-ampere/mctp;branch=main;protocol=https"
 # SRC_URI:append:nuvoton = " file://0001-mctpd-Support-mctp-over-pcie-vdm.patch"
 
-SRC_URI:append:nuvoton = " file://0001-Add-mctp-i2c-discovery-command.patch"
+#SRC_URI:append:nuvoton = " file://0001-Add-mctp-i2c-discovery-command.patch"
 
 DEPENDS += "i2c-tools"
