@@ -39,3 +39,7 @@ SRC_URI:append = " file://0001-arm64-dts-nuvoton-npcm845-set-gpio96-defaule-high
 
 # Set high slew rate for PSPI pins
 SRC_URI:append = " file://0008-dts-arm64-npcm845-evb-Set-high-slew-rate-for-PSPI-pi.patch"
+
+# add jtm spi driver
+SRC_URI:append = " file://2001-add-jtm-spi-driver.patch"
+#SRC_URI:append = " file://spi_jtm.cfg"
