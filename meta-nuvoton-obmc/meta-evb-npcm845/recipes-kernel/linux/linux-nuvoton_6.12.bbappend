@@ -43,3 +43,6 @@ SRC_URI:append = " file://0008-dts-arm64-npcm845-evb-Set-high-slew-rate-for-PSPI
 # add jtm spi driver
 SRC_URI:append = " file://2001-add-jtm-spi-driver.patch"
 #SRC_URI:append = " file://spi_jtm.cfg"
+
+# Enable mmbi interface
+#SRC_URI:append = " file://0009-dts-arm64-npcm845-evb-enable-mmbi.patch"
