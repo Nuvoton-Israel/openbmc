@@ -1,0 +1,52 @@
+From 023e620c670ece9a9a8ff4b3ef104396d67d2212 Mon Sep 17 00:00:00 2001
+From: Ban Feng <kcfeng0@nuvoton.com>
+Date: Wed, 26 Nov 2025 16:01:29 +0800
+Subject: [PATCH] dts: arm64: npcm845 evb: enable mmbi
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
+---
+ .../boot/dts/nuvoton/nuvoton-npcm845-evb.dts   | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+index cfb6ac0eaa3c..39848663bf77 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+@@ -5,6 +5,7 @@
+ #include "nuvoton-npcm845.dtsi"
+ #include "nuvoton-npcm845-pincfg-evb.dtsi"
+ #include <dt-bindings/i2c/i2c.h>
++#include <dt-bindings/mmbi/protocols.h>
+ 
+ / {
+ 	model = "Nuvoton npcm845 Development Board (Device Tree)";
+@@ -135,8 +136,25 @@ tip_reserved: tip@0x0 {
+ 			alloc-ranges = <0x0 0x20000000 0x0 0x8000000>;
+ 			linux,cma-default;
+ 		};*/
++
++		espi_mmbi_memory: mmbi@0xc0008000 {
++			reg = <0x0 0xc0008000 0x0 0x1000>;
++			no-map;
++		};
+ 	};
+ 
++	mmbi: mmbi@c0001000 {
++		compatible = "nuvoton,npcm845-espi-mmbi";
++		reg = <0x0 0xc0001000 0x0 0x800>;
++		interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
++		memory-region = <&espi_mmbi_memory>;
++		nuvoton,espi = <&espi>;
++		use-interrupt;
++		status = "okay";
++		instance@0 {
++			protocols = /bits/ 8 <MMBI_PROTOCOL_RAS_OFFLOAD>;
++		};
++	};
+ 
+ 	mdio0: mdio@0 {
+ 		compatible = "virtual,mdio-gpio";
+-- 
+2.34.1
+
