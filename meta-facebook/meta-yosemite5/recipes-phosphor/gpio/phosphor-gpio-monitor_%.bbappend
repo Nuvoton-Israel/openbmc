@@ -9,6 +9,12 @@ SRC_URI += "file://yosemite5-phosphor-multi-gpio-monitor.json \
             file://multi-gpios-sys-init.service \
             file://assert-host-ready.service \
             file://deassert-host-ready.service \
+            file://assert-power-good-drop \
+            file://assert-power-good-drop.service \
+            file://deassert-power-good-drop \
+            file://deassert-power-good-drop.service \
+            file://gpio_bypass \
+            file://gpio_bypass@.service \
             "
 
 RDEPENDS:${PN}:append = " bash"
@@ -20,6 +26,9 @@ SYSTEMD_SERVICE:${PN} += " \
     multi-gpios-sys-init.service \
     assert-host-ready.service \
     deassert-host-ready.service \
+    assert-power-good-drop.service \
+    deassert-power-good-drop.service \
+    gpio_bypass@.service \
     "
 
 SYSTEMD_AUTO_ENABLE = "enable"
@@ -34,6 +43,7 @@ do_install:append:() {
 
     install -d ${D}${libexecdir}/${PN}
     install -m 0755 ${UNPACKDIR}/reset_btn ${D}${libexecdir}/${PN}/
+    install -m 0755 ${UNPACKDIR}/gpio_bypass ${D}${libexecdir}/${PN}/
     install -m 0755 ${UNPACKDIR}/multi-gpios-sys-init ${D}${libexecdir}/${PN}/
 }
 
