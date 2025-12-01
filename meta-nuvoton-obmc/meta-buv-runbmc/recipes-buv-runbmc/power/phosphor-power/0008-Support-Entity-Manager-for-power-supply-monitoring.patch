@@ -1,4 +1,4 @@
-From 378f1989c2b6c91e33a45fdf184e2016a24cd192 Mon Sep 17 00:00:00 2001
+From 8ea7186af0a75f53272b386550f9cede047362c1 Mon Sep 17 00:00:00 2001
 From: Eason Yang <j2anfernee@gmail.com>
 Date: Mon, 30 Jun 2025 17:07:52 +0800
 Subject: [PATCH 08/10] Support Entity-Manager for power supply monitoring
@@ -19,18 +19,18 @@ Signed-off-by: Eason Yang <j2anfernee@gmail.com>
  create mode 100644 services/power-supply-monitor-em@.service
 
 diff --git a/meson.build b/meson.build
-index d11437a6..f04835de 100644
+index 7843cd33..c898db7c 100644
 --- a/meson.build
 +++ b/meson.build
-@@ -109,6 +109,7 @@ servicedir = systemd.get_variable('systemdsystemunitdir')
- 
+@@ -114,6 +114,7 @@ servicedir = systemd.get_variable('systemd_system_unit_dir')
  services = [
+     ['chassis-power', 'phosphor-chassis-power.service'],
      ['supply-monitor', 'power-supply-monitor@.service'],
 +    ['supply-monitor-em', 'power-supply-monitor-em@.service'],
      ['sequencer-monitor', 'pseq-monitor-pgood.service'],
      ['sequencer-monitor', 'pseq-monitor.service'],
      ['supply-monitor-ng', 'phosphor-psu-monitor.service'],
-@@ -155,6 +156,7 @@ conf.set_quoted('PSU_JSON_PATH', '/usr/share/phosphor-power/psu.json')
+@@ -160,6 +161,7 @@ conf.set_quoted('PSU_JSON_PATH', '/usr/share/phosphor-power/psu.json')
  conf.set('SEQUENCER', sequencer_class)
  conf.set10('DEVICE_ACCESS', get_option('device-access'))
  conf.set10('IBM_VPD', get_option('ibm-vpd'))
@@ -38,7 +38,7 @@ index d11437a6..f04835de 100644
  conf.set('PGOOD_TIMEOUT', get_option('pgood-timeout-value'))
  
  configure_file(output: 'config.h', configuration: conf)
-@@ -202,7 +204,7 @@ endif
+@@ -210,7 +212,7 @@ endif
  if get_option('power-control')
      subdir('phosphor-power-sequencer')
  endif
@@ -48,7 +48,7 @@ index d11437a6..f04835de 100644
  endif
  if get_option('supply-monitor-ng')
 diff --git a/meson.options b/meson.options
-index c7019605..9bd96c3f 100644
+index 296c6722..d9d4ce6d 100644
 --- a/meson.options
 +++ b/meson.options
 @@ -39,6 +39,11 @@ option(
@@ -75,10 +75,10 @@ index c7019605..9bd96c3f 100644
      'oe-sdk',
      type: 'feature',
 diff --git a/pmbus.cpp b/pmbus.cpp
-index 7bdda541..cf3cacd6 100644
+index 8b6d7479..8fa1132d 100644
 --- a/pmbus.cpp
 +++ b/pmbus.cpp
-@@ -379,6 +379,7 @@ void PMBus::findHwmonDir()
+@@ -401,6 +401,7 @@ void PMBus::findHwmonDir()
          lg2::info("Unable to find hwmon directory in device base path "
                    "DEVICE_PATH={DEVICE_PATH}",
                    "DEVICE_PATH", basePath);
@@ -409,7 +409,7 @@ index 1f2cfe64..e554d8d6 100644
  constexpr auto INPUT_HISTORY = "input_history";
  
 diff --git a/utility.cpp b/utility.cpp
-index 0cee1bf4..fe40a336 100644
+index 94de833b..1f197918 100644
 --- a/utility.cpp
 +++ b/utility.cpp
 @@ -19,6 +19,8 @@
@@ -421,7 +421,7 @@ index 0cee1bf4..fe40a336 100644
  namespace phosphor
  {
  namespace power
-@@ -32,6 +34,9 @@ constexpr auto MAPPER_INTERFACE = "xyz.openbmc_project.ObjectMapper";
+@@ -36,6 +38,9 @@ constexpr auto CHASSIS_ID_PROPERTY = "SlotNumber";
  
  using json = nlohmann::json;
  
@@ -431,7 +431,7 @@ index 0cee1bf4..fe40a336 100644
  std::string getService(const std::string& path, const std::string& interface,
                         sdbusplus::bus_t& bus, bool logError)
  {
-@@ -183,8 +188,15 @@ bool isPoweredOn(sdbusplus::bus_t& bus, bool defaultState)
+@@ -187,8 +192,15 @@ bool isPoweredOn(sdbusplus::bus_t& bus, bool defaultState)
      {
          // When state = 1, system is powered on
          auto service = util::getService(POWER_OBJ_PATH, POWER_IFACE, bus);
