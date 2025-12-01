@@ -40,10 +40,10 @@ index ddc6fa1b..98dd7116 100644
 -        // std::get<7>(details) = {{0}}; // default constructed to all 0
 +        std::get<7>(details) =
 +            ipmi::mappedVariant<std::vector<uint8_t>>(
-+                sessionProps, "RemoteMACAddress", std::vector<uint8_t>(6, 0));    
++                sessionProps, "RemoteMACAddress", std::vector<uint8_t>(6, 0));
          std::get<8>(details) =
 -            ipmi::mappedVariant<uint16_t>(sessionProps, "RemotePort", 0);
-+            ipmi::mappedVariant<uint16_t>(sessionProps, "RemotePort", 0);        
++            ipmi::mappedVariant<uint16_t>(sessionProps, "RemotePort", 0);
      }
  
      return ipmi::ccSuccess;

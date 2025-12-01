@@ -1,7 +1,7 @@
-From 4b9cf3c4b8c22131937826d8d8130e76fcb82cbf Mon Sep 17 00:00:00 2001
+From 198b3548315c43ef3ef4519a273100dafc3c53ac Mon Sep 17 00:00:00 2001
 From: Joseph Liu <kwliu@nuvoton.com>
 Date: Tue, 3 Sep 2024 12:01:16 +0800
-Subject: [PATCH] add sensor reading factory support
+Subject: [PATCH 12/14] add sensor reading factory support
 
 Upstream-Status: Inappropriate [oe-specific]
 
@@ -12,10 +12,10 @@ Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
  1 file changed, 113 insertions(+)
 
 diff --git a/dbus-sdr/sensorcommands.cpp b/dbus-sdr/sensorcommands.cpp
-index ef5eb996..9f37b8ff 100644
+index 83a74a9d..cbc7663a 100644
 --- a/dbus-sdr/sensorcommands.cpp
 +++ b/dbus-sdr/sensorcommands.cpp
-@@ -2820,6 +2820,115 @@ ipmi::RspType<uint8_t,                // No of instances for requested id
+@@ -2858,6 +2858,115 @@ ipmi::RspType<uint8_t,                // No of instances for requested id
  
  } // namespace dcmi
  
@@ -43,7 +43,7 @@ index ef5eb996..9f37b8ff 100644
 +        return ipmi::responseResponseError();
 +    }
 +
-+    auto sensorObject = sensorMap.find(sensor::sensorInterface);
++    auto sensorObject = sensorMap.find(SensorValue::interface);
 +
 +    if (sensorObject == sensorMap.end() ||
 +        sensorObject->second.find("Value") == sensorObject->second.end())
@@ -131,7 +131,7 @@ index ef5eb996..9f37b8ff 100644
  /* end storage commands */
  
  void registerSensorFunctions()
-@@ -2914,5 +3023,9 @@ void registerSensorFunctions()
+@@ -2952,5 +3061,9 @@ void registerSensorFunctions()
                            ipmi::sensor_event::cmdGetSensorType,
                            ipmi::Privilege::User, ipmiSenGetSensorType);
  

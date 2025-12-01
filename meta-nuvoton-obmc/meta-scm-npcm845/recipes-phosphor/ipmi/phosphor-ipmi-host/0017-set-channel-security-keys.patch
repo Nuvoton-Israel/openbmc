@@ -1,7 +1,7 @@
-From f863d22fef6d18583616762cfd602a9a46441a49 Mon Sep 17 00:00:00 2001
+From e0cb13cdd8229dd8e78270532a81a041ce0310c0 Mon Sep 17 00:00:00 2001
 From: Joseph Liu <kwliu@nuvoton.com>
 Date: Mon, 24 Mar 2025 15:08:25 +0800
-Subject: [PATCH] set channel security keys
+Subject: [PATCH 14/14] set channel security keys
 
 Upstream-Status: Inappropriate [oe-specific]
 
@@ -38,11 +38,11 @@ index a6b8703d..e9f24c9c 100644
 +}__attribute__((packed));
 +
 diff --git a/apphandler.cpp b/apphandler.cpp
-index 1e320615..e6116999 100644
+index 2fd31bb5..9ad2ce1c 100644
 --- a/apphandler.cpp
 +++ b/apphandler.cpp
 @@ -67,7 +67,21 @@ using Activation =
- using BMC = sdbusplus::server::xyz::openbmc_project::state::BMC;
+ using BMCState = sdbusplus::server::xyz::openbmc_project::state::BMC;
  namespace fs = std::filesystem;
  
 +#define MAXCH 15
@@ -63,7 +63,7 @@ index 1e320615..e6116999 100644
  typedef struct
  {
      uint8_t busId;
-@@ -1785,6 +1799,145 @@ ipmi::RspType<std::vector<uint8_t>> ipmiControllerWriteRead(
+@@ -1874,6 +1888,145 @@ ipmi::RspType<std::vector<uint8_t>> ipmiControllerWriteRead(
      return ipmi::responseSuccess(readBuf);
  }
  
@@ -209,7 +209,7 @@ index 1e320615..e6116999 100644
  void registerNetFnAppFunctions()
  {
      // <Get Device ID>
-@@ -1869,5 +2022,10 @@ void registerNetFnAppFunctions()
+@@ -1958,5 +2111,10 @@ void registerNetFnAppFunctions()
      ipmi::registerHandler(ipmi::prioOpenBmcBase, ipmi::netFnApp,
                            ipmi::app::cmdSetSystemInfoParameters,
                            ipmi::Privilege::Admin, ipmiAppSetSystemInfo);
@@ -221,10 +221,10 @@ index 1e320615..e6116999 100644
      return;
  }
 diff --git a/include/ipmid/api.h b/include/ipmid/api.h
-index fd6fee61..a1a00027 100644
+index 1a92322d..83b6ce70 100644
 --- a/include/ipmid/api.h
 +++ b/include/ipmid/api.h
-@@ -108,6 +108,11 @@ enum ipmi_return_codes
+@@ -107,6 +107,11 @@ enum ipmi_return_codes
      IPMI_WDOG_CC_NOT_INIT = 0x80,
      IPMI_CC_SYSTEM_INFO_PARAMETER_NOT_SUPPORTED = 0x80,
      IPMI_CC_SYSTEM_INFO_PARAMETER_SET_READ_ONLY = 0x82,
@@ -237,7 +237,7 @@ index fd6fee61..a1a00027 100644
      IPMI_CC_INVALID = 0xC1,
      IPMI_CC_TIMEOUT = 0xC3,
 diff --git a/user_channel/user_layer.cpp b/user_channel/user_layer.cpp
-index 5a2e7e02..92a13753 100644
+index ff1f9657..484301b0 100644
 --- a/user_channel/user_layer.cpp
 +++ b/user_channel/user_layer.cpp
 @@ -18,6 +18,14 @@
@@ -255,7 +255,7 @@ index 5a2e7e02..92a13753 100644
  
  namespace
  {
-@@ -223,4 +231,30 @@ Cc ipmiUserGetUserPayloadAccess(const uint8_t chNum, const uint8_t userId,
+@@ -234,4 +242,30 @@ Cc ipmiUserGetUserPayloadAccess(const uint8_t chNum, const uint8_t userId,
      return ccSuccess;
  }
  
@@ -302,5 +302,5 @@ index ad215e39..688b0eec 100644
  
  } // namespace ipmi
 -- 
-2.43.0
+2.34.1
 

@@ -1,7 +1,7 @@
-From 9f0b9d92c792434070efe5e728b06117c9dcbd3d Mon Sep 17 00:00:00 2001
+From 9a25d7d6cb3205e17b87230f34b587e758849654 Mon Sep 17 00:00:00 2001
 From: Joseph Liu <kwliu@nuvoton.com>
 Date: Tue, 3 Sep 2024 12:07:58 +0800
-Subject: [PATCH] fix percentage type show
+Subject: [PATCH 10/14] fix percentage type show
 
 Upstream-Status: Inappropriate [oe-specific]
 ---
@@ -9,10 +9,10 @@ Upstream-Status: Inappropriate [oe-specific]
  1 file changed, 20 insertions(+), 1 deletion(-)
 
 diff --git a/dbus-sdr/sensorcommands.cpp b/dbus-sdr/sensorcommands.cpp
-index bd96ea28..582edc80 100644
+index be7c3176..d3e82a05 100644
 --- a/dbus-sdr/sensorcommands.cpp
 +++ b/dbus-sdr/sensorcommands.cpp
-@@ -1789,6 +1789,18 @@ void constructSensorSdrHeaderKey(uint16_t sensorNum, uint16_t recordID,
+@@ -1817,6 +1817,18 @@ void constructSensorSdrHeaderKey(uint16_t sensorNum, uint16_t recordID,
      record.key.ownerLun = lun;
      record.key.sensorNumber = sensornumber;
  }
@@ -21,7 +21,7 @@ index bd96ea28..582edc80 100644
 +{
 +    const static std::string PERCENT =
 +        "xyz.openbmc_project.Sensor.Value.Unit.Percent";
-+    auto sensorObject = sensorMap.find(sensor::sensorInterface);
++    auto sensorObject = sensorMap.find(SensorValue::interface);
 +    std::string unit;
 +    unit = ipmi::mappedVariant<std::string>(sensorObject->second, "Unit",
 +                                            std::string());
@@ -31,7 +31,7 @@ index bd96ea28..582edc80 100644
  bool constructSensorSdr(
      ipmi::Context::ptr ctx,
      const std::unordered_set<std::string>& ipmiDecoratorPaths,
-@@ -1897,7 +1909,14 @@ bool constructSensorSdr(
+@@ -1925,7 +1937,14 @@ bool constructSensorSdr(
  
      // Set the analog reading byte interpretation accordingly
      record.body.sensorUnits1 = (bSigned ? 1 : 0) << 7;
