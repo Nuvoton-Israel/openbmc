@@ -1,20 +1,20 @@
-From 3108eb27ee4284e6fd33ce89ca4b18b15f763e4b Mon Sep 17 00:00:00 2001
+From 71c179fc1db987b86c550491b70069bcf4c7448e Mon Sep 17 00:00:00 2001
 From: Stanley Chu <yschu@nuvoton.com>
 Date: Tue, 5 Jul 2022 12:56:01 +0800
-Subject: [PATCH] ipmi warm reset command
+Subject: [PATCH 03/14] ipmi warm reset command
 
 Upstream-Status: Inappropriate [oe-specific]
 
 Signed-off-by: Stanley Chu <yschu@nuvoton.com>
 ---
- globalhandler.cpp | 78 ++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 77 insertions(+), 1 deletion(-)
+ globalhandler.cpp | 64 ++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 63 insertions(+), 1 deletion(-)
 
 diff --git a/globalhandler.cpp b/globalhandler.cpp
-index 7b64d42a..7ecf26ea 100644
+index 36cf0a48..ce05eb4c 100644
 --- a/globalhandler.cpp
 +++ b/globalhandler.cpp
-@@ -3,7 +3,12 @@
+@@ -3,13 +3,46 @@
  #include <phosphor-logging/lg2.hpp>
  #include <xyz/openbmc_project/State/BMC/server.hpp>
  
@@ -25,9 +25,7 @@ index 7b64d42a..7ecf26ea 100644
 +
 +static std::atomic_flag reset_queued = ATOMIC_FLAG_INIT;
  
- static constexpr auto bmcStateRoot = "/xyz/openbmc_project/state";
- static constexpr auto bmcStateIntf = "xyz.openbmc_project.State.BMC";
-@@ -14,7 +19,49 @@ using BMC = sdbusplus::server::xyz::openbmc_project::state::BMC;
+ using BMCState = sdbusplus::server::xyz::openbmc_project::state::BMC;
  
  void registerNetFnGlobalFunctions() __attribute__((constructor));
  
@@ -36,20 +34,6 @@ index 7b64d42a..7ecf26ea 100644
 +constexpr auto SYSTEMD_OBJ_PATH = "/org/freedesktop/systemd1";
 +constexpr auto SYSTEMD_INTERFACE = "org.freedesktop.systemd1.Manager";
 +constexpr auto SYSTEMD_WARM_RESET_TARGET = "phosphor-ipmi-warm-reset.target";
-+
-+void resetBMC()
-+{
-+    sdbusplus::bus_t bus{ipmid_get_sd_bus_connection()};
-+
-+    auto bmcStateObj = ipmi::getDbusObject(bus, bmcStateIntf, bmcStateRoot,
-+                                           match);
-+
-+    auto service = ipmi::getService(bus, bmcStateIntf, bmcStateObj.first);
-+
-+    ipmi::setDbusProperty(bus, service, bmcStateObj.first, bmcStateIntf,
-+                          reqTransition,
-+                          convertForMessage(BMC::Transition::Reboot));
-+}
 +
 +void warmResetBMC()
 +{
@@ -78,7 +62,7 @@ index 7b64d42a..7ecf26ea 100644
   *  @param - None
   *  @returns IPMI completion code.
   */
-@@ -44,11 +91,40 @@ ipmi::RspType<> ipmiGlobalReset(ipmi::Context::ptr ctx)
+@@ -42,11 +75,40 @@ ipmi::RspType<> ipmiGlobalReset(ipmi::Context::ptr ctx)
      return ipmi::responseSuccess();
  }
  
@@ -120,5 +104,5 @@ index 7b64d42a..7ecf26ea 100644
      return;
  }
 -- 
-2.43.0
+2.34.1
 
