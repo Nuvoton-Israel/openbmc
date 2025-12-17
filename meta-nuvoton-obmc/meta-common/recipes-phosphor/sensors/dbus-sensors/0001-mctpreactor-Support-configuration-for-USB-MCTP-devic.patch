@@ -1,0 +1,293 @@
+Upstream-Status: Submitted [https://gerrit.openbmc.org/c/openbmc/dbus-sensors/+/80452]
+
+From 8b698aa5ad627eb80d3111e004bb9a169183e2d1 Mon Sep 17 00:00:00 2001
+From: Saptarsi Saha <saptarsis@nvidia.com>
+Date: Tue, 20 May 2025 21:38:37 +0530
+Subject: [PATCH] mctpreactor: Support configuration for USB MCTP devices
+
+Changes for MCTPUSBDevice reactor with schema defined in mctp.json[1]
+
+Tested
+'''
+On gb200nvl-obmc machine, the mctpreactor is able to read the exposed EM config and populate the EID properly for usb devices.
+'''
+'''
+MCTP over USB enumeration on Alon8 via this + [2].
+'''
+[1](https://gerrit.openbmc.org/c/openbmc/entity-manager/+/77381)
+[2](https://gerrit.openbmc.org/c/openbmc/entity-manager/+/85991)
+
+Change-Id: I2a2c30605b2738f64d30b3f3efcdefdece8e5652
+Signed-off-by: Saptarsi Saha <saptarsis@nvidia.com>
+Signed-off-by: Deepak Kodihalli <deepak.kodihalli.83@gmail.com>
+---
+ src/mctp/MCTPEndpoint.cpp    | 160 +++++++++++++++++++++++++++++++++++
+ src/mctp/MCTPEndpoint.hpp    |  28 ++++++
+ src/mctp/MCTPReactorMain.cpp |  12 ++-
+ 3 files changed, 198 insertions(+), 2 deletions(-)
+
+diff --git a/src/mctp/MCTPEndpoint.cpp b/src/mctp/MCTPEndpoint.cpp
+index 391085d67..4937d3681 100644
+--- a/src/mctp/MCTPEndpoint.cpp
++++ b/src/mctp/MCTPEndpoint.cpp
+@@ -20,6 +20,7 @@
+ #include <exception>
+ #include <filesystem>
+ #include <format>
++#include <fstream>
+ #include <functional>
+ #include <map>
+ #include <memory>
+@@ -27,6 +28,7 @@
+ #include <set>
+ #include <stdexcept>
+ #include <string>
++#include <string_view>
+ #include <system_error>
+ #include <utility>
+ #include <variant>
+@@ -503,3 +505,161 @@ std::string I3CMCTPDDevice::interfaceFromBus(int bus)
+           "I3C_BUS", bus, "NET_DEVICE", netdir);
+     throw MCTPException("No matching net device found for the specified bus");
+ }
++
++/*
++ * Given the sysfs path for a USB root hub, determines the bus number. An
++ * example root hub path on an AST2600 is
++ * /sys/devices/platform/ahb/1e6a1000.usb. This function identifies the
++ * correct bus device directory (e.g. "usb1") by looking for a "busnum"
++ * attribute file within it, and returns the content of that file.
++ */
++std::string USBMCTPDDevice::busFromRootHubPath(
++    const std::filesystem::path& rootHubPath)
++{
++    std::error_code ec;
++    std::filesystem::directory_iterator it(rootHubPath, ec);
++    if (ec)
++    {
++        error("Unable to open RootHubPath {PATH}", "PATH", rootHubPath);
++        throw MCTPException("Invalid RootHubPath");
++    }
++
++    for (const auto& entry : it)
++    {
++        const auto& path = entry.path();
++        if (!entry.is_directory() ||
++            !path.filename().string().starts_with("usb"))
++        {
++            continue;
++        }
++
++        std::filesystem::path busnumPath = path / "busnum";
++        if (!std::filesystem::exists(busnumPath))
++        {
++            continue;
++        }
++        std::ifstream busnumFile(busnumPath);
++        std::string busnum;
++        if (busnumFile >> busnum && !busnum.empty())
++        {
++            return busnum;
++        }
++    }
++
++    error(
++        "No directory containing a 'busnum' file found under RootHubPath {PATH}",
++        "PATH", rootHubPath);
++    throw MCTPException("Could not determine bus number");
++}
++
++/*
++ * Given the components of a USB device's sysfs path, construct the full path
++ * and determine the network interface name associated with it.
++ */
++std::string USBMCTPDDevice::interfaceFromSysfs(
++    const std::string& bus, const std::string& port, uint8_t configuration,
++    uint8_t interfaceNum)
++{
++    std::filesystem::path netdir =
++        std::format("/sys/bus/usb/devices/{}-{}/{}-{}:{}.{}/net", bus, port,
++                    bus, port, configuration, interfaceNum);
++    std::error_code ec;
++    std::filesystem::directory_iterator it(netdir, ec);
++    if (ec || it == std::filesystem::end(it))
++    {
++        error("No net device associated with USB device at {NET_DEVICE}",
++              "NET_DEVICE", netdir);
++        throw MCTPException("Device is not configured as an MCTP interface");
++    }
++
++    return it->path().filename();
++}
++
++std::optional<SensorBaseConfigMap> USBMCTPDDevice::match(
++    const SensorData& config)
++{
++    auto iface = config.find(configInterfaceName(configType));
++    if (iface == config.end())
++    {
++        return std::nullopt;
++    }
++    return iface->second;
++}
++
++bool USBMCTPDDevice::match(const std::set<std::string>& interfaces)
++{
++    return interfaces.contains(configInterfaceName(configType));
++}
++
++std::shared_ptr<USBMCTPDDevice> USBMCTPDDevice::from(
++    const std::shared_ptr<sdbusplus::asio::connection>& connection,
++    const SensorBaseConfigMap& iface)
++{
++    auto mName = iface.find("Name");
++    auto mType = iface.find("Type");
++    if (mType == iface.end())
++    {
++        throw std::invalid_argument(
++            "No 'Type' member found for provided configuration object");
++    }
++
++    auto type = std::visit(VariantToStringVisitor(), mType->second);
++    if (type != configType)
++    {
++        throw std::invalid_argument("Not an USB device");
++    }
++
++    auto mRootHubPath = iface.find("RootHubPath");
++    auto mPort = iface.find("Port");
++    auto mConfiguration = iface.find("Configuration");
++    auto mInterfaceNum = iface.find("InterfaceNum");
++
++    if (mName == iface.end() || mRootHubPath == iface.end() ||
++        mPort == iface.end() || mConfiguration == iface.end() ||
++        mInterfaceNum == iface.end())
++    {
++        throw std::invalid_argument(
++            "Configuration object violates MCTPUSBDevice schema");
++    }
++
++    auto rootHubPath =
++        std::visit(VariantToStringVisitor(), mRootHubPath->second);
++    auto port = std::visit(VariantToStringVisitor(), mPort->second);
++
++    auto sConfiguration =
++        std::visit(VariantToStringVisitor(), mConfiguration->second);
++    uint8_t configuration{};
++    auto [cptr, cec] = std::from_chars(
++        sConfiguration.data(), sConfiguration.data() + sConfiguration.size(),
++        configuration);
++    if (cec != std::errc{})
++    {
++        throw std::invalid_argument("Bad Configuration value");
++    }
++
++    auto sInterfaceNum =
++        std::visit(VariantToStringVisitor(), mInterfaceNum->second);
++    uint8_t interfaceNum{};
++    auto [iptr, iec] = std::from_chars(
++        sInterfaceNum.data(), sInterfaceNum.data() + sInterfaceNum.size(),
++        interfaceNum);
++    if (iec != std::errc{})
++    {
++        throw std::invalid_argument("Bad Interface value");
++    }
++
++    try
++    {
++        std::string bus = busFromRootHubPath(rootHubPath);
++        std::string interface =
++            interfaceFromSysfs(bus, port, configuration, interfaceNum);
++        return std::make_shared<USBMCTPDDevice>(connection, interface);
++    }
++    catch (const MCTPException& ex)
++    {
++        warning(
++            "Failed to create MCTPUSBDevice at [ RootHub: {PATH}, port: {USB_PORT} ]: {EXCEPTION}",
++            "PATH", rootHubPath, "USB_PORT", port, "EXCEPTION", ex);
++        return {};
++    }
++}
+diff --git a/src/mctp/MCTPEndpoint.hpp b/src/mctp/MCTPEndpoint.hpp
+index 2abfc9551..c46bfdc77 100644
+--- a/src/mctp/MCTPEndpoint.hpp
++++ b/src/mctp/MCTPEndpoint.hpp
+@@ -9,6 +9,7 @@
+ 
+ #include <cstdint>
+ #include <exception>
++#include <filesystem>
+ #include <functional>
+ #include <memory>
+ #include <optional>
+@@ -349,3 +350,30 @@ class I3CMCTPDDevice : public MCTPDDevice
+ 
+     static std::string interfaceFromBus(int bus);
+ };
++
++class USBMCTPDDevice : public MCTPDDevice
++{
++  public:
++    static std::optional<SensorBaseConfigMap> match(const SensorData& config);
++    static bool match(const std::set<std::string>& interfaces);
++    static std::shared_ptr<USBMCTPDDevice> from(
++        const std::shared_ptr<sdbusplus::asio::connection>& connection,
++        const SensorBaseConfigMap& iface);
++
++    USBMCTPDDevice() = delete;
++    USBMCTPDDevice(
++        const std::shared_ptr<sdbusplus::asio::connection>& connection,
++        const std::string& interface) :
++        MCTPDDevice(connection, interface, std::vector<uint8_t>{})
++    {}
++    ~USBMCTPDDevice() override = default;
++
++  private:
++    static constexpr const char* configType = "MCTPUSBDevice";
++
++    static std::string busFromRootHubPath(
++        const std::filesystem::path& rootHubPath);
++    static std::string interfaceFromSysfs(
++        const std::string& bus, const std::string& port, uint8_t configuration,
++        uint8_t interfaceNum);
++};
+diff --git a/src/mctp/MCTPReactorMain.cpp b/src/mctp/MCTPReactorMain.cpp
+index 6d333497a..f6a93bc34 100644
+--- a/src/mctp/MCTPReactorMain.cpp
++++ b/src/mctp/MCTPReactorMain.cpp
+@@ -93,6 +93,12 @@ static std::shared_ptr<MCTPDevice> deviceFromConfig(
+             info("Creating I3CMCTPDDevice");
+             return I3CMCTPDDevice::from(connection, *iface);
+         }
++
++        iface = USBMCTPDDevice::match(config);
++        if (iface)
++        {
++            return USBMCTPDDevice::from(connection, *iface);
++        }
+     }
+     catch (const std::invalid_argument& ex)
+     {
+@@ -133,7 +139,8 @@ static void removeInventory(const std::shared_ptr<MCTPReactor>& reactor,
+         msg.unpack<sdbusplus::message::object_path, std::set<std::string>>();
+     try
+     {
+-        if (I2CMCTPDDevice::match(removed) || I3CMCTPDDevice::match(removed))
++        if (I2CMCTPDDevice::match(removed) || I3CMCTPDDevice::match(removed) ||
++            USBMCTPDDevice::match(removed))
+         {
+             reactor->unmanageMCTPDevice(path.str);
+         }
+@@ -248,7 +255,8 @@ int main()
+     boost::asio::post(io, [reactor, systemBus]() {
+         auto gsc = std::make_shared<GetSensorConfiguration>(
+             systemBus, std::bind_front(manageMCTPEntity, systemBus, reactor));
+-        gsc->getConfiguration({"MCTPI2CTarget", "MCTPI3CTarget"});
++        gsc->getConfiguration(
++            {"MCTPI2CTarget", "MCTPI3CTarget", "MCTPUSBDevice"});
+     });
+ 
+     io.run();
+-- 
+2.43.0
+
