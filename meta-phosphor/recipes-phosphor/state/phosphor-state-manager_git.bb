@@ -72,6 +72,8 @@ PACKAGECONFIG[check-fwupdate-before-do-transition] = "-Dcheck-fwupdate-before-do
 
 PACKAGECONFIG[install-utils] = "-Dinstall-utils=enabled, -Dinstall-utils=disabled"
 
+PACKAGECONFIG[auto-reboot-on-bmc-quiesce] = "-Dauto-reboot-on-bmc-quiesce=enabled,-Dauto-reboot-on-bmc-quiesce=disabled"
+
 # The host-check function will check if the host is running
 # after a BMC reset.
 # The reset-sensor-states function will reset the host
@@ -133,6 +135,9 @@ FILES:${PN}-bmc += "${sysconfdir}/phosphor-systemd-target-monitor/phosphor-servi
 FILES:${PN}-bmc += "${bindir}/obmcutil"
 DBUS_SERVICE:${PN}-bmc += "xyz.openbmc_project.State.BMC.service"
 DBUS_SERVICE:${PN}-bmc += "obmc-bmc-service-quiesce@.target"
+SYSTEMD_SERVICE:${PN}-bmc += "phosphor-bmc-quiesce-reboot.service"
+FILES:${PN}-bmc += "${@bb.utils.contains('PACKAGECONFIG', 'auto-reboot-on-bmc-quiesce', '${systemd_system_unitdir}/obmc-bmc-service-quiesce@0.target.wants', '', d)}"
+FILES:${PN}-bmc += "${@bb.utils.contains('PACKAGECONFIG', 'auto-reboot-on-bmc-quiesce', '${systemd_system_unitdir}/obmc-bmc-service-quiesce@0.target.wants/phosphor-bmc-quiesce-reboot.service', '', d)}"
 
 FILES:${PN}-secure-check = "${bindir}/phosphor-secure-boot-check"
 SYSTEMD_SERVICE:${PN}-secure-check += "phosphor-bmc-security-check.service"
@@ -284,6 +289,6 @@ SYSTEMD_LINK:${PN}-obmc-targets += "${@compose_list_zip(d, 'RESET_FMT_CTRL', 'OB
 SYSTEMD_LINK[vardeps] += "OBMC_CHASSIS_INSTANCES OBMC_HOST_INSTANCES"
 
 SRC_URI = "git://github.com/openbmc/phosphor-state-manager;branch=master;protocol=https"
-SRCREV = "4d2da4bef6656b6b71ecfc09ef8a416ccece50b9"
+SRCREV = "29755255feace17385d83fb7e3296108fd7876cb"
 
 S = "${WORKDIR}/git"
