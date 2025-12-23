@@ -1,0 +1,65 @@
+Upstream-Status: Inappropriate [oe-specific]
+
+From 55ec252841fbe049048c575d07a51023e957280c Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Tue, 23 Dec 2025 11:13:21 +0800
+Subject: [PATCH] fixed: InvalidArgs Erro
+
+Add try-catch block around handleMctpEndpoints in MctpDiscovery::discoverEndpoints to catch and log specific exception details (DBus error name and message).
+Add try-catch block around addToExistingMctpInfos just in case.
+Log the MctpInfo details (EID, NetworkId, Name) before calling handlers to verify data integrity.
+
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ requester/mctp_endpoint_discovery.cpp | 24 +++++++++++++++++++++---
+ 1 file changed, 21 insertions(+), 3 deletions(-)
+
+diff --git a/requester/mctp_endpoint_discovery.cpp b/requester/mctp_endpoint_discovery.cpp
+index 00527ee27..335cc55f7 100644
+--- a/requester/mctp_endpoint_discovery.cpp
++++ b/requester/mctp_endpoint_discovery.cpp
+@@ -389,12 +389,28 @@ void MctpDiscovery::removeEndpoints(sdbusplus::message_t&)
+ 
+ void MctpDiscovery::handleMctpEndpoints(const MctpInfos& mctpInfos)
+ {
++    for (const auto& mctpInfo : mctpInfos)
++    {
++         info("Processing Endpoint networkId '{NETWORK}' and EID '{EID}'",
++                     "NETWORK", std::get<3>(mctpInfo), "EID", std::get<0>(mctpInfo));
++    }
+     for (const auto& handler : handlers)
+     {
+         if (handler)
+         {
+-            handler->handleConfigurations(configurations);
+-            handler->handleMctpEndpoints(mctpInfos);
++            try
++            {
++                handler->handleConfigurations(configurations);
++                handler->handleMctpEndpoints(mctpInfos);
++            }
++            catch (const std::exception& e)
++            {
++                error("Handler failed with error: {ERROR}", "ERROR", e);
++            }
++            catch (...)
++            {
++                error("Handler failed with unknown error");
++            }
+         }
+     }
+ }
+@@ -430,7 +446,9 @@ std::string MctpDiscovery::getNameFromProperties(
+         error("Missing name property");
+         return "";
+     }
+-    return std::get<std::string>(properties.at("Name"));
++    auto name = std::get<std::string>(properties.at("Name"));
++    pldm::utils::trimNameForDbus(name);
++    return name;
+ }
+ 
+ std::string MctpDiscovery::constructMctpReactorObjectPath(
+-- 
+2.43.0
+

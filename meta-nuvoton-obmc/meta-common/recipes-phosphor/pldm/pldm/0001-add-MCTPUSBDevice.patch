@@ -1,0 +1,29 @@
+Upstream-Status: Inappropriate [oe-specific]
+
+From ad3483f058bf7692983cbc9407363eb36498d885 Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Mon, 22 Dec 2025 15:00:14 +0800
+Subject: [PATCH] add MCTPUSBDevice
+
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ requester/mctp_endpoint_discovery.hpp | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/requester/mctp_endpoint_discovery.hpp b/requester/mctp_endpoint_discovery.hpp
+index 3c37e4470..69fda7bb8 100644
+--- a/requester/mctp_endpoint_discovery.hpp
++++ b/requester/mctp_endpoint_discovery.hpp
+@@ -31,7 +31,8 @@ constexpr const char* inventorySubtreePathStr =
+ 
+ const std::vector<std::string> interfaceFilter = {
+     "xyz.openbmc_project.Configuration.MCTPI2CTarget",
+-    "xyz.openbmc_project.Configuration.MCTPI3CTarget"};
++    "xyz.openbmc_project.Configuration.MCTPI3CTarget",
++    "xyz.openbmc_project.Configuration.MCTPUSBDevice"};
+ 
+ /** @class MctpDiscoveryHandlerIntf
+  *
+-- 
+2.43.0
+
