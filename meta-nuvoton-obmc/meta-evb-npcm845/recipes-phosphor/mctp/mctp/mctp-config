@@ -4,15 +4,10 @@ localEid=8
 
 mctp addr add ${localEid} dev mctpi3c0
 mctp link set mctpi3c0 up
-busctl call au.com.codeconstruct.MCTP1 /au/com/codeconstruct/mctp1/interfaces/mctpi3c0 au.com.codeconstruct.MCTP.BusOwner1 SetupEndpoint ay 6 0x06 0x32 0x12 0x34 0x56 0x07 
-busctl call au.com.codeconstruct.MCTP1 /au/com/codeconstruct/mctp1/interfaces/mctpi3c0 au.com.codeconstruct.MCTP.BusOwner1 LearnEndpoint ay 6 0x06 0x32 0x12 0x34 0x56 0x07 
 
 mctp addr add ${localEid} dev mctpi2c0
 mctp link set mctpi2c0 up
-busctl call au.com.codeconstruct.MCTP1 /au/com/codeconstruct/mctp1/interfaces/mctpi2c0 au.com.codeconstruct.MCTP.BusOwner1 SetupEndpoint ay  1 0x10
-busctl call au.com.codeconstruct.MCTP1 /au/com/codeconstruct/mctp1/interfaces/mctpi2c0 au.com.codeconstruct.MCTP.BusOwner1 LearnEndpoint ay  1 0x10
 
 mctp addr add ${localEid} dev mctpusb0
 mctp link set mctpusb0 up
-busctl call au.com.codeconstruct.MCTP1 /au/com/codeconstruct/mctp1/interfaces/mctpusb0 au.com.codeconstruct.MCTP.BusOwner1 SetupEndpoint ay  0
-busctl call au.com.codeconstruct.MCTP1 /au/com/codeconstruct/mctp1/interfaces/mctpusb0 au.com.codeconstruct.MCTP.BusOwner1 LearnEndpoint ay  0
+

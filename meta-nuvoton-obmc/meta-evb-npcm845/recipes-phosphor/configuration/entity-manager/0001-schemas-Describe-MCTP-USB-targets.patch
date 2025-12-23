@@ -1,0 +1,106 @@
+Upstream-Status: Inappropriate [oe-specific]
+
+From 690bdcd2a621275cd107c5d53b0331a82e5781ad Mon Sep 17 00:00:00 2001
+From: Faizan Ali <faizana@nvidia.com>
+Date: Thu, 8 May 2025 13:50:42 +0530
+Subject: [PATCH] schemas: Describe MCTP USB targets
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Introducing `MCTPUSBTarget` schema for a reactor to derive
+usb interface information in order to set up
+USB devices for given MCTP network.
+
+Since the physical address is not a distinguishing factor for
+USB devices, and the assigned MCTP USB interface name is
+unpredictable, this will allows configurations to setup
+indeterminate (dynamic) endpoint ID for a given USB device.
+
+Tested
+'''
+Sample Json Config Exposes
+"Exposes": [
+        {
+	     "RootHubPath": "/sys/devices/platform/ahb/1e6a3000.usb",
+	     "Port": "1.2.5",
+             "Configuration": "1",
+             "InterfaceNum": “0”,
+	     "Name": "mctpusb_x”,
+             "Type": "MCTPUSBDevice"
+        }
+    ]
+'''
+
+Change-Id: Ia86a269cd2409f05dcfb479158f85866c4e93561
+Signed-off-by: Faizan Ali <faizana@nvidia.com>
+---
+ schemas/exposes_record.json |  3 +++
+ schemas/mctp.json           | 37 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 40 insertions(+)
+
+diff --git a/schemas/exposes_record.json b/schemas/exposes_record.json
+index 89b4599e9..ba9390e77 100644
+--- a/schemas/exposes_record.json
++++ b/schemas/exposes_record.json
+@@ -21,6 +21,9 @@
+                 {
+                     "$ref": "mctp.json#/$defs/MCTPI3CTarget"
+                 },
++                {
++                    "$ref": "mctp.json#/$defs/MCTPUSBDevice"
++                },
+                 {
+                     "$ref": "pid.json#/$defs/Pid"
+                 },
+diff --git a/schemas/mctp.json b/schemas/mctp.json
+index 7dc16292b..f395f3e88 100644
+--- a/schemas/mctp.json
++++ b/schemas/mctp.json
+@@ -44,6 +44,43 @@
+             },
+             "required": ["Address", "Bus", "Name", "Type"],
+             "type": "object"
++        },
++        "MCTPUSBDevice": {
++            "properties": {
++                "RootHubPath": {
++                    "description": "The path to the USB root hub for the device. For AST2600, the RootHubPath looks like /sys/devices/platform/ahb/1e6a3000.usb",
++                    "type": "string"
++                },
++                "Port": {
++                    "description": "The port on the root hub to which the device is attached.",
++                    "type": "string"
++                },
++                "Configuration": {
++                    "description": "The configuration index for the USB device.",
++                    "type": "string"
++                },
++                "InterfaceNum": {
++                    "description": "The interface number for the USB device.",
++                    "type": "string"
++                },
++                "Name": {
++                    "description": "A recognisable name for the USB device",
++                    "type": "string"
++                },
++                "Type": {
++                    "type": "string",
++                    "enum": ["MCTPUSBDevice"]
++                }
++            },
++            "required": [
++                "RootHubPath",
++                "Port",
++                "Configuration",
++                "InterfaceNum",
++                "Name",
++                "Type"
++            ],
++            "type": "object"
+         }
+     }
+ }
+-- 
+2.43.0
+

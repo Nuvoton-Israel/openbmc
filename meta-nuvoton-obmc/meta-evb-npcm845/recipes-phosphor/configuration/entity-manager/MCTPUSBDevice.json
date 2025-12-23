@@ -1,0 +1,44 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$defs": {
+        "MCTPUSBDevice": {
+            "properties": {
+                "Configuration": {
+                    "description": "The USB configuration number",
+                    "type": "string"
+                },
+                "InterfaceNum": {
+                    "description": "The USB interface number",
+                    "type": "string"
+                },
+                "Name": {
+                    "description": "A recognisable name for the device",
+                    "type": "string"
+                },
+                "Port": {
+                    "description": "The USB port number",
+                    "type": "string"
+                },
+                "RootHubPath": {
+                    "description": "The path to the USB root hub",
+                    "type": "string"
+                },
+                "Type": {
+                    "enum": [
+                        "MCTPUSBDevice"
+                    ],
+                    "type": "string"
+                }
+            },
+            "required": [
+                "Configuration",
+                "InterfaceNum",
+                "Name",
+                "Port",
+                "RootHubPath",
+                "Type"
+            ],
+            "type": "object"
+        }
+    }
+}
