@@ -2489,7 +2489,7 @@ $ DISTRO=arbel-evb-entity bitbake obmc-phosphor-image
 $ sudo apt install nettle-dev
 $ git clone git@github.com:Nuvoton-Israel/qemu.git
 $ cd qemu
-$ ./configure --target-list=aarch64-softmmu --enable-nettle
+$ ./configure --target-list=aarch64-softmmu --enable-nettle --disable-gnutls
 $ make -j $(nproc)    // will generate a qemu-system-aarch64 binary file in the build floder
 ```
 **Run QEMU**
