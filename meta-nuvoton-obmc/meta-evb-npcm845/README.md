@@ -2502,6 +2502,29 @@ $ ./qemu-system-aarch64 -machine npcm845-evb -nographic \
 	-device loader,cpu-num=2,addr=0x2000000 \
 	-device loader,cpu-num=1,addr=0x2000000
 ```
+
+**Add USB device passthrough to QEMU**
+```
+$ lsusb
+# Example output:
+# Bus 001 Device 003: ID 1d6b:0104 Linux Foundation Multifunction Composite Gadget
+```
+
+2. Handle permissions (either run QEMU with `sudo` or change device permissions):
+```bash
+$ sudo chmod 666 /dev/bus/usb/001/003
+```
+
+3. Add the following parameter to your QEMU command (replace IDs with your device's):
+```bash
+-device usb-host,vendorid=0x1d6b,productid=0x0104
+```
+
+**Add SPI Flash device to PSPI bus in QEMU**
+```bash
+-device mx66l1g45g,bus=pspi
+```
+
 # Troubleshooting
 
 ## Failed to probe SPI0 CS0 in u-boot
