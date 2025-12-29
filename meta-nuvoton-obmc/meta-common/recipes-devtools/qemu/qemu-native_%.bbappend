@@ -13,7 +13,7 @@ PV = "10.2.0+git${SRCPV}"
 EXTRA_OECONF:append = " --target-list=aarch64-softmmu,aarch64-linux-user,arm-softmmu,arm-linux-user"
 
 # PACKAGECONFIG modification
-PACKAGECONFIG:append = " nettle fdt"
+PACKAGECONFIG:append = " nettle fdt libusb"
 PACKAGECONFIG:remove = " gnutls"
 
 # Remove options that cause issues with this specific QEMU version
