@@ -7,7 +7,7 @@ LIC_FILES_CHKSUM = "file://Licenses/README;md5=2ca5f2c35c8cc335f0a19756634782f1"
 
 UBRANCH = "npcm-v2024.10"
 SRC_URI = "git://github.com/Nuvoton-Israel/u-boot.git;branch=${UBRANCH};protocol=https"
-SRCREV = "994669801efc3c54fc5ba24678466b43fa5f712a"
+SRCREV = "e5b755a9c58d12afad90e60950cd7e41bd519b20"
 
 S = "${WORKDIR}/git"
 
