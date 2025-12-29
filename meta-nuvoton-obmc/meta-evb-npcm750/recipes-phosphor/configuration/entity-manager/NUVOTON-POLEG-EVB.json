@@ -444,7 +444,7 @@
                     "Value": 0
                 }
             ],
-            "Type": "LM75"
+            "Type": "LM75A"
         },
         {
             "Address": "0x48",
