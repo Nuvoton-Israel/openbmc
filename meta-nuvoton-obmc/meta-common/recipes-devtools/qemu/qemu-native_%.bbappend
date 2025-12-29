@@ -1,9 +1,9 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 
 # Override source URI to Nuvoton's fork
-UBRANCH = "npcm-v10.2.0"
-SRC_URI = "gitsm://github.com/Nuvoton-Israel/qemu.git;protocol=https;branch=${UBRANCH}"
-SRCREV = "6209f1e0d7dea2aec5d01e85d04d2376ae7d62b2"
+QBRANCH = "npcm-v10.2.0"
+SRC_URI = "gitsm://github.com/Nuvoton-Israel/qemu.git;protocol=https;branch=${QBRANCH}"
+SRCREV = "48a47736f9c6e26deb64f768d3ded72e8aecff0b"
 
 S = "${WORKDIR}/git"
 PV = "10.2.0+git${SRCPV}"
