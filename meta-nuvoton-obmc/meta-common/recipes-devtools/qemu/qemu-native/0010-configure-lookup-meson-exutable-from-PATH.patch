@@ -1,0 +1,40 @@
+From d8aaa0280544dabd8014bd48e7eedd5e08e06aa5 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Martin=20Hundeb=C3=B8ll?= <martin@geanix.com>
+Date: Wed, 22 May 2024 14:02:55 +0200
+Subject: [PATCH] configure: lookup meson exutable from PATH
+
+Upstream-Status: Inappropriate [workaround, would need a real fix for upstream]
+---
+ configure | 16 +---------------
+ 1 file changed, 1 insertion(+), 15 deletions(-)
+
+diff --git a/configure b/configure
+index 82cace1bc9..9d4ca5609b 100755
+--- a/configure
++++ b/configure
+@@ -979,21 +979,7 @@ mkvenv="$python ${source_path}/python/scripts/mkvenv.py"
+ $mkvenv ensuregroup --dir "${source_path}/python/wheels" \
+      ${source_path}/pythondeps.toml meson || exit 1
+ 
+-# At this point, we expect Meson to be installed and available.
+-# We expect mkvenv or pip to have created pyvenv/bin/meson for us.
+-# We ignore PATH completely here: we want to use the venv's Meson
+-# *exclusively*.
+-
+-# for msys2
+-get_pwd() {
+-    if pwd -W >/dev/null 2>&1; then
+-        pwd -W
+-    else
+-        pwd
+-    fi
+-}
+-
+-meson="$(cd pyvenv/bin; get_pwd)/meson"
++meson=`which meson`
+ if [ -f "$meson$EXESUF" ]; then
+   meson="$meson$EXESUF"
+ fi
+-- 
+2.34.1
+
