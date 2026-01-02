@@ -8,6 +8,11 @@ SRCREV = "48e6aea0574f1dcca3c7bc8fb5ea68a92728144a"
 S = "${WORKDIR}/git"
 PV = "10.2.0+git${SRCPV}"
 
+SRC_URI:append = " \
+    file://0010-configure-lookup-meson-exutable-from-PATH.patch \
+    file://0011-qemu-Ensure-pip-and-the-python-venv-aren-t-used-for-.patch \
+    "
+
 # Since qemu-native runs on the build host and doesn't see machine overrides like npcm7xx/npcm8xx,
 # we must enable both ARM (for NPCM7xx) and AArch64 (for NPCM8xx) targets unconditionally.
 EXTRA_OECONF:append = " --target-list=aarch64-softmmu,aarch64-linux-user,arm-softmmu,arm-linux-user"
@@ -20,7 +25,7 @@ PACKAGECONFIG:remove = " gnutls"
 EXTRA_OECONF:remove = "--disable-static --disable-download"
 
 # Force use of host python to avoid shebang length limit issues with sysroot python
-EXTRA_OECONF:append = " --python=${HOSTTOOLS_DIR}/python3"
+#EXTRA_OECONF:append = " --python=${HOSTTOOLS_DIR}/python3"
 
 # Allow fetching subprojects during configure
 do_configure[network] = "1"
