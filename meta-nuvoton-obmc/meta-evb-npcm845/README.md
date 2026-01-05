@@ -2489,7 +2489,7 @@ $ DISTRO=arbel-evb-entity bitbake obmc-phosphor-image
 $ sudo apt install nettle-dev
 $ git clone git@github.com:Nuvoton-Israel/qemu.git
 $ cd qemu
-$ ./configure --target-list=aarch64-softmmu --enable-nettle --disable-gnutls
+$ ./configure --target-list=aarch64-softmmu --enable-nettle --disable-gnutls --enable-libusb
 $ make -j $(nproc)    // will generate a qemu-system-aarch64 binary file in the build floder
 ```
 **Run QEMU**
@@ -2517,7 +2517,7 @@ $ sudo chmod 666 /dev/bus/usb/001/003
 
 3. Add the following parameter to your QEMU command (replace IDs with your device's):
 ```bash
--device usb-host,vendorid=0x1d6b,productid=0x0104
+-device usb-host,vendorid=0x1d6b,productid=0x0104,bus=usb-bus.0
 ```
 
 **Add SPI Flash device to PSPI bus in QEMU**
