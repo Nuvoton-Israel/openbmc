@@ -10,8 +10,22 @@ SRC_URI:append = " \
     file://0003-svf-suuport-loop-command.patch \
 "
 
-# Enable NPCM JTAG and linuxgpiod adapter
-PACKAGECONFIG[linuxgpiod] = "--enable-linuxgpiod,--disable-linuxgpiod"
-PACKAGECONFIG[npcm-jtag] = "--enable-npcm-jtag,--disable-npcm-jtag"
-PACKAGECONFIG:append = " linuxgpiod npcm-jtag"
+# Override PACKAGECONFIG to only enable linuxgpiod and npcm-jtag
+PACKAGECONFIG = "linuxgpiod npcm-jtag"
+PACKAGECONFIG[linuxgpiod] = "--enable-linuxgpiod,--disable-linuxgpiod,libgpiod"
+PACKAGECONFIG[npcm-jtag] = "--enable-npcm-jtag,--disable-npcm-jtag,libnpcm-jtag"
 
+# Disable unused features to reduce image size
+EXTRA_OECONF:append = " \
+	--disable-ftdi --disable-xds110 --disable-usb-blaster --disable-usb-blaster_2 \
+	--disable-esp-usb-jtag --disable-jtag-vpi --disable-ft232r --disable-presto \
+	--disable-usbprog --disable-openjtag --disable-vsllink --disable-rlink --disable-ulink \
+	--disable-armjtagew --disable-buspirate --disable-remote-bitbang --disable-stlink \
+	--disable-ti-icdi --disable-osbdm --disable-opendous --disable-sysfsgpio \
+	--disable-cmsis-dap --disable-cmsis-dap-v2 \
+	--disable-dummy --disable-parport --disable-gw16012 \
+	--disable-bcm2835gpio --disable-imx_gpio --disable-am335xgpio \
+	--disable-ep93xx --disable-at91rm9200 \
+	--disable-vdebug --disable-jtag-dpi \
+	--disable-verbose --disable-verbose-usb-io --disable-verbose-usb-comms \
+"
