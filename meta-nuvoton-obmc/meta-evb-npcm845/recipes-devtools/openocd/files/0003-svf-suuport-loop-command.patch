@@ -1,0 +1,153 @@
+From b05025b70e529d7b6e5c24eaed5863964a525a43 Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Fri, 2 Jan 2026 17:03:29 +0800
+Subject: [PATCH] svf suuport loop command
+
+Upstream-Status: Inappropriate [oe-specific]
+
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ src/svf/svf.c | 62 ++++++++++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 54 insertions(+), 8 deletions(-)
+
+diff --git a/src/svf/svf.c b/src/svf/svf.c
+index dd3d5175c..32b2fda8d 100644
+--- a/src/svf/svf.c
++++ b/src/svf/svf.c
+@@ -41,9 +41,11 @@ enum svf_command {
+ 	TDR,
+ 	TIR,
+ 	TRST,
++	LOOP,
++	ENDLOOP
+ };
+ 
+-static const char *svf_command_name[14] = {
++static const char *svf_command_name[] = {
+ 	"ENDDR",
+ 	"ENDIR",
+ 	"FREQUENCY",
+@@ -57,7 +59,9 @@ static const char *svf_command_name[14] = {
+ 	"STATE",
+ 	"TDR",
+ 	"TIR",
+-	"TRST"
++	"TRST",
++	"LOOP",
++	"ENDLOOP"
+ };
+ 
+ enum trst_mode {
+@@ -206,7 +210,7 @@ static struct svf_check_tdo_para *svf_check_tdo_para;
+ static int svf_check_tdo_para_index;
+ 
+ static int svf_read_command_from_file(FILE *fd);
+-static int svf_check_tdo(void);
++static int svf_check_tdo(bool silent);
+ static int svf_add_check_para(uint8_t enabled, int buffer_offset, int bit_len);
+ static int svf_run_command(struct command_context *cmd_ctx, char *cmd_str);
+ static int svf_execute_tap(void);
+@@ -218,6 +222,11 @@ static char *svf_command_buffer;
+ static size_t svf_command_buffer_size;
+ static int svf_line_number;
+ static int svf_getline(char **lineptr, size_t *n, FILE *stream);
++static long file_offset;
++static int loop = 0;
++static int loop_line_number;
++static bool poll_status;
++static bool poll_status_ok;
+ 
+ #define SVF_MAX_BUFFER_SIZE_TO_COMMIT   (1024 * 1024)
+ static uint8_t *svf_tdi_buffer, *svf_tdo_buffer, *svf_mask_buffer;
+@@ -596,7 +605,7 @@ COMMAND_HANDLER(handle_svf_command)
+ 
+ 	if ((!svf_nil) && (jtag_execute_queue() != ERROR_OK))
+ 		ret = ERROR_FAIL;
+-	else if (svf_check_tdo() != ERROR_OK)
++	else if (svf_check_tdo(false) != ERROR_OK)
+ 		ret = ERROR_FAIL;
+ 
+ 	/* print time */
+@@ -924,7 +933,7 @@ static int svf_copy_hexstring_to_binary(char *str, uint8_t **bin, int orig_bit_l
+ 	return ERROR_OK;
+ }
+ 
+-static int svf_check_tdo(void)
++static int svf_check_tdo(bool silent)
+ {
+ 	int i, len, index_var;
+ 
+@@ -934,12 +943,14 @@ static int svf_check_tdo(void)
+ 		if ((svf_check_tdo_para[i].enabled)
+ 				&& buf_cmp_mask(&svf_tdi_buffer[index_var], &svf_tdo_buffer[index_var],
+ 				&svf_mask_buffer[index_var], len)) {
++			if (!silent) {
+ 			LOG_ERROR("tdo check error at line %d",
+ 				svf_check_tdo_para[i].line_num);
+ 			SVF_BUF_LOG(ERROR, &svf_tdi_buffer[index_var], len, "READ");
+ 			SVF_BUF_LOG(ERROR, &svf_tdo_buffer[index_var], len, "WANT");
+ 			SVF_BUF_LOG(ERROR, &svf_mask_buffer[index_var], len, "MASK");
+-
++			} else
++				svf_check_tdo_para_index = 0;
+ 			if (svf_ignore_error == 0)
+ 				return ERROR_FAIL;
+ 			else
+@@ -969,10 +980,16 @@ static int svf_add_check_para(uint8_t enabled, int buffer_offset, int bit_len)
+ 
+ static int svf_execute_tap(void)
+ {
+-	if ((!svf_nil) && (jtag_execute_queue() != ERROR_OK))
++	if ((!svf_nil) && (jtag_execute_queue() != ERROR_OK)) {
+ 		return ERROR_FAIL;
+-	else if (svf_check_tdo() != ERROR_OK)
++	} else if (poll_status) {
++		if (svf_check_tdo(true) == ERROR_OK)
++			poll_status_ok = true;
++		else
++			poll_status_ok = false;
++	} else if (svf_check_tdo(false) != ERROR_OK) {
+ 		return ERROR_FAIL;
++	}
+ 
+ 	svf_buffer_index = 0;
+ 
+@@ -1009,6 +1026,35 @@ static int svf_run_command(struct command_context *cmd_ctx, char *cmd_str)
+ 	command = svf_find_string_in_array(argus[0],
+ 			(char **)svf_command_name, ARRAY_SIZE(svf_command_name));
+ 	switch (command) {
++		case LOOP:
++			if (num_of_argu != 2) {
++				LOG_ERROR("invalid parameter of %s", argus[0]);
++				return ERROR_FAIL;
++			}
++
++			loop = atoi(argus[1]);
++			file_offset = ftell(svf_fd);
++			loop--;
++			loop_line_number = svf_line_number;
++			poll_status = true;
++			poll_status_ok = false;
++			break;
++		case ENDLOOP:
++			if (loop > 0) {
++				if (svf_execute_tap() != ERROR_OK)
++					return ERROR_FAIL;
++				if (poll_status_ok) {
++					loop = 0;
++					poll_status = false;
++					break;
++				} else {
++					fseek(svf_fd, file_offset, SEEK_SET);
++					svf_line_number = loop_line_number;
++					loop--;
++				}
++			} else
++				poll_status = false;
++			break;
+ 		case ENDDR:
+ 		case ENDIR:
+ 			if (num_of_argu != 2) {
+-- 
+2.34.1
+

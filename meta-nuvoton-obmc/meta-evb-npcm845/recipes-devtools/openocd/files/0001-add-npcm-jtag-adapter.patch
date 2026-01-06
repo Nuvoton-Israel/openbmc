@@ -1,0 +1,459 @@
+From 8f10a29f8796cdeb7ed06b738b7de860c3b29142 Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Tue, 6 Jan 2026 10:27:53 +0800
+Subject: [PATCH] add npcm jtag adapter
+
+Upstream-Status: Inappropriate [oe-specific]
+
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ src/jtag/drivers/npcm_jtag.c | 363 +++++++++++++++++++++++++++++++++++
+ src/jtag/drivers/npcm_jtag.h |  66 +++++++
+ 2 files changed, 429 insertions(+)
+ create mode 100644 src/jtag/drivers/npcm_jtag.c
+ create mode 100644 src/jtag/drivers/npcm_jtag.h
+
+diff --git a/src/jtag/drivers/npcm_jtag.c b/src/jtag/drivers/npcm_jtag.c
+new file mode 100644
+index 000000000..b1afafd05
+--- /dev/null
++++ b/src/jtag/drivers/npcm_jtag.c
+@@ -0,0 +1,363 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++
++/***************************************************************************
++ *   NPCM JTAG driver using libnpcm-jtag                                  *
++ *   Copyright (C) 2025 Nuvoton Technology Corporation                    *
++ ***************************************************************************/
++
++#ifdef HAVE_CONFIG_H
++#include "config.h"
++#endif
++
++#include <jtag/interface.h>
++#include <jtag/commands.h>
++#include <helper/time_support.h>
++#include "npcm_jtag.h"
++
++#define DEV_NAME_LEN 16
++
++static JTAG_Handler *npcm_handler = NULL;
++static char npcm_device[DEV_NAME_LEN + 1] = "jtag0";
++static int jtag_freq_hkz = 1000; /* Default 1MHz in kHz */
++static int npcm_end_state;
++
++/* Convert OpenOCD TAP state to libnpcm-jtag state */
++static int openocd_to_npcm_state(tap_state_t state)
++{
++	switch (state) {
++	case TAP_RESET:
++		return JtagTLR;
++	case TAP_IDLE:
++		return JtagRTI;
++	case TAP_DRSELECT:
++		return JtagSelDR;
++	case TAP_DRCAPTURE:
++		return JtagCapDR;
++	case TAP_DRSHIFT:
++		return JtagShfDR;
++	case TAP_DREXIT1:
++		return JtagEx1DR;
++	case TAP_DRPAUSE:
++		return JtagPauDR;
++	case TAP_DREXIT2:
++		return JtagEx2DR;
++	case TAP_DRUPDATE:
++		return JtagUpdDR;
++	case TAP_IRSELECT:
++		return JtagSelIR;
++	case TAP_IRCAPTURE:
++		return JtagCapIR;
++	case TAP_IRSHIFT:
++		return JtagShfIR;
++	case TAP_IREXIT1:
++		return JtagEx1IR;
++	case TAP_IRPAUSE:
++		return JtagPauIR;
++	case TAP_IREXIT2:
++		return JtagEx2IR;
++	case TAP_IRUPDATE:
++		return JtagUpdIR;
++	default:
++		return JtagRTI;
++	}
++}
++
++static int npcm_jtag_init(void)
++{
++	struct jtag_args args = {0};
++	int ret;
++	char dev_path[DEV_NAME_LEN + 5];
++
++	sprintf(dev_path, "/dev/%s", npcm_device);
++	LOG_INFO("NPCM JTAG interface init (device: %s)", dev_path);
++
++	/* Set up arguments */
++	args.arg[args.num_args].id = ARG_MODE;
++	args.arg[args.num_args].val = JTAG_MODE_HW;
++	args.num_args++;
++
++	args.arg[args.num_args].id = ARG_FREQ;
++	args.arg[args.num_args].val = jtag_freq_hkz * 1000;
++	args.num_args++;
++
++	args.arg[args.num_args].id = ARG_LOG_LEVEL;
++	args.arg[args.num_args].val = LEV_INFO;
++	args.num_args++;
++
++	npcm_handler = JTAG_open(dev_path, &args);
++	if (!npcm_handler) {
++		LOG_ERROR("Failed to open NPCM JTAG device: %d", ret);
++		return ERROR_JTAG_INIT_FAILED;
++	}
++
++	return ERROR_OK;
++}
++
++static int npcm_jtag_quit(void)
++{
++	LOG_INFO("NPCM JTAG interface quit");
++
++	if (npcm_handler) {
++		JTAG_close(npcm_handler);
++		npcm_handler = NULL;
++	}
++
++	return ERROR_OK;
++}
++
++static int npcm_jtag_speed(int speed)
++{
++	int ret;
++
++	LOG_DEBUG("NPCM JTAG speed: %d kHz", speed);
++
++	if (!npcm_handler) {
++		jtag_freq_hkz = speed;
++		return ERROR_OK;
++	}
++
++	ret = JTAG_set_clock_frequency(npcm_handler, speed * 1000);
++	if (ret < 0) {
++		LOG_ERROR("Failed to set JTAG frequency: %d", ret);
++		return ERROR_FAIL;
++	}
++
++	jtag_freq_hkz = speed;
++	return ERROR_OK;
++}
++
++static int npcm_jtag_khz(int khz, int *jtag_speed)
++{
++	*jtag_speed = khz;
++	return ERROR_OK;
++}
++
++static int npcm_jtag_speed_div(int speed, int *khz)
++{
++	*khz = speed;
++	return ERROR_OK;
++}
++
++static int npcm_jtag_scan(bool ir_scan, enum scan_type type, uint8_t *buffer,
++		unsigned scan_size)
++{
++	int ret;
++	tap_state_t end_state = tap_get_state();
++
++	if (!npcm_handler)
++		return ERROR_JTAG_INIT_FAILED;
++
++	if (ir_scan) {
++		ret = JTAG_ir_scan(npcm_handler, scan_size,
++				    buffer, buffer,
++				    npcm_end_state);
++	} else {
++		ret = JTAG_dr_scan(npcm_handler, scan_size,
++				    buffer, buffer,
++				    npcm_end_state);
++	}
++
++	if (ret)
++		return ERROR_FAIL;
++	else
++		return ERROR_OK;
++}
++
++static int npcm_jtag_execute_runtest(struct runtest_command *cmd)
++{
++	int ret;
++
++	if (!npcm_handler)
++		return ERROR_JTAG_INIT_FAILED;
++
++	/* Move to Run-Test/Idle state and run specified number of cycles */
++	ret = JTAG_set_tap_state(npcm_handler, JtagRTI);
++	if (ret < 0) {
++		LOG_ERROR("Failed to set RTI state");
++		return ERROR_FAIL;
++	}
++
++	if (cmd->num_cycles > 0) {
++		JTAG_runtest_idle(npcm_handler, cmd->num_cycles);
++	}
++
++	/* Move to end state */
++	if (cmd->end_state != TAP_INVALID) {
++		int npcm_state = openocd_to_npcm_state(cmd->end_state);
++		ret = JTAG_set_tap_state(npcm_handler, npcm_state);
++		if (ret < 0) {
++			LOG_ERROR("Failed to set end state");
++			return ERROR_FAIL;
++		}
++	}
++
++	return ERROR_OK;
++}
++
++static int npcm_jtag_execute_stableclocks(struct stableclocks_command *cmd)
++{
++	int ret;
++
++	if (!npcm_handler)
++		return ERROR_JTAG_INIT_FAILED;
++
++	ret = JTAG_run_test(npcm_handler, JTAG_STATE_CURRENT, cmd->num_cycles);
++	if (ret < 0) {
++		LOG_ERROR("Failed to run stable clocks");
++		return ERROR_FAIL;
++	}
++
++	return ERROR_OK;
++}
++
++static int npcm_jtag_execute_pathmove(struct pathmove_command *cmd)
++{
++	int ret;
++
++	if (!npcm_handler)
++		return ERROR_JTAG_INIT_FAILED;
++
++	for (int i = 0; i < cmd->num_states; i++) {
++		int npcm_state = openocd_to_npcm_state(cmd->path[i]);
++		ret = JTAG_set_tap_state(npcm_handler, npcm_state);
++		if (ret < 0) {
++			LOG_ERROR("Failed to move to state %d", cmd->path[i]);
++			return ERROR_FAIL;
++		}
++	}
++
++	return ERROR_OK;
++}
++
++static int npcm_jtag_execute_queue(void)
++{
++	struct jtag_command *cmd = jtag_command_queue;
++	int scan_size;
++	enum scan_type type;
++	uint8_t *buffer;
++	int retval;
++
++	/* return ERROR_OK, unless a jtag_read_buffer returns a failed check
++	 * that wasn't handled by a caller-provided error handler
++	 */
++	retval = ERROR_OK;
++
++	while (cmd) {
++		switch (cmd->type) {
++		case JTAG_RUNTEST:
++			retval = npcm_jtag_execute_runtest(cmd->cmd.runtest);
++			break;
++		case JTAG_STABLECLOCKS:
++			retval = npcm_jtag_execute_stableclocks(cmd->cmd.stableclocks);
++			break;
++		case JTAG_TLR_RESET:
++			retval = JTAG_set_tap_state(npcm_handler, JtagTLR);
++			break;
++		case JTAG_PATHMOVE:
++			retval = npcm_jtag_execute_pathmove(cmd->cmd.pathmove);
++			break;
++		case JTAG_SLEEP:
++			jtag_sleep(cmd->cmd.sleep->us);
++			break;
++		case JTAG_SCAN:
++			npcm_end_state = openocd_to_npcm_state(cmd->cmd.scan->end_state);
++			scan_size = jtag_build_buffer(cmd->cmd.scan, &buffer);
++			LOG_DEBUG_IO("%s scan %d bits; end in %s",
++					(cmd->cmd.scan->ir_scan) ? "IR" : "DR",
++					scan_size,
++					tap_state_name(cmd->cmd.scan->end_state));
++			type = jtag_scan_type(cmd->cmd.scan);
++			retval = npcm_jtag_scan(cmd->cmd.scan->ir_scan, type, buffer, scan_size);
++			if (retval == ERROR_OK && jtag_read_buffer(buffer, cmd->cmd.scan) != ERROR_OK)
++				retval = ERROR_JTAG_QUEUE_FAILED;
++			free(buffer);
++			break;
++		default:
++			LOG_ERROR("Unknown JTAG command type: %d", cmd->type);
++			retval = ERROR_FAIL;
++			break;
++		}
++		cmd = cmd->next;
++	}
++
++	return retval;
++}
++
++static int npcm_jtag_reset(int trst, int srst)
++{
++	int ret;
++
++	LOG_DEBUG("NPCM JTAG reset: trst=%d srst=%d", trst, srst);
++
++	if (!npcm_handler)
++		return ERROR_JTAG_INIT_FAILED;
++
++	/* Handle TRST - move to Test-Logic-Reset state */
++	if (trst == 1) {
++		ret = JTAG_set_tap_state(npcm_handler, JtagTLR);
++		if (ret < 0) {
++			LOG_ERROR("Failed to reset TAP");
++			return ERROR_FAIL;
++		}
++	}
++
++	return ERROR_OK;
++}
++
++COMMAND_HANDLER(npcm_jtag_handle_device_command)
++{
++	if (CMD_ARGC != 1)
++		return ERROR_COMMAND_SYNTAX_ERROR;
++
++	strncpy(npcm_device, CMD_ARGV[0], DEV_NAME_LEN);
++	LOG_INFO("NPCM JTAG device set to: %s", npcm_device);
++
++	return ERROR_OK;
++}
++
++COMMAND_HANDLER(npcm_jtag_handle_mode_command)
++{
++	if (CMD_ARGC != 1)
++		return ERROR_COMMAND_SYNTAX_ERROR;
++
++	LOG_INFO("NPCM JTAG mode: %s (hardware mode always used)", CMD_ARGV[0]);
++
++	return ERROR_OK;
++}
++
++static const struct command_registration npcm_jtag_commands[] = {
++	{
++		.name = "npcm_jtag_device",
++		.handler = &npcm_jtag_handle_device_command,
++		.mode = COMMAND_CONFIG,
++		.help = "set the NPCM JTAG device path",
++		.usage = "device_path (default: /dev/jtag0)",
++	},
++	{
++		.name = "npcm_jtag_mode",
++		.handler = &npcm_jtag_handle_mode_command,
++		.mode = COMMAND_CONFIG,
++		.help = "set the NPCM JTAG mode (hw/sw)",
++		.usage = "hw|sw (default: hw)",
++	},
++	COMMAND_REGISTRATION_DONE
++};
++
++static struct jtag_interface npcm_jtag_interface = {
++	.execute_queue = npcm_jtag_execute_queue,
++};
++
++struct adapter_driver npcm_jtag_adapter_driver = {
++	.name = "npcm_jtag",
++	.transports = jtag_only,
++	.commands = npcm_jtag_commands,
++
++	.init = npcm_jtag_init,
++	.quit = npcm_jtag_quit,
++	.speed = npcm_jtag_speed,
++	.khz = npcm_jtag_khz,
++	.speed_div = npcm_jtag_speed_div,
++	.reset = npcm_jtag_reset,
++
++	.jtag_ops = &npcm_jtag_interface,
++};
+diff --git a/src/jtag/drivers/npcm_jtag.h b/src/jtag/drivers/npcm_jtag.h
+new file mode 100644
+index 000000000..8533948b6
+--- /dev/null
++++ b/src/jtag/drivers/npcm_jtag.h
+@@ -0,0 +1,66 @@
++#ifndef __NPCM_JTAG_H__
++#define __NPCM_JTAG_H__
++
++#define LEV_DEBUG	1
++#define LEV_INFO	2
++#define LEV_ERROR	3
++
++#define JTAG_MODE_HW	0
++#define JTAG_MODE_SW	1
++
++typedef void* JTAG_Handler;
++
++typedef enum {
++	ARG_MODE,
++	ARG_FREQ,
++	ARG_LOG_LEVEL,
++	ARG_EID,
++	ARG_NET,
++} JTAG_ARG_ID;
++
++#define JTAG_MAX_ARGS	8
++struct jtag_arg {
++	int id;
++	int val;
++};
++struct jtag_args {
++	struct jtag_arg arg[JTAG_MAX_ARGS];
++	int num_args;
++};
++
++typedef enum {
++	JtagTLR,
++	JtagRTI,
++	JtagSelDR,
++	JtagCapDR,
++	JtagShfDR,
++	JtagEx1DR,
++	JtagPauDR,
++	JtagEx2DR,
++	JtagUpdDR,
++	JtagSelIR,
++	JtagCapIR,
++	JtagShfIR,
++	JtagEx1IR,
++	JtagPauIR,
++	JtagEx2IR,
++	JtagUpdIR,
++	JTAG_STATE_CURRENT
++} JtagStates;
++
++int JTAG_set_tap_state(JTAG_Handler *jtag, int tap_state);
++int JTAG_get_tap_state(JTAG_Handler *jtag);
++int JTAG_run_test(JTAG_Handler *jtag, int tap_state, int tcks);
++int JTAG_set_clock_frequency(JTAG_Handler *jtag, int frequency);
++int JTAG_get_clock_frequency(JTAG_Handler *jtag);
++int JTAG_ir_scan(JTAG_Handler *jtag, int num_bits, const uint8_t *out_bits, uint8_t *in_bits,
++	tap_state_t state);
++int JTAG_dr_scan(JTAG_Handler *jtag, int num_bits, const uint8_t *out_bits, uint8_t *in_bits,
++	tap_state_t state);
++
++JTAG_Handler *JTAG_open(char *jtag_dev, struct jtag_args *args);
++void JTAG_close(JTAG_Handler *handler);
++void JTAG_reset_state(JTAG_Handler *handler);
++void JTAG_runtest_idle(JTAG_Handler *handler, uint32_t tcks);
++
++#endif
+-- 
+2.34.1
+

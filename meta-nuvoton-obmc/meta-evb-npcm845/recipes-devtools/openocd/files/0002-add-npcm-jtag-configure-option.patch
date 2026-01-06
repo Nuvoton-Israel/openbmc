@@ -1,0 +1,102 @@
+From d52a4ef834fbe21ddbfa1ac651b33f8ef8116124 Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Fri, 2 Jan 2026 16:55:48 +0800
+Subject: [PATCH] add npcm jtag configure option
+
+Upstream-Status: Inappropriate [oe-specific]
+
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ configure.ac                 | 11 +++++++++++
+ src/jtag/drivers/Makefile.am |  7 +++++++
+ src/jtag/interfaces.c        |  6 ++++++
+ 3 files changed, 24 insertions(+)
+
+diff --git a/configure.ac b/configure.ac
+index ac2808e1f..c122515d2 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -376,6 +376,10 @@ AC_ARG_ENABLE([remote-bitbang],
+   AS_HELP_STRING([--enable-remote-bitbang], [Enable building support for the Remote Bitbang jtag driver]),
+   [build_remote_bitbang=$enableval], [build_remote_bitbang=no])
+ 
++AC_ARG_ENABLE([npcm-jtag],
++  AS_HELP_STRING([--enable-npcm-jtag], [Enable building support for npcm jtag driver]),
++  [build_npcm_jtag=$enableval], [build_npcm_jtag=no])
++
+ AS_CASE(["${host_cpu}"],
+   [i?86|x86*], [],
+   [
+@@ -602,6 +606,12 @@ AS_IF([test "x$build_xlnx_pcie_xvc" = "xyes"], [
+   AC_DEFINE([BUILD_XLNX_PCIE_XVC], [0], [0 if you don't want Xilinx XVC/PCIe driver.])
+ ])
+ 
++AS_IF([test "x$build_npcm_jtag" = "xyes"], [
++  AC_DEFINE([BUILD_NPCM_JTAG], [1], [1 if you want npcm jtag adapter.])
++], [
++  AC_DEFINE([BUILD_NPCM_JTAG], [0], [0 if you don't want npcm jtag adapter.])
++])
++
+ PKG_CHECK_MODULES([LIBUSB1], [libusb-1.0], [
+ 	use_libusb1=yes
+ 	AC_DEFINE([HAVE_LIBUSB1], [1], [Define if you have libusb-1.x])
+@@ -757,6 +767,7 @@ AM_CONDITIONAL([HAVE_CAPSTONE], [test "x$enable_capstone" != "xno"])
+ 
+ AM_CONDITIONAL([INTERNAL_JIMTCL], [test "x$use_internal_jimtcl" = "xyes"])
+ AM_CONDITIONAL([INTERNAL_LIBJAYLINK], [test "x$use_internal_libjaylink" = "xyes"])
++AM_CONDITIONAL([NPCM_JTAG], [test "x$build_npcm_jtag" = "xyes"])
+ 
+ # Look for environ alternatives.  Possibility #1: is environ in unistd.h or stdlib.h?
+ AC_MSG_CHECKING([for environ in unistd.h and stdlib.h])
+diff --git a/src/jtag/drivers/Makefile.am b/src/jtag/drivers/Makefile.am
+index 6410f3754..8d8ef1287 100644
+--- a/src/jtag/drivers/Makefile.am
++++ b/src/jtag/drivers/Makefile.am
+@@ -48,6 +48,10 @@ if USE_LIBJAYLINK
+ %C%_libocdjtagdrivers_la_LIBADD += $(LIBJAYLINK_LIBS)
+ endif
+ 
++if NPCM_JTAG
++%C%_libocdjtagdrivers_la_LIBADD += -lnpcm-jtag
++endif
++
+ if JLINK
+ DRIVERFILES += %D%/jlink.c
+ if INTERNAL_LIBJAYLINK
+@@ -193,6 +197,9 @@ endif
+ if AM335XGPIO
+ DRIVERFILES += %D%/am335xgpio.c
+ endif
++if NPCM_JTAG
++DRIVERFILES += %D%/npcm_jtag.c
++endif
+ 
+ DRIVERHEADERS = \
+ 	%D%/bitbang.h \
+diff --git a/src/jtag/interfaces.c b/src/jtag/interfaces.c
+index 12848be03..afbd8b8f3 100644
+--- a/src/jtag/interfaces.c
++++ b/src/jtag/interfaces.c
+@@ -142,6 +142,9 @@ extern struct adapter_driver rshim_dap_adapter_driver;
+ #if BUILD_AM335XGPIO == 1
+ extern struct adapter_driver am335xgpio_adapter_driver;
+ #endif
++#if BUILD_NPCM_JTAG == 1
++extern struct adapter_driver npcm_jtag_adapter_driver;
++#endif
+ 
+ /**
+  * The list of built-in JTAG interfaces, containing entries for those
+@@ -258,6 +261,9 @@ struct adapter_driver *adapter_drivers[] = {
+ #endif
+ #if BUILD_AM335XGPIO == 1
+ 		&am335xgpio_adapter_driver,
++#endif
++#if BUILD_NPCM_JTAG == 1
++               &npcm_jtag_adapter_driver,
+ #endif
+ 		NULL,
+ 	};
+-- 
+2.34.1
+
