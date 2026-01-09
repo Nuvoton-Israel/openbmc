@@ -1,0 +1,3880 @@
+From f28df37d93e187c1f157e74a9b0b1d07ac13a802 Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Fri, 9 Jan 2026 13:13:20 +0800
+Subject: [PATCH] add support for nct6694 flash
+
+Upstream-Status: Inappropriate [oe-specific]
+
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ contrib/loaders/flash/nct_esio/Makefile       |  84 ++
+ .../flash/nct_esio/nct6692d_fiu_algo.inc      | 124 +++
+ .../flash/nct_esio/nct6692d_fiu_flash.c       | 690 ++++++++++++++++
+ .../loaders/flash/nct_esio/nct6692d_flash.h   | 274 +++++++
+ .../flash/nct_esio/nct6694d_fiu_algo.inc      | 138 ++++
+ .../flash/nct_esio/nct6694d_fiu_flash.c       | 642 +++++++++++++++
+ .../loaders/flash/nct_esio/nct6694d_flash.h   | 529 +++++++++++++
+ .../flash/nct_esio/nct6694d_spim_algo.inc     |  61 ++
+ .../flash/nct_esio/nct6694d_spim_flash.c      | 287 +++++++
+ .../loaders/flash/nct_esio/nct_esio_flash.lds |  57 ++
+ src/flash/nor/Makefile.am                     |   4 +-
+ src/flash/nor/drivers.c                       |   2 +
+ src/flash/nor/nct_esio.c                      | 735 ++++++++++++++++++
+ src/flash/nor/nct_esio.h                      |  59 ++
+ src/flash/startup.tcl                         |   4 +-
+ tcl/board/npcm400_evb.cfg                     |  18 +
+ 16 files changed, 3705 insertions(+), 3 deletions(-)
+ create mode 100644 contrib/loaders/flash/nct_esio/Makefile
+ create mode 100644 contrib/loaders/flash/nct_esio/nct6692d_fiu_algo.inc
+ create mode 100644 contrib/loaders/flash/nct_esio/nct6692d_fiu_flash.c
+ create mode 100644 contrib/loaders/flash/nct_esio/nct6692d_flash.h
+ create mode 100644 contrib/loaders/flash/nct_esio/nct6694d_fiu_algo.inc
+ create mode 100644 contrib/loaders/flash/nct_esio/nct6694d_fiu_flash.c
+ create mode 100644 contrib/loaders/flash/nct_esio/nct6694d_flash.h
+ create mode 100644 contrib/loaders/flash/nct_esio/nct6694d_spim_algo.inc
+ create mode 100644 contrib/loaders/flash/nct_esio/nct6694d_spim_flash.c
+ create mode 100644 contrib/loaders/flash/nct_esio/nct_esio_flash.lds
+ create mode 100644 src/flash/nor/nct_esio.c
+ create mode 100644 src/flash/nor/nct_esio.h
+ create mode 100644 tcl/board/npcm400_evb.cfg
+
+diff --git a/contrib/loaders/flash/nct_esio/Makefile b/contrib/loaders/flash/nct_esio/Makefile
+new file mode 100644
+index 000000000..ef6117fe0
+--- /dev/null
++++ b/contrib/loaders/flash/nct_esio/Makefile
+@@ -0,0 +1,84 @@
++# SPDX-License-Identifier: GPL-2.0-or-later
++
++BIN2C = ../../../../src/helper/bin2char.sh
++
++# Toolchain used in makefile
++CROSS_COMPILE ?= arm-none-eabi-
++CC             = $(CROSS_COMPILE)gcc
++CPLUS          = $(CROSS_COMPILE)g++
++CPP            = $(CROSS_COMPILE)cpp
++LD             = $(CROSS_COMPILE)gcc
++AS             = $(CROSS_COMPILE)as
++OBJCOPY        = $(CROSS_COMPILE)objcopy
++OBJDUMP        = $(CROSS_COMPILE)objdump
++OBJSIZE        = $(CROSS_COMPILE)size
++
++# NCT6692D targets
++TARGET_6692D_FIU     = nct6692d_fiu_algo
++OBJS_6692D_FIU       = nct6692d_fiu_flash.o
++
++# NCT6694D targets (both FIU and SPIM)
++TARGET_6694D_FIU     = nct6694d_fiu_algo
++TARGET_6694D_SPIM    = nct6694d_spim_algo
++OBJS_6694D_FIU       = nct6694d_fiu_flash.o
++OBJS_6694D_SPIM      = nct6694d_spim_flash.o
++
++FLAGS          = -mthumb -Os -ffunction-sections -fdata-sections -g -gdwarf-3 --specs=nano.specs
++FLAGS         += -gstrict-dwarf -Wall -fno-strict-aliasing --asm
++
++CFLAGS         = -c -I. -mcpu=cortex-m4 -fpack-struct
++
++PRE_LD_FILE    = nct_esio_flash.lds
++LD_FILE        = nct_esio_flash_generated.lds
++LDFLAGS        = -Wl,-Map,lfw.map -Wl,-T$(LD_FILE) -nostartfiles
++
++all: $(TARGET_6692D_FIU).inc $(TARGET_6694D_FIU).inc $(TARGET_6694D_SPIM).inc
++
++# Implicit rules
++%.o: %.c
++	-@ echo CC $@ from $<
++	@$(CC) $< $(FLAGS) $(CFLAGS) -o $@
++
++$(LD_FILE): $(PRE_LD_FILE)
++	-@ echo Generate $@ from $<
++	-@$(CPP) $(PRE_LD_FILE) | grep -v '^#' >>$(LD_FILE)
++
++# NCT6692D FIU target
++$(TARGET_6692D_FIU).elf: $(OBJS_6692D_FIU) $(LD_FILE)
++	-@ echo LD  $@ from $<
++	@$(LD) -o $@ $< $(FLAGS) $(LDFLAGS)
++
++# NCT6694D FIU target
++$(TARGET_6694D_FIU).elf: $(OBJS_6694D_FIU) $(LD_FILE)
++	-@ echo LD  $@ from $<
++	@$(LD) -o $@ $< $(FLAGS) $(LDFLAGS)
++
++# NCT6694D SPIM target
++$(TARGET_6694D_SPIM).elf: $(OBJS_6694D_SPIM) $(LD_FILE)
++	-@ echo LD  $@ from $<
++	@$(LD) -o $@ $< $(FLAGS) $(LDFLAGS)
++
++%.bin: %.elf
++	-@ echo OBJCOPY $@ from $<
++	-@ $(OBJCOPY) $< -O binary $@
++	-@ $(OBJSIZE) $< --format=berkeley
++
++%.inc: %.bin
++	@echo 'Building target: $@'
++	@echo 'Invoking Bin2Char Script'
++	$(BIN2C) < $< > $@
++	rm $< $*.elf
++	@echo 'Finished building target: $@'
++	@echo ' '
++
++clean:
++	@echo 'Cleaning Targets and Build Artifacts'
++	rm -rf *.inc *.bin *.elf *.map
++	rm -rf *.o *.d
++	rm -rf $(LD_FILE)
++	@echo 'Finished clean'
++	@echo ' '
++
++.PRECIOUS: %.bin
++
++.PHONY: all clean
+diff --git a/contrib/loaders/flash/nct_esio/nct6692d_fiu_algo.inc b/contrib/loaders/flash/nct_esio/nct6692d_fiu_algo.inc
+new file mode 100644
+index 000000000..1e6e3a1a2
+--- /dev/null
++++ b/contrib/loaders/flash/nct_esio/nct6692d_fiu_algo.inc
+@@ -0,0 +1,124 @@
++/* Autogenerated with ../../../../src/helper/bin2char.sh */
++0x08,0xb5,0xdf,0xf8,0x08,0xd0,0x00,0xf0,0x29,0xf9,0x00,0x00,0x44,0x19,0x0c,0x20,
++0x14,0x23,0x0d,0x4a,0x30,0xb5,0x59,0x43,0x40,0xf0,0x81,0x04,0x05,0x25,0x40,0xf6,
++0x5f,0x13,0x00,0xbf,0x01,0x3b,0xfc,0xd1,0x95,0x75,0x94,0x77,0x93,0x7f,0x1b,0x06,
++0xfc,0xd4,0x93,0x7e,0x13,0xf0,0x01,0x00,0x05,0xd0,0x00,0x29,0xef,0xd0,0x01,0x39,
++0xed,0xd1,0x4f,0xf0,0xff,0x30,0x30,0xbd,0x00,0x00,0x02,0x40,0x70,0xb5,0x2f,0x4b,
++0x01,0x24,0xdc,0x77,0x93,0xf8,0x43,0x40,0x44,0xf0,0x08,0x04,0x83,0xf8,0x43,0x40,
++0x04,0x78,0x9c,0x75,0x44,0x78,0x5c,0x76,0x84,0x78,0x1c,0x76,0xc4,0x78,0xdc,0x75,
++0xc8,0x24,0x9c,0x77,0x9c,0x7f,0x24,0x06,0xfc,0xd4,0x04,0x79,0x9c,0x75,0x44,0x79,
++0x9c,0x76,0x84,0x79,0xdc,0x76,0xc4,0x79,0x1c,0x77,0x00,0x7a,0x58,0x77,0xe0,0x20,
++0x98,0x77,0x1e,0x48,0x83,0x7f,0x1e,0x06,0xfc,0xd4,0x1c,0x4b,0x08,0x1d,0x14,0x46,
++0x6f,0xf0,0x2b,0x06,0x04,0x3c,0x9e,0x77,0xa4,0xb2,0x9d,0x7f,0x2d,0x06,0xfc,0xd4,
++0x9d,0x7e,0x00,0xf8,0x04,0x5c,0xdd,0x7e,0x00,0xf8,0x03,0x5c,0x1d,0x7f,0x00,0xf8,
++0x02,0x5c,0x5d,0x7f,0x00,0xf8,0x01,0x5c,0x04,0x2c,0x00,0xf1,0x04,0x00,0xe9,0xd8,
++0x01,0x3a,0xd4,0x24,0xc2,0xf3,0x8d,0x02,0x9c,0x77,0x0c,0x4b,0x01,0xeb,0x82,0x00,
++0x9c,0x7f,0x24,0x06,0xfc,0xd4,0x9c,0x7e,0x01,0xf8,0x22,0x40,0xda,0x7e,0x42,0x70,
++0x1a,0x7f,0x82,0x70,0x5a,0x7f,0xc2,0x70,0x03,0x22,0xda,0x77,0x93,0xf8,0x43,0x20,
++0x02,0xf0,0xf7,0x02,0x83,0xf8,0x43,0x20,0x70,0xbd,0x00,0xbf,0x00,0x00,0x02,0x40,
++0x5a,0xb1,0x06,0x4b,0x59,0x60,0x98,0x60,0xda,0x60,0x4f,0xf0,0x01,0x12,0x1a,0x60,
++0x1a,0x68,0x12,0xf0,0x01,0x02,0xfb,0xd1,0x1a,0x60,0x70,0x47,0x00,0x10,0x01,0x40,
++0x70,0xb4,0x13,0x46,0x04,0x46,0x0d,0x46,0x1a,0xb3,0x41,0xea,0x00,0x06,0x36,0x07,
++0x02,0xd0,0x70,0xbc,0xff,0xf7,0xe4,0xbf,0x32,0xf0,0x3f,0x01,0x15,0xd0,0x0e,0x4e,
++0x0b,0x22,0x72,0x70,0x0d,0x4a,0x55,0x60,0x90,0x60,0x08,0x09,0xd0,0x60,0x0c,0x48,
++0x10,0x60,0x10,0x68,0x10,0xf0,0x01,0x00,0xfb,0xd1,0x10,0x60,0x5b,0x1a,0x4f,0xf0,
++0x03,0x02,0x72,0x70,0x05,0xd0,0x0d,0x44,0x0c,0x44,0x1a,0x46,0x29,0x46,0x20,0x46,
++0xdf,0xe7,0x70,0xbc,0x70,0x47,0x00,0xbf,0x00,0x00,0x02,0x40,0x00,0x10,0x01,0x40,
++0x01,0x22,0x01,0x00,0x38,0xb5,0x04,0x46,0x01,0x2c,0x10,0x46,0x9d,0xf8,0x10,0x50,
++0x1a,0x46,0x1b,0xd1,0x4d,0xb1,0x10,0x4b,0x93,0xf8,0x33,0x40,0x44,0xf0,0x03,0x04,
++0x83,0xf8,0x33,0x40,0xbc,0x24,0x83,0xf8,0x30,0x40,0x01,0xf1,0xc8,0x41,0xff,0xf7,
++0xb7,0xff,0x4d,0xb1,0x08,0x4b,0x93,0xf8,0x33,0x20,0x02,0xf0,0xfc,0x02,0x83,0xf8,
++0x33,0x20,0x00,0x22,0x83,0xf8,0x30,0x20,0x00,0x20,0x38,0xbd,0x01,0xf1,0xc0,0x41,
++0xff,0xf7,0xa6,0xff,0xf8,0xe7,0x00,0xbf,0x00,0x00,0x02,0x40,0x10,0x4b,0x93,0xf8,
++0x43,0x20,0x00,0x28,0x42,0xf0,0x08,0x02,0x83,0xf8,0x43,0x20,0x14,0xbf,0xc0,0x22,
++0x80,0x22,0x01,0x29,0x0d,0xd1,0xb7,0x21,0x99,0x75,0x9a,0x77,0x9a,0x7f,0x11,0x06,
++0xfc,0xd4,0x07,0x4a,0x92,0xf8,0x43,0x30,0x03,0xf0,0xf7,0x03,0x82,0xf8,0x43,0x30,
++0x70,0x47,0xe9,0x21,0x99,0x75,0x9a,0x77,0x9a,0x7f,0x12,0x06,0xfc,0xd4,0xf0,0xe7,
++0x00,0x00,0x02,0x40,0x01,0x28,0x0e,0xd1,0x07,0x4b,0x00,0x22,0x1a,0x70,0x28,0x22,
++0x1a,0x77,0xa3,0xf5,0x23,0x23,0x03,0x22,0x5a,0x70,0x1a,0x7d,0x42,0xf0,0xc0,0x02,
++0x1a,0x75,0xff,0xf7,0xcb,0xbf,0x70,0x47,0x00,0x30,0x0c,0x40,0x2d,0xe9,0xf0,0x4f,
++0x87,0x4d,0x14,0x22,0x00,0x21,0xcd,0xb0,0x28,0x46,0x00,0xf0,0x1d,0xfa,0x85,0x48,
++0x4f,0xf4,0x80,0x52,0x00,0x21,0x00,0xf0,0x17,0xfa,0x00,0x23,0x2b,0x70,0x2b,0x78,
++0x00,0x2b,0xfc,0xd0,0xab,0x78,0x01,0x2b,0xdc,0xb2,0x02,0xd9,0xff,0x23,0x2b,0x70,
++0xfe,0xe7,0x6b,0x78,0x04,0x2b,0x06,0xd8,0xdf,0xe8,0x13,0xf0,0x08,0x00,0xac,0x00,
++0xfa,0x00,0xbe,0x01,0xca,0x01,0xff,0x20,0x28,0x70,0xfe,0xe7,0x01,0x2c,0x76,0x4b,
++0x38,0xd0,0x40,0x22,0x1a,0x70,0x10,0x22,0x1a,0x77,0xa3,0xf5,0x23,0x23,0x93,0xf8,
++0x43,0x20,0x42,0xf0,0x08,0x02,0x83,0xf8,0x43,0x20,0x03,0x22,0xda,0x77,0x9f,0x22,
++0x9a,0x75,0x00,0x22,0x9a,0x76,0xda,0x76,0x1a,0x77,0x83,0x22,0x9a,0x77,0x9a,0x7f,
++0x10,0x06,0xfc,0xd4,0x03,0x22,0xda,0x77,0x93,0xf8,0x43,0x20,0x02,0xf0,0xf7,0x02,
++0x83,0xf8,0x43,0x20,0x98,0x7e,0xda,0x7e,0x19,0x7f,0x13,0x02,0x43,0xea,0x00,0x43,
++0x0b,0x43,0xd0,0xd0,0x6f,0xf0,0x7f,0x42,0x93,0x42,0xcc,0xd0,0x5d,0x4a,0xd9,0xb2,
++0x11,0x70,0xc3,0xf3,0x07,0x21,0x1b,0x0c,0x51,0x70,0x93,0x70,0x00,0x23,0xd3,0x70,
++0x13,0x72,0xaa,0xe7,0x59,0x4c,0x00,0x26,0x28,0x22,0x1e,0x70,0x31,0x46,0x1a,0x77,
++0x0c,0xa8,0x5a,0x23,0x10,0x22,0x0a,0x93,0x8d,0xf8,0x2c,0x60,0x00,0xf0,0xb4,0xf9,
++0x94,0xf8,0x43,0x30,0x43,0xf0,0x08,0x03,0x84,0xf8,0x43,0x30,0x03,0x23,0xe3,0x77,
++0x9f,0x23,0xa3,0x75,0xc3,0x23,0xa6,0x76,0xe6,0x76,0x26,0x77,0xa3,0x77,0xa3,0x7f,
++0x19,0x06,0xfc,0xd4,0x47,0x4e,0x23,0x7f,0x33,0x70,0xe3,0x7e,0x73,0x70,0xa3,0x7e,
++0xb3,0x70,0x10,0x22,0x0c,0xa9,0x0a,0xa8,0xff,0xf7,0x68,0xfe,0x9d,0xf8,0x30,0x30,
++0x53,0x2b,0x90,0xd1,0x9d,0xf8,0x31,0x30,0x46,0x2b,0x8c,0xd1,0x9d,0xf8,0x32,0x30,
++0x44,0x2b,0x88,0xd1,0x9d,0xf8,0x33,0x30,0x50,0x2b,0x84,0xd1,0x9d,0xf8,0x3e,0x30,
++0x8d,0xf8,0x29,0x30,0xbd,0xf8,0x3c,0x30,0x08,0x22,0x5b,0xba,0x0a,0xa8,0xad,0xf8,
++0x2a,0x30,0xff,0xf7,0x4b,0xfe,0x9d,0xf9,0x37,0x30,0x00,0x2b,0xff,0xf6,0x73,0xaf,
++0x0d,0x9b,0x01,0x33,0xdb,0x10,0x1a,0x0a,0x33,0x71,0x72,0x71,0x1a,0x0c,0x1b,0x0e,
++0xf3,0x71,0x9d,0xf8,0x32,0x30,0xb2,0x71,0x13,0xf0,0x03,0x03,0x18,0xbf,0x01,0x23,
++0x33,0x72,0x03,0x23,0xe3,0x77,0x94,0xf8,0x43,0x30,0x03,0xf0,0xf7,0x03,0x84,0xf8,
++0x43,0x30,0x42,0xe7,0xe9,0x78,0x20,0x46,0xff,0xf7,0x1c,0xff,0xa9,0x68,0xea,0x78,
++0x22,0x4b,0x02,0xf0,0xff,0x07,0x2a,0xb1,0x93,0xf8,0x33,0x20,0x42,0xf0,0x01,0x02,
++0x83,0xf8,0x33,0x20,0x93,0xf8,0x43,0x20,0x42,0xf0,0x08,0x02,0x83,0xf8,0x43,0x20,
++0x00,0x2c,0x1a,0x4b,0x14,0xbf,0xc0,0x22,0x80,0x22,0x06,0x20,0x98,0x75,0x9a,0x77,
++0x9a,0x7f,0x12,0x06,0xfc,0xd4,0x15,0x4e,0x59,0x63,0x00,0x2c,0x14,0xbf,0xc8,0x23,
++0x88,0x23,0x20,0x22,0xb2,0x75,0xb3,0x77,0xb3,0x7f,0x1b,0x06,0xfc,0xd4,0xa0,0x01,
++0x4f,0xf4,0xfa,0x71,0x00,0xf0,0xc0,0x00,0xff,0xf7,0xda,0xfd,0x96,0xf8,0x43,0x30,
++0x03,0xf0,0xf7,0x03,0x86,0xf8,0x43,0x30,0x2f,0xb1,0x96,0xf8,0x33,0x30,0x03,0xf0,
++0xfe,0x03,0x86,0xf8,0x33,0x30,0xc0,0xb2,0x00,0x28,0x3f,0xf4,0xfe,0xae,0x13,0xe7,
++0x00,0x00,0x0c,0x20,0x14,0x00,0x0c,0x20,0x00,0x30,0x0c,0x40,0x00,0x00,0x02,0x40,
++0xe9,0x78,0x20,0x46,0xff,0xf7,0xce,0xfe,0xd5,0xf8,0x08,0x90,0xd5,0xf8,0x0c,0x80,
++0xea,0x78,0x7f,0x4b,0x5f,0xfa,0x89,0xf7,0xc7,0xf5,0x80,0x77,0xbf,0xb2,0x02,0xf0,
++0xff,0x0a,0x2a,0xb1,0x93,0xf8,0x33,0x20,0x42,0xf0,0x01,0x02,0x83,0xf8,0x33,0x20,
++0x93,0xf8,0x43,0x20,0x77,0x4e,0x42,0xf0,0x08,0x02,0x83,0xf8,0x43,0x20,0x84,0xf0,
++0x01,0x03,0x03,0xf0,0x01,0x03,0x00,0x2b,0x14,0xbf,0x80,0x22,0xc0,0x22,0x04,0x92,
++0x14,0xbf,0x02,0x22,0x01,0x22,0xba,0xf1,0x00,0x0f,0x05,0x92,0x4f,0xea,0x84,0x14,
++0x14,0xbf,0x12,0x22,0x02,0x22,0x00,0x2b,0x14,0xbf,0xa8,0x23,0xe8,0x23,0xe1,0xb2,
++0x67,0x4c,0x06,0x92,0x07,0x93,0x15,0xbf,0xa0,0x22,0xe0,0x22,0xac,0x23,0xec,0x23,
++0x03,0x91,0x4f,0xf0,0x03,0x0b,0xb8,0xf1,0x00,0x0f,0x5a,0xd0,0x4f,0xf0,0x06,0x01,
++0x84,0xf8,0x1f,0xb0,0x47,0x45,0xa1,0x75,0x04,0x99,0xa1,0x77,0x28,0xbf,0x47,0x46,
++0x1f,0xfa,0x87,0xfc,0xa1,0x7f,0x08,0x06,0xfc,0xd4,0xba,0xf1,0x00,0x0f,0x05,0xd1,
++0x94,0xf8,0x33,0x10,0x01,0xf0,0xfe,0x01,0x84,0xf8,0x33,0x10,0x05,0x99,0xe1,0x77,
++0xc4,0xf8,0x34,0x90,0x06,0x99,0xa1,0x75,0x07,0x99,0xa1,0x77,0xa1,0x7f,0x09,0x06,
++0xfc,0xd4,0x94,0xf8,0x33,0x10,0x41,0xf0,0x01,0x01,0x84,0xf8,0x33,0x10,0x4f,0xf0,
++0x00,0x0e,0xa7,0xeb,0x0e,0x01,0x08,0x29,0x39,0xdc,0x04,0x29,0xc8,0xbf,0x05,0x21,
++0xa0,0x7f,0x00,0x06,0xfc,0xd4,0x30,0x78,0xa0,0x75,0x09,0x29,0x31,0xd1,0xd6,0xf8,
++0x01,0x00,0x00,0xba,0x60,0x63,0x70,0x79,0xa0,0x76,0xb0,0x79,0xe0,0x76,0xf0,0x79,
++0x20,0x77,0x30,0x7a,0x60,0x77,0xa3,0x77,0x0e,0x44,0x71,0x44,0x1f,0xfa,0x81,0xfe,
++0xf4,0x45,0xde,0xd8,0xa1,0x7f,0x09,0x06,0xfc,0xd4,0xcd,0xe9,0x08,0x32,0x84,0xf8,
++0x1f,0xb0,0x03,0x98,0x32,0x21,0xff,0xf7,0x23,0xfd,0x00,0x28,0xdd,0xe9,0x08,0x32,
++0x1c,0xda,0x33,0x4b,0x93,0xf8,0x43,0x20,0x02,0xf0,0xf7,0x02,0x83,0xf8,0x43,0x20,
++0x93,0xf8,0x33,0x20,0x02,0xf0,0xfe,0x02,0x83,0xf8,0x33,0x20,0x45,0xe6,0x09,0x21,
++0xc6,0xe7,0x70,0x78,0xa0,0x76,0xb0,0x78,0xe0,0x76,0xf0,0x78,0x20,0x77,0x30,0x79,
++0x60,0x77,0x48,0x1e,0x10,0x43,0xc0,0xb2,0xa0,0x77,0xcd,0xe7,0xb9,0x44,0xa8,0xeb,
++0x07,0x08,0x4f,0xf4,0x80,0x77,0x7e,0xe7,0xe9,0x78,0x20,0x46,0xff,0xf7,0x0a,0xfe,
++0xa9,0x68,0xeb,0x68,0xea,0x78,0x00,0x92,0x1e,0x4a,0xff,0xf7,0xb3,0xfd,0x22,0xe7,
++0xe9,0x78,0xdf,0xf8,0x70,0xa0,0x20,0x46,0xff,0xf7,0xfc,0xfd,0x4f,0xf4,0x80,0x72,
++0x00,0x21,0x0c,0xa8,0xd5,0xf8,0x08,0x90,0xee,0x68,0x95,0xf8,0x03,0x80,0x00,0xf0,
++0x2b,0xf8,0x5f,0xfa,0x88,0xf8,0x00,0x27,0x0e,0xb9,0x30,0x46,0x0b,0xe7,0xb6,0xf5,
++0x80,0x7f,0xb3,0x46,0x28,0xbf,0x4f,0xf4,0x80,0x7b,0xcd,0xf8,0x00,0x80,0x5b,0x46,
++0x0c,0xaa,0x09,0xeb,0x07,0x01,0x20,0x46,0xff,0xf7,0x8c,0xfd,0x00,0x28,0x7f,0xf4,
++0xfa,0xae,0x5a,0x46,0x0c,0xa9,0x0a,0xeb,0x07,0x00,0x00,0xf0,0x65,0xf8,0x18,0xb9,
++0x5f,0x44,0xa6,0xeb,0x0b,0x06,0xdf,0xe7,0x4f,0xf0,0xff,0x30,0xeb,0xe6,0x00,0xbf,
++0x00,0x00,0x02,0x40,0x14,0x00,0x0c,0x20,0xf0,0xb5,0x05,0x00,0x83,0x07,0x4d,0xd0,
++0x54,0x1e,0x00,0x2a,0x47,0xd0,0x0a,0x06,0x03,0x00,0x03,0x26,0x12,0x0e,0x02,0xe0,
++0x01,0x35,0x01,0x3c,0x3f,0xd3,0x01,0x33,0x2a,0x70,0x33,0x42,0xf8,0xd1,0x03,0x2c,
++0x30,0xd9,0xff,0x22,0x0a,0x40,0x15,0x02,0xad,0x18,0x2a,0x04,0xad,0x18,0x0f,0x2c,
++0x37,0xd9,0x27,0x00,0x10,0x3f,0x3f,0x09,0x3e,0x01,0xb4,0x46,0x1e,0x00,0x1a,0x00,
++0x10,0x36,0x66,0x44,0x15,0x60,0x55,0x60,0x95,0x60,0xd5,0x60,0x10,0x32,0x96,0x42,
++0xf8,0xd1,0x01,0x37,0x3f,0x01,0xdb,0x19,0x0f,0x27,0x0c,0x22,0x27,0x40,0x22,0x40,
++0x3c,0x00,0x00,0x2a,0x0e,0xd0,0x3e,0x1f,0xb6,0x08,0xb4,0x00,0xa4,0x46,0x1a,0x00,
++0x1c,0x1d,0x64,0x44,0x20,0xc2,0xa2,0x42,0xfc,0xd1,0x03,0x24,0x01,0x36,0xb6,0x00,
++0x9b,0x19,0x3c,0x40,0x00,0x2c,0x06,0xd0,0x09,0x06,0x09,0x0e,0x1c,0x19,0x19,0x70,
++0x01,0x33,0x9c,0x42,0xfb,0xd1,0xf0,0xbc,0x02,0xbc,0x08,0x47,0x03,0x00,0x14,0x00,
++0xbd,0xe7,0x27,0x00,0xdf,0xe7,0xc0,0x46,0x30,0xb5,0x03,0x2a,0x1a,0xd9,0x0b,0x00,
++0x03,0x43,0x9b,0x07,0x11,0xd0,0x55,0x1e,0x00,0x23,0x03,0xe0,0x5a,0x1c,0x9d,0x42,
++0x13,0xd0,0x13,0x00,0xc2,0x5c,0xcc,0x5c,0xa2,0x42,0xf7,0xd0,0x10,0x1b,0x0d,0xe0,
++0x04,0x3a,0x04,0x30,0x04,0x31,0x03,0x2a,0x04,0xd9,0x04,0x68,0x0b,0x68,0x9c,0x42,
++0xf6,0xd0,0xe8,0xe7,0x55,0x1e,0x00,0x2a,0xe6,0xd1,0x00,0x20,0x30,0xbc,0x02,0xbc,
++0x08,0x47,0xc0,0x46,
+diff --git a/contrib/loaders/flash/nct_esio/nct6692d_fiu_flash.c b/contrib/loaders/flash/nct_esio/nct6692d_fiu_flash.c
+new file mode 100644
+index 000000000..68d97640c
+--- /dev/null
++++ b/contrib/loaders/flash/nct_esio/nct6692d_fiu_flash.c
+@@ -0,0 +1,690 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++
++#include <stdint.h>
++#include <string.h>
++#include "nct6692d_flash.h"
++
++/* flashloader parameter structure */
++__attribute__ ((section(".buffers.g_cfg")))
++static volatile struct nct_esio_flash_params g_cfg;
++
++/* data buffer */
++__attribute__ ((section(".buffers.g_buf")))
++static volatile uint8_t g_buf[0x1000];
++
++static inline uint32_t __REV(uint32_t value) {
++    return ((value & 0xFF000000) >> 24) |
++           ((value & 0x00FF0000) >> 8)  |
++           ((value & 0x0000FF00) << 8)  |
++           ((value & 0x000000FF) << 24);
++}
++
++static void delay(uint32_t i)
++{
++	while (i--)
++		__asm__ volatile ("nop");
++}
++
++static void UMA_ExeCmd(FIU_T *fiu, enum flash_command cmd, uint8_t sts)
++{
++	fiu->UMA_CODE = cmd;
++	fiu->UMA_CTS = sts;
++	while (fiu->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++}
++
++/* timeout_ms: 0 means waiting forever until busy flag is released. */
++static int UMA_WaitFlashReady(FIU_T *fiu, uint8_t flash_sel, uint32_t timeout_ms)
++{
++	uint32_t countdownTick = timeout_ms * 20; // 1ms => 1000us / 50us = 20 tick
++
++	while(1) {
++		delay(2399); // 50us @ 48MHz
++		UMA_ExeCmd(fiu, FLASH_CMD_READ_STATUS_REG, (FIU_UMA_CTS_EXEC_DONE_Msk | flash_sel | 1));
++		if ((fiu->UMA_DB0 & 0x01) == 0) break;
++		if (countdownTick == 0) continue;
++		if (--countdownTick == 0) return -1;
++	}
++
++	return 0;
++}
++
++void gdma_memcpy_u8(uint8_t* dst, uint8_t* src, uint32_t cpylen)
++{
++	if (cpylen == 0) return;
++
++	GDMA_SRCB0 = (uint32_t)src;
++	GDMA_DSTB0 = (uint32_t)dst;
++	GDMA_TCNT0 = cpylen;
++	GDMA_CTL0 = 0x10001;
++
++	while (GDMA_CTL0 & 0x1);
++	GDMA_CTL0 = 0;
++}
++
++void gdma_memcpy_burst_u32(uint8_t* dst, uint8_t* src, uint32_t cpylen)
++{
++	uint32_t rlen;
++
++	if(cpylen == 0) return;
++
++	/* src and dst address must 16byte aligned */
++	if (((uint32_t)src & 0x0F) || ((uint32_t)dst & 0xF)) {
++
++		gdma_memcpy_u8(dst, src, cpylen);
++
++		return;
++	}
++
++	/* aligned 64Byte length */
++	rlen = cpylen & 0xFFFFFFC0;
++	if (rlen) {
++		FIU0->BURST_CFG = 0x0B;
++
++		GDMA_SRCB0 = (uint32_t)src;
++		GDMA_DSTB0 = (uint32_t)dst;
++		GDMA_TCNT0 = rlen/16;
++		GDMA_CTL0 = 0x12201;
++
++		while (GDMA_CTL0 & 0x1);
++		GDMA_CTL0 = 0;
++
++		FIU0->BURST_CFG = 0x03;
++
++		src += rlen;
++		dst += rlen;
++		cpylen -= rlen;
++	}
++
++	/* remain length */
++	if (cpylen) {
++		gdma_memcpy_u8(dst, src, cpylen);
++	}
++}
++
++static int fiu_dual_io_read(enum flash_port port, uint32_t addr, uint8_t* buff, uint32_t len, uint8_t adr_4b)
++{
++	if (port == FLASH_PORT_SHD) {
++		if (adr_4b) {
++			FIU0->EXT_CFG |= (FIU_EXT_CFG_SET_CMD_EN_Msk | FIU_EXT_CFG_FOUR_BADDR_Msk);
++			FIU0->RD_CMD = FLASH_CMD_4BYTE_DUAL_IO_READ;
++		}
++
++		gdma_memcpy_burst_u32(buff, (uint8_t*)(addr + 0x64000000), len);
++
++		if (adr_4b) {
++			FIU0->EXT_CFG &= ~(FIU_EXT_CFG_SET_CMD_EN_Msk | FIU_EXT_CFG_FOUR_BADDR_Msk);
++			FIU0->RD_CMD = 0;
++		}
++	} else {
++		gdma_memcpy_burst_u32(buff, (uint8_t*)(addr + 0x60000000), len);
++	}
++
++	return 0;
++}
++
++static int FIU_Verify(enum flash_port port, uint32_t addr, uint8_t *data, uint32_t len, uint8_t FourByteMode)
++{
++	uint8_t read_buf[256] = {0};
++	uint32_t offset = 0;
++	int ret = 0;
++
++	while (len > 0) {
++		uint32_t chunk_size = (len > 256) ? 256 : len;
++
++		ret = fiu_dual_io_read(port, addr + offset, read_buf, chunk_size, FourByteMode);
++		if (ret != 0) {
++			return ret;
++		}
++
++		if (memcmp(data + offset, read_buf, chunk_size) != 0) {
++			return -1; // Verification failed
++		}
++
++		offset += chunk_size;
++		len -= chunk_size;
++	}
++
++	return 0; // Verification successful
++}
++
++static int FIU_PageProgram(enum flash_port port, uint32_t addr, uint8_t *data, uint32_t len, uint8_t FourByteMode)
++{
++	uint16_t dataCnt = 0;
++	uint16_t maxBytes = 256 - (addr % 256);
++	uint16_t n;
++	uint32_t d_size = 0;
++	int ret = 0;
++
++	if (FourByteMode) {
++		FIU0->EXT_CFG |= FIU_EXT_CFG_FOUR_BADDR_Msk;
++	}
++
++	FIU_UMA_BLOCK(FIU0);
++#define UMA_TEST 2
++#if (UMA_TEST == 1)
++	while (len > 0) {
++		n = (len <= maxBytes) ? len : maxBytes;
++
++		FIU0->UMA_ECTS = (BIT0 | BIT1);
++		UMA_ExeCmd(FIU0, FLASH_CMD_WRITE_ENABLE, (FIU_UMA_CTS_EXEC_DONE_Msk | \
++							  ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk))));
++
++		FIU0->UMA_ECTS = ((port == FLASH_PORT_PVT) ? BIT1 : BIT0);  // keep CS low
++		FIU0->UMA_AB0_3 = addr;
++		FIU0->UMA_CODE = (FourByteMode) ? FLASH_CMD_4BYTE_PROGRAM : FLASH_CMD_PAGE_PROGRAM;
++		FIU0->UMA_DB0 = *data++;
++		FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | FIU_UMA_CTS_RD_WR_Msk | FIU_UMA_CTS_A_SIZE_Msk | \
++				 ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk)) | 1);
++		while (FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++
++		/* write data */
++		dataCnt = 1;
++		while (dataCnt < n) {
++			d_size = ((n - dataCnt) < 5) ? (n - dataCnt) : 5 ;
++
++			FIU0->UMA_CODE = data[0];
++			FIU0->UMA_DB0 = data[1];
++			FIU0->UMA_DB1 = data[2];
++			FIU0->UMA_DB2 = data[3];
++			FIU0->UMA_DB3 = data[4];
++
++			data += d_size;
++			dataCnt += d_size;
++
++			FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | FIU_UMA_CTS_RD_WR_Msk | \
++					 ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk)) | (d_size - 1));
++			while (FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++		}
++		FIU0->UMA_ECTS = (BIT0 | BIT1); // release CS
++
++		/* Wait flash is ready */
++		if ((ret = UMA_WaitFlashReady(FIU0, ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk)), 50)) < 0) break;
++
++		addr += n;      // adjust the addresses
++		len -= n;
++		maxBytes = 256;     // now we can do up to 256 bytes per loop
++	}
++#elif (UMA_TEST == 2)
++	while (len > 0) {
++		n = (len <= maxBytes) ? len : maxBytes;
++
++		FIU0->UMA_ECTS = (BIT0 | BIT1);
++		UMA_ExeCmd(FIU0, FLASH_CMD_WRITE_ENABLE, (FIU_UMA_CTS_EXEC_DONE_Msk | \
++							  ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk))));
++
++		if (!FourByteMode) FIU0->EXT_CFG &= ~(FIU_EXT_CFG_FOUR_BADDR_Msk);
++		FIU0->UMA_ECTS = ((port == FLASH_PORT_PVT) ? BIT1 : BIT0);  // keep CS low
++		FIU0->UMA_AB0_3 = addr;
++		FIU0->UMA_CODE = (FourByteMode) ? FLASH_CMD_4BYTE_PROGRAM : FLASH_CMD_PAGE_PROGRAM;
++		FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | FIU_UMA_CTS_RD_WR_Msk | FIU_UMA_CTS_A_SIZE_Msk | \
++				 ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk)) | 0);
++
++		while (FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++
++		FIU0->EXT_CFG |= FIU_EXT_CFG_FOUR_BADDR_Msk;
++		/* write data */
++		dataCnt = 0;
++
++		while (dataCnt < n) {
++			if ((n-dataCnt) >= 9) {
++				d_size = 9;
++			} else if ((n-dataCnt) < 5) {
++				d_size = (n-dataCnt);
++			} else {
++				d_size = 5;
++			}
++
++			while (FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++
++			if (d_size == 9) {
++				FIU0->UMA_CODE = data[0];
++				FIU0->UMA_AB0_3 = __REV(*(uint32_t*)&data[1]);
++				FIU0->UMA_DB0 = data[5];
++				FIU0->UMA_DB1 = data[6];
++				FIU0->UMA_DB2 = data[7];
++				FIU0->UMA_DB3 = data[8];
++				FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | FIU_UMA_CTS_RD_WR_Msk | FIU_UMA_CTS_A_SIZE_Msk | \
++						 ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk)) | 4);
++			}
++			else {
++				FIU0->UMA_CODE = data[0];
++				FIU0->UMA_DB0 = data[1];
++				FIU0->UMA_DB1 = data[2];
++				FIU0->UMA_DB2 = data[3];
++				FIU0->UMA_DB3 = data[4];
++				FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | FIU_UMA_CTS_RD_WR_Msk | \
++						 ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk)) | (d_size - 1));
++			}
++
++			data += d_size;
++			dataCnt += d_size;
++		}
++
++		while (FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++		FIU0->UMA_ECTS = (BIT0 | BIT1); // release CS
++
++		/* Wait flash is ready */
++		if ((ret = UMA_WaitFlashReady(FIU0, ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk)), 50)) < 0) break;
++
++		addr += n;      // adjust the addresses
++		len -= n;
++		maxBytes = 256;     // now we can do up to 256 bytes per loop
++	}
++#endif
++	FIU_UMA_UNBLOCK(FIU0);
++
++	FIU0->EXT_CFG &= ~(FIU_EXT_CFG_FOUR_BADDR_Msk);
++	return ret;
++}
++
++static int FIU_SectorErase(enum flash_port port, uint32_t addr, uint8_t FourByteMode)
++{
++	int ret;
++
++	if (FourByteMode) {
++		FIU0->EXT_CFG |= FIU_EXT_CFG_FOUR_BADDR_Msk;
++	}
++
++	FIU_UMA_BLOCK(FIU0);
++	// Write enable
++	UMA_ExeCmd(FIU0, FLASH_CMD_WRITE_ENABLE, (FIU_UMA_CTS_EXEC_DONE_Msk | ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk))));
++	// Set address
++	FIU0->UMA_AB0_3 = addr;
++	// Erase
++	UMA_ExeCmd(FIU0, FLASH_CMD_SECTOR_ERASE, (FIU_UMA_CTS_EXEC_DONE_Msk | FIU_UMA_CTS_A_SIZE_Msk | \
++						  ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk))));
++	// Wait flash is ready
++	ret = UMA_WaitFlashReady(FIU0, ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk)), 500);
++	FIU_UMA_UNBLOCK(FIU0);
++
++	if (FourByteMode) {
++		FIU0->EXT_CFG &= ~(FIU_EXT_CFG_FOUR_BADDR_Msk);
++	}
++
++	return ret;
++}
++
++static uint32_t halspi_rw(enum flash_port port, uint8_t *wr_buf, uint16_t wr_size, uint8_t *rd_buf, uint16_t rd_size)
++{
++	uint32_t len;
++	uint8_t* pspidat;
++	uint8_t cs_auto;
++	uint8_t a_size = 0;
++
++	if (wr_size == 0) {
++		return 0xFFFFFFFF;
++	}
++
++	a_size = 0;
++
++	if ((rd_size > 4) || (wr_size >= 5)) {
++		/* Read or write data, CS is manual control. */
++		FIU0->UMA_ECTS = (port == FLASH_PORT_PVT) ? FIU_UMA_ECTS_SW_CS1_Msk : FIU_UMA_ECTS_SW_CS0_Msk;
++		FIU0->MSR_IE_CFG |= FIU_MSR_IE_CGF_UMA_BLOCK_Msk;
++		cs_auto = 0;
++	} else {
++		/* Read or write instruction, CS is auto control. */
++		FIU0->UMA_ECTS = (FIU_UMA_ECTS_SW_CS1_Msk | FIU_UMA_ECTS_SW_CS0_Msk);
++		FIU0->MSR_IE_CFG &= ~FIU_MSR_IE_CGF_UMA_BLOCK_Msk;
++		cs_auto = 1;
++	}
++
++	/* Command code */
++	FIU0->UMA_CODE = *wr_buf++;
++
++	if (wr_size >= 4) {
++		/* address */
++		FIU0->UMA_AB2 = *wr_buf++;
++		FIU0->UMA_AB1 = *wr_buf++;
++		FIU0->UMA_AB0 = *wr_buf++;
++		wr_size -= 4;
++
++		if(cs_auto == 0) {
++			/* read or write data */
++			FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | \
++					 ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk)) | \
++					 FIU_UMA_CTS_A_SIZE_Msk);
++			while (FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++		} else {
++			/* erase command */
++			if ((wr_size == 0) && (rd_size == 0)) {
++				FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | \
++						 FIU_UMA_CTS_RD_WR_Msk | \
++						 ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk)) | \
++						 FIU_UMA_CTS_A_SIZE_Msk);
++				while (FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++			}
++
++			/* 4-byte erase command or read <= 4byte */
++			a_size = FIU_UMA_CTS_A_SIZE_Msk;
++		}
++	} else {
++		wr_size -= 1;
++
++		if(cs_auto == 0) {
++			//FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk |
++			//                 FIU_UMA_CTS_DEV_NUM_Msk);
++			//while(FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++		}
++		else {
++			/* Write status */
++			if((wr_size == 0) && (rd_size == 0)) {
++				FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | \
++						 FIU_UMA_CTS_RD_WR_Msk | \
++						 ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk)));
++				while (FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++			}
++		}
++	}
++
++	while (wr_size) {
++		if (cs_auto == 0) {
++			len = (wr_size >= 5)?(5):(wr_size);
++
++			FIU0->UMA_CODE = *wr_buf++;
++			FIU0->UMA_DB0 = *wr_buf++;
++			FIU0->UMA_DB1 = *wr_buf++;
++			FIU0->UMA_DB2 = *wr_buf++;
++			FIU0->UMA_DB3 = *wr_buf++;
++
++			/* Read per 4 byte */
++			FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | \
++					 FIU_UMA_CTS_RD_WR_Msk | \
++					 ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk)) | \
++					 (len - 1));
++
++			wr_size -= len;
++			while (FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++		} else {
++			len = wr_size;
++			pspidat = (uint8_t*)(&(FIU0->UMA_DB0));
++
++			while (len--) {
++				*pspidat++ = *wr_buf++;
++			}
++
++			/* write per < 4 byte */
++			FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | \
++					 FIU_UMA_CTS_RD_WR_Msk | a_size | \
++					 ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk)) | \
++					 (wr_size));
++
++			wr_size = 0;
++			while (FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++		}
++	}
++
++	while (rd_size) {
++		if(rd_size > 4) {
++			/* Read per 4 byte */
++			FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | \
++					 FIU_UMA_CTS_C_SIZE_Msk | \
++					 ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk)) | \
++					 4);
++			rd_size -= 4;
++			while (FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++			*rd_buf++ = FIU0->UMA_DB0;
++			*rd_buf++ = FIU0->UMA_DB1;
++			*rd_buf++ = FIU0->UMA_DB2;
++			*rd_buf++ = FIU0->UMA_DB3;
++		} else {
++			/* Read per 4 byte */
++			if (cs_auto == 0) {
++				FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | \
++						 FIU_UMA_CTS_C_SIZE_Msk | \
++						 ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk)) | \
++						 (rd_size & 0x07));
++
++				while (FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++			} else {
++				/* total rd_len < 4 */
++				FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | \
++						 ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk)) | \
++						 a_size | \
++						 (rd_size & 0x07));
++
++				while (FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++			}
++
++			pspidat = (uint8_t*)(&(FIU0->UMA_DB0));
++			while (rd_size--) {
++				*rd_buf++ = *pspidat++;
++			}
++
++			rd_size = 0;
++		}
++	}
++
++	if (cs_auto == 0) {
++		// CS_HIGH
++		FIU0->UMA_ECTS = (FIU_UMA_ECTS_SW_CS1_Msk | FIU_UMA_ECTS_SW_CS0_Msk);
++		FIU0->MSR_IE_CFG &= ~FIU_MSR_IE_CGF_UMA_BLOCK_Msk;
++	}
++
++	return 0;
++}
++
++static uint8_t fiu_get_flash_info(enum flash_port port, uint8_t *buf)
++{
++	uint32_t flash_size;
++	uint8_t wr_buf[5] = {0x5A, 0, 0, 0, 0};
++	uint8_t rd_buf[0x10] = {0};
++
++	FIU_UMA_BLOCK(FIU0);
++	FIU0->UMA_ECTS = (BIT0 | BIT1);
++
++	/* Read JEDEC ID */
++	FIU0->UMA_CODE = FLASH_CMD_READ_JEDEC_ID;
++	FIU0->UMA_DB0 = 0;
++	FIU0->UMA_DB1 = 0;
++	FIU0->UMA_DB2 = 0;
++
++	FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk)) | 3);
++	while(FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++
++	buf[0] = FIU0->UMA_DB2; // Manufacturer ID
++	buf[1] = FIU0->UMA_DB1; // Memory Type
++	buf[2] = FIU0->UMA_DB0; // Capacity
++
++	/* Read SFDP header */
++	// TODO: Implement SFDP reading using halspi_rw or direct UMA commands
++	halspi_rw(port, wr_buf, 5, rd_buf, 16);
++
++	/* Check the SFDP header */
++	if (!(rd_buf[0] == 'S' && rd_buf[1] == 'F' && rd_buf[2] == 'D' && rd_buf[3] == 'P'))
++		return 0xFF;
++
++	/* Access SFDP parameter table */
++	wr_buf[0] = 0x5A;
++	wr_buf[1] = rd_buf[0xE];
++	wr_buf[2] = rd_buf[0xD];
++	wr_buf[3] = rd_buf[0xC];
++	wr_buf[4] = 0x00;
++
++	halspi_rw(port, wr_buf, 5, rd_buf, 8);
++
++	/* Get the Flash memory density */
++	if (rd_buf[7] & 0x80)
++		return 0xFF;
++
++	flash_size = ((rd_buf[4] | (rd_buf[5] << 8) | (rd_buf[6] << 16) | (rd_buf[7] << 24)) + 1) >> 3;
++	buf[4] = flash_size & 0xFF;
++	buf[5] = (flash_size >> 8) & 0xFF;
++	buf[6] = (flash_size >> 16) & 0xFF;
++	buf[7] = (flash_size >> 24) & 0xFF;
++
++	/* Verify if the flash supports 4-byte addressing mode */
++	buf[8] = (rd_buf[2] & 0x03) ? 1 : 0;
++
++	FIU0->UMA_ECTS = (BIT0 | BIT1); // release CS
++	FIU_UMA_UNBLOCK(FIU0);
++
++	return 0;
++}
++
++static uint32_t FIU_GetID(enum flash_port port)
++{
++	FIU_UMA_BLOCK(FIU0);
++
++	FIU0->UMA_ECTS = (BIT0 | BIT1);
++
++	FIU0->UMA_CODE = FLASH_CMD_READ_JEDEC_ID;
++	FIU0->UMA_DB0 = 0;
++	FIU0->UMA_DB1 = 0;
++	FIU0->UMA_DB2 = 0;
++
++	FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk)) | 3);
++	while(FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++
++	FIU0->UMA_ECTS = (BIT0 | BIT1); // release CS
++
++	FIU_UMA_UNBLOCK(FIU0);
++
++	return (((FIU0->UMA_DB0) << 16) | ((FIU0->UMA_DB1) << 8) | (FIU0->UMA_DB2));
++}
++
++static void PinSelect(enum flash_port port)
++{
++	switch (port) {
++	case FLASH_PORT_PVT:
++		SCFG->DEVCNT = 0x40;
++		SCFG->DEVALTC = 0x10;
++		break;
++        case FLASH_PORT_SHD:
++		SCFG->DEVCNT = 0x00;
++		SCFG->DEVALTC = 0x28;
++		break;
++        default:
++		break;
++	}
++}
++
++void FIU_4ByteMode(enum flash_port port, uint8_t enter)
++{
++	FIU_UMA_BLOCK(FIU0);
++	if (enter == 1)
++	{
++		// Enter 4-byte Address mode
++		UMA_ExeCmd(FIU0, FLASH_CMD_ENTER_4BYTE_MODE, (FIU_UMA_CTS_EXEC_DONE_Msk | \
++							      ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk))));
++		// Switch FIU to 4byte mode
++		//FIU_ADR_4BYTE_ENABLE(FIU0, FASTREAD_DUAL_4B);
++	}
++	else
++	{
++		// Exit 4-byte Address mode
++		UMA_ExeCmd(FIU0, FLASH_CMD_EXIT_4BYTE_MODE, (FIU_UMA_CTS_EXEC_DONE_Msk | \
++							     ((port == FLASH_PORT_PVT) ? 0 : (FIU_UMA_CTS_DEV_NUM_Msk))));
++		// Switch FIU to 3byte mode
++		//FIU_ADR_4BYTE_DISABLE(FIU0);
++	}
++	FIU_UMA_UNBLOCK(FIU0);
++}
++
++static void fiu_port_init(enum flash_port port, uint8_t adr_4b)
++{
++	if (port != FLASH_PORT_SHD) return;
++
++	PinSelect(port);
++        FIU0->BURST_CFG = 3;
++        FIU_RD_MODE_FAST_RD_DUAL_IO(FIU0);
++	FIU_4ByteMode(port, adr_4b);
++}
++
++static void flashloader_init(void)
++{
++	/* Initialize the flashloader parameters and buffer */
++	memset((struct nct_esio_flash_params *)&g_cfg, 0, sizeof(struct nct_esio_flash_params));
++	memset((uint8_t *)g_buf, 0, sizeof(g_buf));
++	g_cfg.state = FLASH_ALGO_STATE_IDLE;
++}
++
++int main(void)
++{
++	uint8_t status;
++	uint32_t id;
++
++	flashloader_init();
++
++	while (1) {
++		enum flash_port port;
++
++		while (g_cfg.state == FLASH_ALGO_STATE_IDLE);
++		port = g_cfg.type;
++		if (port != FLASH_PORT_PVT && port != FLASH_PORT_SHD) {
++			g_cfg.state = 0xFF;
++			while (1);
++		}
++
++		switch (g_cfg.cmd) {
++		case FLASH_ALGO_CMD_INIT:
++			PinSelect(port);
++			if (port == FLASH_PORT_PVT) {
++				id = FIU_GetID(port);
++				if (id == 0 || id == 0xFFFFFF) {
++					status = 0xFF;
++				} else {
++					g_buf[0] = id & 0xff;
++					g_buf[1] = (id >> 8) & 0xff;
++					g_buf[2] = (id >> 16) & 0xff;
++					g_buf[3] = 0x00;
++					g_buf[8] = 0;
++					status = 0;
++				}
++			} else if (port == FLASH_PORT_SHD) {
++				status = fiu_get_flash_info(port, (uint8_t *)g_buf);
++			} else {
++				status = 0xFF;
++			}
++
++			break;
++		case FLASH_ALGO_CMD_ERASE:
++			fiu_port_init(port, g_cfg.adr_4b);
++			status = FIU_SectorErase(port, g_cfg.addr, g_cfg.adr_4b);
++			break;
++		case FLASH_ALGO_CMD_PROGRAM:
++			fiu_port_init(port, g_cfg.adr_4b);
++			status = FIU_PageProgram(port, g_cfg.addr, (uint8_t *)g_buf, g_cfg.len, g_cfg.adr_4b);
++			status = 0;
++			break;
++		case FLASH_ALGO_CMD_READ:
++			fiu_port_init(port, g_cfg.adr_4b);
++			status = fiu_dual_io_read(port, g_cfg.addr, (uint8_t *)g_buf, g_cfg.len, g_cfg.adr_4b);
++			break;
++		case FLASH_ALGO_CMD_VERIFY:
++			fiu_port_init(port, g_cfg.adr_4b);
++			status = FIU_Verify(port, g_cfg.addr, (uint8_t *)g_buf, g_cfg.len, g_cfg.adr_4b);
++			break;
++		default:
++			status = 0xff;
++			break;
++		}
++
++		if (status != 0) {
++			g_cfg.state = status;
++			while (1);
++		} else {
++			g_cfg.state = FLASH_ALGO_STATE_IDLE;
++		}
++	}
++	return 0;
++}
++
++__attribute__ ((section(".stack")))
++__attribute__ ((used))
++static uint32_t stack[400 / 4];
++extern uint32_t _estack;
++extern uint32_t _bss;
++extern uint32_t _ebss;
++
++__attribute__ ((section(".entry")))
++void entry(void)
++{
++	/* set sp from end of stack */
++	__asm(" ldr sp, =_estack - 4");
++
++	main();
++
++	__asm(" bkpt #0x00");
++}
++
+diff --git a/contrib/loaders/flash/nct_esio/nct6692d_flash.h b/contrib/loaders/flash/nct_esio/nct6692d_flash.h
+new file mode 100644
+index 000000000..e46953ec1
+--- /dev/null
++++ b/contrib/loaders/flash/nct_esio/nct6692d_flash.h
+@@ -0,0 +1,274 @@
++/* SPDX-License-Identifier: GPL-2.0-or-later */
++
++#ifndef OPENOCD_LOADERS_FLASH_NCT_ESIO_NCT6692D_FLASH_H
++#define OPENOCD_LOADERS_FLASH_NCT_ESIO_NCT6692D_FLASH_H
++
++/* Define one bit mask */
++#define BIT0	(0x00000001)	///< Bit 0 mask of an 32 bit integer
++#define BIT1	(0x00000002)	///< Bit 1 mask of an 32 bit integer
++#define BIT2	(0x00000004)	///< Bit 2 mask of an 32 bit integer
++#define BIT3	(0x00000008)	///< Bit 3 mask of an 32 bit integer
++#define BIT4	(0x00000010)	///< Bit 4 mask of an 32 bit integer
++#define BIT5	(0x00000020)	///< Bit 5 mask of an 32 bit integer
++#define BIT6	(0x00000040)	///< Bit 6 mask of an 32 bit integer
++#define BIT7	(0x00000080)	///< Bit 7 mask of an 32 bit integer
++#define BIT8	(0x00000100)	///< Bit 8 mask of an 32 bit integer
++#define BIT9	(0x00000200)	///< Bit 9 mask of an 32 bit integer
++#define BIT10	(0x00000400)	///< Bit 10 mask of an 32 bit integer
++#define BIT11	(0x00000800)	///< Bit 11 mask of an 32 bit integer
++#define BIT12	(0x00001000)	///< Bit 12 mask of an 32 bit integer
++#define BIT13	(0x00002000)	///< Bit 13 mask of an 32 bit integer
++#define BIT14	(0x00004000)	///< Bit 14 mask of an 32 bit integer
++#define BIT15	(0x00008000)	///< Bit 15 mask of an 32 bit integer
++#define BIT16	(0x00010000)	///< Bit 16 mask of an 32 bit integer
++#define BIT17	(0x00020000)	///< Bit 17 mask of an 32 bit integer
++#define BIT18	(0x00040000)	///< Bit 18 mask of an 32 bit integer
++#define BIT19	(0x00080000)	///< Bit 19 mask of an 32 bit integer
++#define BIT20	(0x00100000)	///< Bit 20 mask of an 32 bit integer
++#define BIT21	(0x00200000)	///< Bit 21 mask of an 32 bit integer
++#define BIT22	(0x00400000)	///< Bit 22 mask of an 32 bit integer
++#define BIT23	(0x00800000)	///< Bit 23 mask of an 32 bit integer
++#define BIT24	(0x01000000)	///< Bit 24 mask of an 32 bit integer
++#define BIT25	(0x02000000)	///< Bit 25 mask of an 32 bit integer
++#define BIT26	(0x04000000)	///< Bit 26 mask of an 32 bit integer
++#define BIT27	(0x08000000)	///< Bit 27 mask of an 32 bit integer
++#define BIT28	(0x10000000)	///< Bit 28 mask of an 32 bit integer
++#define BIT29	(0x20000000)	///< Bit 29 mask of an 32 bit integer
++#define BIT30	(0x40000000)	///< Bit 30 mask of an 32 bit integer
++#define BIT31	(0x80000000)	///< Bit 31 mask of an 32 bit integer
++
++#define RegSetBit(Reg, BitMsk)	{(Reg) |= (BitMsk);}					// Set register bit
++#define RegClrBit(Reg, BitMsk)	{(Reg) &= ~(BitMsk);}					// Clear register bit
++#define RegRepBit(Reg, BitMsk, BitMskVal) {(Reg) = ((Reg) & ~(BitMsk)) | (BitMskVal);}	// Replace register bit
++
++enum flash_algo_command {
++	FLASH_ALGO_CMD_INIT = 0,
++	FLASH_ALGO_CMD_ERASE,
++	FLASH_ALGO_CMD_PROGRAM,
++	FLASH_ALGO_CMD_READ,
++	FLASH_ALGO_CMD_VERIFY,
++};
++
++enum flash_algo_state {
++	FLASH_ALGO_STATE_IDLE = 0,
++	FLASH_ALGO_STATE_BUSY,
++};
++
++enum flash_port {
++	FLASH_PORT_PVT = 0,
++	FLASH_PORT_SHD,
++	FLASH_PORT_BKP,
++	FLASH_PORT_INTERNAL = 0xFF,
++};
++
++enum flash_mode {
++	FLASH_MODE_SINGLE,
++	FLASH_MODE_DUAL,
++	FLASH_MODE_QUAD,
++};
++
++enum flash_command {
++	FLASH_CMD_WRITE_STATUS_REG		= 0x01,
++	FLASH_CMD_PAGE_PROGRAM			= 0x02,
++	FLASH_CMD_READ_DATA			= 0x03,
++	FLASH_CMD_WRITE_DISABLE			= 0x04,
++	FLASH_CMD_READ_STATUS_REG		= 0x05,
++	FLASH_CMD_WRITE_ENABLE			= 0x06,
++	FLASH_CMD_4BYTE_PROGRAM			= 0x12,
++	FLASH_CMD_4BYTE_READ			= 0x13,
++	FLASH_CMD_SECTOR_ERASE			= 0x20,
++	FLASH_CMD_4BYTE_SECTOR_ERASE		= 0x21,
++	FLASH_CMD_READ_STATUS2_REG		= 0x35,
++	FLASH_CMD_ENTER_4BYTE_MODE		= 0xB7,
++	FLASH_CMD_4BYTE_DUAL_IO_READ		= 0xBC,
++	FLASH_CMD_EXIT_4BYTE_MODE		= 0xE9,
++	FLASH_CMD_READ_JEDEC_ID			= 0x9F,
++};
++
++/* Flash loader parameters */
++struct __attribute__((__packed__)) nct_esio_flash_params {
++	volatile uint8_t state;		/* Flash loader state */
++	volatile uint8_t cmd;		/* Flash loader command */
++	volatile uint8_t type;		/* Flash type */
++	volatile uint8_t adr_4b;	/* 4-byte address mode */
++	volatile uint32_t version;	/* Flash loader version */
++	volatile uint32_t addr; 	/* Address in flash */
++	volatile uint32_t len;  	/* Number of bytes */
++	volatile uint32_t reserved; /* Reserved */
++};
++
++/*==============================================================================================================*/
++/* FLASH INTERFACE UNIT	(FIU)											*/
++/*==============================================================================================================*/
++/**
++	@addtogroup FIU FLASH INTERFACE UNIT (FIU)
++	Memory Mapped Structure for FIU Controller
++@{ */
++
++typedef struct {
++	volatile uint8_t CFG;			/*!< [0x00]	FIU Configuration				*/
++	volatile uint8_t BURST_CFG;		/*!< [0x01]	Burst Configuration				*/
++	volatile uint8_t RESP_CFG;		/*!< [0x02]	FIU Response Configuration			*/
++	volatile uint8_t Reserved1[17];
++	volatile uint8_t SPI_FL_CFG;		/*!< [0x14]	SPI Flash Configuration				*/
++	volatile uint8_t Reserved2[1];
++	volatile uint8_t UMA_CODE;		/*!< [0x16]	UMA Code Byte					*/
++	volatile uint8_t UMA_AB0;		/*!< [0x17]	UMA Address Byte 0				*/
++	volatile uint8_t UMA_AB1;		/*!< [0x18]	UMA Address Byte 1				*/
++	volatile uint8_t UMA_AB2;		/*!< [0x19]	UMA Address Byte 2				*/
++	volatile uint8_t UMA_DB0;		/*!< [0x1A]	UMA Data Byte 0					*/
++	volatile uint8_t UMA_DB1;		/*!< [0x1B]	UMA Data Byte 1					*/
++	volatile uint8_t UMA_DB2;		/*!< [0x1C]	UMA Data Byte 2					*/
++	volatile uint8_t UMA_DB3;		/*!< [0x1D]	UMA Data Byte 3					*/
++	volatile uint8_t UMA_CTS;		/*!< [0x1E]	UMA Control and Status				*/
++	volatile uint8_t UMA_ECTS;		/*!< [0x1F]	UMA Extended  Control and Status		*/
++	volatile const uint32_t UMA_DB0_3;	/*!< [0x20]	UMA Data Bytes 0-3				*/
++	volatile uint8_t Reserved3[2];
++	volatile uint8_t CRCCON;		/*!< [0x26]	CRC Control Register				*/
++	volatile uint8_t CRCENT;		/*!< [0x27]	CRC Entry Register				*/
++	volatile uint32_t CRCRSLT;		/*!< [0x28]	CRC Initialization and Result Register		*/
++	volatile uint8_t Reserved4[4];
++	volatile uint8_t RD_CMD;		/*!< [0x30]	FIU Read Command				*/
++	volatile uint8_t Reserved5[1];
++	volatile uint8_t DMM_CYC;		/*!< [0x32]	FIU Dummy Cycles				*/
++	volatile uint8_t EXT_CFG;		/*!< [0x33]	FIU Extended Configuration			*/
++	volatile uint32_t UMA_AB0_3;		/*!< [0x34]	UMA Address Bytes 0-3				*/
++	volatile uint8_t Reserved6[9];
++	volatile uint8_t MI_CNT_THRSH;		/*!< [0x41]	Master Inactive Counter Threshold		*/
++	volatile uint8_t MSR_STS;		/*!< [0x42]	FIU Master Status				*/
++	volatile uint8_t MSR_IE_CFG;		/*!< [0x43]	FIU Master Interrupt Enable and Configuration	*/
++} FIU_T;
++#define FIU_BASE_ADDR(mdl)	(0x40020000 + ((mdl) * 0x1000L))	/*!< FLASH INTERFACE UNIT (FIU) */
++#define FIU0			((FIU_T *)	FIU_BASE_ADDR(0))
++
++// UMA
++#define FIU_UMA_BLOCK(fiu)                  {RegSetBit((fiu)->MSR_IE_CFG, FIU_MSR_IE_CGF_UMA_BLOCK_Msk);}
++#define FIU_UMA_UNBLOCK(fiu)                {RegClrBit((fiu)->MSR_IE_CFG, FIU_MSR_IE_CGF_UMA_BLOCK_Msk);}
++
++/*--------------------------*/
++/* UMA_CTS fields          */
++/*--------------------------*/
++#define FIU_UMA_CTS_EXEC_DONE_Pos		(7)
++#define FIU_UMA_CTS_EXEC_DONE_Msk		(0x1 << FIU_UMA_CTS_EXEC_DONE_Pos)
++
++#define FIU_UMA_CTS_DEV_NUM_Pos			(6)
++#define FIU_UMA_CTS_DEV_NUM_Msk			(0x1 << FIU_UMA_CTS_DEV_NUM_Pos)
++
++#define FIU_UMA_CTS_RD_WR_Pos                       (5)
++#define FIU_UMA_CTS_RD_WR_Msk                       (0x1 << FIU_UMA_CTS_RD_WR_Pos)
++
++#define FIU_UMA_CTS_C_SIZE_Pos                      (4)
++#define FIU_UMA_CTS_C_SIZE_Msk                      (0x1 << FIU_UMA_CTS_C_SIZE_Pos)
++
++#define FIU_UMA_CTS_A_SIZE_Pos                      (3)
++#define FIU_UMA_CTS_A_SIZE_Msk                      (0x1 << FIU_UMA_CTS_A_SIZE_Pos)
++
++/*--------------------------*/
++/* UMA_ECTS fields          */
++/*--------------------------*/
++#define FIU_UMA_ECTS_UMA_ADDR_SIZE_Pos		(4)
++#define FIU_UMA_ECTS_UMA_ADDR_SIZE_Msk		(0x7 << FIU_UMA_ECTS_UMA_ADDR_SIZE_Pos)
++
++#define FIU_UMA_ECTS_SW_CS1_Pos			(1)
++#define FIU_UMA_ECTS_SW_CS1_Msk			(0x1 << FIU_UMA_ECTS_SW_CS1_Pos)
++
++#define FIU_UMA_ECTS_SW_CS0_Pos			(0)
++#define FIU_UMA_ECTS_SW_CS0_Msk			(0x1 << FIU_UMA_ECTS_SW_CS0_Pos)
++
++/*--------------------------*/
++/* FIU_EXT_CFG fields       */
++/*--------------------------*/
++#define FIU_EXT_CFG_FL_SIZE_EX_Pos		(3)
++#define FIU_EXT_CFG_FL_SIZE_EX_Msk		(0x3 << FIU_EXT_CFG_FL_SIZE_EX_Pos)
++
++#define FIU_EXT_CFG_SET_DMM_EN_Pos		(2)
++#define FIU_EXT_CFG_SET_DMM_EN_Msk		(0x1 << FIU_EXT_CFG_SET_DMM_EN_Pos)
++
++#define FIU_EXT_CFG_SET_CMD_EN_Pos		(1)
++#define FIU_EXT_CFG_SET_CMD_EN_Msk		(0x1 << FIU_EXT_CFG_SET_CMD_EN_Pos)
++
++#define FIU_EXT_CFG_FOUR_BADDR_Pos		(0)
++#define FIU_EXT_CFG_FOUR_BADDR_Msk		(0x1 << FIU_EXT_CFG_FOUR_BADDR_Pos)
++
++/*--------------------------*/
++/* FIU_MSR_IE_CFG fields    */
++/*--------------------------*/
++#define FIU_MSR_IE_CGF_UMA_BLOCK_Pos		(3)
++#define FIU_MSR_IE_CGF_UMA_BLOCK_Msk		(0x1 << FIU_MSR_IE_CGF_UMA_BLOCK_Pos)
++
++#define FIU_RD_MODE_FAST_RD_DUAL_IO(fiu)	{RegRepBit((fiu)->SPI_FL_CFG, (BIT7|BIT6), (BIT7|BIT6));}
++
++/*==============================================================================================================*/
++/* System Configuration Core Registers										*/
++/*==============================================================================================================*/
++/**
++	@addtogroup SCFG SYSTEM CONFIGURATION CORE REGISTERS (SCFG)
++	Memory Mapped Structure for SCFG Controller
++@{ */
++
++typedef struct {
++	volatile uint8_t DEVCNT;		/*!< [0x00]	Device Control					*/
++	volatile const uint8_t STRPST;		/*!< [0x01]	Straps Status					*/
++	volatile uint8_t RSTCTL;		/*!< [0x02]	Reset Control and Status			*/
++	volatile uint8_t DEV_CTL2;		/*!< [0x03]	Device Control 2				*/
++	volatile uint8_t DEV_CTL3;		/*!< [0x04]	Device Control 3				*/
++	volatile uint8_t RESERVED1[1];
++	volatile uint8_t DEV_CTL4;		/*!< [0x06]	Device Control 4				*/
++	volatile uint8_t RESERVED2[4];
++	volatile uint8_t DEVALT10;		/*!< [0x0B]	Device Alternate Function 10			*/
++	volatile uint8_t DEVALT11;		/*!< [0x0C]	Device Alternate Function 11			*/
++	volatile uint8_t DEVALT12;		/*!< [0x0D]	Device Alternate Function 12			*/
++	volatile uint8_t RESERVED3[2];
++	volatile uint8_t DEVALT0;		/*!< [0x10]	Device Alternate Function 0			*/
++	volatile uint8_t DEVALT1;		/*!< [0x11]	Device Alternate Function 1			*/
++	volatile uint8_t DEVALT2;		/*!< [0x12]	Device Alternate Function 2			*/
++	volatile uint8_t DEVALT3;		/*!< [0x13]	Device Alternate Function 3			*/
++	volatile uint8_t DEVALT4;		/*!< [0x14]	Device Alternate Function 4			*/
++	volatile uint8_t DEVALT5;		/*!< [0x15]	Device Alternate Function 5			*/
++	volatile uint8_t DEVALT6;		/*!< [0x16]	Device Alternate Function 6			*/
++	volatile uint8_t DEVALT7;		/*!< [0x17]	Device Alternate Function 7			*/
++	volatile uint8_t DEVALT8;		/*!< [0x18]	Device Alternate Function 8			*/
++	volatile uint8_t DEVALT9;		/*!< [0x19]	Device Alternate Function 9			*/
++	volatile uint8_t DEVALTA;		/*!< [0x1A]	Device Alternate Function A			*/
++	volatile uint8_t DEVALTB;		/*!< [0x1B]	Device Alternate Function B			*/
++	volatile uint8_t DEVALTC;		/*!< [0x1C]	Device Alternate Function C			*/
++	volatile uint8_t DEVALTD;		/*!< [0x1D]	Device Alternate Function D			*/
++	volatile uint8_t DEVALTE;		/*!< [0x1E]	Device Alternate Function E			*/
++	volatile uint8_t RESERVED6[3];
++	volatile uint8_t DBGCTRL;		/*!< [0x22]	Device Alternate Function E			*/
++	volatile uint8_t RESERVED7[5];
++	volatile uint8_t DEVPU0;		/*!< [0x28]	Device Pull-Up Enable 0				*/
++	volatile uint8_t DEVPU1;		/*!< [0x29]	Device Pull-Up Enable 1				*/
++	volatile uint8_t RESERVED8[76];
++	volatile uint8_t DBGFRZEN1;		/*!< [0x76]	Debug Freeze Enable 1				*/
++	volatile uint8_t DBGFRZEN2;		/*!< [0x77]	Debug Freeze Enable 2				*/
++	volatile uint8_t DBGFRZEN3;		/*!< [0x78]	Debug Freeze Enable 3				*/
++	volatile uint8_t DBGFRZEN4;		/*!< [0x79]	Debug Freeze Enable 4				*/
++} SCFG_T;
++#define SCFG_BASE_ADDR		(0x400C3000)	/*!< SYSTEM CONFIGURATION */
++#define SCFG			((SCFG_T *)	SCFG_BASE_ADDR)
++
++#define M8(addr)		(*((volatile unsigned char  *) (addr)))
++#define M16(addr)		(*((volatile unsigned short *) (addr)))
++#define M32(addr)		(*((volatile unsigned long *) (addr)))
++
++#define GDMA_BASE_ADDR		(0x40011000)	/*!< General DMA CONTROLLER */
++
++#define GDMA_CTL0		M32(GDMA_BASE_ADDR + 0x00)
++#define GDMA_SRCB0		M32(GDMA_BASE_ADDR + 0x04)
++#define GDMA_DSTB0		M32(GDMA_BASE_ADDR + 0x08)
++#define GDMA_TCNT0		M32(GDMA_BASE_ADDR + 0x0C)
++#define GDMA_CSRC0		M32(GDMA_BASE_ADDR + 0x10)
++#define GDMA_CDST0		M32(GDMA_BASE_ADDR + 0x14)
++#define GDMA_CTCNT0		M32(GDMA_BASE_ADDR + 0x18)
++
++#define GDMA_CTL1		M32(GDMA_BASE_ADDR + 0x20)
++#define GDMA_SRCB1		M32(GDMA_BASE_ADDR + 0x24)
++#define GDMA_DSTB1		M32(GDMA_BASE_ADDR + 0x28)
++#define GDMA_TCNT1		M32(GDMA_BASE_ADDR + 0x2C)
++#define GDMA_CSRC1		M32(GDMA_BASE_ADDR + 0x30)
++#define GDMA_CDST1		M32(GDMA_BASE_ADDR + 0x34)
++#define GDMA_CTCNT1		M32(GDMA_BASE_ADDR + 0x38)
++
++#endif /* OPENOCD_LOADERS_FLASH_NCT_ESIO_NCT6692D_FLASH_H */
++
+diff --git a/contrib/loaders/flash/nct_esio/nct6694d_fiu_algo.inc b/contrib/loaders/flash/nct_esio/nct6694d_fiu_algo.inc
+new file mode 100644
+index 000000000..4a7c4ee72
+--- /dev/null
++++ b/contrib/loaders/flash/nct_esio/nct6694d_fiu_algo.inc
+@@ -0,0 +1,138 @@
++/* Autogenerated with ../../../../src/helper/bin2char.sh */
++0x08,0xb5,0xdf,0xf8,0x08,0xd0,0x00,0xf0,0x29,0xfa,0x00,0x00,0x28,0x1a,0x0c,0x20,
++0x70,0xb5,0x2e,0x4c,0x04,0x9e,0x94,0xf8,0x43,0x50,0x45,0xf0,0x08,0x05,0x84,0xf8,
++0x43,0x50,0x07,0x25,0xe5,0x77,0xa1,0x75,0xca,0xb1,0x35,0x46,0x00,0x24,0x15,0xf8,
++0x01,0x1b,0x41,0xea,0x04,0x24,0x71,0x1b,0x11,0x44,0xc9,0xb2,0x00,0x29,0xf6,0xd1,
++0x22,0x49,0x4c,0x63,0xcc,0x7f,0x44,0xea,0x02,0x14,0xe4,0xb2,0xcc,0x77,0x04,0x2a,
++0x02,0xbf,0x91,0xf8,0x33,0x40,0x44,0xf0,0x01,0x04,0x81,0xf8,0x33,0x40,0x02,0x28,
++0x2e,0xd1,0x1a,0x48,0xc1,0x7f,0x41,0xf0,0x08,0x01,0xc1,0x77,0x6f,0xf0,0x3f,0x01,
++0x10,0x1f,0x42,0x42,0x42,0x41,0x41,0xea,0xc2,0x01,0x19,0x43,0x13,0x4a,0xc9,0xb2,
++0x91,0x77,0x91,0x7f,0x09,0x06,0xfc,0xd4,0x53,0xb1,0x11,0x6a,0x05,0x9a,0x13,0x44,
++0xdb,0xb2,0x02,0xf8,0x01,0x1b,0xd0,0xb2,0x98,0x42,0x4f,0xea,0x11,0x21,0xf8,0xd1,
++0x0a,0x4b,0x07,0x22,0xda,0x77,0x93,0xf8,0x43,0x20,0x02,0xf0,0xf7,0x02,0x83,0xf8,
++0x43,0x20,0x93,0xf8,0x33,0x20,0x02,0xf0,0xfe,0x02,0x83,0xf8,0x33,0x20,0x70,0xbd,
++0x00,0x28,0xd3,0xd1,0x6f,0xf0,0x7f,0x01,0xd2,0xe7,0x00,0xbf,0x00,0x00,0x02,0x40,
++0x7f,0xb5,0x14,0x23,0x05,0x46,0x03,0xfb,0x01,0xf4,0x0d,0xf1,0x0f,0x06,0x41,0xf2,
++0xbf,0x22,0x00,0xbf,0x01,0x3a,0xfc,0xd1,0x01,0x23,0xcd,0xe9,0x00,0x26,0x05,0x21,
++0x28,0x46,0xff,0xf7,0x8d,0xff,0x9d,0xf8,0x0f,0x30,0xdb,0x07,0x03,0xd5,0x00,0x2c,
++0xed,0xd0,0x01,0x3c,0xeb,0xd1,0x04,0xb0,0x70,0xbd,0x00,0x00,0x02,0x28,0xf0,0xb5,
++0x9c,0xbf,0x3c,0x4c,0x25,0x5c,0x3c,0x4c,0x88,0xbf,0x00,0x25,0xe5,0x77,0x94,0xf8,
++0x43,0x50,0x45,0xf0,0x08,0x05,0x84,0xf8,0x43,0x50,0x0d,0x78,0xa5,0x75,0x02,0x28,
++0x02,0xbf,0xe5,0x7f,0x45,0xf0,0x08,0x05,0xe5,0x77,0x4d,0x78,0x65,0x76,0x8d,0x78,
++0x25,0x76,0xcd,0x78,0xe5,0x75,0x00,0x28,0x2f,0x4c,0x14,0xbf,0xc8,0x25,0x88,0x25,
++0xa5,0x77,0xa5,0x7f,0x2d,0x06,0xfc,0xd4,0x0d,0x79,0xa5,0x75,0x4d,0x79,0xa5,0x76,
++0x8d,0x79,0xe5,0x76,0xcd,0x79,0x25,0x77,0x09,0x7a,0x61,0x77,0x00,0x28,0x26,0x49,
++0x14,0xbf,0xe0,0x24,0xa0,0x24,0x8c,0x77,0x8c,0x7f,0x24,0x06,0xfc,0xd4,0x00,0x28,
++0x21,0x4c,0x02,0xf1,0x04,0x01,0x0c,0xbf,0x94,0x27,0xd4,0x27,0x1d,0x46,0x04,0x3d,
++0xa7,0x77,0xad,0xb2,0xa6,0x7f,0x36,0x06,0xfc,0xd4,0xa6,0x7e,0x01,0xf8,0x04,0x6c,
++0xe6,0x7e,0x01,0xf8,0x03,0x6c,0x26,0x7f,0x01,0xf8,0x02,0x6c,0x66,0x7f,0x01,0xf8,
++0x01,0x6c,0x04,0x2d,0x01,0xf1,0x04,0x01,0xe9,0xd8,0x00,0x28,0x14,0xbf,0x6f,0xf0,
++0x2f,0x00,0x6f,0xf0,0x6f,0x00,0x10,0x49,0x01,0x3b,0x40,0xf0,0x04,0x00,0xc3,0xf3,
++0x8d,0x03,0xc0,0xb2,0x02,0xeb,0x83,0x04,0x88,0x77,0x88,0x7f,0x00,0x06,0xfc,0xd4,
++0x88,0x7e,0x02,0xf8,0x23,0x00,0xcb,0x7e,0x63,0x70,0x0b,0x7f,0xa3,0x70,0x4b,0x7f,
++0xe3,0x70,0x07,0x23,0xcb,0x77,0x91,0xf8,0x43,0x30,0x03,0xf0,0xf7,0x03,0x81,0xf8,
++0x43,0x30,0xf0,0xbd,0x98,0x18,0x0c,0x20,0x00,0x00,0x02,0x40,0x23,0x4a,0x93,0x7c,
++0x43,0xf0,0x03,0x03,0x93,0x74,0x22,0x4b,0x03,0x22,0x5a,0x70,0x03,0xf5,0x23,0x23,
++0x1a,0x78,0x02,0xf0,0xbf,0x02,0x1a,0x70,0x1a,0x7f,0x42,0xf0,0x08,0x02,0x1a,0x77,
++0x9a,0x79,0x02,0xf0,0xfb,0x02,0x9a,0x71,0x80,0xb9,0x1a,0x7f,0x42,0xf0,0x0c,0x02,
++0x1a,0x77,0x1a,0x79,0x02,0xf0,0xfd,0x02,0x1a,0x71,0x1a,0x7c,0x42,0xf0,0x02,0x02,
++0x1a,0x74,0x1a,0x7c,0x42,0xf0,0x02,0x02,0x1a,0x74,0x70,0x47,0x02,0x28,0x0f,0xd1,
++0x1a,0x7f,0x42,0xf0,0x0c,0x02,0x1a,0x77,0x1a,0x79,0x02,0xf0,0xfd,0x02,0x1a,0x71,
++0x1a,0x7c,0x42,0xf0,0x04,0x02,0x1a,0x74,0x1a,0x7c,0x42,0xf0,0x04,0x02,0xeb,0xe7,
++0x1a,0x78,0x02,0xf0,0xbf,0x02,0x1a,0x70,0x1a,0x7f,0x42,0xf0,0x0c,0x02,0x1a,0x77,
++0x1a,0x79,0x02,0xf0,0xfd,0x02,0x1a,0x71,0x70,0x47,0x00,0xbf,0x00,0x50,0x0b,0x40,
++0x00,0x00,0x02,0x40,0xf0,0xb5,0x85,0xb0,0xff,0xf7,0xb0,0xff,0x00,0x25,0x03,0xab,
++0x04,0x46,0x01,0x93,0x2a,0x46,0x03,0x23,0x0f,0x46,0x00,0x95,0x9f,0x21,0x02,0xae,
++0xff,0xf7,0xa6,0xfe,0x01,0x23,0x2a,0x46,0x05,0x21,0x20,0x46,0xcd,0xe9,0x00,0x56,
++0xff,0xf7,0x9e,0xfe,0x0d,0xf1,0x09,0x03,0xcd,0xe9,0x00,0x53,0x2a,0x46,0x01,0x23,
++0x35,0x21,0x20,0x46,0xff,0xf7,0x94,0xfe,0x9d,0xf8,0x0c,0x30,0xef,0x2b,0x01,0xd0,
++0xc8,0x2b,0x1b,0xd1,0x9d,0xf8,0x09,0x30,0x23,0xf0,0x02,0x03,0x8d,0xf8,0x09,0x30,
++0x00,0x25,0x01,0x21,0x2b,0x46,0x20,0x46,0xcd,0xe9,0x00,0x65,0x02,0x22,0xff,0xf7,
++0x7f,0xfe,0xaf,0x42,0xcd,0xe9,0x00,0x55,0x2b,0x46,0x2a,0x46,0x0c,0xbf,0xe9,0x21,
++0xb7,0x21,0x20,0x46,0xff,0xf7,0x74,0xfe,0x05,0xb0,0xf0,0xbd,0xc2,0x2b,0x01,0xd0,
++0x20,0x2b,0xe5,0xd1,0x9d,0xf8,0x08,0x30,0x23,0xf0,0x40,0x03,0x8d,0xf8,0x08,0x30,
++0xde,0xe7,0x00,0x00,0x41,0xea,0x00,0x03,0x1b,0x07,0x70,0xb5,0x0d,0xd0,0x5a,0xb1,
++0x18,0x4b,0x59,0x60,0x98,0x60,0xda,0x60,0x4f,0xf0,0x01,0x12,0x1a,0x60,0x1a,0x68,
++0x12,0xf0,0x01,0x02,0xfb,0xd1,0x1a,0x60,0x70,0xbd,0x32,0xf0,0x3f,0x04,0x13,0xd0,
++0x11,0x4e,0x0b,0x23,0x73,0x70,0x0f,0x4b,0x25,0x09,0x59,0x60,0x98,0x60,0xdd,0x60,
++0x0e,0x4d,0x1d,0x60,0x1d,0x68,0x15,0xf0,0x01,0x05,0xfb,0xd1,0x1d,0x60,0x03,0x23,
++0x73,0x70,0x21,0x44,0x20,0x44,0x12,0x1b,0x00,0x2a,0xe5,0xd0,0x05,0x4b,0x59,0x60,
++0x98,0x60,0xda,0x60,0x4f,0xf0,0x01,0x12,0x1a,0x60,0x1a,0x68,0x12,0xf0,0x01,0x02,
++0xfb,0xd1,0xd8,0xe7,0x00,0x10,0x01,0x40,0x00,0x00,0x02,0x40,0x01,0x22,0x01,0x00,
++0x70,0xb5,0x25,0x4c,0x9d,0xf8,0x10,0x60,0x05,0x46,0x10,0x46,0x1a,0x46,0xa3,0x78,
++0x03,0xf0,0xf7,0x03,0xa3,0x70,0x94,0xf8,0x3c,0x30,0x4e,0xb3,0xd5,0xb9,0x43,0xf0,
++0x10,0x03,0x84,0xf8,0x3c,0x30,0x94,0xf8,0x33,0x30,0x43,0xf0,0x01,0x03,0x84,0xf8,
++0x33,0x30,0x13,0x23,0xad,0xb9,0x84,0xf8,0x30,0x30,0x17,0x4b,0x00,0x24,0x1c,0x75,
++0x32,0xb1,0x06,0x35,0x21,0xf0,0x60,0x41,0x01,0xeb,0x05,0x71,0xff,0xf7,0x9a,0xff,
++0x00,0x20,0x70,0xbd,0x02,0x2d,0x0c,0xbf,0x43,0xf0,0x40,0x03,0x43,0xf0,0x20,0x03,
++0xdf,0xe7,0x02,0x2d,0x0c,0xbf,0x84,0xf8,0x2e,0x30,0x84,0xf8,0x31,0x30,0xe4,0xe7,
++0x55,0xb9,0x03,0xf0,0xef,0x03,0x84,0xf8,0x3c,0x30,0x94,0xf8,0x33,0x30,0x03,0xf0,
++0xfc,0x03,0x84,0xf8,0x33,0x30,0xd8,0xe7,0x02,0x2d,0x0c,0xbf,0x03,0xf0,0xbf,0x03,
++0x03,0xf0,0xdf,0x03,0xef,0xe7,0x00,0xbf,0x00,0x00,0x02,0x40,0x2d,0xe9,0xf0,0x4f,
++0xb4,0x4c,0xc9,0xb0,0x14,0x22,0x00,0x21,0x20,0x46,0x00,0xf0,0x8d,0xf9,0xb2,0x48,
++0x4f,0xf4,0x80,0x52,0x00,0x21,0x00,0xf0,0x87,0xf9,0x4f,0xf0,0x00,0x09,0x84,0xf8,
++0x00,0x90,0x23,0x78,0x00,0x2b,0xfc,0xd0,0x63,0x78,0x04,0x2b,0x06,0xd8,0xdf,0xe8,
++0x13,0xf0,0x08,0x00,0x64,0x00,0x93,0x00,0x29,0x01,0x39,0x01,0xff,0x20,0x20,0x70,
++0xfe,0xe7,0xa0,0x78,0xff,0xf7,0xb2,0xfe,0xa7,0x78,0x00,0x26,0x08,0xad,0x5a,0x23,
++0x31,0x46,0xff,0xb2,0x10,0x22,0x28,0x46,0x06,0x93,0x8d,0xf8,0x1c,0x60,0x00,0xf0,
++0x63,0xf9,0x32,0x46,0xcd,0xe9,0x00,0x65,0x03,0x23,0x9b,0x4e,0x9f,0x21,0x38,0x46,
++0xff,0xf7,0x9e,0xfd,0x9d,0xf8,0x22,0x30,0x33,0x70,0x9d,0xf8,0x21,0x30,0x73,0x70,
++0x9d,0xf8,0x20,0x30,0xb3,0x70,0x2a,0x46,0x10,0x23,0x06,0xa9,0x38,0x46,0xff,0xf7,
++0x0d,0xfe,0x9d,0xf8,0x20,0x30,0x53,0x2b,0xd0,0xd1,0x9d,0xf8,0x21,0x30,0x46,0x2b,
++0xcc,0xd1,0x9d,0xf8,0x22,0x30,0x44,0x2b,0xc8,0xd1,0x9d,0xf8,0x23,0x30,0x50,0x2b,
++0xc4,0xd1,0x9d,0xf8,0x2e,0x30,0x8d,0xf8,0x19,0x30,0xbd,0xf8,0x2c,0x30,0x5b,0xba,
++0xad,0xf8,0x1a,0x30,0x06,0xa9,0x08,0x23,0x38,0x46,0xff,0xf7,0xef,0xfd,0x9d,0xf9,
++0x27,0x30,0x00,0x2b,0xb2,0xdb,0x09,0x9b,0x01,0x33,0xdb,0x10,0x1a,0x0a,0x33,0x71,
++0x72,0x71,0x1a,0x0c,0x1b,0x0e,0xf3,0x71,0x9d,0xf8,0x22,0x30,0xb2,0x71,0x13,0xf0,
++0x03,0x03,0x18,0xbf,0x01,0x23,0x33,0x72,0x91,0xe7,0xa0,0x78,0xe1,0x78,0xff,0xf7,
++0xa1,0xfe,0xa6,0x78,0xa5,0x68,0xe7,0x78,0x00,0x23,0xf6,0xb2,0x1a,0x46,0xcd,0xe9,
++0x00,0x33,0x06,0x21,0x30,0x46,0xff,0xb2,0xff,0xf7,0x4a,0xfd,0x08,0xaa,0x0f,0xb1,
++0xd5,0x70,0x2d,0x0a,0x2b,0x0c,0x13,0x70,0x2b,0x0a,0x53,0x70,0x00,0x2f,0x4f,0xf0,
++0x00,0x03,0x95,0x70,0x08,0xbf,0x20,0x21,0xcd,0xe9,0x00,0x23,0x18,0xbf,0x21,0x21,
++0x30,0x46,0x0c,0xbf,0x03,0x22,0x04,0x22,0xff,0xf7,0x32,0xfd,0x4f,0xf4,0xfa,0x71,
++0x30,0x46,0xff,0xf7,0x8d,0xfd,0x62,0xe7,0xa0,0x78,0xe1,0x78,0xdf,0xf8,0x78,0xb1,
++0x5e,0x4e,0xff,0xf7,0x6f,0xfe,0x94,0xf8,0x02,0xa0,0xa7,0x68,0xd4,0xf8,0x0c,0x80,
++0xe3,0x78,0x00,0x3b,0x18,0xbf,0x01,0x23,0x00,0x2b,0x15,0xbf,0x40,0x22,0x30,0x22,
++0x12,0x23,0x02,0x23,0x5f,0xfa,0x8a,0xfa,0x02,0x92,0x03,0x93,0xb8,0xf1,0x00,0x0f,
++0x09,0xd1,0x52,0x4b,0x83,0xf8,0x44,0x80,0x93,0xf8,0x43,0x20,0x02,0xf0,0xf7,0x02,
++0x83,0xf8,0x43,0x20,0x3b,0xe7,0xfb,0xb2,0x00,0x2b,0x47,0xd0,0x7d,0x42,0xed,0xb2,
++0x45,0x45,0x28,0xbf,0x45,0x46,0x00,0x23,0x1a,0x46,0xcd,0xe9,0x00,0x99,0x06,0x21,
++0x50,0x46,0xff,0xf7,0xf5,0xfc,0x96,0xf8,0x43,0x30,0xad,0xb2,0x43,0xf0,0x08,0x03,
++0xa8,0xeb,0x05,0x08,0x86,0xf8,0x43,0x30,0xba,0xf1,0x00,0x0f,0x35,0xd0,0xba,0xf1,
++0x02,0x0f,0x14,0xbf,0x05,0x23,0x0b,0x23,0x02,0x9a,0x13,0x43,0xf3,0x77,0x77,0x63,
++0x03,0x9b,0xb3,0x75,0x1b,0xf8,0x01,0x3b,0xb3,0x76,0x01,0x3d,0xa1,0x23,0x86,0xf8,
++0x44,0x90,0xad,0xb2,0x01,0x37,0xb3,0x77,0xb3,0x7f,0x19,0x06,0xfc,0xd4,0xf3,0x7f,
++0x03,0xf0,0x8f,0x03,0xf3,0x77,0x2f,0x44,0x25,0xb1,0x01,0x2d,0x17,0xd1,0x08,0xf1,
++0x01,0x08,0x01,0x3f,0xb3,0x7f,0x1b,0x06,0xfc,0xd4,0x07,0x23,0x86,0xf8,0x48,0x90,
++0x0a,0x21,0xf3,0x77,0x50,0x46,0xff,0xf7,0x1b,0xfd,0xa7,0xe7,0xb8,0xf5,0x80,0x7f,
++0x45,0x46,0x28,0xbf,0x4f,0xf4,0x80,0x75,0xb5,0xe7,0x06,0x23,0xcc,0xe7,0x10,0x2d,
++0x2a,0x46,0x28,0xbf,0x10,0x22,0xd3,0xb2,0x59,0x46,0x21,0x48,0x05,0x93,0xad,0x1a,
++0x04,0x92,0xff,0xf7,0x3f,0xfe,0x04,0x9a,0x05,0x9b,0xad,0xb2,0x93,0x44,0xb2,0x7f,
++0x12,0x06,0xfc,0xd4,0x43,0xf0,0x20,0x03,0x86,0xf8,0x48,0x30,0x6f,0xf0,0x4f,0x03,
++0xb3,0x77,0xc9,0xe7,0xa0,0x78,0xe1,0x78,0xff,0xf7,0xdc,0xfd,0xa0,0x78,0xa1,0x68,
++0xe3,0x68,0xe2,0x78,0x00,0x92,0x10,0x4a,0xff,0xf7,0x62,0xfe,0x00,0x28,0x3f,0xf4,
++0xbe,0xae,0xcc,0xe6,0xa0,0x78,0xe1,0x78,0xff,0xf7,0xcc,0xfd,0x4f,0xf4,0x80,0x72,
++0x00,0x21,0x08,0xa8,0xa7,0x78,0xd4,0xf8,0x08,0xa0,0xe5,0x68,0x94,0xf8,0x03,0x80,
++0x00,0xf0,0x32,0xf8,0xff,0xb2,0x5f,0xfa,0x88,0xf8,0x00,0x26,0x55,0xb9,0x28,0x46,
++0xc0,0xb2,0xe3,0xe7,0x00,0x00,0x0c,0x20,0x14,0x00,0x0c,0x20,0x00,0x00,0x02,0x40,
++0x50,0x00,0x02,0x40,0xb5,0xf5,0x80,0x7f,0xab,0x46,0x28,0xbf,0x4f,0xf4,0x80,0x7b,
++0xcd,0xf8,0x00,0x80,0x5b,0x46,0x08,0xaa,0x0a,0xeb,0x06,0x01,0x38,0x46,0xff,0xf7,
++0x2f,0xfe,0x00,0x28,0xe4,0xd1,0x07,0x4b,0x5a,0x46,0x08,0xa9,0x98,0x19,0x00,0xf0,
++0x63,0xf8,0x18,0xb9,0x5e,0x44,0xa5,0xeb,0x0b,0x05,0xd7,0xe7,0x4f,0xf0,0xff,0x30,
++0xd6,0xe7,0x00,0xbf,0x14,0x00,0x0c,0x20,0xf0,0xb5,0x05,0x00,0x83,0x07,0x4d,0xd0,
++0x54,0x1e,0x00,0x2a,0x47,0xd0,0x0a,0x06,0x03,0x00,0x03,0x26,0x12,0x0e,0x02,0xe0,
++0x01,0x35,0x01,0x3c,0x3f,0xd3,0x01,0x33,0x2a,0x70,0x33,0x42,0xf8,0xd1,0x03,0x2c,
++0x30,0xd9,0xff,0x22,0x0a,0x40,0x15,0x02,0xad,0x18,0x2a,0x04,0xad,0x18,0x0f,0x2c,
++0x37,0xd9,0x27,0x00,0x10,0x3f,0x3f,0x09,0x3e,0x01,0xb4,0x46,0x1e,0x00,0x1a,0x00,
++0x10,0x36,0x66,0x44,0x15,0x60,0x55,0x60,0x95,0x60,0xd5,0x60,0x10,0x32,0x96,0x42,
++0xf8,0xd1,0x01,0x37,0x3f,0x01,0xdb,0x19,0x0f,0x27,0x0c,0x22,0x27,0x40,0x22,0x40,
++0x3c,0x00,0x00,0x2a,0x0e,0xd0,0x3e,0x1f,0xb6,0x08,0xb4,0x00,0xa4,0x46,0x1a,0x00,
++0x1c,0x1d,0x64,0x44,0x20,0xc2,0xa2,0x42,0xfc,0xd1,0x03,0x24,0x01,0x36,0xb6,0x00,
++0x9b,0x19,0x3c,0x40,0x00,0x2c,0x06,0xd0,0x09,0x06,0x09,0x0e,0x1c,0x19,0x19,0x70,
++0x01,0x33,0x9c,0x42,0xfb,0xd1,0xf0,0xbc,0x02,0xbc,0x08,0x47,0x03,0x00,0x14,0x00,
++0xbd,0xe7,0x27,0x00,0xdf,0xe7,0xc0,0x46,0x30,0xb5,0x03,0x2a,0x1a,0xd9,0x0b,0x00,
++0x03,0x43,0x9b,0x07,0x11,0xd0,0x55,0x1e,0x00,0x23,0x03,0xe0,0x5a,0x1c,0x9d,0x42,
++0x13,0xd0,0x13,0x00,0xc2,0x5c,0xcc,0x5c,0xa2,0x42,0xf7,0xd0,0x10,0x1b,0x0d,0xe0,
++0x04,0x3a,0x04,0x30,0x04,0x31,0x03,0x2a,0x04,0xd9,0x04,0x68,0x0b,0x68,0x9c,0x42,
++0xf6,0xd0,0xe8,0xe7,0x55,0x1e,0x00,0x2a,0xe6,0xd1,0x00,0x20,0x30,0xbc,0x02,0xbc,
++0x08,0x47,0xc0,0x46,0x06,0x05,0x03,
+diff --git a/contrib/loaders/flash/nct_esio/nct6694d_fiu_flash.c b/contrib/loaders/flash/nct_esio/nct6694d_fiu_flash.c
+new file mode 100644
+index 000000000..2ff07eb93
+--- /dev/null
++++ b/contrib/loaders/flash/nct_esio/nct6694d_fiu_flash.c
+@@ -0,0 +1,642 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++
++#include <stdint.h>
++#include <string.h>
++#include "nct6694d_flash.h"
++
++/* flashloader parameter structure */
++__attribute__ ((section(".buffers.g_cfg")))
++static volatile struct nct_esio_flash_params g_cfg;
++
++/* data buffer */
++__attribute__ ((section(".buffers.g_buf")))
++static volatile uint8_t g_buf[0x1000];
++
++static void delay(uint32_t i)
++{
++	while (i--)
++		__asm__ volatile ("nop");
++}
++
++static void gdma_memcpy_u8(uint8_t* dst, uint8_t* src, uint32_t cpylen)
++{
++	if (cpylen == 0) return;
++
++	GDMA_SRCB0 = (uint32_t)src;
++	GDMA_DSTB0 = (uint32_t)dst;
++	GDMA_TCNT0 = cpylen;
++	GDMA_CTL0 = 0x10001;
++
++	while (GDMA_CTL0 & 0x1);
++	GDMA_CTL0 = 0;
++}
++
++static void gdma_memcpy_burst_u32(uint8_t* dst, uint8_t* src, uint32_t cpylen)
++{
++	uint32_t rlen;
++
++	if (cpylen == 0) return;
++
++	/* src and dst address must 16byte aligned */
++	if (((uint32_t)src & 0x0F) || ((uint32_t)dst & 0xF)) {
++		gdma_memcpy_u8(dst, src, cpylen);
++		return;
++	}
++
++	/* aligned 64Byte length */
++	rlen = cpylen & 0xFFFFFFC0;
++	if (rlen) {
++		FIU0->BURST_CFG = 0x0B;
++
++		GDMA_SRCB0 = (uint32_t)src;
++		GDMA_DSTB0 = (uint32_t)dst;
++		GDMA_TCNT0 = rlen/16;
++		GDMA_CTL0 = 0x12201;
++
++		while(GDMA_CTL0 & 0x1);
++		GDMA_CTL0 = 0;
++
++		FIU0->BURST_CFG = 0x03;
++
++		src += rlen;
++		dst += rlen;
++		cpylen -= rlen;
++	}
++
++	/* remain length */
++	if(cpylen) {
++		gdma_memcpy_u8(dst, src, cpylen);
++	}
++}
++
++static uint8_t fiu_read(enum flash_port port, uint32_t addr, uint8_t* buff, uint32_t len, uint8_t adr_4b)
++{
++	FIU_Quad_Mode_Disable;
++	if (adr_4b) {
++	FIU_Set_4B_CMD_EN(port, FLASH_CMD_4BYTE_READ);
++	} else {
++	FIU_Clr_4B_CMD_EN(port);
++	}
++	FIU0->SPI_FL_CFG = (0 << FIU_SPI_FL_CFG_RD_MODE_Pos) & FIU_SPI_FL_CFG_RD_MODE_Msk;
++	gdma_memcpy_burst_u32(buff, (uint8_t*)((addr & 0x1FFFFFFF) + BASE_FIU(port)), len);
++
++	return 0;
++}
++
++static int fiu_verify(enum flash_port port, uint32_t addr, uint8_t *data, uint32_t len, uint8_t adr_4b)
++{
++	uint8_t read_buf[256] = {0};
++	uint32_t offset = 0;
++	int ret = 0;
++
++	while (len > 0) {
++		uint32_t chunk_size = (len > 256) ? 256 : len;
++
++		ret = fiu_read(port, addr + offset, read_buf, chunk_size, adr_4b);
++		if (ret != 0) {
++			return ret;
++		}
++
++		if (memcmp(data + offset, read_buf, chunk_size) != 0) {
++			return -1; // Verification failed
++		}
++
++		offset += chunk_size;
++		len -= chunk_size;
++	}
++
++	return 0; // Verification successful
++}
++
++static void FIU_CmdReadWrite(enum flash_port port, uint8_t cmd, uint8_t tx_len, uint8_t rx_len, uint8_t* tx_dat, uint8_t* rx_dat)
++{
++	/* tx_len and rx_len must <= 4 */
++	uint8_t len;
++	uint32_t dat;
++
++	if((tx_len > 4) || (rx_len > 4)) { return; }
++
++	FIU0->MSR_IE_CFG |= FIU_MSR_IE_CGF_UMA_BLOCK_Msk;
++	FIU0->UMA_ECTS = (FIU_UMA_ECTS_SW_CS0_Msk | FIU_UMA_ECTS_SW_CS1_Msk | FIU_UMA_ECTS_SW_CS2_Msk);
++	FIU0->UMA_CODE = cmd;
++
++	/* write */
++	if (tx_len) {
++		len = tx_len;
++		dat = 0;
++		while(len--) {
++			dat <<= 8;
++			dat |= *tx_dat++;
++		}
++		FIU0->UMA_AB0_3 = dat;
++		FIU0->UMA_ECTS |= (tx_len << FIU_UMA_ECTS_UMA_ADDR_SIZE_Pos);
++
++		if (tx_len == 4) {
++			FIU0->EXT_CFG |= (FIU_EXT_CFG_FOUR_BADDR_Msk);
++		}
++	}
++
++	(port == FLASH_PORT_BKP) ? ({FIU0->UMA_ECTS |= FIU_UMA_ECTS_DEV_NUM_BKP_Msk;}) : ({});
++	FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | \
++		((port == FLASH_PORT_PVT) ? (FIU_UMA_CTS_DEV_PRI_MSK) : (FIU_UMA_CTS_DEV_SHR_MSK)) | \
++		((tx_len == 4) ? (FIU_UMA_CTS_A_SIZE_Msk) : (0)) | \
++		((rx_len) ? (rx_len) : (0)));
++
++	while (FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++
++	/* Read data */
++	if (rx_len) {
++		dat = FIU0->UMA_DB0_3;
++		while (rx_len--) {
++			*rx_dat++ = dat & 0xFF;
++			dat >>= 8;
++		}
++	}
++
++	FIU0->UMA_ECTS = (FIU_UMA_ECTS_SW_CS0_Msk | FIU_UMA_ECTS_SW_CS1_Msk | FIU_UMA_ECTS_SW_CS2_Msk);
++	FIU0->MSR_IE_CFG &= ~FIU_MSR_IE_CGF_UMA_BLOCK_Msk;
++	FIU0->EXT_CFG &= ~(FIU_EXT_CFG_FOUR_BADDR_Msk);
++}
++
++/* timeout_ms: 0 means waiting forever until busy flag is released. */
++static void fiu_flash_wait_ready(enum flash_port port, uint32_t timeout_ms)
++{
++    uint8_t value;
++    uint32_t countdownTick = 0;
++
++    countdownTick = timeout_ms * 20; // 1ms => 1000us / 50us = 20 tick
++    while(1) {
++        delay(4799); // 50us
++        FIU_CmdReadWrite(port, FLASH_CMD_READ_STATUS_REG, 0, 1, NULL, &value);
++        if ((value & 0x01) == 0) break;
++        if (countdownTick <= 0) continue;
++        if (--countdownTick == 0) break;
++    }
++}
++
++static uint8_t fiu_program(enum flash_port port, uint32_t addr, uint8_t *buff, uint32_t len, uint8_t adr_4b)
++{
++    uint16_t page_len;
++    uint8_t d_size, align_size;
++
++    while (len) {
++		if(addr & 0xFF) {
++			align_size = (256 - (addr & 0xFF));
++			page_len = (len > align_size) ? (align_size) : (len);
++		} else {
++			page_len = (len >= 256) ? (256) : (len);
++		}
++
++		len -= page_len;
++
++		/* write enable*/
++		FIU_CmdReadWrite(port, FLASH_CMD_WRITE_ENABLE, 0, 0, 0, 0);
++
++		/* write address 3B */
++		FIU0->MSR_IE_CFG |= FIU_MSR_IE_CGF_UMA_BLOCK_Msk;
++		FIU0->UMA_ECTS = ((adr_4b) ? ( 4 << FIU_UMA_ECTS_UMA_ADDR_SIZE_Pos) : (3 << FIU_UMA_ECTS_UMA_ADDR_SIZE_Pos)) |
++				 ((port == FLASH_PORT_PVT) ? (FIU_UMA_ECTS_SW_CS1_Msk | FIU_UMA_ECTS_SW_CS2_Msk) : \
++				 ((port == FLASH_PORT_BKP) ? (FIU_UMA_ECTS_DEV_NUM_BKP_Msk | FIU_UMA_ECTS_SW_CS0_Msk | FIU_UMA_ECTS_SW_CS1_Msk) : \
++				 (FIU_UMA_ECTS_SW_CS0_Msk | FIU_UMA_ECTS_SW_CS2_Msk)));
++		FIU0->UMA_AB0_3 = addr;
++		FIU0->UMA_CODE = (adr_4b) ? (FLASH_CMD_4BYTE_PROGRAM) : (FLASH_CMD_PAGE_PROGRAM);
++
++		FIU0->UMA_DB0 = buff[0];
++		buff += 1;
++		page_len -= 1;
++		addr += 1;
++		FIU0->Q_P_EN = 0;
++		FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | FIU_UMA_CTS_RD_WR_Msk | 1);
++
++		while (FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++
++		FIU0->UMA_ECTS &= ~FIU_UMA_ECTS_UMA_ADDR_SIZE_Msk;
++
++		/* CS keep low and adr length = 0 */
++		addr += page_len;
++
++		while (page_len) {
++			if(page_len == 1) {
++				len += 1;
++				addr -= 1;
++				break;
++			}
++
++			d_size = (page_len >= 16) ? (16) : (page_len);
++			page_len -= d_size;
++
++			gdma_memcpy_burst_u32((uint8_t *)(FIU0->UMA_EXT_DB), buff, d_size);
++			buff += d_size;
++
++			while(FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++			FIU0->EXT_DB_CFG = EXT_DB_CFG_EXT_DB_EN_Msk | (d_size << EXT_DB_CFG_D_SIZE_Pos);
++			FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | FIU_UMA_CTS_RD_WR_Msk | FIU_UMA_CTS_C_SIZE_Msk);
++		}
++
++		while(FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++		FIU0->EXT_DB_CFG = 0;
++		FIU0->UMA_ECTS = (FIU_UMA_ECTS_SW_CS2_Msk | FIU_UMA_ECTS_SW_CS1_Msk | FIU_UMA_ECTS_SW_CS0_Msk);
++
++		/* wait flash busy */
++		fiu_flash_wait_ready(port, 10);
++	}
++
++	FIU0->Q_P_EN = 0;
++	FIU0->MSR_IE_CFG &= ~FIU_MSR_IE_CGF_UMA_BLOCK_Msk;
++
++	return 0;
++}
++
++static uint8_t fiu_sector_erase(enum flash_port port, uint32_t addr, uint8_t adr_4b)
++{
++	uint8_t dat[4];
++
++	/* write enable */
++	FIU_CmdReadWrite(port, FLASH_CMD_WRITE_ENABLE, 0, 0, 0, 0);
++
++	/* addr to byte array */
++	if (adr_4b) {
++		dat[3] = addr & 0xFF;
++		addr >>= 8;
++	}
++	dat[0] = (addr >> 16) & 0xFF;
++	dat[1] = (addr >> 8) & 0xFF;
++	dat[2] = addr & 0xFF;
++
++	/* erase cmd */
++	FIU_CmdReadWrite(port, ((adr_4b) ? (FLASH_CMD_4BYTE_SECTOR_ERASE) : (FLASH_CMD_SECTOR_ERASE)), ((adr_4b) ? (4):(3)), 0, dat, 0);
++
++	/* wait flash busy */
++	fiu_flash_wait_ready(port, 500);
++
++	return 0;
++}
++
++static uint32_t halspi_rw(enum flash_port port, uint8_t *wr_buf, uint16_t wr_size, uint8_t *rd_buf, uint16_t rd_size)
++{
++	uint32_t len;
++	uint8_t* pspidat;
++	uint8_t cs_auto;
++	uint8_t a_size = 0;
++
++	if(wr_size == 0) {
++		return 0xFFFFFFFF;
++	}
++
++	a_size = 0;
++
++	if((rd_size > 4) || (wr_size >= 5)) {
++		/* Read or write data, CS is manual control. */
++		FIU0->UMA_ECTS = (port == FLASH_PORT_PVT) ? (FIU_UMA_ECTS_SW_CS1_Msk | FIU_UMA_ECTS_SW_CS2_Msk) :
++				 (port == FLASH_PORT_SHD) ? (FIU_UMA_ECTS_SW_CS0_Msk | FIU_UMA_ECTS_SW_CS2_Msk) :
++				 (port == FLASH_PORT_BKP) ? (FIU_UMA_ECTS_SW_CS0_Msk | FIU_UMA_ECTS_SW_CS1_Msk) : 0;
++		FIU0->MSR_IE_CFG |= FIU_MSR_IE_CGF_UMA_BLOCK_Msk;
++		cs_auto = 0;
++	} else {
++		/* Read or write instruction, CS is auto control. */
++		FIU0->UMA_ECTS = (FIU_UMA_ECTS_SW_CS0_Msk | FIU_UMA_ECTS_SW_CS1_Msk | FIU_UMA_ECTS_SW_CS2_Msk);
++		FIU0->MSR_IE_CFG &= ~FIU_MSR_IE_CGF_UMA_BLOCK_Msk;
++		cs_auto = 1;
++	}
++
++	/* Command code */
++	FIU0->UMA_CODE = *wr_buf++;
++    (port == FLASH_PORT_BKP) ? ({FIU0->UMA_ECTS |= FIU_UMA_ECTS_DEV_NUM_BKP_Msk;}) : ({});
++
++	if(wr_size >= 4) {
++		/* address */
++		FIU0->UMA_AB2 = *wr_buf++;
++		FIU0->UMA_AB1 = *wr_buf++;
++		FIU0->UMA_AB0 = *wr_buf++;
++		wr_size -= 4;
++
++		if(cs_auto == 0) {
++			/* read or write data */
++			FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | \
++					 ((port == FLASH_PORT_PVT) ? (FIU_UMA_CTS_DEV_PRI_MSK) : (FIU_UMA_CTS_DEV_SHR_MSK)) | \
++					 FIU_UMA_CTS_A_SIZE_Msk);
++
++			while(FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++		} else {
++			/* erase command */
++			if((wr_size == 0) && (rd_size == 0)) {
++				FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | \
++						 FIU_UMA_CTS_RD_WR_Msk | \
++						 ((port == FLASH_PORT_PVT) ? (FIU_UMA_CTS_DEV_PRI_MSK) : (FIU_UMA_CTS_DEV_SHR_MSK)) | \
++						 FIU_UMA_CTS_A_SIZE_Msk);
++
++				while(FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++			}
++
++			/* 4-byte erase command or read <= 4byte */
++			a_size = FIU_UMA_CTS_A_SIZE_Msk;
++		}
++	} else {
++		wr_size -= 1;
++
++		if(cs_auto == 1) {
++			/* Write status */
++			if((wr_size == 0) && (rd_size == 0)) {
++				FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | \
++				FIU_UMA_CTS_RD_WR_Msk | \
++				((port == FLASH_PORT_PVT) ? (FIU_UMA_CTS_DEV_PRI_MSK) : (FIU_UMA_CTS_DEV_SHR_MSK)));
++
++				while(FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++			}
++		}
++	}
++
++	while (wr_size) {
++		if(cs_auto == 0) {
++			len = (wr_size >= 5)?(5):(wr_size);
++
++			FIU0->UMA_CODE = *wr_buf++;
++			FIU0->UMA_DB0 = *wr_buf++;
++			FIU0->UMA_DB1 = *wr_buf++;
++			FIU0->UMA_DB2 = *wr_buf++;
++			FIU0->UMA_DB3 = *wr_buf++;
++
++			/* Read per 4 byte */
++			FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | \
++					 FIU_UMA_CTS_RD_WR_Msk | \
++					 ((port == FLASH_PORT_PVT) ? (FIU_UMA_CTS_DEV_PRI_MSK) : (FIU_UMA_CTS_DEV_SHR_MSK)) | \
++					 (len - 1));
++
++			wr_size -= len;
++
++			while(FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++		} else {
++			len = wr_size;
++			pspidat = (uint8_t*)(&(FIU0->UMA_DB0));
++
++			while(len--) {
++				*pspidat++ = *wr_buf++;
++			}
++
++			/* write per < 4 byte */
++			FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | \
++					 FIU_UMA_CTS_RD_WR_Msk | a_size | \
++					 ((port == FLASH_PORT_PVT) ? (FIU_UMA_CTS_DEV_PRI_MSK) : (FIU_UMA_CTS_DEV_SHR_MSK)) | \
++					 (wr_size));
++
++			wr_size = 0;
++
++			while(FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++		}
++	}
++
++	while (rd_size) {
++		if(rd_size > 4) {
++			/* Read per 4 byte */
++			FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | \
++					 FIU_UMA_CTS_C_SIZE_Msk | \
++					 ((port == FLASH_PORT_PVT) ? (FIU_UMA_CTS_DEV_PRI_MSK) : (FIU_UMA_CTS_DEV_SHR_MSK)) | \
++					 4);
++			rd_size -= 4;
++
++			while (FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++			*rd_buf++ = FIU0->UMA_DB0;
++			*rd_buf++ = FIU0->UMA_DB1;
++			*rd_buf++ = FIU0->UMA_DB2;
++			*rd_buf++ = FIU0->UMA_DB3;
++		} else {
++			/* Read per 4 byte */
++			if(cs_auto == 0) {
++				FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | \
++						 FIU_UMA_CTS_C_SIZE_Msk | \
++						 ((port == FLASH_PORT_PVT) ? (FIU_UMA_CTS_DEV_PRI_MSK) : (FIU_UMA_CTS_DEV_SHR_MSK)) | \
++						 (rd_size & 0x07));
++
++			while(FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++			} else {
++				/* total rd_len < 4 */
++				FIU0->UMA_CTS = (FIU_UMA_CTS_EXEC_DONE_Msk | \
++						 ((port == FLASH_PORT_PVT) ? (FIU_UMA_CTS_DEV_PRI_MSK) : (FIU_UMA_CTS_DEV_SHR_MSK)) | \
++						 a_size | \
++						 (rd_size & 0x07));
++
++				while(FIU0->UMA_CTS & FIU_UMA_CTS_EXEC_DONE_Msk);
++			}
++
++			pspidat = (uint8_t*)(&(FIU0->UMA_DB0));
++			while(rd_size--) {
++				*rd_buf++ = *pspidat++;
++			}
++
++			rd_size = 0;
++		}
++	}
++
++	if(cs_auto == 0) {
++		// CS_HIGH
++		FIU0->UMA_ECTS = (FIU_UMA_ECTS_SW_CS0_Msk | FIU_UMA_ECTS_SW_CS1_Msk | FIU_UMA_ECTS_SW_CS2_Msk);
++		FIU0->MSR_IE_CFG &= ~FIU_MSR_IE_CGF_UMA_BLOCK_Msk;
++	}
++
++    return 0;
++}
++
++static uint8_t fiu_get_flash_info(enum flash_port port, uint8_t *buf)
++{
++	uint32_t flash_size;
++	uint8_t wr_buf[5] = {0x5A, 0, 0, 0, 0};
++	uint8_t rd_buf[0x10] = {0};
++
++	/* Read JEDEC ID */
++	FIU_CmdReadWrite(port, FLASH_CMD_READ_JEDEC_ID, 0, 3, 0, rd_buf);
++	buf[0] = rd_buf[2];
++	buf[1] = rd_buf[1];
++	buf[2] = rd_buf[0];
++
++	halspi_rw(port, wr_buf, 5, rd_buf, 16);
++
++	/* Check the SFDP header */
++	if (!(rd_buf[0] == 'S' && rd_buf[1] == 'F' && rd_buf[2] == 'D' && rd_buf[3] == 'P'))
++		return 0xFF;
++
++	/* Access SFDP parameter table */
++	wr_buf[0] = 0x5A;
++	wr_buf[1] = rd_buf[0xE];
++	wr_buf[2] = rd_buf[0xD];
++	wr_buf[3] = rd_buf[0xC];
++	wr_buf[4] = 0x00;
++
++	halspi_rw(port, wr_buf, 5, rd_buf, 8);
++
++	/* Get the Flash memory density */
++	if (rd_buf[7] & 0x80)
++		return 0xFF;
++
++	flash_size = ((rd_buf[4] | (rd_buf[5] << 8) | (rd_buf[6] << 16) | (rd_buf[7] << 24)) + 1) >> 3;
++	buf[4] = flash_size & 0xFF;
++	buf[5] = (flash_size >> 8) & 0xFF;
++	buf[6] = (flash_size >> 16) & 0xFF;
++	buf[7] = (flash_size >> 24) & 0xFF;
++
++	/* Verify if the flash supports 4-byte addressing mode */
++	buf[8] = (rd_buf[2] & 0x03) ? 1 : 0;
++
++	return 0;
++}
++
++static void fiu_quad_mode(enum flash_port port, uint8_t enable)
++{
++	#define WB_GIGA_REG2_QE     0x02
++	#define MXIC_XMC_REG1_QE    0x40
++
++	uint8_t reg[2];
++	uint8_t EDID[3];
++
++	FIU_CmdReadWrite(port, FLASH_CMD_READ_JEDEC_ID, 0, 3, 0, EDID);
++	FIU_CmdReadWrite(port, FLASH_CMD_READ_STATUS_REG, 0, 1, 0, reg);
++	FIU_CmdReadWrite(port, FLASH_CMD_READ_STATUS2_REG, 0, 1, 0, (reg + 1));
++
++	if(EDID[0] == FLASH_ID_WINBOND || EDID[0] == FLASH_ID_GIGADEV) {
++		if (enable) {
++			reg[1] |= WB_GIGA_REG2_QE;
++		} else {
++			reg[1] &= ~WB_GIGA_REG2_QE;
++		}
++	} else if (EDID[0] == FLASH_ID_MXIC || EDID[0] == FLASH_ID_MICRON) {
++		if (enable) {
++			reg[0] |= MXIC_XMC_REG1_QE;
++		} else {
++			reg[0] &= ~MXIC_XMC_REG1_QE;
++		}
++	}
++	FIU_CmdReadWrite(port, FLASH_CMD_WRITE_STATUS_REG, 2, 0, reg, 0);
++}
++
++static void fiu_4byte_mode(enum flash_port port, uint8_t enter)
++{
++	FIU_CmdReadWrite(port, (enter) ? (FLASH_CMD_ENTER_4BYTE_MODE) : (FLASH_CMD_EXIT_4BYTE_MODE), 0, 0, 0, 0);
++}
++
++static void PinSelect(enum flash_port port)
++{
++	switch (port) {
++	case FLASH_PORT_PVT:
++		RegSetBit(SCFG->DEVALTC, (BIT3 | BIT2));
++		RegClrBit(SCFG->DEV_CTL3, BIT1);
++		RegSetBit(SCFG->DEVALT0, BIT1);
++		break;
++        case FLASH_PORT_SHD:
++		RegClrBit(SCFG->DEVCNT, BIT6);
++		RegSetBit(SCFG->DEVALTC, (BIT3 | BIT2));
++		RegClrBit(SCFG->DEV_CTL3, BIT1);
++		break;
++        case FLASH_PORT_BKP:
++		RegSetBit(SCFG->DEVALTC, (BIT3 | BIT2));
++		RegClrBit(SCFG->DEV_CTL3, BIT1);
++		RegSetBit(SCFG->DEVALT0, BIT2);
++		break;
++        default:
++		break;
++	}
++}
++
++static void FIU_OpenPort(enum flash_port port, uint8_t quad_mode)
++{
++	/* Set FIU clock to 24MHz */
++	SET_FIU_CLK_DIV(0x03);
++
++	FIU0->BURST_CFG = FIU_BURST_CFG_R_BURST_Msk;
++
++	/* Share SPI not tri-state */
++	SET_FIU_SHD_ACTIVE;
++
++	ENABLE_FIU_SHD_SPI;
++	FIU_SWITCH_TO_SHARE;
++
++	if (quad_mode)
++		ENABLE_FIU_SHD_QUAD;
++
++	if(port == FLASH_PORT_PVT) {
++		PinSelect(FLASH_PORT_PVT);
++		ENABLE_FIU_PVT_CS;
++	} else if(port == FLASH_PORT_BKP) {
++		PinSelect(FLASH_PORT_BKP);
++		ENABLE_FIU_BKP_CS;
++	} else {
++		PinSelect(FLASH_PORT_SHD);
++	}
++}
++
++static void fiu_port_init(enum flash_port port, uint8_t quad_mode, uint8_t adr_4b)
++{
++	FIU_OpenPort(port, quad_mode);
++	fiu_quad_mode(port, quad_mode);
++	fiu_4byte_mode(port, adr_4b);
++}
++
++static void flashloader_init(void)
++{
++	/* Initialize the flashloader parameters and buffer */
++	memset((struct nct_esio_flash_params *)&g_cfg, 0, sizeof(struct nct_esio_flash_params));
++	memset((uint8_t *)g_buf, 0, sizeof(g_buf));
++	g_cfg.state = FLASH_ALGO_STATE_IDLE;
++}
++
++int main(void)
++{
++	uint8_t status;
++
++	flashloader_init();
++
++	while (1) {
++		while (g_cfg.state == FLASH_ALGO_STATE_IDLE);
++
++		switch (g_cfg.cmd) {
++		case FLASH_ALGO_CMD_INIT:
++			FIU_OpenPort(g_cfg.type, FLASH_MODE_SINGLE);
++			status = fiu_get_flash_info(g_cfg.type, (uint8_t *)g_buf);
++			break;
++		case FLASH_ALGO_CMD_ERASE:
++			fiu_port_init(g_cfg.type, FLASH_MODE_SINGLE, g_cfg.adr_4b);
++			status = fiu_sector_erase(g_cfg.type, g_cfg.addr, g_cfg.adr_4b);
++			break;
++		case FLASH_ALGO_CMD_PROGRAM:
++			fiu_port_init(g_cfg.type, FLASH_MODE_SINGLE, g_cfg.adr_4b);
++			status = fiu_program(g_cfg.type, g_cfg.addr, (uint8_t *)g_buf, g_cfg.len, g_cfg.adr_4b);
++			break;
++		case FLASH_ALGO_CMD_READ:
++			fiu_port_init(g_cfg.type, FLASH_MODE_SINGLE, g_cfg.adr_4b);
++			status = fiu_read(g_cfg.type, g_cfg.addr, (uint8_t *)g_buf, g_cfg.len, g_cfg.adr_4b);
++			break;
++		case FLASH_ALGO_CMD_VERIFY:
++			fiu_port_init(g_cfg.type, FLASH_MODE_SINGLE, g_cfg.adr_4b);
++			status = fiu_verify(g_cfg.type, g_cfg.addr, (uint8_t *)g_buf, g_cfg.len, g_cfg.adr_4b);
++			break;
++		default:
++			status = 0xff;
++			break;
++		}
++
++		if (status != 0) {
++			g_cfg.state = status;
++			while (1);
++		} else {
++			g_cfg.state = FLASH_ALGO_STATE_IDLE;
++		}
++	}
++	return 0;
++}
++
++__attribute__ ((section(".stack")))
++__attribute__ ((used))
++static uint32_t stack[400 / 4];
++extern uint32_t _estack;
++extern uint32_t _bss;
++extern uint32_t _ebss;
++
++__attribute__ ((section(".entry")))
++void entry(void)
++{
++	/* set sp from end of stack */
++	__asm(" ldr sp, =_estack - 4");
++
++	main();
++
++	__asm(" bkpt #0x00");
++}
++
+diff --git a/contrib/loaders/flash/nct_esio/nct6694d_flash.h b/contrib/loaders/flash/nct_esio/nct6694d_flash.h
+new file mode 100644
+index 000000000..ed90f5f68
+--- /dev/null
++++ b/contrib/loaders/flash/nct_esio/nct6694d_flash.h
+@@ -0,0 +1,529 @@
++/* SPDX-License-Identifier: GPL-2.0-or-later */
++
++#ifndef OPENOCD_LOADERS_FLASH_NCT_ESIO_NCT6694D_FLASH_H
++#define OPENOCD_LOADERS_FLASH_NCT_ESIO_NCT6694D_FLASH_H
++
++/* Define one bit mask */
++#define BIT0	(0x00000001)	///< Bit 0 mask of an 32 bit integer
++#define BIT1	(0x00000002)	///< Bit 1 mask of an 32 bit integer
++#define BIT2	(0x00000004)	///< Bit 2 mask of an 32 bit integer
++#define BIT3	(0x00000008)	///< Bit 3 mask of an 32 bit integer
++#define BIT4	(0x00000010)	///< Bit 4 mask of an 32 bit integer
++#define BIT5	(0x00000020)	///< Bit 5 mask of an 32 bit integer
++#define BIT6	(0x00000040)	///< Bit 6 mask of an 32 bit integer
++#define BIT7	(0x00000080)	///< Bit 7 mask of an 32 bit integer
++#define BIT8	(0x00000100)	///< Bit 8 mask of an 32 bit integer
++#define BIT9	(0x00000200)	///< Bit 9 mask of an 32 bit integer
++#define BIT10	(0x00000400)	///< Bit 10 mask of an 32 bit integer
++#define BIT11	(0x00000800)	///< Bit 11 mask of an 32 bit integer
++#define BIT12	(0x00001000)	///< Bit 12 mask of an 32 bit integer
++#define BIT13	(0x00002000)	///< Bit 13 mask of an 32 bit integer
++#define BIT14	(0x00004000)	///< Bit 14 mask of an 32 bit integer
++#define BIT15	(0x00008000)	///< Bit 15 mask of an 32 bit integer
++#define BIT16	(0x00010000)	///< Bit 16 mask of an 32 bit integer
++#define BIT17	(0x00020000)	///< Bit 17 mask of an 32 bit integer
++#define BIT18	(0x00040000)	///< Bit 18 mask of an 32 bit integer
++#define BIT19	(0x00080000)	///< Bit 19 mask of an 32 bit integer
++#define BIT20	(0x00100000)	///< Bit 20 mask of an 32 bit integer
++#define BIT21	(0x00200000)	///< Bit 21 mask of an 32 bit integer
++#define BIT22	(0x00400000)	///< Bit 22 mask of an 32 bit integer
++#define BIT23	(0x00800000)	///< Bit 23 mask of an 32 bit integer
++#define BIT24	(0x01000000)	///< Bit 24 mask of an 32 bit integer
++#define BIT25	(0x02000000)	///< Bit 25 mask of an 32 bit integer
++#define BIT26	(0x04000000)	///< Bit 26 mask of an 32 bit integer
++#define BIT27	(0x08000000)	///< Bit 27 mask of an 32 bit integer
++#define BIT28	(0x10000000)	///< Bit 28 mask of an 32 bit integer
++#define BIT29	(0x20000000)	///< Bit 29 mask of an 32 bit integer
++#define BIT30	(0x40000000)	///< Bit 30 mask of an 32 bit integer
++#define BIT31	(0x80000000)	///< Bit 31 mask of an 32 bit integer
++
++#define RegSetBit(Reg, BitMsk)	{(Reg) |= (BitMsk);}	// Set register bit
++#define RegClrBit(Reg, BitMsk)	{(Reg) &= ~(BitMsk);}	// Clear register bit
++
++enum flash_algo_command {
++	FLASH_ALGO_CMD_INIT = 0,
++	FLASH_ALGO_CMD_ERASE,
++	FLASH_ALGO_CMD_PROGRAM,
++	FLASH_ALGO_CMD_READ,
++	FLASH_ALGO_CMD_VERIFY,
++};
++
++enum flash_algo_state {
++	FLASH_ALGO_STATE_IDLE = 0,
++	FLASH_ALGO_STATE_BUSY,
++};
++
++enum flash_port {
++	FLASH_PORT_PVT = 0,
++	FLASH_PORT_SHD,
++	FLASH_PORT_BKP,
++	FLASH_PORT_INTERNAL = 0xFF,
++};
++
++enum flash_mode {
++	FLASH_MODE_SINGLE,
++	FLASH_MODE_DUAL,
++	FLASH_MODE_QUAD,
++};
++
++enum flash_command {
++	FLASH_CMD_WRITE_STATUS_REG		= 0x01,
++	FLASH_CMD_PAGE_PROGRAM			= 0x02,
++	FLASH_CMD_READ_DATA			= 0x03,
++	FLASH_CMD_WRITE_DISABLE			= 0x04,
++	FLASH_CMD_READ_STATUS_REG		= 0x05,
++	FLASH_CMD_WRITE_ENABLE			= 0x06,
++	FLASH_CMD_4BYTE_PROGRAM			= 0x12,
++	FLASH_CMD_4BYTE_READ			= 0x13,
++	FLASH_CMD_SECTOR_ERASE			= 0x20,
++	FLASH_CMD_4BYTE_SECTOR_ERASE		= 0x21,
++	FLASH_CMD_READ_STATUS2_REG		= 0x35,
++	FLASH_CMD_ENTER_4BYTE_MODE		= 0xB7,
++	FLASH_CMD_EXIT_4BYTE_MODE		= 0xE9,
++	FLASH_CMD_READ_JEDEC_ID			= 0x9F,
++};
++
++/* Flash loader parameters */
++struct __attribute__((__packed__)) nct_esio_flash_params {
++	volatile uint8_t state;		/* Flash loader state */
++	volatile uint8_t cmd;		/* Flash loader command */
++	volatile uint8_t type;		/* Flash type */
++	volatile uint8_t adr_4b;	/* 4-byte address mode */
++	volatile uint32_t version;	/* Flash loader version */
++	volatile uint32_t addr; 	/* Address in flash */
++	volatile uint32_t len;  	/* Number of bytes */
++	volatile uint32_t reserved; /* Reserved */
++};
++
++/*==============================================================================================================*/
++/* SPI Master Mode (SPIM) Registers																				*/
++/*==============================================================================================================*/
++typedef struct {
++	volatile unsigned long CTL0;		/*!< [0x00]	Control and Status Register 0				*/
++	volatile unsigned long CTL1;		/*!< [0x04]	Control Register 1							*/
++	volatile unsigned long RESERVED1[1];
++	volatile unsigned long RXCLKDLY;	/*!< [0x0C]	RX Clock Delay Control Register				*/
++	volatile unsigned long RX[4];		/*!< [0x10]	Data Receive Register						*/
++	volatile unsigned long TX[4];		/*!< [0x20]	Data Transmit Register						*/
++	volatile unsigned long SRAMADDR;	/*!< [0x30]	SRAM Memory Address Register				*/
++	volatile unsigned long DMACNT;		/*!< [0x34]	DMA Transfer Byte Count Register			*/
++	volatile unsigned long FADDR;		/*!< [0x38]	SPI Flash Address Register					*/
++	volatile unsigned long KEY1;		/*!< [0x3C]	Cipher Key1 Register						*/
++	volatile unsigned long KEY2;		/*!< [0x40]	Cipher Key2 Register						*/
++	volatile unsigned long DMMCTL;		/*!< [0x44]	Direct Memory Mapping Mode Control Register	*/
++	volatile unsigned long CTL2;		/*!< [0x48]	Control Register 2							*/
++	volatile unsigned long VERSION;		/*!< [0x4C]	SPIM Version Control Register				*/
++} SPIM_T;
++
++#define SPIM	((SPIM_T *)	(0x40017000))
++
++/*----------------------*/
++/* SPIM_CTL0 fields	*/
++/*----------------------*/
++#define SPIM_CTL0_CMDCODE_Pos	(24)
++#define SPIM_CTL0_CMDCODE_Msk	(0xFF << SPIM_CTL0_CMDCODE_Pos)
++
++#define SPIM_CTL0_OPMODE_Pos	(22)
++#define SPIM_CTL0_OPMODE_Msk	(0x3 << SPIM_CTL0_OPMODE_Pos)
++
++#define SPIM_CTL0_BITMODE_Pos	(20)
++#define SPIM_CTL0_BITMODE_Msk	(0x3 << SPIM_CTL0_BITMODE_Pos)
++
++#define SPIM_CTL0_QDIODIR_Pos	(15)
++#define SPIM_CTL0_QDIODIR_Msk	(0x1 << SPIM_CTL0_QDIODIR_Pos)
++
++#define SPIM_CTL0_BURSTNUM_Pos	(13)
++#define SPIM_CTL0_BURSTNUM_Msk	(0x3 << SPIM_CTL0_BURSTNUM_Pos)
++
++#define SPIM_CTL0_DWIDTH_Pos	(8)
++#define SPIM_CTL0_DWIDTH_Msk	(0x1F << SPIM_CTL0_DWIDTH_Pos)
++
++#define SPIM_CTL0_CIPHOFF_Pos	(0)
++#define SPIM_CTL0_CIPHOFF_Msk	(0x1 << SPIM_CTL0_CIPHOFF_Pos)
++
++/*----------------------*/
++/* SPIM_CTL1 fields	*/
++/*----------------------*/
++#define SPIM_CTL1_DIVIDER_Pos	(16)
++#define SPIM_CTL1_DIVIDER_Msk	(0xFF << SPIM_CTL1_DIVIDER_Pos)
++
++#define SPIM_CTL1_SS_Pos	(4)
++#define SPIM_CTL1_SS_Msk	(0x1 << SPIM_CTL1_SS_Pos)
++
++#define SPIM_CTL1_CDINVAL_Pos	(3)
++#define SPIM_CTL1_CDINVAL_Msk	(0x1 << SPIM_CTL1_CDINVAL_Pos)
++
++#define SPIM_CTL1_SPIMEN_Pos	(0)
++#define SPIM_CTL1_SPIMEN_Msk	(0x1 << SPIM_CTL1_SPIMEN_Pos)
++
++#define SPIM_MODE_NORMAL	0
++#define SPIM_MODE_DMA_WRITE	1
++#define SPIM_BITMODE_SINGLE	0
++
++#define SPIM_CTL0_NORMAL(bit_mode, output, bitwidth, len) \
++	((SPIM_MODE_NORMAL << SPIM_CTL0_OPMODE_Pos) | \
++	((bit_mode) << SPIM_CTL0_BITMODE_Pos) | \
++	((output) << SPIM_CTL0_QDIODIR_Pos) | \
++	((bitwidth-1) << SPIM_CTL0_DWIDTH_Pos) | \
++	(((len) - 1) << SPIM_CTL0_BURSTNUM_Pos) | \
++	SPIM_CTL0_CIPHOFF_Msk);
++
++/*==============================================================================================================*/
++/* HIGH-FREQUENCY CLOCK GENERATOR (HFCG)																		*/
++/*==============================================================================================================*/
++typedef struct {
++	volatile uint8_t CTRL;			/*!< [0x00]	HFCG Control				*/
++	volatile uint8_t RESERVED1[1];
++	volatile uint8_t ML;			/*!< [0x02]	HFCG M Low Byte Value		*/
++	volatile uint8_t RESERVED2[1];
++	volatile uint8_t MH;			/*!< [0x04]	HFCG M High Byte Value		*/
++	volatile uint8_t RESERVED3[1];
++	volatile uint8_t N;				/*!< [0x06]	HFCG N Value				*/
++	volatile uint8_t RESERVED4[1];
++	volatile uint8_t P;				/*!< [0x08]	HFCG Prescaler				*/
++	volatile uint8_t RESERVED5[7];
++	volatile uint8_t BCD;			/*!< [0x10]	HFCG Bus Clock Dividers		*/
++	volatile uint8_t RESERVED6[1];
++	volatile uint8_t BCD1;			/*!< [0x12]	HFCG Bus Clock Dividers 1	*/
++	volatile uint8_t RESERVED7[1];
++	volatile uint8_t BCD2;			/*!< [0x14]	HFCG Bus Clock Dividers 2	*/
++} HFCG_T;
++
++#define HFCG	((HFCG_T *)	(0x400B5000))
++
++/*==============================================================================================================*/
++/* System Configuration Core Registers																			*/
++/*==============================================================================================================*/
++typedef struct {
++	volatile uint8_t DEVCNT;			/*!< [0x00]	Device Control						*/
++	volatile const uint8_t STRPST;		/*!< [0x01]	Straps Status						*/
++	volatile uint8_t RSTCTL;			/*!< [0x02]	Reset Control and Status			*/
++	volatile uint8_t DEV_CTL2;			/*!< [0x03]	Device Control 2					*/
++	volatile uint8_t DEV_CTL3;			/*!< [0x04]	Device Control 3					*/
++	volatile uint8_t RESERVED1[1];
++	volatile uint8_t DEV_CTL4;			/*!< [0x06]	Device Control 4					*/
++	volatile uint8_t RESERVED2[4];
++	volatile uint8_t DEVALT10;			/*!< [0x0B]	Device Alternate Function 10		*/
++	volatile uint8_t DEVALT11;			/*!< [0x0C]	Device Alternate Function 11		*/
++	volatile const uint8_t DEVALT12;	/*!< [0x0D]	Device Alternate Function 12		*/
++	volatile uint8_t RESERVED3[2];
++	volatile uint8_t DEVALT0;			/*!< [0x10]	Device Alternate Function 0			*/
++	volatile uint8_t DEVALT1;			/*!< [0x11]	Device Alternate Function 1			*/
++	volatile uint8_t DEVALT2;			/*!< [0x12]	Device Alternate Function 2			*/
++	volatile uint8_t DEVALT3;			/*!< [0x13]	Device Alternate Function 3			*/
++	volatile uint8_t DEVALT4;			/*!< [0x14]	Device Alternate Function 4			*/
++	volatile uint8_t DEVALT5;			/*!< [0x15]	Device Alternate Function 5			*/
++	volatile uint8_t DEVALT6;			/*!< [0x16]	Device Alternate Function 6			*/
++	volatile uint8_t DEVALT7;			/*!< [0x17]	Device Alternate Function 7			*/
++	volatile uint8_t DEVALT8;			/*!< [0x18]	Device Alternate Function 8			*/
++	volatile uint8_t DEVALT9;			/*!< [0x19]	Device Alternate Function 9			*/
++	volatile uint8_t DEVALTA;			/*!< [0x1A]	Device Alternate Function A			*/
++	volatile uint8_t DEVALTB;			/*!< [0x1B]	Device Alternate Function B			*/
++	volatile uint8_t DEVALTC;			/*!< [0x1C]	Device Alternate Function C			*/
++	volatile uint8_t RESERVED6[1];
++	volatile uint8_t DEVALTE;			/*!< [0x1E]	Device Alternate Function E			*/
++	volatile uint8_t RESERVED7[3];
++	volatile uint8_t DBGCTRL;			/*!< [0x22]	Device Alternate Function E			*/
++	volatile uint8_t RESERVED8[1];
++	volatile uint8_t DEVALTCX;			/*!< [0x24]	Device Alternate Function CX		*/
++	volatile uint8_t RESERVED9[3];
++	volatile uint8_t DEVPU0;			/*!< [0x28]	Device Pull-Up Enable 0				*/
++	volatile uint8_t DEVPD1;			/*!< [0x29]	Device Pull-Down Enable 1			*/
++	volatile uint8_t RESERVED10[1];
++	volatile uint8_t LV_CTL1;			/*!< [0x2B]	Low-Voltage Pins Control 1 Register	*/
++	volatile uint8_t RESERVED11[2];
++	volatile uint8_t DEVALT2E;			/*!< [0x2E]	Device Alternate Function 2E		*/
++	volatile uint8_t RESERVED12[1];
++	volatile uint8_t DEVALT30;			/*!< [0x30]	Device Alternate Function 30		*/
++	volatile uint8_t DEVALT31;			/*!< [0x31]	Device Alternate Function 31		*/
++	volatile uint8_t DEVALT32;			/*!< [0x32]	Device Alternate Function 32		*/
++	volatile uint8_t DEVALT33;			/*!< [0x33]	Device Alternate Function 33		*/
++	volatile uint8_t DEVALT34;			/*!< [0x34]	Device Alternate Function 34		*/
++	volatile uint8_t M4DIS;				/*!< [0x35]	Cortex-M4 function Disable			*/
++	volatile uint8_t RESERVED13[22];
++	volatile uint8_t EMCPHY_CTL;		/*!< [0x4C]	EMC Management Interface Control	*/
++	volatile uint8_t EMC_CTL;			/*!< [0x4D]	EMC Control							*/
++	volatile uint8_t RESERVED14[2];
++	volatile uint8_t DEVALT50;			/*!< [0x50]	ACPI_HW_SW_ctl_0					*/
++	volatile uint8_t DEVALT51;			/*!< [0x51]	ACPI_HW_SW_ctl_1					*/
++	volatile uint8_t DEVALT52;			/*!< [0x52]	ACPI_HW_SW_ctl_2					*/
++	volatile uint8_t DEVALT53;			/*!< [0x53]	ACPI_HW_SW_val_0					*/
++	volatile uint8_t DEVALT54;			/*!< [0x54]	ACPI_HW_SW_val_1					*/
++	volatile uint8_t DEVALT55;			/*!< [0x55]	ACPI_HW_SW_val_2					*/
++	volatile uint8_t RESERVED15[3];
++	volatile uint8_t DEVALT59;			/*!< [0x59]	ACPI_HW_OD_SEL_0					*/
++	volatile uint8_t DEVALT5A;			/*!< [0x5A]	ACPI_HW_OD_SEL_1					*/
++	volatile uint8_t DEVALT5B;			/*!< [0x5B]	ACPI_HW_OD_SEL_2					*/
++	volatile uint8_t DEVALT5C;			/*!< [0x5C]	ACPI_GPIO_SEL_0						*/
++	volatile uint8_t DEVALT5D;			/*!< [0x5D]	ACPI_GPIO_SEL_1						*/
++	volatile uint8_t DEVALT5E;			/*!< [0x5E]	ACPI_GPIO_SEL_2						*/
++	volatile uint8_t DEVALT5F;			/*!< [0x5F]	ACPI_GPIO_SEL_3						*/
++	volatile uint8_t RESERVED16[2];
++	volatile uint8_t DEVALT62;			/*!< [0x62]	Device Alternate Function 62		*/
++	volatile uint8_t RESERVED17[3];
++	volatile uint8_t DEVALT66;			/*!< [0x66]	Device Alternate Function 66		*/
++	volatile uint8_t DEVALT67;			/*!< [0x67]	Device Alternate Function 67		*/
++	volatile uint8_t RESERVED18[1];
++	volatile uint8_t DEVALT69;			/*!< [0x69]	Device Alternate Function 69		*/
++	volatile uint8_t RESERVED19[1];
++	volatile uint8_t DEVALT6B;			/*!< [0x6B]	Device Alternate Function 6B		*/
++	volatile uint8_t DEVALT6C;			/*!< [0x6C]	Device Alternate Function 6C		*/
++	volatile uint8_t DEVALT6D;			/*!< [0x6D]	Device Alternate Function 6D		*/
++	volatile uint8_t LV_CTL4;			/*!< [0x6E]	Low-Voltage Control 4				*/
++	volatile uint8_t RESERVED20[4];
++	volatile uint8_t DEVPU2;			/*!< [0x73]	Device Pull-Up Enable 2				*/
++	volatile uint8_t RESERVED21[2];
++	volatile uint8_t DBGFRZEN1;			/*!< [0x76]	Debug Freeze Enable 1				*/
++	volatile uint8_t DBGFRZEN2;			/*!< [0x77]	Debug Freeze Enable 2				*/
++	volatile uint8_t DBGFRZEN3;			/*!< [0x78]	Debug Freeze Enable 3				*/
++	volatile uint8_t DBGFRZEN4;			/*!< [0x79]	Debug Freeze Enable 4				*/
++} SCFG_T;
++
++#define SCFG	((SCFG_T *)	(0x400C3000))
++
++/*==============================================================================================================*/
++/* FLASH INTERFACE UNIT (FIU)																					*/
++/*==============================================================================================================*/
++typedef struct {
++	volatile uint8_t CFG;				/*!< [0x00]	FIU Configuration								*/
++	volatile uint8_t BURST_CFG;			/*!< [0x01]	Burst Configuration								*/
++	volatile uint8_t RESP_CFG;			/*!< [0x02]	FIU Response Configuration						*/
++	volatile uint8_t Reserved1[17];
++	volatile uint8_t SPI_FL_CFG;		/*!< [0x14]	SPI Flash Configuration							*/
++	volatile uint8_t Reserved2[1];
++	volatile uint8_t UMA_CODE;			/*!< [0x16]	UMA Code Byte									*/
++	volatile uint8_t UMA_AB0;			/*!< [0x17]	UMA Address Byte 0								*/
++	volatile uint8_t UMA_AB1;			/*!< [0x18]	UMA Address Byte 1								*/
++	volatile uint8_t UMA_AB2;			/*!< [0x19]	UMA Address Byte 2								*/
++	volatile uint8_t UMA_DB0;			/*!< [0x1A]	UMA Data Byte 0									*/
++	volatile uint8_t UMA_DB1;			/*!< [0x1B]	UMA Data Byte 1									*/
++	volatile uint8_t UMA_DB2;			/*!< [0x1C]	UMA Data Byte 2									*/
++	volatile uint8_t UMA_DB3;			/*!< [0x1D]	UMA Data Byte 3									*/
++	volatile uint8_t UMA_CTS;			/*!< [0x1E]	UMA Control and Status							*/
++	volatile uint8_t UMA_ECTS;			/*!< [0x1F]	UMA Extended  Control and Status				*/
++	volatile const uint32_t UMA_DB0_3;	/*!< [0x20]	UMA Data Bytes 0-3								*/
++	volatile uint8_t Reserved3[2];
++ 	volatile uint8_t CRCCON;			/*!< [0x26]	CRC Control Register							*/
++	volatile uint8_t CRCENT;			/*!< [0x27]	CRC Entry Register								*/
++	volatile uint32_t CRCRSLT;			/*!< [0x28]	CRC Initialization and Result Register			*/
++	volatile uint8_t Reserved4[2];
++	volatile uint8_t RD_CMD_BKP;		/*!< [0x2E]	FIU Read Command (6694)							*/
++	volatile uint8_t Reserved5;
++	volatile uint8_t RD_CMD_PVT;		/*!< [0x30]	FIU Read Command (6694)							*/
++	volatile uint8_t RD_CMD_SHD;		/*!< [0x31]	FIU Read Command (6694)							*/
++	volatile uint8_t DMM_CYC;			/*!< [0x32]	FIU Dummy Cycles								*/
++	volatile uint8_t EXT_CFG;			/*!< [0x33]	FIU Extended Configuration						*/
++	volatile uint32_t UMA_AB0_3;		/*!< [0x34]	UMA Address Bytes 0-3							*/
++	volatile uint8_t Reserved6[4];
++	volatile uint8_t SET_CMD_EN;		/*!< [0x3C]	Set command enable in 4 Byte address mode		*/
++	volatile uint8_t SHD_4B_EN;			/*!< [0x3D]	4 Byte address mode Enable						*/
++	volatile uint8_t Reserved7[3];
++	volatile uint8_t MI_CNT_THRSH;		/*!< [0x41]	Master Inactive Counter Threshold				*/
++	volatile uint8_t MSR_STS;			/*!< [0x42]	FIU Master Status								*/
++	volatile uint8_t MSR_IE_CFG;		/*!< [0x43]	FIU Master Interrupt Enable and Configuration	*/
++	volatile uint8_t Q_P_EN;			/*!< [0x44]	FIU Master Interrupt Enable and Configuration	*/
++	volatile uint8_t Reserved8[3];
++	volatile uint8_t EXT_DB_CFG;		/*!< [0x48]	Quad Program Enable								*/
++	volatile uint8_t DIRECT_WR_CFG;		/*!< [0x49]	SPI Direct Write Configuration					*/
++	volatile uint8_t Reserved9[6];
++	volatile uint8_t UMA_EXT_DB[16];	/*!< [0x50]	Extended Data Buffer							*/
++} FIU_T;
++
++#define FIU0	((FIU_T *)	(0x40020000))
++
++//++-----------------------------------------++//
++
++#define FIU_UMA_CTS_DEV_PRI_MSK	0
++#define FIU_UMA_CTS_DEV_SHR_MSK	FIU_UMA_CTS_DEV_NUM_Msk
++
++//++-----------------------------------------++//
++
++#define FIU_Set_4B_CMD_EN(fiu, cmd)	{(fiu == FLASH_PORT_PVT)?(FIU0->SET_CMD_EN |= FIU_SET_PVT_CMD_EN_Msk): \
++					((fiu == FLASH_PORT_BKP)?(FIU0->SET_CMD_EN |= FIU_SET_BKP_CMD_EN_Msk):\
++					(FIU0->SET_CMD_EN |= FIU_SET_SHD_CMD_EN_Msk)); \
++					FIU0->EXT_CFG |= (FIU_EXT_CFG_FOUR_BADDR_Msk); \
++					(fiu == FLASH_PORT_PVT)?(FIU0->RD_CMD_PVT = cmd):\
++					((fiu == FLASH_PORT_BKP)?(FIU0->RD_CMD_BKP = cmd):(FIU0->RD_CMD_SHD = cmd));}
++#define FIU_Clr_4B_CMD_EN(fiu)		{(fiu == FLASH_PORT_PVT)?(FIU0->SET_CMD_EN &= ~FIU_SET_PVT_CMD_EN_Msk):\
++					(fiu == FLASH_PORT_BKP)?(FIU0->SET_CMD_EN &= ~FIU_SET_BKP_CMD_EN_Msk):\
++					(FIU0->SET_CMD_EN &= ~FIU_SET_SHD_CMD_EN_Msk);\
++					FIU0->EXT_CFG &= ~(FIU_EXT_CFG_SET_CMD_EN_Msk | FIU_EXT_CFG_FOUR_BADDR_Msk); }
++
++//++-----------------------------------------++//
++
++#define FIU_Quad_Mode_Enable	{ FIU0->RESP_CFG |= FIU_RESP_CFG_QUAD_EN_Msk;}
++#define FIU_Quad_Mode_Disable	{ FIU0->RESP_CFG &= ~FIU_RESP_CFG_QUAD_EN_Msk;}
++
++//++-----------------------------------------++//
++
++#define SET_FIU_CLK_DIV(div)    {HFCG->BCD1 = ((HFCG->BCD1&(~HFCG_BCD1_FIUDIV_Msk))|((div&0x03)<<HFCG_BCD1_FIUDIV_Pos));}
++
++//++-----------------------------------------++//
++
++#define BASE_FIU_PVT	0x60000000
++#define BASE_FIU_SHD	0x70000000
++#define BASE_FIU_BKP	0x80000000
++#define BASE_FIU(n)	(0x60000000+(0x10000000*n))
++
++// FIU pin confiugration
++#define SET_FIU_SHD_TRI_STATE	{ SCFG->DEVCNT |= SCFG_DEVCNT_SHD_SPI_TRIS_Msk; }
++#define SET_FIU_SHD_ACTIVE		{ SCFG->DEVCNT &= ~SCFG_DEVCNT_SHD_SPI_TRIS_Msk; }
++
++#define ENABLE_FIU_SHD_QUAD		{ SCFG->DEVALTC |= SCFG_DEVALTC_SHD_SPI_QUAD_Msk; }
++#define DISABLE_FIU_SHD_QUAD	{ SCFG->DEVALTC &= ~SCFG_DEVALTC_SHD_SPI_QUAD_Msk; }
++
++#define ENABLE_FIU_SHD_SPI		{ SCFG->DEVALTC |= SCFG_DEVALTC_SHD_SPI_Msk; }
++#define DISABLE_FIU_SHD_SPI		{ SCFG->DEVALTC &= ~SCFG_DEVALTC_SHD_SPI_Msk; }
++
++#define ENABLE_FIU_PVT_CS		{ SCFG->DEVALT0 |= SCFG_DEVALT0_FIU_PVT_CS_SL_Msk; }
++#define DISABLE_FIU_PVT_CS		{ SCFG->DEVALT0 &= ~SCFG_DEVALT0_FIU_PVT_CS_SL_Msk; }
++
++#define ENABLE_FIU_BKP_CS		{ SCFG->DEVALT0 |= SCFG_DEVALT0_FIU_BAK_CS_SL_Msk; }
++#define DISABLE_FIU_BKP_CS		{ SCFG->DEVALT0 &= ~SCFG_DEVALT0_FIU_BAK_CS_SL_Msk; }
++
++// AMD eSPI
++#define FIU_SWITCH_TO_SHARE		{ SCFG->DEV_CTL4 &= ~SCFG_DEV_CTL4_AMD_EN_Msk; }
++
++/*--------------------------*/
++/* BURST_CFG fields         */
++/*--------------------------*/
++#define FIU_BURST_CFG_R_BURST_Pos	(0)
++#define FIU_BURST_CFG_R_BURST_Msk	(0x3 << FIU_BURST_CFG_R_BURST_Pos)
++
++/*--------------------------*/
++/* RESP_CFG fields          */
++/*--------------------------*/
++#define FIU_RESP_CFG_QUAD_EN_Pos	(3)
++#define FIU_RESP_CFG_QUAD_EN_Msk	(0x1 << FIU_RESP_CFG_QUAD_EN_Pos)
++
++/*--------------------------*/
++/* SPI_FL_CFG fields        */
++/*--------------------------*/
++#define FIU_SPI_FL_CFG_RD_MODE_Pos	(6)
++#define FIU_SPI_FL_CFG_RD_MODE_Msk	(0x3 << FIU_SPI_FL_CFG_RD_MODE_Pos)
++
++/*--------------------------*/
++/* UMA_CTS fields          */
++/*--------------------------*/
++#define FIU_UMA_CTS_EXEC_DONE_Pos	(7)
++#define FIU_UMA_CTS_EXEC_DONE_Msk	(0x1 << FIU_UMA_CTS_EXEC_DONE_Pos)
++
++#define FIU_UMA_CTS_DEV_NUM_Pos		(6)
++#define FIU_UMA_CTS_DEV_NUM_Msk		(0x1 << FIU_UMA_CTS_DEV_NUM_Pos)
++
++#define FIU_UMA_CTS_RD_WR_Pos		(5)
++#define FIU_UMA_CTS_RD_WR_Msk		(0x1 << FIU_UMA_CTS_RD_WR_Pos)
++
++#define FIU_UMA_CTS_C_SIZE_Pos		(4)
++#define FIU_UMA_CTS_C_SIZE_Msk		(0x1 << FIU_UMA_CTS_C_SIZE_Pos)
++
++#define FIU_UMA_CTS_A_SIZE_Pos		(3)
++#define FIU_UMA_CTS_A_SIZE_Msk		(0x1 << FIU_UMA_CTS_A_SIZE_Pos)
++
++/*--------------------------*/
++/* UMA_ECTS fields          */
++/*--------------------------*/
++#define FIU_UMA_ECTS_UMA_ADDR_SIZE_Pos	(4)
++#define FIU_UMA_ECTS_UMA_ADDR_SIZE_Msk	(0x7 << FIU_UMA_ECTS_UMA_ADDR_SIZE_Pos)
++
++#define FIU_UMA_ECTS_DEV_NUM_BKP_Pos	(3)
++#define FIU_UMA_ECTS_DEV_NUM_BKP_Msk	(0x1 << FIU_UMA_ECTS_DEV_NUM_BKP_Pos)
++
++#define FIU_UMA_ECTS_SW_CS2_Pos		(2)
++#define FIU_UMA_ECTS_SW_CS2_Msk		(0x1 << FIU_UMA_ECTS_SW_CS2_Pos)
++
++#define FIU_UMA_ECTS_SW_CS1_Pos		(1)
++#define FIU_UMA_ECTS_SW_CS1_Msk		(0x1 << FIU_UMA_ECTS_SW_CS1_Pos)
++
++#define FIU_UMA_ECTS_SW_CS0_Pos		(0)
++#define FIU_UMA_ECTS_SW_CS0_Msk		(0x1 << FIU_UMA_ECTS_SW_CS0_Pos)
++
++/*--------------------------*/
++/* FIU_EXT_CFG fields       */
++/*--------------------------*/
++#define FIU_EXT_CFG_SET_CMD_EN_Pos	(1)
++#define FIU_EXT_CFG_SET_CMD_EN_Msk	(0x1 << FIU_EXT_CFG_SET_CMD_EN_Pos)
++
++#define FIU_EXT_CFG_FOUR_BADDR_Pos	(0)
++#define FIU_EXT_CFG_FOUR_BADDR_Msk	(0x1 << FIU_EXT_CFG_FOUR_BADDR_Pos)
++
++/*--------------------------*/
++/* SET_CMD_EN fields        */
++/*--------------------------*/
++#define FIU_SET_BKP_CMD_EN_Pos		(6)
++#define FIU_SET_BKP_CMD_EN_Msk		(0x1 << FIU_SET_BKP_CMD_EN_Pos)
++
++#define FIU_SET_SHD_CMD_EN_Pos		(5)
++#define FIU_SET_SHD_CMD_EN_Msk		(0x1 << FIU_SET_SHD_CMD_EN_Pos)
++
++#define FIU_SET_PVT_CMD_EN_Pos		(4)
++#define FIU_SET_PVT_CMD_EN_Msk		(0x1 << FIU_SET_PVT_CMD_EN_Pos)
++
++/*--------------------------*/
++/* FIU_MSR_IE_CFG fields    */
++/*--------------------------*/
++#define FIU_MSR_IE_CGF_UMA_BLOCK_Pos	(3)
++#define FIU_MSR_IE_CGF_UMA_BLOCK_Msk	(0x1 << FIU_MSR_IE_CGF_UMA_BLOCK_Pos)
++
++/*--------------------------*/
++/* DEVCNT fields            */
++/*--------------------------*/
++#define SCFG_DEVCNT_SHD_SPI_TRIS_Pos	(6)
++#define SCFG_DEVCNT_SHD_SPI_TRIS_Msk	(0x1 << SCFG_DEVCNT_SHD_SPI_TRIS_Pos)
++
++/*--------------------------*/
++/* DEVALT0 fields           */
++/*--------------------------*/
++#define SCFG_DEVALT0_FIU_BAK_CS_SL_Pos	(2)
++#define SCFG_DEVALT0_FIU_BAK_CS_SL_Msk	(0x1 << SCFG_DEVALT0_FIU_BAK_CS_SL_Pos)
++#define SCFG_DEVALT0_FIU_PVT_CS_SL_Pos	(1)
++#define SCFG_DEVALT0_FIU_PVT_CS_SL_Msk	(0x1 << SCFG_DEVALT0_FIU_PVT_CS_SL_Pos)
++
++/*--------------------------*/
++/* DEVALTC fields           */
++/*--------------------------*/
++#define SCFG_DEVALTC_SHD_SPI_Pos		(3)
++#define SCFG_DEVALTC_SHD_SPI_Msk		(0x1 << SCFG_DEVALTC_SHD_SPI_Pos)
++#define SCFG_DEVALTC_SHD_SPI_QUAD_Pos	(2)
++#define SCFG_DEVALTC_SHD_SPI_QUAD_Msk	(0x1 << SCFG_DEVALTC_SHD_SPI_QUAD_Pos)
++
++/*--------------------------*/
++/* DEV_CTL4 fields          */
++/*--------------------------*/
++#define SCFG_DEV_CTL4_AMD_EN_Pos		(2)
++#define SCFG_DEV_CTL4_AMD_EN_Msk		(0x1 << SCFG_DEV_CTL4_AMD_EN_Pos)
++
++/*--------------------------*/
++/* HFCBCD1 fields           */
++/*--------------------------*/
++#define HFCG_BCD1_FIUDIV_Pos			(0)
++#define HFCG_BCD1_FIUDIV_Msk			(0x3 << HFCG_BCD1_FIUDIV_Pos)
++
++/*--------------------------*/
++/* EXT_DB_CFG fields        */
++/*--------------------------*/
++#define EXT_DB_CFG_EXT_DB_EN_Pos		(5)
++#define EXT_DB_CFG_EXT_DB_EN_Msk		(0x1 << EXT_DB_CFG_EXT_DB_EN_Pos)
++
++#define EXT_DB_CFG_D_SIZE_Pos			(0)
++#define EXT_DB_CFG_D_SIZE_Msk			(0x1F << EXT_DB_CFG_D_SIZE_Pos)
++
++/* Flash  ID */
++#define FLASH_ID_WINBOND				0xEF
++#define FLASH_ID_MXIC					0xC2
++#define FLASH_ID_GIGADEV				0xC8
++#define FLASH_ID_CYPRESS				0x01
++#define FLASH_ID_MICRON					0x20
++#define FLASH_ID_UNSUPP					0xFF
++
++/* GDMA */
++#define GDMA_BASE_ADDR					(0x40011000)
++#define M32(addr) (*((volatile unsigned long *) (addr)))
++
++#define GDMA_CTL0		M32(GDMA_BASE_ADDR + 0x00)
++#define GDMA_SRCB0		M32(GDMA_BASE_ADDR + 0x04)
++#define GDMA_DSTB0		M32(GDMA_BASE_ADDR + 0x08)
++#define GDMA_TCNT0		M32(GDMA_BASE_ADDR + 0x0C)
++
++#endif /* OPENOCD_LOADERS_FLASH_NCT_ESIO_NCT6694D_FLASH_H */
++
+diff --git a/contrib/loaders/flash/nct_esio/nct6694d_spim_algo.inc b/contrib/loaders/flash/nct_esio/nct6694d_spim_algo.inc
+new file mode 100644
+index 000000000..6346549dc
+--- /dev/null
++++ b/contrib/loaders/flash/nct_esio/nct6694d_spim_algo.inc
+@@ -0,0 +1,61 @@
++/* Autogenerated with ../../../../src/helper/bin2char.sh */
++0x08,0xb5,0xdf,0xf8,0x08,0xd0,0x00,0xf0,0x9d,0xf8,0x00,0x00,0x58,0x15,0x0c,0x20,
++0x2d,0xe9,0xf0,0x43,0x29,0x4c,0x07,0x9f,0x26,0x68,0x48,0xf2,0x01,0x75,0x25,0x60,
++0x20,0x62,0x60,0x68,0x20,0xf0,0x10,0x00,0x60,0x60,0x60,0x68,0x40,0xf0,0x01,0x00,
++0x60,0x60,0x60,0x68,0xc5,0x07,0xfc,0xd4,0x20,0x48,0x48,0xf2,0x01,0x7e,0xf9,0xb9,
++0xb2,0xb1,0x53,0x1e,0x40,0xf2,0x01,0x71,0x41,0xea,0x43,0x31,0x1b,0x4b,0x19,0x60,
++0x59,0x68,0x41,0xf0,0x01,0x01,0x59,0x60,0x59,0x68,0xc9,0x07,0xfc,0xd4,0x17,0x49,
++0x01,0x3a,0x13,0x1d,0x51,0xf8,0x23,0x30,0x07,0xf8,0x01,0x3b,0x00,0x2a,0xf7,0xd1,
++0x12,0x4b,0x1e,0x60,0x5a,0x68,0x42,0xf0,0x18,0x02,0x5a,0x60,0xbd,0xe8,0xf0,0x83,
++0x04,0x29,0x0c,0x46,0x28,0xbf,0x04,0x24,0x65,0x1e,0x4e,0xea,0x45,0x35,0x09,0x1b,
++0x05,0x60,0xc9,0xb2,0x25,0x46,0x9c,0x46,0x01,0x3d,0x05,0xf1,0x08,0x08,0x1c,0xf8,
++0x01,0x9b,0x40,0xf8,0x28,0x90,0x00,0x2d,0xf6,0xd1,0x23,0x44,0x44,0x68,0x44,0xf0,
++0x01,0x04,0x44,0x60,0x44,0x68,0xe4,0x07,0xfc,0xd4,0xc0,0xe7,0x00,0x70,0x01,0x40,
++0x1f,0xb5,0x0d,0xf1,0x0f,0x04,0x00,0x23,0x19,0x46,0x00,0x94,0x01,0x22,0x05,0x20,
++0xff,0xf7,0x9e,0xff,0x9d,0xf8,0x0f,0x30,0xdb,0x07,0xf4,0xd4,0x04,0xb0,0x10,0xbd,
++0x2d,0xe9,0xf0,0x43,0xdf,0xf8,0x54,0x80,0x15,0x4d,0xc1,0xb0,0x06,0x46,0x0c,0x46,
++0x4f,0xf0,0x01,0x19,0x1c,0xb9,0x20,0x46,0x41,0xb0,0xbd,0xe8,0xf0,0x83,0xb4,0xf5,
++0x80,0x7f,0x27,0x46,0x06,0xf5,0x00,0x23,0x28,0xbf,0x4f,0xf4,0x80,0x77,0x6b,0x60,
++0xc5,0xf8,0x08,0xd0,0xef,0x60,0xc5,0xf8,0x00,0x90,0x2b,0x68,0x13,0xf0,0x01,0x03,
++0xfb,0xd1,0x2b,0x60,0x3a,0x46,0x69,0x46,0x40,0x46,0x00,0xf0,0x1f,0xf9,0x18,0xb9,
++0x3e,0x44,0xb8,0x44,0xe4,0x1b,0xdd,0xe7,0x01,0x20,0xdd,0xe7,0x14,0x00,0x0c,0x20,
++0x00,0x10,0x01,0x40,0x2d,0xe9,0xf0,0x4f,0x57,0x4c,0x87,0xb0,0x14,0x22,0x00,0x21,
++0x20,0x46,0x00,0xf0,0xb3,0xf8,0x4f,0xf4,0x80,0x52,0x54,0x48,0x00,0x21,0x00,0xf0,
++0xad,0xf8,0x00,0x27,0x52,0x4a,0x27,0x70,0x53,0x68,0x23,0xf4,0x7f,0x03,0x43,0xf4,
++0x80,0x33,0x53,0x60,0x23,0x78,0x00,0x2b,0xfc,0xd0,0x63,0x78,0x04,0x2b,0x00,0xf2,
++0x91,0x80,0xdf,0xe8,0x03,0xf0,0x03,0x19,0x39,0x73,0x87,0x00,0x05,0xab,0x00,0x93,
++0x00,0x23,0x03,0x22,0x19,0x46,0x9f,0x20,0xff,0xf7,0x3a,0xff,0x43,0x4b,0x9d,0xf8,
++0x16,0x20,0x1a,0x70,0x9d,0xf8,0x15,0x20,0x5a,0x70,0x9d,0xf8,0x14,0x20,0x9a,0x70,
++0x00,0x22,0xda,0x70,0x27,0x70,0xdd,0xe7,0x00,0x25,0xa6,0x68,0x00,0x95,0x2b,0x46,
++0x2a,0x46,0x29,0x46,0x06,0x20,0xff,0xf7,0x23,0xff,0x33,0x0c,0x8d,0xf8,0x14,0x30,
++0x33,0x0a,0x2a,0x46,0x8d,0xf8,0x15,0x30,0x03,0x21,0x05,0xab,0x20,0x20,0x00,0x95,
++0x8d,0xf8,0x16,0x60,0xff,0xf7,0x14,0xff,0xff,0xf7,0x6a,0xff,0x30,0x4a,0x53,0x68,
++0x43,0xf0,0x08,0x03,0x53,0x60,0xdd,0xe7,0x2d,0x4d,0xd4,0xf8,0x08,0xb0,0xd4,0xf8,
++0x0c,0xa0,0xdf,0xf8,0xa8,0x80,0x2b,0x68,0x03,0x93,0x56,0x46,0x00,0x23,0x1a,0x46,
++0x19,0x46,0x00,0x97,0x06,0x20,0xff,0xf7,0xfb,0xfe,0x0b,0xeb,0x0a,0x09,0x25,0x4b,
++0x2b,0x60,0xb6,0xf5,0x80,0x7f,0x33,0x46,0xa9,0xeb,0x06,0x09,0x28,0xbf,0x4f,0xf4,
++0x80,0x73,0xc5,0xf8,0x30,0x80,0x6b,0x63,0xc5,0xf8,0x38,0x90,0x6b,0x68,0x43,0xf0,
++0x01,0x03,0x6b,0x60,0x6b,0x68,0xdb,0x07,0xfc,0xd4,0xff,0xf7,0x39,0xff,0xb6,0xf5,
++0x80,0x7f,0x04,0xd9,0x08,0xf5,0x80,0x78,0xa6,0xf5,0x80,0x76,0xd6,0xe7,0x03,0x9b,
++0x2b,0x60,0x6b,0x68,0x43,0xf0,0x08,0x03,0x6b,0x60,0xa3,0xe7,0xa2,0x68,0xe1,0x68,
++0x00,0x29,0x9f,0xd0,0x10,0x4b,0x02,0xf5,0x00,0x22,0x5a,0x60,0x0b,0x4a,0x9a,0x60,
++0x4f,0xf0,0x01,0x12,0xd9,0x60,0x1a,0x60,0x1a,0x68,0x12,0xf0,0x01,0x02,0xfb,0xd1,
++0x1a,0x60,0x8f,0xe7,0xa0,0x68,0xe1,0x68,0xff,0xf7,0x22,0xff,0x00,0x28,0x89,0xd0,
++0x20,0x70,0xfe,0xe7,0xff,0x20,0xfb,0xe7,0x00,0x00,0x0c,0x20,0x14,0x00,0x0c,0x20,
++0x00,0x70,0x01,0x40,0x03,0x00,0x40,0x02,0x00,0x10,0x01,0x40,0xf0,0xb5,0x05,0x00,
++0x83,0x07,0x4d,0xd0,0x54,0x1e,0x00,0x2a,0x47,0xd0,0x0a,0x06,0x03,0x00,0x03,0x26,
++0x12,0x0e,0x02,0xe0,0x01,0x35,0x01,0x3c,0x3f,0xd3,0x01,0x33,0x2a,0x70,0x33,0x42,
++0xf8,0xd1,0x03,0x2c,0x30,0xd9,0xff,0x22,0x0a,0x40,0x15,0x02,0xad,0x18,0x2a,0x04,
++0xad,0x18,0x0f,0x2c,0x37,0xd9,0x27,0x00,0x10,0x3f,0x3f,0x09,0x3e,0x01,0xb4,0x46,
++0x1e,0x00,0x1a,0x00,0x10,0x36,0x66,0x44,0x15,0x60,0x55,0x60,0x95,0x60,0xd5,0x60,
++0x10,0x32,0x96,0x42,0xf8,0xd1,0x01,0x37,0x3f,0x01,0xdb,0x19,0x0f,0x27,0x0c,0x22,
++0x27,0x40,0x22,0x40,0x3c,0x00,0x00,0x2a,0x0e,0xd0,0x3e,0x1f,0xb6,0x08,0xb4,0x00,
++0xa4,0x46,0x1a,0x00,0x1c,0x1d,0x64,0x44,0x20,0xc2,0xa2,0x42,0xfc,0xd1,0x03,0x24,
++0x01,0x36,0xb6,0x00,0x9b,0x19,0x3c,0x40,0x00,0x2c,0x06,0xd0,0x09,0x06,0x09,0x0e,
++0x1c,0x19,0x19,0x70,0x01,0x33,0x9c,0x42,0xfb,0xd1,0xf0,0xbc,0x02,0xbc,0x08,0x47,
++0x03,0x00,0x14,0x00,0xbd,0xe7,0x27,0x00,0xdf,0xe7,0xc0,0x46,0x30,0xb5,0x03,0x2a,
++0x1a,0xd9,0x0b,0x00,0x03,0x43,0x9b,0x07,0x11,0xd0,0x55,0x1e,0x00,0x23,0x03,0xe0,
++0x5a,0x1c,0x9d,0x42,0x13,0xd0,0x13,0x00,0xc2,0x5c,0xcc,0x5c,0xa2,0x42,0xf7,0xd0,
++0x10,0x1b,0x0d,0xe0,0x04,0x3a,0x04,0x30,0x04,0x31,0x03,0x2a,0x04,0xd9,0x04,0x68,
++0x0b,0x68,0x9c,0x42,0xf6,0xd0,0xe8,0xe7,0x55,0x1e,0x00,0x2a,0xe6,0xd1,0x00,0x20,
++0x30,0xbc,0x02,0xbc,0x08,0x47,0xc0,0x46,
+diff --git a/contrib/loaders/flash/nct_esio/nct6694d_spim_flash.c b/contrib/loaders/flash/nct_esio/nct6694d_spim_flash.c
+new file mode 100644
+index 000000000..a3e5f51f1
+--- /dev/null
++++ b/contrib/loaders/flash/nct_esio/nct6694d_spim_flash.c
+@@ -0,0 +1,287 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++
++#include <stdint.h>
++#include <string.h>
++#include "nct6694d_flash.h"
++
++/* flashloader parameter structure */
++__attribute__ ((section(".buffers.g_cfg")))
++static volatile struct nct_esio_flash_params g_cfg;
++
++/* data buffer */
++__attribute__ ((section(".buffers.g_buf")))
++static volatile uint8_t g_buf[0x1000];
++
++static void SPIM_CmdReadWrite(uint8_t cmd, uint8_t tx_len, uint8_t rx_len,
++						      uint8_t* tx_dat, uint8_t* rx_dat)
++{
++	unsigned long len;
++	unsigned long spim_ctl_copy = SPIM->CTL0;
++
++	/* bit width:8, busrtlen = tx_len */
++	SPIM->CTL0 = SPIM_CTL0_NORMAL(SPIM_BITMODE_SINGLE, 1, 8, 1);
++
++	SPIM->TX[0] = cmd;
++
++	/* CS active & start*/
++	SPIM->CTL1 &= ~SPIM_CTL1_SS_Msk;
++	SPIM->CTL1 |= SPIM_CTL1_SPIMEN_Msk;
++
++	/* wait ready */
++	while (SPIM->CTL1 & SPIM_CTL1_SPIMEN_Msk);
++
++	while (tx_len) {
++		len = (tx_len > 4) ? 4 : tx_len;
++		tx_len -= len;
++
++		/* bit width:8, busrtlen = tx_len */
++		SPIM->CTL0 = SPIM_CTL0_NORMAL(SPIM_BITMODE_SINGLE, 1, 8, len);
++
++		/* Tx data */
++		while(len) {
++			SPIM->TX[--len] = *tx_dat++;
++		}
++
++		/* start */
++		SPIM->CTL1 |= SPIM_CTL1_SPIMEN_Msk;
++
++		while(SPIM->CTL1 & SPIM_CTL1_SPIMEN_Msk);
++	}
++
++	while (rx_len) {
++		len = (tx_len > 4) ? 4 : rx_len;
++		rx_len -= len;
++
++		/* bit width:8, busrt len = tx_len */
++		SPIM->CTL0 = SPIM_CTL0_NORMAL(SPIM_BITMODE_SINGLE, 0, 8, len);
++
++		SPIM->CTL1 |= SPIM_CTL1_SPIMEN_Msk;
++
++		while (SPIM->CTL1 & SPIM_CTL1_SPIMEN_Msk);
++
++        /* Rx data */
++        while (len)
++		*rx_dat++ = SPIM->RX[--len];
++	}
++
++	/* restore CTL0 setting */
++	SPIM->CTL0 = spim_ctl_copy;
++
++	/* clear cache, set invalid, CS inactive */
++	SPIM->CTL1 |= (SPIM_CTL1_SS_Msk | SPIM_CTL1_CDINVAL_Msk);
++}
++
++static void spim_wait_flash_ready(void)
++{
++	unsigned char dat;
++    
++	do {
++		SPIM_CmdReadWrite(FLASH_CMD_READ_STATUS_REG, 0, 1, NULL, &dat);
++	} while (dat & 0x01);
++}
++
++static void gdma_memcpy_u8(uint8_t* dst, uint8_t* src, uint32_t cpylen)
++{
++	if (cpylen == 0) return;
++
++	GDMA_SRCB0 = (uint32_t)src;
++	GDMA_DSTB0 = (uint32_t)dst;
++	GDMA_TCNT0 = cpylen;
++	GDMA_CTL0 = 0x10001;
++
++	while (GDMA_CTL0 & 0x1);
++	GDMA_CTL0 = 0;
++}
++
++static uint8_t spim_read(uint32_t addr, uint8_t *buf, uint32_t len)
++{
++	gdma_memcpy_u8(buf, (uint8_t*)(0x80000 + addr), len);
++
++	return 0;
++}
++
++static uint8_t spim_verify(uint32_t addr, uint8_t *buf, uint32_t len)
++{
++	uint8_t tmp_buf[256];
++	uint32_t verify_len;
++
++	while (len) {
++		verify_len = (len > 256) ? 256 : len;
++
++		/* read from flash */
++		spim_read(addr, tmp_buf, verify_len);
++
++		/* compare data */
++		if (memcmp(buf, tmp_buf, verify_len) != 0) {
++			return 1;
++		}
++
++		/* next */
++		addr += verify_len;
++		buf += verify_len;
++		len -= verify_len;
++	}
++
++	return 0;
++}
++
++static uint8_t spim_program(uint32_t addr, uint8_t *buf, uint32_t len)
++{
++	unsigned long spim_ctl_copy = SPIM->CTL0;
++
++	while(1) {
++		/* write enable automatically send in DMA mode */
++		SPIM_CmdReadWrite(FLASH_CMD_WRITE_ENABLE, 0, 0, NULL, NULL);
++
++		/* DMA write */
++		SPIM->CTL0 = (FLASH_CMD_PAGE_PROGRAM << SPIM_CTL0_CMDCODE_Pos) |
++				     (SPIM_MODE_DMA_WRITE << SPIM_CTL0_OPMODE_Pos) |
++				     SPIM_CTL0_CIPHOFF_Msk | 0x02;
++
++		/* DMA */
++		SPIM->SRAMADDR = (unsigned long)buf;
++		SPIM->DMACNT = (len > 256) ? 256 : len;
++		SPIM->FADDR = addr;
++
++		/* start*/
++		SPIM->CTL1 |= (SPIM_CTL1_SPIMEN_Msk);
++		while (SPIM->CTL1 & SPIM_CTL1_SPIMEN_Msk);
++
++		/* wait flash busy */
++		spim_wait_flash_ready();
++
++		/* check length */
++		if(len > 256) {
++			addr += 256;
++			buf += 256;
++			len -= 256;
++		} else {
++			break;
++		}
++	}
++    
++	/* restore CTL0 setting */
++	SPIM->CTL0 = spim_ctl_copy;
++
++	/* clear cache, set invalid */
++	SPIM->CTL1 |= SPIM_CTL1_CDINVAL_Msk;
++
++	return 0;
++}
++
++static uint8_t spim_erase_sector(uint32_t addr)
++{
++	uint8_t dat[3];
++
++	/* write enable */
++	SPIM_CmdReadWrite(FLASH_CMD_WRITE_ENABLE, 0, 0, NULL, NULL);
++
++	/* addr to byte array */
++	dat[0] = (addr >> 16) & 0xFF;
++	dat[1] = (addr >> 8) & 0xFF;
++	dat[2] = addr & 0xFF;
++
++	/* erase cmd */
++	SPIM_CmdReadWrite(FLASH_CMD_SECTOR_ERASE, 3, 0, dat, NULL);
++
++	/* wait flash busy */
++	spim_wait_flash_ready();
++
++	/* clear cache, set invalid */
++	SPIM->CTL1 |= SPIM_CTL1_CDINVAL_Msk;
++
++	return 0;
++}
++
++static uint8_t spim_get_id(uint32_t *id)
++{
++	uint8_t jedec_id[3];
++
++	SPIM_CmdReadWrite(FLASH_CMD_READ_JEDEC_ID, 0, 3, NULL, jedec_id);
++
++	*id = (jedec_id[0] << 16) | (jedec_id[1] << 8) | jedec_id[2];
++
++	return 0;
++}
++
++static void spim_clk_div(uint32_t div)
++{
++    SPIM->CTL1 = (SPIM->CTL1 & ~SPIM_CTL1_DIVIDER_Msk) | (div << SPIM_CTL1_DIVIDER_Pos);
++}
++
++static void flashloader_init(void)
++{
++	memset((struct nct_esio_flash_params *)&g_cfg, 0, sizeof(struct nct_esio_flash_params));
++	memset((uint8_t *)g_buf, 0, sizeof(g_buf));
++	g_cfg.state = FLASH_ALGO_STATE_IDLE;
++}
++
++int main(void)
++{
++	uint32_t id;
++	uint8_t status;
++
++	/* Initialize the flashloader parameters and buffer */
++	flashloader_init();
++
++	/* Set SPIM clock to 48MHz */
++	spim_clk_div(1);
++
++	while (1) {
++		while (g_cfg.state == FLASH_ALGO_STATE_IDLE);
++
++		switch (g_cfg.cmd) {
++		case FLASH_ALGO_CMD_INIT:
++			status = spim_get_id(&id);
++			if (status == 0) {
++				g_buf[0] = id & 0xff;
++				g_buf[1] = (id >> 8) & 0xff;
++				g_buf[2] = (id >> 16) & 0xff;
++				g_buf[3] = 0x00;
++			}
++			break;
++		case FLASH_ALGO_CMD_ERASE:
++			status = spim_erase_sector(g_cfg.addr);
++			break;
++		case FLASH_ALGO_CMD_PROGRAM:
++			status = spim_program(g_cfg.addr, (uint8_t *)g_buf, g_cfg.len);
++			break;
++		case FLASH_ALGO_CMD_READ:
++			status = spim_read(g_cfg.addr, (uint8_t *)g_buf, g_cfg.len);
++			break;
++		case FLASH_ALGO_CMD_VERIFY:
++			status = spim_verify(g_cfg.addr, (uint8_t *)g_buf, g_cfg.len);
++			break;
++		default:
++			status = 0xff;
++			break;
++		}
++
++		if (status != 0) {
++			g_cfg.state = status;
++			while (1);
++		} else {
++			g_cfg.state = FLASH_ALGO_STATE_IDLE;
++		}
++	}
++	return 0;
++}
++
++__attribute__ ((section(".stack")))
++__attribute__ ((used))
++static uint32_t stack[400 / 4];
++extern uint32_t _estack;
++extern uint32_t _bss;
++extern uint32_t _ebss;
++
++__attribute__ ((section(".entry")))
++void entry(void)
++{
++	/* set sp from end of stack */
++	__asm(" ldr sp, =_estack - 4");
++
++	main();
++
++	__asm(" bkpt #0x00");
++}
++
+diff --git a/contrib/loaders/flash/nct_esio/nct_esio_flash.lds b/contrib/loaders/flash/nct_esio/nct_esio_flash.lds
+new file mode 100644
+index 000000000..54696a1a7
+--- /dev/null
++++ b/contrib/loaders/flash/nct_esio/nct_esio_flash.lds
+@@ -0,0 +1,57 @@
++/* SPDX-License-Identifier: GPL-2.0-or-later */
++
++/* Application memory map */
++MEMORY {
++	/* buffer + parameters */
++	BUFFER (RWX)  : ORIGIN = 0x200C0000,
++			LENGTH = 0x1000 + 20
++
++	PROGRAM (RWX)  : ORIGIN = 0x200C1014,
++			 LENGTH = 0x1000
++}
++
++/* Sections used for flashing */
++SECTIONS
++{
++	.buffers (NOLOAD) :
++	{
++		_buffers = .;
++		*(.buffers.g_cfg)
++		*(.buffers.g_buf)
++		*(.buffers*)
++		_ebuffers = .;
++	} > BUFFER
++
++	.text :
++	{
++		_text = .;
++		*(.entry*)
++		*(.text*)
++		_etext = .;
++	} > PROGRAM
++
++	.data :
++	{	_data = .;
++		*(.rodata*)
++		*(.data*)
++		_edata = .;
++	} > PROGRAM
++
++	.bss :
++	{
++		__bss_start__ = .;
++		_bss = .;
++		*(.bss*)
++		*(COMMON)
++		_ebss = .;
++		__bss_end__ = .;
++	} > PROGRAM
++
++	.stack (NOLOAD) :
++	{
++		_stack = .;
++		*(.stack*)
++		_estack = .;
++	} > PROGRAM
++}
++
+diff --git a/src/flash/nor/Makefile.am b/src/flash/nor/Makefile.am
+index f04f0d206..12a7330e7 100644
+--- a/src/flash/nor/Makefile.am
++++ b/src/flash/nor/Makefile.am
+@@ -44,6 +44,7 @@ NOR_DRIVERS = \
+ 	%D%/mdr.c \
+ 	%D%/msp432.c \
+ 	%D%/mrvlqspi.c \
++	%D%/nct_esio.c \
+ 	%D%/niietcm4.c \
+ 	%D%/non_cfi.c \
+ 	%D%/npcx.c \
+@@ -94,4 +95,5 @@ NORHEADERS = \
+ 	%D%/spi.h \
+ 	%D%/stm32l4x.h \
+ 	%D%/stmqspi.h \
+-	%D%/msp432.h
++	%D%/msp432.h \
++	%D%/nct_esio.h
+diff --git a/src/flash/nor/drivers.c b/src/flash/nor/drivers.c
+index b9353d820..85ecdf333 100644
+--- a/src/flash/nor/drivers.c
++++ b/src/flash/nor/drivers.c
+@@ -44,6 +44,7 @@ extern const struct flash_driver max32xxx_flash;
+ extern const struct flash_driver mdr_flash;
+ extern const struct flash_driver mrvlqspi_flash;
+ extern const struct flash_driver msp432_flash;
++extern const struct flash_driver nct_esio_flash;
+ extern const struct flash_driver niietcm4_flash;
+ extern const struct flash_driver npcx_flash;
+ extern const struct flash_driver nrf5_flash;
+@@ -120,6 +121,7 @@ static const struct flash_driver * const flash_drivers[] = {
+ 	&mdr_flash,
+ 	&mrvlqspi_flash,
+ 	&msp432_flash,
++	&nct_esio_flash,
+ 	&niietcm4_flash,
+ 	&npcx_flash,
+ 	&nrf5_flash,
+diff --git a/src/flash/nor/nct_esio.c b/src/flash/nor/nct_esio.c
+new file mode 100644
+index 000000000..8d93081a1
+--- /dev/null
++++ b/src/flash/nor/nct_esio.c
+@@ -0,0 +1,735 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++
++/*
++ * Copyright (C) 2025 by Nuvoton Technology Corporation
++ * Ming Yu <tmyu0@nuvoton.com>
++ * 
++ * Based on npcx.c
++ * Copyright (C) 2020 by Nuvoton Technology Corporation
++ * Mulin Chao <mlchao@nuvoton.com>
++ * Wealian Liao <WHLIAO@nuvoton.com>
++ * Luca	Hung	<YCHUNG0@nuvoton.com>
++ */
++
++#ifdef HAVE_CONFIG_H
++#include "config.h"
++#endif
++
++#include "imp.h"
++#include "nct_esio.h"
++#include <helper/binarybuffer.h>
++#include <helper/time_support.h>
++#include <target/armv7m.h>
++
++/* NCT6694D series SPIM flash loader */
++static const uint8_t nct6694d_spim_algo[] = {
++#include "../../../contrib/loaders/flash/nct_esio/nct6694d_spim_algo.inc"
++};
++
++/* NCT6694D series FIU flash loader */
++static const uint8_t nct6694d_fiu_algo[] = {
++#include "../../../contrib/loaders/flash/nct_esio/nct6694d_fiu_algo.inc"
++};
++
++/* NCT6692D series FIU flash loader */
++static const uint8_t nct6692d_fiu_algo[] = {
++#include "../../../contrib/loaders/flash/nct_esio/nct6692d_fiu_algo.inc"
++};
++
++enum nct_esio_chip_series {
++	NCT_ESIO_SERIES_NCT6692D,
++	NCT_ESIO_SERIES_NCT6694D,
++};
++
++struct nct_esio_flash_info {
++	enum nct_esio_chip_series esio_chip_series;
++	char *name;
++	uint32_t id;
++	uint32_t size;
++	uint8_t adr_4b;
++};
++
++static const struct nct_esio_flash_info flash_info[] = {
++	{ NCT_ESIO_SERIES_NCT6692D, "NCT6801D", 0xEF4014, 1024 * 1024, 0 },
++	{ NCT_ESIO_SERIES_NCT6694D, "NCT6812D", 0xEF4013, 512 * 1024, 0 },
++	{ NCT_ESIO_SERIES_NCT6694D, "NCT6832D", 0xEF4014, 1024 * 1024, 0 },
++	{ NCT_ESIO_SERIES_NCT6692D, "NCT6692D", 0xEF4013, 512 * 1024, 0 },
++	{ NCT_ESIO_SERIES_NCT6694D, "NCT6694B", 0xEF4015, 2048 * 1024, 0 },
++	{ NCT_ESIO_SERIES_NCT6694D, "NCT9650HB", 0xEF4014, 1024 * 1024, 0 },
++};
++
++struct nct_esio_flash_bank {
++	enum nct_esio_flash_type type;
++	struct nct_esio_flash_info flash;
++	struct working_area *working_area;
++	struct armv7m_algorithm armv7m_info;
++	const uint8_t *algo_code;
++	char *esio_chip_name;
++	uint32_t algo_size;
++	uint32_t algo_working_size;
++	uint32_t buffer_addr;
++	uint32_t params_addr;
++	bool is_on_chip_flash;
++	bool probed;
++};
++
++static int nct_esio_init(struct flash_bank *bank)
++{
++	struct nct_esio_flash_bank *nct_esio_bank = bank->driver_priv;
++	struct target *target = bank->target;
++
++	target_free_working_area(target, nct_esio_bank->working_area);
++	nct_esio_bank->working_area = NULL;
++
++	int retval = target_alloc_working_area(target,
++					       nct_esio_bank->algo_working_size,
++					       &nct_esio_bank->working_area);
++	if (retval != ERROR_OK)
++		return retval;
++
++	if (nct_esio_bank->working_area->address != NCT_ESIO_FLASH_ALGO_BASE_ADDR) {
++		LOG_TARGET_ERROR(target, "Invalid working address");
++		target_free_working_area(target, nct_esio_bank->working_area);
++		nct_esio_bank->working_area = NULL;
++		return ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
++	}
++
++	retval = target_write_buffer(target, NCT_ESIO_FLASH_ALGO_PROGRAM_ADDR,
++				     nct_esio_bank->algo_size, nct_esio_bank->algo_code);
++	if (retval != ERROR_OK) {
++		LOG_TARGET_ERROR(target, "Failed to load flash helper algorithm");
++		target_free_working_area(target, nct_esio_bank->working_area);
++		nct_esio_bank->working_area = NULL;
++		return retval;
++	}
++
++	nct_esio_bank->armv7m_info.common_magic = ARMV7M_COMMON_MAGIC;
++	nct_esio_bank->armv7m_info.core_mode = ARM_MODE_THREAD;
++
++	retval = target_start_algorithm(target, 0, NULL, 0, NULL,
++					NCT_ESIO_FLASH_ALGO_PROGRAM_ADDR, 0,
++					&nct_esio_bank->armv7m_info);
++	if (retval != ERROR_OK) {
++		LOG_TARGET_ERROR(target, "Failed to start flash helper algorithm");
++		target_free_working_area(target, nct_esio_bank->working_area);
++		nct_esio_bank->working_area = NULL;
++		return retval;
++	}
++
++	return retval;
++}
++
++static int nct_esio_quit(struct flash_bank *bank)
++{
++	struct nct_esio_flash_bank *nct_esio_bank = bank->driver_priv;
++	struct target *target = bank->target;
++
++	(void)target_halt(target);
++
++	int retval = target_wait_algorithm(target, 0, NULL, 0, NULL, 0,
++					   NCT_ESIO_FLASH_TIMEOUT_MS,
++					   &nct_esio_bank->armv7m_info);
++
++	target_free_working_area(target, nct_esio_bank->working_area);
++	nct_esio_bank->working_area = NULL;
++
++	return retval;
++}
++
++static int nct_esio_wait_algo_done(struct flash_bank *bank,
++				  uint32_t params_addr)
++{
++	struct target *target = bank->target;
++	uint32_t status_addr = params_addr + offsetof(struct nct_esio_flash_algo_params, state);
++	int64_t start_ms = timeval_ms();
++	uint8_t status;
++
++	do {
++		int retval = target_read_u8(target, status_addr, &status);
++		if (retval != ERROR_OK)
++			return retval;
++
++		keep_alive();
++
++		int64_t elapsed_ms = timeval_ms() - start_ms;
++		if (elapsed_ms > NCT_ESIO_FLASH_TIMEOUT_MS)
++			break;
++	} while (status == NCT_ESIO_FLASH_ALGO_STATE_BUSY);
++
++	if (status != NCT_ESIO_FLASH_ALGO_STATE_IDLE) {
++		LOG_TARGET_ERROR(target, "Flash operation failed, status (%0x" PRIX32 ") ", status);
++		return ERROR_FAIL;
++	}
++
++	return ERROR_OK;
++}
++
++static int nct_esio_get_flash_info(struct flash_bank *bank, uint32_t *flash_id,
++				   uint32_t *flash_size)
++{
++	struct nct_esio_flash_bank *nct_esio_bank = bank->driver_priv;
++	struct nct_esio_flash_algo_params algo_params;
++	struct target *target = bank->target;
++	int retval;
++
++	if (target->state != TARGET_HALTED) {
++		LOG_ERROR("%s: Target not halted", __func__);
++		return ERROR_TARGET_NOT_HALTED;
++	}
++
++	retval = nct_esio_init(bank);
++	if (retval != ERROR_OK)
++		return retval;
++
++	/* Initialize algorithm parameters to default values */
++	algo_params.type = nct_esio_bank->type;
++	algo_params.cmd = NCT_ESIO_FLASH_ALGO_CMD_INIT;
++	algo_params.state = NCT_ESIO_FLASH_ALGO_STATE_IDLE;
++
++	retval = target_write_buffer(target, nct_esio_bank->params_addr,
++				     sizeof(algo_params), (uint8_t *)&algo_params);
++	if (retval != ERROR_OK) {
++		(void)nct_esio_quit(bank);
++		return retval;
++	}
++
++	/* Set algorithm parameters */
++	algo_params.state = NCT_ESIO_FLASH_ALGO_STATE_BUSY;
++
++	retval = target_write_buffer(target, nct_esio_bank->params_addr,
++				sizeof(algo_params), (uint8_t *)&algo_params);
++	if (retval != ERROR_OK) {
++		(void)nct_esio_quit(bank);
++		return retval;
++	}
++
++	/* Wait for algorithm to finish */
++	retval = nct_esio_wait_algo_done(bank, nct_esio_bank->params_addr);
++	if (retval != ERROR_OK) {
++		(void)nct_esio_quit(bank);
++		return retval;
++	}
++
++	/* Read flash informations */
++	target_read_u32(target, nct_esio_bank->buffer_addr, flash_id);
++	target_read_u32(target, nct_esio_bank->buffer_addr + 4, flash_size);
++	target_read_u8(target, nct_esio_bank->buffer_addr + 8, &nct_esio_bank->flash.adr_4b);
++
++	retval = nct_esio_quit(bank);
++	if (retval != ERROR_OK)
++		return retval;
++
++	return ERROR_OK;
++}
++
++static int nct_esio_erase_sector(struct flash_bank *bank, int sector)
++{
++	struct nct_esio_flash_bank *nct_esio_bank = bank->driver_priv;
++	struct nct_esio_flash_algo_params algo_params;
++	struct target *target = bank->target;
++	int retval;
++
++	LOG_INFO("%s: Erasing sector %d at 0x%08x, size %d bytes", __func__, sector,
++								   bank->sectors[sector].offset,
++								   bank->sectors[sector].size);
++
++	/* Initialize algorithm parameters to default values */
++	algo_params.addr = bank->sectors[sector].offset;
++	algo_params.len = bank->sectors[sector].size;
++	algo_params.type = nct_esio_bank->type;
++	algo_params.adr_4b = nct_esio_bank->flash.adr_4b;
++	algo_params.cmd = NCT_ESIO_FLASH_ALGO_CMD_ERASE;
++	algo_params.state = NCT_ESIO_FLASH_ALGO_STATE_IDLE;
++
++	retval = target_write_buffer(target, nct_esio_bank->params_addr,
++				     sizeof(algo_params), (uint8_t *)&algo_params);
++	if (retval != ERROR_OK)
++		return retval;
++
++	/* Set algorithm parameters */
++	algo_params.state = NCT_ESIO_FLASH_ALGO_STATE_BUSY;
++
++	retval = target_write_buffer(target, nct_esio_bank->params_addr,
++				     sizeof(algo_params), (uint8_t *)&algo_params);
++	if (retval != ERROR_OK)
++		return retval;
++
++	return nct_esio_wait_algo_done(bank, nct_esio_bank->params_addr);
++}
++
++static int nct_esio_flash_erase(struct flash_bank *bank, unsigned int first,
++				unsigned int last)
++{
++	struct nct_esio_flash_bank *nct_esio_bank = bank->driver_priv;
++	struct target *target = bank->target;
++	int retval;
++
++	LOG_INFO("%s: Erasing sectors %d to %d", __func__, first, last);
++
++	if (target->state != TARGET_HALTED) {
++		LOG_ERROR("Target not halted");
++		return ERROR_TARGET_NOT_HALTED;
++	}
++
++	if (!(nct_esio_bank->probed)) {
++		LOG_ERROR("Flash bank not probed");
++		return ERROR_FLASH_BANK_NOT_PROBED;
++	}
++
++	retval = nct_esio_init(bank);
++	if (retval != ERROR_OK)
++		return retval;
++
++	for (unsigned int sector = first; sector <= last; sector++) {
++		retval = nct_esio_erase_sector(bank, sector);
++		if (retval != ERROR_OK)
++			goto done;
++		keep_alive();
++	}
++
++done:
++	(void)nct_esio_quit(bank);
++
++	return retval;
++}
++
++static int nct_esio_flash_write(struct flash_bank *bank, const uint8_t *buffer,
++				uint32_t offset, uint32_t count)
++{
++	struct nct_esio_flash_bank *nct_esio_bank = bank->driver_priv;
++	struct nct_esio_flash_algo_params algo_params;
++	struct target *target = bank->target;
++	int retval;
++
++	LOG_INFO("%s: Writing %d bytes to 0x%08x", __func__, count, offset);
++
++	if (target->state != TARGET_HALTED) {
++		LOG_ERROR("Target not halted");
++		return ERROR_TARGET_NOT_HALTED;
++	}
++
++	if (!(nct_esio_bank->probed)) {
++		LOG_ERROR("Flash bank not probed");
++		return ERROR_FLASH_BANK_NOT_PROBED;
++	}
++
++	retval = nct_esio_init(bank);
++	if (retval != ERROR_OK)
++		return retval;
++
++	uint32_t address = offset;
++
++	while (count > 0) {
++		uint32_t size = (count > NCT_ESIO_FLASH_ALGO_BUFFER_SIZE) ?
++			NCT_ESIO_FLASH_ALGO_BUFFER_SIZE : count;
++
++		/* Write data to target memory */
++		retval = target_write_buffer(target, nct_esio_bank->buffer_addr,
++					     size, buffer);
++		if (retval != ERROR_OK) {
++			LOG_ERROR("Unable to write data to target memory");
++			break;
++		}
++
++		/* Initialize algorithm parameters to default values */
++		algo_params.addr = address;
++		algo_params.len = size;
++		algo_params.type = nct_esio_bank->type;
++		algo_params.adr_4b = nct_esio_bank->flash.adr_4b;
++		algo_params.cmd = NCT_ESIO_FLASH_ALGO_CMD_PROGRAM;
++		algo_params.state = NCT_ESIO_FLASH_ALGO_STATE_IDLE;
++
++		LOG_INFO("%s: Writing %d bytes to 0x%08x", __func__, algo_params.len,
++							   algo_params.addr);
++
++		retval = target_write_buffer(target, nct_esio_bank->params_addr,
++					     sizeof(algo_params), (uint8_t *)&algo_params);
++		if (retval != ERROR_OK)
++			break;
++
++		/* Set algorithm parameters */
++		algo_params.state = NCT_ESIO_FLASH_ALGO_STATE_BUSY;
++
++		retval = target_write_buffer(target, nct_esio_bank->params_addr,
++					     sizeof(algo_params), (uint8_t *)&algo_params);
++		if (retval != ERROR_OK)
++			break;
++
++		/* Wait for flash write to complete */
++		retval = nct_esio_wait_algo_done(bank, nct_esio_bank->params_addr);
++		if (retval != ERROR_OK)
++			break;
++
++		count -= size;
++		buffer += size;
++		address += size;
++	}
++
++	(void)nct_esio_quit(bank);
++
++	return retval;
++}
++
++static int nct_esio_flash_read(struct flash_bank *bank, uint8_t *buffer,
++			       uint32_t offset, uint32_t count)
++{
++	struct nct_esio_flash_bank *nct_esio_bank = bank->driver_priv;
++	struct nct_esio_flash_algo_params algo_params;
++	struct target *target = bank->target;
++	int retval;
++
++	LOG_INFO("%s: Reading %d bytes from 0x%08x", __func__, count, offset);
++
++	if (target->state != TARGET_HALTED) {
++		LOG_ERROR("Target not halted");
++		return ERROR_TARGET_NOT_HALTED;
++	}
++
++	if (!(nct_esio_bank->probed)) {
++		LOG_ERROR("Flash bank not probed");
++		return ERROR_FLASH_BANK_NOT_PROBED;
++	}
++
++	/* Check if flash supports 4-byte addressing */
++	if (nct_esio_bank->flash.adr_4b) {
++		retval = nct_esio_init(bank);
++		if (retval != ERROR_OK)
++			return retval;
++
++		uint32_t address = offset;
++
++		while (count > 0) {
++			uint32_t size = (count > NCT_ESIO_FLASH_ALGO_BUFFER_SIZE) ?
++				NCT_ESIO_FLASH_ALGO_BUFFER_SIZE : count;
++
++			/* Initialize algorithm parameters to default values */
++			algo_params.addr = address;
++			algo_params.len = size;
++			algo_params.type = nct_esio_bank->type;
++			algo_params.adr_4b = nct_esio_bank->flash.adr_4b;
++			algo_params.cmd = NCT_ESIO_FLASH_ALGO_CMD_READ;
++			algo_params.state = NCT_ESIO_FLASH_ALGO_STATE_IDLE;
++
++			retval = target_write_buffer(target, nct_esio_bank->params_addr,
++						     sizeof(algo_params), (uint8_t *)&algo_params);
++			if (retval != ERROR_OK)
++				break;
++
++			/* Set algorithm parameters */
++			algo_params.state = NCT_ESIO_FLASH_ALGO_STATE_BUSY;
++
++			retval = target_write_buffer(target, nct_esio_bank->params_addr,
++						     sizeof(algo_params), (uint8_t *)&algo_params);
++			if (retval != ERROR_OK)
++				break;
++
++			/* Wait for flash read to complete */
++			retval = nct_esio_wait_algo_done(bank, nct_esio_bank->params_addr);
++			if (retval != ERROR_OK) {
++				break;
++			} else {
++				retval = target_read_buffer(target, nct_esio_bank->buffer_addr, size, buffer);
++				if (retval != ERROR_OK) {
++					break;
++				}
++			}
++
++			count -= size;
++			buffer += size;
++			address += size;
++		}
++
++		(void)nct_esio_quit(bank);
++	} else {
++		retval = target_read_buffer(bank->target, offset + bank->base, count, buffer);
++		if (retval != ERROR_OK) {
++			LOG_ERROR("Failed to read data from target memory");
++		}
++	}
++
++	return retval;
++}
++
++static int nct_esio_flash_verify(struct flash_bank *bank, const uint8_t *buffer,
++				 uint32_t offset, uint32_t count)
++{
++	struct nct_esio_flash_bank *nct_esio_bank = bank->driver_priv;
++	struct nct_esio_flash_algo_params algo_params;
++	struct target *target = bank->target;
++	int retval;
++
++	LOG_INFO("%s: Verifying %d bytes to 0x%08x", __func__, count, offset);
++
++	if (target->state != TARGET_HALTED) {
++		LOG_ERROR("Target not halted");
++		return ERROR_TARGET_NOT_HALTED;
++	}
++
++	if (!(nct_esio_bank->probed)) {
++		LOG_ERROR("Flash bank not probed");
++		return ERROR_FLASH_BANK_NOT_PROBED;
++	}
++
++	retval = nct_esio_init(bank);
++	if (retval != ERROR_OK)
++		return retval;
++
++	uint32_t address = offset;
++
++	while (count > 0) {
++		uint32_t size = (count > NCT_ESIO_FLASH_ALGO_BUFFER_SIZE) ?
++			NCT_ESIO_FLASH_ALGO_BUFFER_SIZE : count;
++
++		/* Write data to target memory */
++		retval = target_write_buffer(target, nct_esio_bank->buffer_addr,
++					     size, buffer);
++		if (retval != ERROR_OK) {
++			LOG_ERROR("Unable to write data to target memory");
++			break;
++		}
++
++		/* Initialize algorithm parameters to default values */
++		algo_params.addr = address;
++		algo_params.len = size;
++		algo_params.type = nct_esio_bank->type;
++		algo_params.adr_4b = nct_esio_bank->flash.adr_4b;
++		algo_params.cmd = NCT_ESIO_FLASH_ALGO_CMD_VERIFY;
++		algo_params.state = NCT_ESIO_FLASH_ALGO_STATE_IDLE;
++
++		LOG_INFO("%s: Verifying %d bytes to 0x%08x", __func__, algo_params.len,
++							     algo_params.addr);
++
++		retval = target_write_buffer(target, nct_esio_bank->params_addr,
++					     sizeof(algo_params), (uint8_t *)&algo_params);
++		if (retval != ERROR_OK)
++			break;
++
++		/* Set algorithm parameters */
++		algo_params.state = NCT_ESIO_FLASH_ALGO_STATE_BUSY;
++
++		retval = target_write_buffer(target, nct_esio_bank->params_addr,
++					     sizeof(algo_params), (uint8_t *)&algo_params);
++		if (retval != ERROR_OK)
++			break;
++
++		/* Wait for flash write to complete */
++		retval = nct_esio_wait_algo_done(bank, nct_esio_bank->params_addr);
++		if (retval != ERROR_OK)
++			break;
++
++		count -= size;
++		buffer += size;
++		address += size;
++	}
++
++	(void)nct_esio_quit(bank);
++
++	return retval;
++}
++
++static int nct_esio_flash_probe(struct flash_bank *bank)
++{
++	struct nct_esio_flash_bank *nct_esio_bank = bank->driver_priv;
++	uint32_t sector_length = NCT_ESIO_FLASH_SECTOR_SIZE;
++	uint32_t flash_id, flash_size, num_sectors;
++	int retval;
++
++	LOG_INFO("%s: Probing flash bank: %s", __func__, bank->name);
++
++	nct_esio_bank->probed = false;
++
++	/* Set up appropriate flash helper algorithm */
++	if (!nct_esio_bank->esio_chip_name) {
++		LOG_ERROR("%s: eSio chip name is NULL", __func__);
++		return ERROR_FAIL;
++	}
++
++	bool found = false;
++	for (unsigned int i = 0; i < ARRAY_SIZE(flash_info); i++) {
++		if (strcmp(nct_esio_bank->esio_chip_name, flash_info[i].name) == 0) {
++			nct_esio_bank->flash = flash_info[i];
++			found = true;
++			break;
++		}
++	}
++
++	if (!found) {
++		LOG_ERROR("%s: Unknown eSio chip name: %s", __func__, nct_esio_bank->esio_chip_name);
++		return ERROR_FAIL;
++	}
++
++	/* Determine flash type based on base address */
++	switch (bank->base) {
++	case NCT_ESIO_PRIVATE_FLASH_ADDR:
++		if (nct_esio_bank->flash.esio_chip_series == NCT_ESIO_SERIES_NCT6692D){
++			nct_esio_bank->is_on_chip_flash = true;
++		}
++		nct_esio_bank->type = NCT_ESIO_FLASH_PRIVATE;
++		break;
++	case NCT_ESIO_SHARED_FLASH_NCT6692_ADDR:
++		if (nct_esio_bank->flash.esio_chip_series != NCT_ESIO_SERIES_NCT6692D) {
++			LOG_ERROR("%s: Address 0x%08llx only valid for NCT6692D series", __func__, bank->base);
++			return ERROR_FAIL;
++		}
++		nct_esio_bank->type = NCT_ESIO_FLASH_SHARED;
++		break;
++	case NCT_ESIO_SHARED_FLASH_NCT6694_ADDR:
++		if (nct_esio_bank->flash.esio_chip_series != NCT_ESIO_SERIES_NCT6694D) {
++			LOG_ERROR("%s: Address 0x%08llx only valid for NCT6694D series", __func__, bank->base);
++			return ERROR_FAIL;
++		}
++		nct_esio_bank->type = NCT_ESIO_FLASH_SHARED;
++		break;
++	case NCT_ESIO_BACKUP_FLASH_ADDR:
++		if (nct_esio_bank->flash.esio_chip_series != NCT_ESIO_SERIES_NCT6694D) {
++			LOG_ERROR("%s: Backup flash only available on NCT6694D series", __func__);
++			return ERROR_FAIL;
++		}
++		nct_esio_bank->type = NCT_ESIO_FLASH_BACKUP;
++		break;
++	case NCT_ESIO_INTERNAL_FLASH_ADDR:
++		if (nct_esio_bank->flash.esio_chip_series != NCT_ESIO_SERIES_NCT6694D) {
++			LOG_ERROR("%s: Internal flash only available on NCT6694D series", __func__);
++			return ERROR_FAIL;
++		}
++		nct_esio_bank->is_on_chip_flash = true;
++		nct_esio_bank->type = NCT_ESIO_FLASH_INTERNAL;
++		break;
++	default:
++		LOG_ERROR("%s: Invalid flash bank address 0x%08llx", __func__, bank->base);
++		return ERROR_FAIL;
++	}
++
++	/* Set algorithm based on chip series and flash type */
++	if (nct_esio_bank->flash.esio_chip_series == NCT_ESIO_SERIES_NCT6692D) {
++		nct_esio_bank->algo_code = nct6692d_fiu_algo;
++		nct_esio_bank->algo_size = sizeof(nct6692d_fiu_algo);
++	} else if (nct_esio_bank->flash.esio_chip_series == NCT_ESIO_SERIES_NCT6694D) {
++		if (nct_esio_bank->type == NCT_ESIO_FLASH_INTERNAL) {
++			nct_esio_bank->algo_code = nct6694d_spim_algo;
++			nct_esio_bank->algo_size = sizeof(nct6694d_spim_algo);
++		} else {
++			nct_esio_bank->algo_code = nct6694d_fiu_algo;
++			nct_esio_bank->algo_size = sizeof(nct6694d_fiu_algo);
++		}
++	} else {
++		LOG_ERROR("%s: Invalid eSio chip series", __func__);
++		return ERROR_FAIL;
++	}
++
++	nct_esio_bank->algo_working_size = NCT_ESIO_FLASH_ALGO_PARAMS_SIZE +
++					   NCT_ESIO_FLASH_ALGO_BUFFER_SIZE +
++					   NCT_ESIO_FLASH_ALGO_PROGRAM_SIZE;
++	nct_esio_bank->params_addr = NCT_ESIO_FLASH_ALGO_PARAMS_ADDR;
++	nct_esio_bank->buffer_addr = NCT_ESIO_FLASH_ALGO_BUFFER_ADDR;
++
++	/* Get flash ID and size */
++	retval = nct_esio_get_flash_info(bank, &flash_id, &flash_size);
++	if (retval != ERROR_OK)
++		return retval;
++
++	/* Check flash info is valid */
++	if (nct_esio_bank->is_on_chip_flash) {
++		if (flash_id != nct_esio_bank->flash.id) {
++			LOG_ERROR("%s: On-Chip Flash ID mismatch: expected 0x%08x, got 0x%08x",
++				  __func__, nct_esio_bank->flash.id, flash_id);
++			return ERROR_FAIL;
++		}
++	} else {
++		nct_esio_bank->flash.name = "External Flash";
++		nct_esio_bank->flash.id = flash_id;
++		nct_esio_bank->flash.size = flash_size;
++	}
++
++	LOG_INFO("%s: Flash info: id = 0x%08x, size = 0x%08x", __func__,
++							       nct_esio_bank->flash.id,
++							       nct_esio_bank->flash.size);
++
++	num_sectors = nct_esio_bank->flash.size / sector_length;
++
++	bank->sectors = calloc(num_sectors, sizeof(struct flash_sector));
++	if (!bank->sectors) {
++		LOG_ERROR("Out of memory");
++		return ERROR_FAIL;
++	}
++
++	bank->num_sectors = num_sectors;
++	bank->size = num_sectors * sector_length;
++	bank->write_start_alignment = 0;
++	bank->write_end_alignment = 0;
++
++	for (unsigned int i = 0; i < num_sectors; i++) {
++		bank->sectors[i].offset = i * sector_length;
++		bank->sectors[i].size = sector_length;
++		bank->sectors[i].is_erased = -1;
++		bank->sectors[i].is_protected = 0;
++	}
++
++	nct_esio_bank->probed = true;
++
++	return ERROR_OK;
++}
++
++static int nct_esio_flash_auto_probe(struct flash_bank *bank)
++{
++	struct nct_esio_flash_bank *nct_esio_bank = bank->driver_priv;
++
++	if (nct_esio_bank->probed)
++		return ERROR_OK;
++
++	return nct_esio_flash_probe(bank);
++}
++
++FLASH_BANK_COMMAND_HANDLER(nct_esio_flash_bank_command)
++{
++	struct nct_esio_flash_bank *nct_esio_bank;
++
++	if (CMD_ARGC != 7)
++		return ERROR_COMMAND_SYNTAX_ERROR;
++
++	nct_esio_bank = calloc(1, sizeof(struct nct_esio_flash_bank));
++	if (!nct_esio_bank) {
++		LOG_ERROR("Out of memory");
++		return ERROR_FAIL;
++	}
++
++	nct_esio_bank->esio_chip_name = strdup(CMD_ARGV[6]);
++	nct_esio_bank->probed = false;
++
++	bank->driver_priv = nct_esio_bank;
++
++	LOG_INFO("nct_esio flash bank initialized");
++
++	return ERROR_OK;
++}
++
++static int get_nct_esio_info(struct flash_bank *bank, struct command_invocation *cmd)
++{
++	struct nct_esio_flash_bank *nct_esio_bank = bank->driver_priv;
++
++	if (!(nct_esio_bank->probed)) {
++		command_print_sameline(cmd, "\nnct_esio flash bank not probed yet\n");
++		return ERROR_OK;
++	}
++
++	command_print_sameline(cmd, "\nnct_esio flash information:\n"
++		"  Device \'%s\' (ID 0x%08" PRIx32 ")\n",
++		nct_esio_bank->flash.name, nct_esio_bank->flash.id);
++
++	return ERROR_OK;
++}
++
++const struct flash_driver nct_esio_flash = {
++	.name = "nct_esio",
++	.flash_bank_command = nct_esio_flash_bank_command,
++	.erase = nct_esio_flash_erase,
++	.write = nct_esio_flash_write,
++	.read = nct_esio_flash_read,
++	.verify = nct_esio_flash_verify,
++	.probe = nct_esio_flash_probe,
++	.auto_probe = nct_esio_flash_auto_probe,
++	.erase_check = default_flash_blank_check,
++	.info = get_nct_esio_info,
++	.free_driver_priv = default_flash_free_driver_priv,
++};
++
+diff --git a/src/flash/nor/nct_esio.h b/src/flash/nor/nct_esio.h
+new file mode 100644
+index 000000000..6a8a3a6ec
+--- /dev/null
++++ b/src/flash/nor/nct_esio.h
+@@ -0,0 +1,59 @@
++/* SPDX-License-Identifier: GPL-2.0-or-later */
++
++/****************************************************************************
++ *	Copyright (C) 2025 by Nuvoton Technolgy Corp							*
++ ****************************************************************************/
++
++#ifndef OPENOCD_FLASH_NOR_NCT_ESIO_H
++#define OPENOCD_FLASH_NOR_NCT_ESIO_H
++
++#define NCT_ESIO_INTERNAL_FLASH_ADDR		0x00080000U
++#define NCT_ESIO_PRIVATE_FLASH_ADDR		0x60000000U
++#define NCT_ESIO_SHARED_FLASH_NCT6692_ADDR	0x64000000U
++#define NCT_ESIO_SHARED_FLASH_NCT6694_ADDR	0x70000000U
++#define NCT_ESIO_BACKUP_FLASH_ADDR		0x80000000U
++
++#define NCT_ESIO_FLASH_ALGO_BASE_ADDR		0x200C0000U
++#define NCT_ESIO_FLASH_ALGO_PARAMS_ADDR		NCT_ESIO_FLASH_ALGO_BASE_ADDR
++#define NCT_ESIO_FLASH_ALGO_PARAMS_SIZE		20
++#define NCT_ESIO_FLASH_ALGO_BUFFER_ADDR		(NCT_ESIO_FLASH_ALGO_PARAMS_ADDR + NCT_ESIO_FLASH_ALGO_PARAMS_SIZE)
++#define NCT_ESIO_FLASH_ALGO_BUFFER_SIZE		0x1000
++#define NCT_ESIO_FLASH_ALGO_PROGRAM_ADDR	(NCT_ESIO_FLASH_ALGO_BUFFER_ADDR + NCT_ESIO_FLASH_ALGO_BUFFER_SIZE)
++#define NCT_ESIO_FLASH_ALGO_PROGRAM_SIZE	0x1000
++
++#define NCT_ESIO_FLASH_TIMEOUT_MS		8000
++#define NCT_ESIO_FLASH_SECTOR_SIZE		4096
++
++enum nct_esio_flash_type {
++	NCT_ESIO_FLASH_PRIVATE = 0,
++	NCT_ESIO_FLASH_SHARED,
++	NCT_ESIO_FLASH_BACKUP,
++	NCT_ESIO_FLASH_INTERNAL = 0xFF,
++};
++
++enum nct_esio_flash_algo_state {
++	NCT_ESIO_FLASH_ALGO_STATE_IDLE = 0,
++	NCT_ESIO_FLASH_ALGO_STATE_BUSY,
++};
++
++enum nct_esio_flash_algo_cmd {
++	NCT_ESIO_FLASH_ALGO_CMD_INIT = 0,
++	NCT_ESIO_FLASH_ALGO_CMD_ERASE,
++	NCT_ESIO_FLASH_ALGO_CMD_PROGRAM,
++	NCT_ESIO_FLASH_ALGO_CMD_READ,
++	NCT_ESIO_FLASH_ALGO_CMD_VERIFY,
++};
++
++struct nct_esio_flash_algo_params {
++	uint8_t state;		/* Flash loader state */
++	uint8_t cmd;		/* Flash loader command */
++	uint8_t type;		/* Flash type */
++	uint8_t adr_4b;		/* 4-byte address mode */
++	uint32_t version;	/* Flash loader version */
++	uint32_t addr;		/* Address in flash */
++	uint32_t len;		/* Number of bytes */
++	uint32_t reserved;	/* Reserved */
++};
++
++#endif /* OPENOCD_FLASH_NOR_NCT_ESIO_H */
++
+diff --git a/src/flash/startup.tcl b/src/flash/startup.tcl
+index 654f201a4..f3cedd513 100644
+--- a/src/flash/startup.tcl
++++ b/src/flash/startup.tcl
+@@ -58,7 +58,7 @@ proc program {filename args} {
+ 	# Check whether programming is needed
+ 	if {[info exists preverify]} {
+ 		echo "**pre-verifying**"
+-		if {[catch {eval verify_image $flash_args}] == 0} {
++		if {[catch {eval flash verify_image $flash_args}] == 0} {
+ 			echo "**Verified OK - No flashing**"
+ 			set needsflash 0
+ 		}
+@@ -73,7 +73,7 @@ proc program {filename args} {
+ 			if {[info exists verify]} {
+ 				# verify phase
+ 				echo "** Verify Started **"
+-				if {[catch {eval verify_image $flash_args}] == 0} {
++				if {[catch {eval flash verify_image $flash_args}] == 0} {
+ 					echo "** Verified OK **"
+ 				} else {
+ 					program_error "** Verify Failed **" $exit
+diff --git a/tcl/board/npcm400_evb.cfg b/tcl/board/npcm400_evb.cfg
+new file mode 100644
+index 000000000..ae0a56cd3
+--- /dev/null
++++ b/tcl/board/npcm400_evb.cfg
+@@ -0,0 +1,18 @@
++adapter driver npcm_jtag
++transport select jtag
++adapter speed 1000
++npcm_jtag_device jtag0
++
++set _CHIPNAME NCT6694B
++jtag newtap $_CHIPNAME cpu -irlen 4 -expected-id 0
++dap create $_CHIPNAME.dap -chain-position $_CHIPNAME.cpu
++target create $_CHIPNAME.cpu cortex_m -dap $_CHIPNAME.dap
++
++set _TARGETNAME $_CHIPNAME.cpu
++$_TARGETNAME configure -work-area-phys 0x200C0000 -work-area-size 0x8000 -work-area-backup 0
++
++# flash configuration
++set _FLASHNAME $_CHIPNAME.internal.flash
++flash bank $_FLASHNAME nct_esio 0x00080000 0x10000 0 0 $_TARGETNAME $_CHIPNAME
++
++init
+-- 
+2.34.1
+

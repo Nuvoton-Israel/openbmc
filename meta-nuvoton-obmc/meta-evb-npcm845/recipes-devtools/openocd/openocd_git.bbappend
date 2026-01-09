@@ -8,6 +8,7 @@ SRC_URI:append = " \
     file://0001-add-npcm-jtag-adapter.patch \
     file://0002-add-npcm-jtag-configure-option.patch \
     file://0003-svf-suuport-loop-command.patch \
+    file://0004-add-support-for-nct6694-flash.patch \
 "
 
 # Override PACKAGECONFIG to only enable linuxgpiod and npcm-jtag
