@@ -84,11 +84,13 @@ For more product questions, please contact us at:
 * The other straps remain off.
 
 ### 2) Power Source selector
-* JP_5V_SEL set to 1-2, If On-Board VR(12V->5V) is used to power the EVB (<span style="color: green">Recommended)
-* JP_5V_SEL set to 2-3, If USB VBUS is used to power the EVB
+* JP_5V_SEL set to 1-2, If On-Board VR(12V->5V) is used to power the EVB (<span style="color: green">Recommended)</span>)
+* JP_5V_SEL set to 2-3 (this header is closed to VGA connector), If USB VBUS is used to power the EVB 
+  * Connect 2x Mini-USB cable to J_USB_TO_UART and J_USB1_DEV, the two usb connectors are next to the USB host connector.
 
-### 3) Automation header
-* Confirm that the jumps on the automation header are disconnected.
+
+### 3) Automation(J2) header
+* Confirm that the jumps on the automation header are disconnected, the J2 header is close to dip-switch.
 When the jumps are short, we cannot control some straps using a switch.
 Instead, they are controlled by FTDI.
 
