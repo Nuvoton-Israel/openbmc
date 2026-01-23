@@ -1,0 +1,13 @@
+{
+    "Exposes": [
+        {
+            "Address": "0x10",
+            "Bus": "2",
+            "Name": "MCTP I2C Device 0",
+            "Type": "MCTPI2CTarget"
+        }
+    ],
+    "Name": "MCTP_DEV",
+    "Probe": "TRUE",
+    "Type": "Board"
+}

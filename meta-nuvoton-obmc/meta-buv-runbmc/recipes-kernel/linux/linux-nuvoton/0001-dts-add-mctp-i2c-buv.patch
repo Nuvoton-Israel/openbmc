@@ -10,9 +10,9 @@ index e8e9f5e357c4..70e5ebf6d1b1 100644
  &i2c2 {
  	status = "okay";
 +	mctp-controller;
-+	mctp@12 {
++	mctp@11 {
 +		compatible = "mctp-i2c-controller";
-+		reg = <(0x12 | I2C_OWN_SLAVE_ADDRESS)>;
++		reg = <(0x11 | I2C_OWN_SLAVE_ADDRESS)>;
 +	};
  };
  

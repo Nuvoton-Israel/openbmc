@@ -3,6 +3,7 @@ inherit entity-utils
 
 SRC_URI:append:buv-runbmc = " file://buv-runbmc.cfg"
 SRC_URI:append:buv-runbmc = " file://enable-usb-xceiv.cfg"
+SRC_URI:append:buv-runbmc = " file://af_mctp.cfg"
 SRC_URI:append:buv-runbmc = " ${@bb.utils.contains('DISTRO_FEATURES', 'kdump', 'file://kdump.cfg', '', d)}"
 
 SRC_URI:append:buv-runbmc = " file://0008-driver-misc-seven-segment-display-gpio-driver.patch"
