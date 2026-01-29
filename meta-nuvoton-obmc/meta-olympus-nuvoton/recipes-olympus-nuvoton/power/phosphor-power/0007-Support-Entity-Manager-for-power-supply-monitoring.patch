@@ -30,12 +30,17 @@ index 7843cd33..c898db7c 100644
      ['sequencer-monitor', 'pseq-monitor-pgood.service'],
      ['sequencer-monitor', 'pseq-monitor.service'],
      ['supply-monitor-ng', 'phosphor-psu-monitor.service'],
-@@ -160,6 +161,7 @@ conf.set_quoted('PSU_JSON_PATH', '/usr/share/phosphor-power/psu.json')
+@@ -155,11 +155,12 @@
+ conf.set_quoted('PSU_JSON_PATH', '/usr/share/phosphor-power/psu.json')
  conf.set('SEQUENCER', sequencer_class)
  conf.set10('DEVICE_ACCESS', get_option('device-access'))
  conf.set10('IBM_VPD', get_option('ibm-vpd'))
 +conf.set10('NUVOTON_ENTITY', get_option('nuvoton-entity'))
  conf.set('PGOOD_TIMEOUT', get_option('pgood-timeout-value'))
+ conf.set10(
+     'SEQUENCER_USE_DEFAULT_CONFIG_FILE',
+     get_option('sequencer-use-default-config-file'),
+ )
  
  configure_file(output: 'config.h', configuration: conf)
 @@ -210,7 +212,7 @@ endif

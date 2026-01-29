@@ -21,7 +21,7 @@ diff --git a/user_mgr.cpp b/user_mgr.cpp
 index 4f49925..78b85b2 100644
 --- a/user_mgr.cpp
 +++ b/user_mgr.cpp
-@@ -91,6 +91,7 @@ using InternalFailure =
+@@ -93,6 +93,7 @@ using InternalFailure =
      sdbusplus::xyz::openbmc_project::Common::Error::InternalFailure;
  using InvalidArgument =
      sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument;
@@ -29,7 +29,7 @@ index 4f49925..78b85b2 100644
  using UserNameExists =
      sdbusplus::xyz::openbmc_project::User::Common::Error::UserNameExists;
  using UserNameDoesNotExist =
-@@ -100,6 +101,7 @@ using UserNameGroupFail =
+@@ -102,6 +103,7 @@ using UserNameGroupFail =
  using NoResource =
      sdbusplus::xyz::openbmc_project::User::Common::Error::NoResource;
  using Argument = xyz::openbmc_project::Common::InvalidArgument;
@@ -37,7 +37,7 @@ index 4f49925..78b85b2 100644
  using GroupNameExists =
      sdbusplus::xyz::openbmc_project::User::Common::Error::GroupNameExists;
  using GroupNameDoesNotExists =
-@@ -226,6 +228,15 @@ void UserMgr::throwForUserExists(const std::string& userName)
+@@ -268,6 +270,15 @@ void UserMgr::throwForUserExists(const std::string& userName)
      }
  }
  
@@ -53,15 +53,15 @@ index 4f49925..78b85b2 100644
  void UserMgr::throwForUserNameConstraints(
      const std::string& userName, const std::vector<std::string>& groupNames)
  {
-@@ -392,6 +403,7 @@ void UserMgr::deleteUser(std::string userName)
-     // All user management lock has to be based on /etc/shadow
-     // TODO  phosphor-user-manager#10 phosphor::user::shadow::Lock lock{};
+@@ -476,6 +487,7 @@ void UserMgr::deleteUser(std::string userName)
+ void UserMgr::deleteUser(std::string userName)
+ {
      throwForUserDoesNotExist(userName);
 +    throwForNotAllowRoot(userName);
-     try
-     {
-         // Clear user fail records
-@@ -745,6 +757,8 @@ void UserMgr::userEnable(const std::string& userName, bool enabled)
+     deleteUserImpl(userName);
+     lg2::info("User '{USERNAME}' deleted successfully", "USERNAME", userName);
+ }
+@@ -818,6 +830,8 @@ void UserMgr::userEnable(const std::string& userName, bool enabled)
      // All user management lock has to be based on /etc/shadow
      // TODO  phosphor-user-manager#10 phosphor::user::shadow::Lock lock{};
      throwForUserDoesNotExist(userName);
@@ -74,7 +74,7 @@ diff --git a/user_mgr.hpp b/user_mgr.hpp
 index d7b731c..6d3a32d 100644
 --- a/user_mgr.hpp
 +++ b/user_mgr.hpp
-@@ -333,6 +333,13 @@ class UserMgr : public Ifaces
+@@ -489,6 +489,13 @@ class UserMgr : public Ifaces
       */
      void throwForUserExists(const std::string& userName);
  
@@ -90,4 +90,3 @@ index d7b731c..6d3a32d 100644
       *
 -- 
 2.34.1
-

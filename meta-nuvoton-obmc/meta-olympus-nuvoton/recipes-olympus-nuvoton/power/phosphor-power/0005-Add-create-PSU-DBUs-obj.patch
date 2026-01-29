@@ -3,8 +3,8 @@ From: Allen Kang <jhkang@nuvoton.com>
 Date: Tue, 14 Feb 2023 14:39:21 +0800
 Subject: [PATCH 5/5] Add create PSU DBUs obj
 
-Upstream-Status: Inappropriate [oe-specific]
 
+Upstream-Status: Inappropriate [oe-specific]
 ---
  power-supply/power_supply.cpp | 73 +++++++++++++++++++++++++++++++++++
  power-supply/power_supply.hpp |  2 +
@@ -119,29 +119,23 @@ diff --git a/types.hpp b/types.hpp
 index b682d9bf..1f2cfe64 100644
 --- a/types.hpp
 +++ b/types.hpp
-@@ -16,6 +16,8 @@ constexpr auto VERSION_IFACE = "xyz.openbmc_project.Software.Version";
- constexpr auto AVAILABILITY_IFACE =
-     "xyz.openbmc_project.State.Decorator.Availability";
+@@ -23,3 +23,5 @@
  constexpr auto ASSOC_DEF_IFACE = "xyz.openbmc_project.Association.Definitions";
 +constexpr auto DECOR_CACHEABLE_IFACE = "xyz.openbmc_project.Inventory.Decorator.Cacheable";
 +constexpr auto DECOR_REPLACEABLE_IFACE = "xyz.openbmc_project.Inventory.Decorator.Replaceable";
  constexpr auto CHASSIS_IFACE = "xyz.openbmc_project.Inventory.Item.Chassis";
  #ifdef IBM_VPD
- constexpr auto DINF_IFACE = "com.ibm.ipzvpd.DINF";
-@@ -26,9 +28,13 @@ constexpr auto ENDPOINTS_PROP = "endpoints";
- constexpr auto MESSAGE_PROP = "Message";
- constexpr auto RESOLVED_PROP = "Resolved";
+@@ -32,3 +34,4 @@
  constexpr auto PRESENT_PROP = "Present";
 +constexpr auto PRETTYNAME_PROP = "PrettyName";
  constexpr auto FUNCTIONAL_PROP = "Functional";
  constexpr auto AVAILABLE_PROP = "Available";
+@@ -39,3 +42,6 @@
  constexpr auto ASSOC_PROP = "Associations";
 +constexpr auto CACHED_PROP = "Cached";
 +constexpr auto FIELDREPLACEABLE_PROP = "FieldReplaceable";
 +
  
  constexpr auto INVENTORY_OBJ_PATH = "/xyz/openbmc_project/inventory";
- constexpr auto POWER_OBJ_PATH = "/org/openbmc/control/power0";
 -- 
 2.34.1
-
