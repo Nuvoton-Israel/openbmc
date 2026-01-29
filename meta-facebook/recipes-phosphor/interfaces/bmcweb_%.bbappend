@@ -1,5 +1,6 @@
 EXTRA_OEMESON:append = "\
     -Dexperimental-redfish-dbus-log-subscription=enabled \
+    -Dhttp-body-limit=128 \
 "
 
 EXTRA_OEMESON:append:fb-compute-multihost = "\
@@ -10,6 +11,10 @@ PACKAGECONFIG:append = " \
     insecure-redfish-expand \
     redfish-dbus-log \
     redfish-dump-log \
+"
+
+PACKAGECONFIG:remove = " \
+    redfish-oem-manager-fan-data \
 "
 
 MUTUAL_TLS_PARSING = "UserPrincipalName"

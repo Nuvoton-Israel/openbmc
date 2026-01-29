@@ -2,7 +2,7 @@ HOMEPAGE = "https://github.com/openbmc/pldm"
 LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=86d3f3a95c324c9479bd8986968f4327"
 SRC_URI = "git://github.com/openbmc/pldm;branch=master;protocol=https"
-SRCREV = "0b06dd891c42103a4555a0376e7a47b604f01ca9"
+SRCREV = "58b6663575555d2a6cbc17e89d408ec5690d470a"
 
 SUMMARY = "PLDM Stack"
 DESCRIPTION = "Implementation of the PLDM specifications"
@@ -22,7 +22,7 @@ RRECOMMENDS:${PN}:append = "pldmtool"
 
 S = "${WORKDIR}/git"
 SYSTEMD_SERVICE:${PN} += "pldmd.service"
-SYSTEMD_SERVICE:${PN} += "pldmSoftPowerOff.service"
+SYSTEMD_SERVICE:${PN} += "${@bb.utils.contains('PACKAGECONFIG', 'softoff', 'pldmSoftPowerOff.service', '', d)}"
 
 FILES:pldmtool = "${bindir}/pldmtool"
 FILES:pldm-libs = "${libdir}/lib*${SOLIBS}"
@@ -37,7 +37,8 @@ PACKAGECONFIG[oem-ampere] = "-Doem-ampere=enabled, -Doem-ampere=disabled, libcpe
 PACKAGECONFIG[oem-meta] = "-Doem-meta=enabled, -Doem-meta=disabled"
 PACKAGECONFIG[system-specific-bios-json] = "-Dsystem-specific-bios-json=enabled, -Dsystem-specific-bios-json=disabled"
 PACKAGECONFIG[fw-update-pkg-inotify] = "-Dfw-update-pkg-inotify=enabled, -Dfw-update-pkg-inotify=disabled"
-PACKAGECONFIG ??= ""
+PACKAGECONFIG[softoff] = "-Dsoftoff=enabled, -Dsoftoff=disabled"
+PACKAGECONFIG ??= "softoff"
 PACKAGECONFIG:append:df-mctp = " transport-af-mctp"
 
 EXTRA_OEMESON = " \

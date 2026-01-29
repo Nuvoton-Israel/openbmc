@@ -3,15 +3,18 @@ DESCRIPTION = "Entity Manager provides d-bus configuration data \
 and configures system sensors"
 LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENCE;md5=a6a4edad4aed50f39a66d098d74b265b"
-DEPENDS = "boost \
-           dbus \
-           nlohmann-json \
-           phosphor-logging \
-           sdbusplus \
-           valijson \
-           phosphor-dbus-interfaces \
+DEPENDS = " \
+    boost \
+    dbus \
+    libxml2 \
+    nlohmann-json \
+    phosphor-dbus-interfaces \
+    phosphor-logging \
+    sdbusplus \
+    valijson \
+    zlib \
 "
-SRCREV = "8039efecea82595be885236e4ede9514d5193207"
+SRCREV = "1f08ce74119b4cbd97e542e11eefc5fe99de9d94"
 PACKAGECONFIG ??= "ipmi-fru gpio-presence"
 
 PACKAGECONFIG[dts-vpd] = "-Ddevicetree-vpd=true, -Ddevicetree-vpd=false"

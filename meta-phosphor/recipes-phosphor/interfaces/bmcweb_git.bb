@@ -14,7 +14,7 @@ DEPENDS = " \
     ${@bb.utils.contains('PTEST_ENABLED', '1', 'gtest', '', d)} \
     ${@bb.utils.contains('PTEST_ENABLED', '1', 'gmock', '', d)} \
 "
-SRCREV = "9ad2c6f422bc0860314b853c287283dcbd29430d"
+SRCREV = "ac69e77ea938e8c2a5bd3dad258cdafd9d3182b7"
 PV = "1.0+git${SRCPV}"
 
 SRC_URI = "git://github.com/openbmc/bmcweb.git;branch=master;protocol=https"
@@ -34,6 +34,7 @@ PACKAGECONFIG ??= " \
     kvm \
     mutual-tls-auth \
     redfish-bmc-journal \
+    redfish-oem-manager-fan-data \
 "
 
 PACKAGECONFIG[dbus-rest] = "-Drest=enabled,-Drest=disabled"
@@ -47,6 +48,7 @@ PACKAGECONFIG[redfish-cpu-log] = "-Dredfish-cpu-log=enabled,-Dredfish-cpu-log=di
 PACKAGECONFIG[redfish-dbus-log] = "-Dredfish-dbus-log=enabled,-Dredfish-dbus-log=disabled"
 PACKAGECONFIG[redfish-dump-log] = "-Dredfish-dump-log=enabled,-Dredfish-dump-log=disabled"
 PACKAGECONFIG[redfish-host-logger] = "-Dredfish-host-logger=enabled,-Dredfish-host-logger=disabled"
+PACKAGECONFIG[redfish-oem-manager-fan-data] = "-Dredfish-oem-manager-fan-data=enabled,-Dredfish-oem-manager-fan-data=disabled"
 
 MUTUAL_TLS_PARSING = "CommonName"
 
