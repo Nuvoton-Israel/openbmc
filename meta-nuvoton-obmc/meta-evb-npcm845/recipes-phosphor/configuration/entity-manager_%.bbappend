@@ -9,6 +9,7 @@ SRC_URI:append = " \
 
 do_install:append () {
     mkdir -p ${D}/etc/fru
+    rm -rf ${D}${datadir}/entity-manager/configurations/*
     install -m 0444 ${UNPACKDIR}/baseboard.fru.bin ${D}/etc/fru
     install -d ${D}${datadir}/entity-manager
     install -m 0644 -D ${UNPACKDIR}/nuvoton_npcm8xx_evb.json \
