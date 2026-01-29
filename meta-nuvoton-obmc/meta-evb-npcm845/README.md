@@ -2481,51 +2481,161 @@ CONFIG_RESET_NPCM=y
 ```
 # QEMU
 
-**Build BMC image**
-```
+This section describes how to build and run the NPCM845 EVB in QEMU emulation.
+
+## Prerequisites
+
+### Build BMC Image
+
+Build the OpenBMC image for the evb-npcm845-stage target:
+
+```bash
 $ . setup evb-npcm845-stage
 $ DISTRO=arbel-evb-entity bitbake obmc-phosphor-image
 ```
-**Build QEMU**
-```
-$ sudo apt install nettle-dev
+
+The build will generate the following images in `build/evb-npcm845-stage/tmp/deploy/images/evb-npcm845-stage/`:
+- `image-bmc` - Complete BMC firmware image (for MTD flash boot)
+- `image-u-boot` - U-Boot bootloader only
+- `image-emmc.gz` - eMMC boot image (compressed)
+- `bl31.bin` - ARM Trusted Firmware (ATF) binary
+
+### Build QEMU
+
+Clone and build the Nuvoton QEMU fork with NPCM845 support:
+
+```bash
+$ sudo apt install nettle-dev libusb-1.0-0-dev
 $ git clone git@github.com:Nuvoton-Israel/qemu.git
 $ cd qemu
 $ ./configure --target-list=aarch64-softmmu --enable-nettle --disable-gnutls --enable-libusb
-$ make -j $(nproc)    // will generate a qemu-system-aarch64 binary file in the build floder
-```
-**Run QEMU**
-```
-$ cd build
-$ ./qemu-system-aarch64 -machine npcm845-evb -nographic \
-	-drive file=workdir/image-bmc,if=mtd,bus=0,unit=0,format=raw \
-	-device loader,force-raw=on,addr=0x2000000,file=workdir/bl31.bin \
-	-device loader,cpu-num=3,addr=0x2000000 \
-	-device loader,cpu-num=2,addr=0x2000000 \
-	-device loader,cpu-num=1,addr=0x2000000
+$ make -j $(nproc)
 ```
 
-**Add USB device passthrough to QEMU**
+This will generate the `qemu-system-aarch64` binary in the `build/` folder.
+
+## Running QEMU
+
+### Standard Boot (MTD Flash)
+
+Run QEMU with the complete BMC image from MTD flash:
+
+```bash
+# Set image directory for convenience
+$ export IMG_DIR=${HOME}/openbmc/build/evb-npcm845-stage/tmp/deploy/images/evb-npcm845-stage
+
+# Navigate to QEMU build directory
+$ cd build
+
+# Launch QEMU
+$ ./qemu-system-aarch64 -machine npcm845-evb -nographic \
+    -drive file=${IMG_DIR}/image-bmc,if=mtd,bus=0,unit=0,format=raw \
+    -device loader,force-raw=on,addr=0x2000000,file=${IMG_DIR}/bl31.bin \
+    -device loader,cpu-num=3,addr=0x2000000 \
+    -device loader,cpu-num=2,addr=0x2000000 \
+    -device loader,cpu-num=1,addr=0x2000000
 ```
+
+**Note:** The `image-bmc` contains U-Boot, kernel, and root filesystem in a single MTD flash image.
+
+### eMMC Boot
+
+Run QEMU with eMMC storage (requires eMMC-enabled build):
+
+**Step 1:** Prepare the eMMC image
+
+```bash
+# Set image directory
+$ export IMG_DIR=${HOME}/openbmc/build/evb-npcm845-stage/tmp/deploy/images/evb-npcm845-stage
+
+# Decompress the eMMC image
+$ gunzip -c ${IMG_DIR}/image-emmc.gz > ${IMG_DIR}/image-emmc.wic
+
+# Resize to 1GB (optional, adjust as needed)
+$ qemu-img resize ${IMG_DIR}/image-emmc.wic 1G
+```
+
+**Step 2:** Launch QEMU with eMMC
+
+```bash
+# Navigate to QEMU build directory
+$ cd build
+
+# Launch QEMU with eMMC support
+$ ./qemu-system-aarch64 -machine npcm845-evb -nographic \
+    -drive file=${IMG_DIR}/image-u-boot,if=mtd,bus=0,unit=0,format=raw \
+    -device loader,force-raw=on,addr=0x2000000,file=${IMG_DIR}/bl31.bin \
+    -device loader,cpu-num=3,addr=0x2000000 \
+    -device loader,cpu-num=2,addr=0x2000000 \
+    -device loader,cpu-num=1,addr=0x2000000 \
+    -drive file=${IMG_DIR}/image-emmc.wic,format=raw,if=sd
+```
+
+**Note:** 
+- The MTD flash contains only U-Boot (`image-u-boot`)
+- The kernel and root filesystem are loaded from the eMMC device (`image-emmc.wic`)
+- The eMMC is attached as an SD card device (`if=sd`)
+
+## Optional Features
+
+### USB Device Passthrough
+
+To pass through a USB device from the host to QEMU:
+
+**Step 1:** Identify the USB device
+
+```bash
 $ lsusb
 # Example output:
 # Bus 001 Device 003: ID 1d6b:0104 Linux Foundation Multifunction Composite Gadget
 ```
 
-2. Handle permissions (either run QEMU with `sudo` or change device permissions):
+**Step 2:** Set permissions (choose one method)
+
 ```bash
+# Method 1: Run QEMU with sudo
+$ sudo ./qemu-system-aarch64 ...
+
+# Method 2: Change device permissions
 $ sudo chmod 666 /dev/bus/usb/001/003
 ```
 
-3. Add the following parameter to your QEMU command (replace IDs with your device's):
+**Step 3:** Add USB passthrough parameter
+
+Add the following to your QEMU command (replace vendor/product IDs with your device's):
+
 ```bash
 -device usb-host,vendorid=0x1d6b,productid=0x0104,bus=usb-bus.0
 ```
 
-**Add SPI Flash device to PSPI bus in QEMU**
+### SPI Flash on PSPI Bus
+
+To attach a SPI flash device to the Peripheral SPI (PSPI) bus:
+
 ```bash
 -device mx66l1g45g,bus=pspi
 ```
+
+This emulates a Macronix MX66L1G45G 1Gbit SPI flash on the PSPI bus.
+
+## QEMU Command Reference
+
+### Common Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| `-machine npcm845-evb` | Specify NPCM845 EVB machine type |
+| `-nographic` | Disable graphical output, use serial console only |
+| `-drive file=...,if=mtd` | Attach MTD flash device |
+| `-drive file=...,if=sd` | Attach SD/eMMC device |
+| `-device loader,...` | Load binary files to specific memory addresses |
+| `-device usb-host,...` | USB device passthrough |
+| `-device mx66l1g45g,bus=pspi` | Attach SPI flash to PSPI bus |
+
+### Exit QEMU
+
+To exit QEMU, press: `Ctrl-A` then `X`
+
 
 # Troubleshooting
 
