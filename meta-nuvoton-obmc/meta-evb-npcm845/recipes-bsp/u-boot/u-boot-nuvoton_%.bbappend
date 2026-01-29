@@ -1,5 +1,7 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/u-boot-nuvoton:"
 
+inherit emmc-utils
+
 SRC_URI:append = " file://emmc.cfg"
 SRC_URI:append = " file://ftpm.cfg"
 SRC_URI:append = " file://mem_hide.cfg"
@@ -14,3 +16,5 @@ SRC_URI:append = " file://0001-uart2-clock-source-to-24Mhz.patch"
 SRC_URI:append = " file://0002-Enable-openbmc-copy-base-file-to-ram-feature.patch"
 # SRC_URI:append = " file://0012-Enable-DVO-HSYNC-DDC-i2c-port.patch"
 
+
+SRC_URI:append = " ${@emmc_enabled(d, 'file://1111-boot-openbmc-form-emmc.patch file://mmc-boot.cfg', '')}"

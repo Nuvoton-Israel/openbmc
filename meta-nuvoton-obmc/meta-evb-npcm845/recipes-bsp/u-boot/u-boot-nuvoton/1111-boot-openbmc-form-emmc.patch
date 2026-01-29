@@ -1,0 +1,33 @@
+From d653c8fcc44ee36b4302418fbf61c8086653d921 Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Fri, 13 May 2022 16:43:18 +0800
+Subject: [PATCH] boot openbmc from emmc
+
+Add env for boot Openbmc from eMMC.
+
+Upstream-Status: Inappropriate [oe-specific]
+
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ include/configs/arbel.h | 6 ++++++
+ 1 file changed, 6 insertions(+
+
+diff --git a/include/configs/arbel.h b/include/configs/arbel.h
+index 01cf1c5e6e..0794024f85 100644
+--- a/include/configs/arbel.h
++++ b/include/configs/arbel.h
+@@ -41,6 +41,12 @@
+ 		"console=ttyS0,115200n8\0" \
+ 		"common_bootargs=setenv bootargs earlycon=${earlycon} root=/dev/ram " \
+ 		"console=${console} ramdisk_size=48000\0" \
++		"mmc_bootargs=setenv bootargs earlycon=${earlycon} console=${console} " \
++		"rootwait root=PARTLABEL=rofs-a\0" \
++		"mmcboot=echo Booting Kernel from eMMC; echo Using bootargs: ${bootargs};" \
++		"setenv loadaddr 0x10000000; setenv bootpart 2; " \
++		"ext4load mmc 0:${bootpart} ${loadaddr} fitImage && bootm; " \
++		"echo Error loading kernel FIT image\0" \
+ 		"tftptimeout=1000\0" \
+ 		"tftptimeoutcountmax=50\0" \
+ 		"bootpretryperiod=60000\0" \
+-- 
+2.34.1
