@@ -23,22 +23,36 @@ For more product questions, please contact us at:
 - [Dependencies](#dependencies)
 - [Contact](#contact)
 - [Getting Started](#getting-started)
-  * [Setting up EVB](#setting-up-evb)
-  * [Building your OpenBMC project](#building-your-openbmc-project)
-    + [Enable Secure Image](#enable-secure-image)
-    + [Enable TIP FW](#enable-tip-fw)
-    + [Enable NO TIP FW](#enable-no-tip-fw)
-    + [Enable ECC](#enable-ecc)
-    + [Change FIU Speed](#change-fiu-speed)
-    + [Configuration](#configuration)
-    + [Build](#build)
-    + [Output Images](#output-images)
-  * [Flash Programming Tool](#flash-programming-tool)
-    + [IGPS](#igps)
-    + [ISP](#ISP)
-    + [U-BOOT](#u-boot)
+  * [Quick Start](#quick-start)
+  * [Hardware Setup](#hardware-setup)
+    + [1. Strap Configuration](#1-strap-configuration)
+    + [2. Power Source Selection](#2-power-source-selection)
+    + [3. BMC Serial Console](#3-bmc-serial-console)
+    + [4. Verifying Secure Boot Status](#4-verifying-secure-boot-status)
+  * [Building OpenBMC](#building-openbmc)
+    + [Prerequisites](#prerequisites)
+    + [Build Configuration Options](#build-configuration-options)
+    + [Build Steps](#build-steps)
+    + [Build Output](#build-output)
+  * [Flash Programming](#flash-programming)
+    + [Method 1: IGPS](#method-1-igps-image-generation-and-programming-scripts)
+    + [Method 2: ISP](#method-2-isp-in-system-programming-via-ftdi)
+    + [Method 3: U-Boot TFTP](#method-3-u-boot-tftp)
+  * [Next Steps](#next-steps)
+  * [Troubleshooting](#troubleshooting)
   * [Boot from eMMC](#boot-from-emmc)
-  * [Baudrate change](#baudrate-change)
+    + [Prerequisites](#prerequisites-2)
+    + [Build eMMC Image](#build-emmc-image)
+    + [Flash eMMC Image](#flash-emmc-image)
+    + [Configure Boot from eMMC](#configure-boot-from-emmc)
+    + [Boot Process](#boot-process)
+    + [Partition Layout](#partition-layout)
+    + [Troubleshooting](#troubleshooting-1)
+  * [Baudrate Configuration](#baudrate-configuration)
+    + [Overview](#overview)
+    + [Configuration Steps](#configuration-steps)
+    + [Verification](#verification)
+    + [Important Notes](#important-notes)
 - [BMC Modules](#bmc-modules)
   * [GPIO](#gpio)
   * [UART](#uart)
@@ -72,312 +86,407 @@ For more product questions, please contact us at:
   * [Watchdog](#watchdog)
   * [Software Reset](#software-reset)
 - [QEMU](#qemu)
-- [Troubleshooting](#troubleshooting)
-  * [Failed to probe SPI0 CS0 in u-boot](#failed-to-probe-SPI0-CS0-in-u-boot)
+  * [Prerequisites](#prerequisites-1)
+    + [Build BMC Image](#build-bmc-image)
+    + [Build QEMU](#build-qemu)
+  * [Running QEMU](#running-qemu)
+    + [Standard Boot (MTD Flash)](#standard-boot-mtd-flash)
+    + [eMMC Boot](#emmc-boot)
+  * [Optional Features](#optional-features)
+    + [USB Device Passthrough](#usb-device-passthrough)
+    + [SPI Flash on PSPI Bus](#spi-flash-on-pspi-bus)
+  * [QEMU Command Reference](#qemu-command-reference)
+    + [Common Parameters](#common-parameters)
+    + [Exit QEMU](#exit-qemu)
+
 
 # Getting Started
 
-## Setting up EVB
+This guide will help you set up the NPCM845 EVB hardware and build your first OpenBMC image.
 
-### 1) Strap settings
-* By default, only turn on strap 5 of the SW_STRAP1_8 dip switch.
-* The other straps remain off.
+## Quick Start
 
-### 2) Power Source selector
-* JP_5V_SEL set to 1-2, If On-Board VR(12V->5V) is used to power the EVB (<span style="color: green">Recommended)</span>)
-* JP_5V_SEL set to 2-3 (this header is closed to VGA connector), If USB VBUS is used to power the EVB 
-  * Connect 2x Mini-USB cable to J_USB_TO_UART and J_USB1_DEV, the two usb connectors are next to the USB host connector.
+For experienced users, here's the minimal steps to get started:
 
+```bash
+# 1. Setup hardware (see Hardware Setup section for details)
+# 2. Build OpenBMC
+$ . setup evb-npcm845-stage
+$ DISTRO=arbel-evb-entity bitbake obmc-phosphor-image
 
-### 3) Automation(J2) header
-* Confirm that the jumps on the automation header are disconnected, the J2 header is close to dip-switch.
-When the jumps are short, we cannot control some straps using a switch.
-Instead, they are controlled by FTDI.
+# 3. Flash the image (see Flash Programming section)
+```
 
-### 4) BMC Console
+## Hardware Setup
 
-* Connect a Mini-USB cable to J_USB_TO_UART
-* You will get 4 serial port options from your terminal settings.
-* Please select the second serial port and set the baud rate to 115200.
-* After EVB is powered on, you will get BMC logs from the terminal.
+### Overview
 
-### 5) Secure boot status
-* When you see the following BMC message, it means that secure boot is enabled.
-```ruby
+Before building and flashing OpenBMC, you need to configure the EVB hardware correctly.
+
+### 1. Strap Configuration
+
+Configure the DIP switches on the EVB:
+
+- **SW_STRAP1_8**: Turn **ON** only strap 5, all others should be **OFF**
+- This is the default configuration for normal operation
+
+**Note:** The automation header (J2) jumpers should be **disconnected** to allow manual strap control via the DIP switches.
+
+### 2. Power Source Selection
+
+Choose your power source using the **JP_5V_SEL** jumper:
+
+| Configuration | Description | Recommended |
+|---------------|-------------|-------------|
+| **JP_5V_SEL: 1-2** | On-board voltage regulator (12V → 5V) | ✅ **Yes** |
+| **JP_5V_SEL: 2-3** | USB VBUS power | For USB-only setups |
+
+**For USB power (2-3 configuration):**
+- Connect two Mini-USB cables:
+  - **J_USB_TO_UART** - Console and power
+  - **J_USB1_DEV** - Additional power
+- Both connectors are located next to the USB host connector
+
+### 3. BMC Serial Console
+
+To access the BMC console:
+
+1. Connect a Mini-USB cable to **J_USB_TO_UART**
+2. Open your terminal application (e.g., PuTTY, minicom, screen)
+3. Configure the serial port:
+   - **Port**: Select the **second** serial port from the 4 available options
+   - **Baud Rate**: 115200
+   - **Data Bits**: 8
+   - **Parity**: None
+   - **Stop Bits**: 1
+
+4. Power on the EVB - you should see boot logs in the terminal
+
+### 4. Verifying Secure Boot Status
+
+After powering on, check the boot messages for secure boot status:
+
+```
 Nuvoton Technologies: BMC NPCM8XX
-.....
 .....
 TipROM 0x104 ** Secure boot is enabled
 .....
-.....
 ```
 
-## Building your OpenBMC project
+If you see "**Secure boot is enabled**", the BMC is running in secure mode.
 
-### Enable TIP FW
+## Building OpenBMC
 
-The TIP FW currently is a pre-signed binary release, it is required a nuvoton key.
+### Prerequisites
 
-We enable the tipfw build by default. [Reference](https://github.com/Nuvoton-Israel/openbmc/blob/npcm-master/meta-nuvoton/conf/machine/include/npcm8xx.inc#L60)
-```ruby
+- Ubuntu 20.04 or later (recommended)
+- At least 50GB free disk space
+- Internet connection for downloading dependencies
+
+### Build Configuration Options
+
+Before building, you may want to configure these options:
+
+#### TIP Firmware (Enabled by Default)
+
+The TIP firmware is a pre-signed binary that requires a Nuvoton key. It's enabled by default in [`npcm8xx.inc`](https://github.com/Nuvoton-Israel/openbmc/blob/npcm-master/meta-nuvoton/conf/machine/include/npcm8xx.inc#L60):
+
+```python
 TIP_IMAGE = "True"
 ```
 
-### Enable NO TIP FW
+**To disable TIP firmware** (for non-TIP BMC versions):
 
-Please make sure that your BMC is a non-tip version first.
-
-To enable the NO TIP FW OpenBMC release, please set the below variable in your platform include file. [Reference](https://github.com/Nuvoton-Israel/openbmc/blob/npcm-master/meta-nuvoton/conf/machine/include/npcm8xx.inc#L60)
-```ruby
+```python
 TIP_IMAGE = "False"
 ```
 
-### Enable ECC
+**Important:** Ensure your BMC hardware supports the configuration you choose.
 
-To enable memory ECC function, please enable [MC_CAPABILITY_ECC_EN] in your customized [BootBlockAndHeader.xml](https://github.com/Nuvoton-Israel/igps-npcm8xx/blob/main/py_scripts/ImageGeneration/references/BootBlockAndHeader_A1_EB.xml#L243)
+#### Memory ECC (Optional)
 
-You should read the BootBlockAndHeader.xml comment carefully and update the parameter value by modify [settings.json](https://github.com/Nuvoton-Israel/openbmc/blob/npcm-master/meta-nuvoton/recipes-bsp/images/npcm8xx-bootloader/settings.json) under npcm8xx-bootloader folder. You can write your own settings.json and replace the original one in your bbappend recipe. For TIP enabled image, please set MC_CONFIG in BootBlockAndHeader.xml, or set MC_CONFIG in BootBlockAndHeader_no_tip.xml for no TIP image.
+To enable Error Correction Code (ECC) for memory:
+
+1. Edit your custom `BootBlockAndHeader.xml` and enable `MC_CAPABILITY_ECC_EN`
+2. Update `settings.json` in the `npcm8xx-bootloader` folder:
 
 ```json
 {
-    "BootBlockAndHeader.xml":
-    {
+    "BootBlockAndHeader.xml": {
         "MC_CONFIG": "0x05"
     },
-    "BootBlockAndHeader_no_tip.xml":
-    {
+    "BootBlockAndHeader_no_tip.xml": {
         "MC_CONFIG": "0x05"
     }
 }
 ```
 
-### Change FIU Speed
+**References:**
+- [BootBlockAndHeader.xml](https://github.com/Nuvoton-Israel/igps-npcm8xx/blob/main/py_scripts/ImageGeneration/references/BootBlockAndHeader_A1_EB.xml#L243)
+- [settings.json](https://github.com/Nuvoton-Israel/openbmc/blob/npcm-master/meta-nuvoton/recipes-bsp/images/npcm8xx-bootloader/settings.json)
 
-To change FIU Speed, please modify the content value of FIU_CLK_DIVIDER in **BootBlockAndHeader.xml** file. [Reference](https://github.com/Nuvoton-Israel/igps-npcm8xx/blob/main/py_scripts/ImageGeneration/references/BootBlockAndHeader_A1_EB.xml#L566)
+#### FIU Clock Speed (Optional)
 
-Just like **Enable ECC**, you should update the FIU0_CLK_DIVIDER value in [settings.json](https://github.com/Nuvoton-Israel/openbmc/blob/npcm-master/meta-nuvoton/recipes-bsp/images/npcm8xx-bootloader/settings.json)
+To change the Flash Interface Unit (FIU) clock speed, modify `FIU0_CLK_DIVIDER` in `settings.json`:
 
-Change to **25 MHz** then the divider value should be filled as **10**.
+| Target Speed | Divider Value |
+|--------------|---------------|
+| 25 MHz | 10 |
+| 50 MHz | 5 |
 
-Change to **50 MHz** then the divider value should be filled as **5**.
+**Example** (50 MHz):
 
-The other value can be calculated according to spec.
-
-Below is an example of changing the FIU0 speed to 50MHz.
 ```json
-  "BootBlockAndHeader.xml":
-    {
+{
+    "BootBlockAndHeader.xml": {
         "FIU0_CLK_DIVIDER": "5"
     }
-```
-### Configuration
-
-### Build
-1. Target EVB NPCM845
-Source the setup script as follows:
-```ruby
-. setup evb-npcm845-stage
+}
 ```
 
-2. Choose the distro
+**Reference:** [BootBlockAndHeader.xml FIU_CLK_DIVIDER](https://github.com/Nuvoton-Israel/igps-npcm8xx/blob/main/py_scripts/ImageGeneration/references/BootBlockAndHeader_A1_EB.xml#L566)
 
-* [Inventory manager distro](https://github.com/openbmc/phosphor-inventory-manager)
-```
-bitbake obmc-phosphor-image
-```
+### Build Steps
 
-* [Entity manager distro](https://github.com/openbmc/entity-manager)
-```
-DISTRO=arbel-evb-entity bitbake obmc-phosphor-image
+#### 1. Setup Build Environment
+
+```bash
+$ . setup evb-npcm845-stage
 ```
 
-### Output Images
-* You will find images in path build/evb-npcm845-stage/tmp/deploy/images/evb-npcm845-stage
+This initializes the build environment for the NPCM845 EVB.
 
-Type          | Description                                                                                                     |
-:-------------|:-------------------------------------------------------------------------------------------------------- |
-image-bmc   |  includes image-u-boot and image-kernel and image-rofs                                                                     |
-image-uboot   |  tipfw + bootlock + optee + atf + u-boot                                                                     |
-image-kernel  |  Fit Image(Linux kernel + dtb+ initramfs)                                                                                     |
-image-rofs    |  OpenBMC Root Filesystem                                                          |
+#### 2. Choose Distribution and Build
 
-## Flash Programming Tool
+OpenBMC supports two inventory management systems:
 
-### IGPS
+**Option A: Entity Manager** (Recommended for new projects)
 
-#### Image Generation before flashing through IGPS
-Currently, Arbel supports A1/Z1 devices and EB/SVB boards. The default configuration is using the A1 device and EB board.<br/>
-You need to make sure which one is your device and board. Then execute the correct batch file as below to generate the image.
-
-* UpdateInputsBinaries_A1_EB.bat
-* UpdateInputsBinaries_A1_SVB.bat
-* UpdateInputsBinaries_Z1_EB.bat
-* UpdateInputsBinaries_Z1_SVB.bat
-
-Note: UpdateInputBinaries*.bat resets all the images and xml files inside **py_scripts/ImageGeneration/inputs**<br/>
-After that users can override the existing files in the inputs folder, or use as is.
-
-In OpenBMC, there is one variable for configure Arbel A1/Z1 device in file [evb-npcm845.conf](https://github.com/Nuvoton-Israel/openbmc/blob/npcm-master/meta-nuvoton-obmc/meta-evb-npcm845/conf/machine/evb-npcm845-stage.conf )<br/>
-If you are using Z1 device, please modify variable **DEVICE_GEN = "Z1"**, before bitbake obmc-phosphor-image.<br/>
-
-
-#### Flashing through IGPS
-Python 2.7 is required.<br/>
-Note: FUP means using the internal UART of the Arbel. This feature is only supported in Z1. For A1 device, please use ISP.<br/>
-
-1. BMC enter to FUP Mode :
-* Connect a Mini-USB cable to J_USB_TO_UART 
-* STRAP9 on
-* Quit terminal app 
-* Issue PORST_N (Power-On-Reset). 
-
-
-2. Image programming:
-* Non secure boot
-```
-python ./ProgramAll_Basic.py
+```bash
+$ DISTRO=arbel-evb-entity bitbake obmc-phosphor-image
 ```
 
-* Secure boot is enabled
-```
-python ./ProgramAll_Secure.py
-```
+- Uses [Entity Manager](https://github.com/openbmc/entity-manager) for dynamic hardware configuration
+- Better support for hot-pluggable components
+- Configuration via JSON files
 
-### ISP
+**Option B: Inventory Manager** (Legacy)
 
-#### In-system-programing using FTDI
-
-1. BMC enters to tri-state
-* Connect a Mini-USB cable to J_USB_TO_UART 
-* STRAP7 on(BMC pins are at Hi-Z) and STRAP5 on (Rout BSP signals via Host SI2 pins).
-* Quit terminal app 
-* Issue PORST_N (Power-On-Reset). 
-
-2. Programming bootloader
-```
-Arbel_EVB_FlashProg.exe -open-desc "NPCM8mnx_Evaluation_Board B" -verify-on -prog-file "image-u-boot" 0 0 -1 -reset 
+```bash
+$ bitbake obmc-phosphor-image
 ```
 
-3. Programming full image
-```
-Arbel_EVB_FlashProg.exe -open-desc "NPCM8mnx_Evaluation_Board B" -verify-on -prog-file "image-bmc" 0 0 -1 -reset 
-```
+- Uses [Phosphor Inventory Manager](https://github.com/openbmc/phosphor-inventory-manager)
+- Static hardware configuration
 
-### U-BOOT
+### Build Output
 
-#### Flash in U-BOOT
+After a successful build, images will be located in:
 
-* User can program images by u-boot command.
-* If you are using Red EVB board:
-  - The flash 0 size is 4MB, you should program the openbmc image to flash 1.
-* If you are using Blue/Green EVB board:
-  - The flash 0 size is 128MB, you can leave all images at flash 0.
-
-1. Setting up:
-* Power on your EVB and stop BMC at u-boot stage.
-* Prepare an ethernet cable and connect to J_RGMII
-
-* Set BMC ip and tftp server ip in uboot env
-```ruby
-setenv gatewayip            192.168.0.254
-setenv serverip             192.168.0.128
-setenv ipaddr               192.168.0.12
-setenv netmask              255.255.255.0
 ```
-* Set bootargs in uboot env
-```ruby
-setenv autoload  no
-setenv autostart no
-setenv baudrate 115200
-setenv bootcmd 'run romboot'
-setenv bootdelay 2
-setenv common_bootargs 'setenv bootargs earlycon=${earlycon} root=/dev/ram0 console=${console} mem=${mem}'
-setenv console 'ttyS0,115200n8'
-setenv earlycon 'uart8250,mmio32,0xf0000000'
-setenv mem 880M
-setenv romboot 'run common_bootargs; echo Booting Kernel from flash; echo +++ uimage at 0x${uimage_flash_addr}; echo Using bootargs: ${bootargs};bootm ${uimage_flash_addr}'
-setenv stderr serial
-setenv stdin serial
-setenv stdout serial
-```
-* Blue/Green EVB, boot from flash 0
-```ruby
-setenv uimage_flash_addr 0x80800000
-```
-* Red EVB, boot from flash 1
-```ruby
-setenv bootcmd 'mw fb000000 030111BC; run romboot'
-setenv uimage_flash_addr 0x88200000
+build/evb-npcm845-stage/tmp/deploy/images/evb-npcm845-stage/
 ```
 
-* Save uboot env to flash
-```ruby
-saveenv
+| Image | Description | Components |
+|-------|-------------|------------|
+| **image-bmc** | Complete BMC firmware | U-Boot + Kernel + Root filesystem |
+| **image-u-boot** | Bootloader only | TIP FW + BootBlock + OP-TEE + ATF + U-Boot |
+| **image-kernel** | Kernel image | FIT Image (Linux kernel + DTB + initramfs) |
+| **image-rofs** | Root filesystem | OpenBMC root filesystem (read-only) |
+
+**For most use cases, you only need `image-bmc` for a complete flash.**
+
+## Flash Programming
+
+There are multiple methods to program the BMC flash. Choose the one that best fits your setup.
+
+### Method 1: IGPS (Image Generation and Programming Scripts)
+
+**Prerequisites:**
+- Python 2.7
+- Windows PC (for running batch files)
+- IGPS tools from [Nuvoton IGPS repository](https://github.com/Nuvoton-Israel/igps-npcm8xx)
+
+#### Device and Board Configuration
+
+NPCM845 supports different device generations and board types:
+
+| Device | Board | Batch File |
+|--------|-------|------------|
+| A1 | EB (Evaluation Board) | `UpdateInputsBinaries_A1_EB.bat` |
+| A1 | SVB | `UpdateInputsBinaries_A1_SVB.bat` |
+| Z1 | EB | `UpdateInputsBinaries_Z1_EB.bat` |
+| Z1 | SVB | `UpdateInputsBinaries_Z1_SVB.bat` |
+
+**Configure device generation** in [`evb-npcm845-stage.conf`](https://github.com/Nuvoton-Israel/openbmc/blob/npcm-master/meta-nuvoton-obmc/meta-evb-npcm845/conf/machine/evb-npcm845-stage.conf):
+
+```python
+DEVICE_GEN = "A1"  # or "Z1" for Z1 devices
 ```
 
-2. Image programming:
+#### Programming Steps
 
-* Flash full openbmc image
-```ruby
-setenv ethact gmac2
-tftp 10000000 image-bmc
-/* Blue/Green EVB */
-sf probe 0:0
-sf update 0x10000000 0x0 ${filesize}
-/* Red EVB */
-sf probe 0:1
-sf update 0x10000000 0x0 ${filesize}
+**Step 1: Enter FUP Mode** (Z1 devices only; A1 devices should use ISP)
+
+1. Connect Mini-USB cable to **J_USB_TO_UART**
+2. Turn **ON** STRAP9 on the DIP switch
+3. Close your terminal application
+4. Press **PORST_N** button (Power-On-Reset)
+
+**Step 2: Run Programming Script**
+
+For **non-secure boot**:
+```bash
+$ python ./ProgramAll_Basic.py
 ```
 
-* Flash linux kernel
-```ruby
-setenv ethact gmac2
-tftp 10000000 image-kernel
-/* Blue/Green EVB */
-sf probe 0:0
-sf update 0x10000000 0x800000 ${filesize}
-/* Red EVB */
-sf probe 0:1
-sf update 0x10000000 0x400000 ${filesize}
+For **secure boot**:
+```bash
+$ python ./ProgramAll_Secure.py
 ```
 
-* Flash bootloader
-```ruby
-setenv ethact gmac2
-tftp 10000000 image-u-boot
-sf probe 0:0
-sf update 0x10000000 0x0 ${filesize}
+### Method 2: ISP (In-System Programming via FTDI)
+
+**Prerequisites:**
+- FTDI USB cable
+- `Arbel_EVB_FlashProg.exe` tool
+
+#### Programming Steps
+
+**Step 1: Enter Tri-State Mode**
+
+1. Connect Mini-USB cable to **J_USB_TO_UART**
+2. Configure straps:
+   - **STRAP7**: ON (BMC pins at Hi-Z)
+   - **STRAP5**: ON (Route BSP signals via Host SI2 pins)
+3. Close your terminal application
+4. Press **PORST_N** button (Power-On-Reset)
+
+**Step 2: Program Flash**
+
+**Program bootloader only:**
+```bash
+$ Arbel_EVB_FlashProg.exe -open-desc "NPCM8mnx_Evaluation_Board B" -verify-on -prog-file "image-u-boot" 0 0 -1 -reset
 ```
 
-3. Booting to OpenBMC:
-
-* Enter boot command
-```ruby
-boot
+**Program complete firmware:**
+```bash
+$ Arbel_EVB_FlashProg.exe -open-desc "NPCM8mnx_Evaluation_Board B" -verify-on -prog-file "image-bmc" 0 0 -1 -reset
 ```
 
-4. OpenBMC Login Prompts.
+### Method 3: U-Boot TFTP
 
-* User: root
-* Password: 0penBmc
-```ruby
-[  OK  ] Reached target Login Prompts.
+**Prerequisites:**
+- TFTP server on your network
+- Ethernet cable connected to **J_RGMII**
+- Working U-Boot on the BMC
 
-Phosphor OpenBMC (Phosphor OpenBMC Project Reference Distro) 0.1.0 evb-npcm845-stage ttyS0
+#### Programming Steps
 
-evb-npcm845-stage login:
+**Step 1: Configure U-Boot Environment**
+
+Power on the EVB and stop at U-Boot prompt, then configure network settings:
+
+```bash
+# Network configuration
+U-Boot> setenv gatewayip 192.168.0.254
+U-Boot> setenv serverip 192.168.0.128
+U-Boot> setenv ipaddr 192.168.0.12
+U-Boot> setenv netmask 255.255.255.0
+
+# Boot configuration
+U-Boot> setenv autoload no
+U-Boot> setenv autostart no
+U-Boot> setenv baudrate 115200
+U-Boot> setenv bootcmd 'run romboot'
+U-Boot> setenv bootdelay 2
+U-Boot> setenv common_bootargs 'setenv bootargs earlycon=${earlycon} root=/dev/ram0 console=${console} mem=${mem}'
+U-Boot> setenv console 'ttyS0,115200n8'
+U-Boot> setenv earlycon 'uart8250,mmio32,0xf0000000'
+U-Boot> setenv mem 880M
+U-Boot> setenv romboot 'run common_bootargs; echo Booting Kernel from flash; echo +++ uimage at 0x${uimage_flash_addr}; echo Using bootargs: ${bootargs};bootm ${uimage_flash_addr}'
+U-Boot> setenv stderr serial
+U-Boot> setenv stdin serial
+U-Boot> setenv stdout serial
 ```
 
+**For Blue/Green EVB** (boot from Flash 0):
+```bash
+U-Boot> setenv uimage_flash_addr 0x80800000
+```
+
+**Save configuration:**
+```bash
+U-Boot> saveenv
+```
+
+**Step 2: Program Images via TFTP**
+
+**Program complete BMC image:**
+
+```bash
+U-Boot> setenv ethact gmac2
+U-Boot> tftp 10000000 image-bmc
+U-Boot> sf probe 0:0
+U-Boot> sf update 0x10000000 0x0 ${filesize}
+```
+
+**Program kernel only:**
+
+```bash
+U-Boot> setenv ethact gmac2
+U-Boot> tftp 10000000 image-kernel
+U-Boot> sf probe 0:0
+U-Boot> sf update 0x10000000 0x800000 ${filesize}
+```
+
+**Program bootloader only:**
+
+```bash
+U-Boot> setenv ethact gmac2
+U-Boot> tftp 10000000 image-u-boot
+U-Boot> sf probe 0:0
+U-Boot> sf update 0x10000000 0x0 ${filesize}
+```
+
+## Next Steps
+
+After successfully flashing OpenBMC:
+
+1. **Power cycle the EVB** - Press PORST_N or power cycle
+2. **Verify boot** - Watch the serial console for successful boot messages
+3. **Access BMC** - Connect via SSH or web interface (default credentials in OpenBMC documentation)
+4. **Explore features** - See the rest of this README for feature testing guides
+
+## Troubleshooting
+
+### Build fails with disk space error
+- Ensure you have at least 50GB free space
+- Clean old builds: `bitbake -c cleanall obmc-phosphor-image`
+
+### Cannot access serial console
+- Verify you selected the **second** serial port (not the first)
+- Check baud rate is set to 115200
+- Try a different USB cable
+
+### Flash programming fails
+- Verify strap settings match the programming method
+- Ensure terminal application is closed during programming
+- Check power supply is stable (use on-board VR if possible)
+
+### Boot hangs or fails
+- Check that flash offsets match your configuration
+- Try reflashing with `image-bmc` for a complete firmware update
 ## Boot from eMMC
-Openbmc system can be loaded from the onboard eMMC storage.
 
-* build eMMC image, the image contains fit image and rofs.
-```
-DISTRO=arbel-evb-emmc bitbake obmc-phosphor-image
-```
-image-emmc.gz is generated in the image deploy folder.
+The OpenBMC system can be configured to boot from the onboard eMMC storage instead of SPI flash. This provides more storage capacity and flexibility for the root filesystem.
 
-* u-boot must enable the following configs.
+### Prerequisites
+
+**U-Boot Configuration:**
+
+Ensure the following configurations are enabled in U-Boot:
+
 ```
 CONFIG_CMD_UNZIP=y
 CONFIG_CMD_EXT4=y
@@ -385,60 +494,196 @@ CONFIG_PARTITION_UUIDS=y
 CONFIG_EFI_PARTITION=y
 ```
 
-*  flash eMMC image in u-boot.
-```
-tftp 10000000 image-emmc.gz
-gzwrite mmc 0 10000000 ${filesize}
+### Build eMMC Image
+
+Build the OpenBMC image with eMMC support:
+
+```bash
+$ DISTRO=arbel-evb-emmc bitbake obmc-phosphor-image
 ```
 
-* boot Openbmc
-```ruby
-setenv bootargs earlycon=uart8250,mmio32,0xf0000000 console=ttyS0,115200n8 
-setenv setmmcargs 'setenv bootargs ${bootargs} rootwait root=PARTLABEL=${rootfs}'
-setenv boota 'setenv bootpart 2; setenv rootfs rofs-a; run setmmcargs; ext4load mmc 0:${bootpart} ${loadaddr} fitImage && bootm; echo Error loading kernel FIT image'
-setenv bootb 'setenv bootpart 3; setenv rootfs rofs-b; run setmmcargs; ext4load mmc 0:${bootpart} ${loadaddr} fitImage && bootm; echo Error loading kernel FIT image'
-setenv mmcboot 'if test "${bootside}" = "b"; then run bootb; run boota; else run boota; run bootb; fi'
-setenv bootside a
-setenv loadaddr 0x10000000
-setenv bootcmd run mmcboot
+**Output:** The build generates `image-emmc.gz` in the deployment directory:
+```
+build/evb-npcm845-stage/tmp/deploy/images/evb-npcm845-stage/image-emmc.gz
 ```
 
-## Baudrate change
-NPCM845 can be change the baudrate.
-If need to change it you should modify igps xml and uboot.
+This image contains:
+- FIT image (kernel + DTB + initramfs)
+- Root filesystem (rofs)
+- Partition layout for dual-bank updates
 
-* IGPS
-```
-Download IGPS 03.09.02 or newer.
-Based on your platform modify the BootBlockAndHeader_*.xml
-If you use npcm845 evb you need to modify BootBlockAndHeader_A1_EB.xml
-The XML file will show baud rate options and the default is 115200.
-	<BinField>
-		<!-- baud rate options:
-		9600,14400,19200,38400,57600,115200,230400,380400,460800,921600
-		default is 115200.
-			-->
-		<name>BAUD_RATE</name>          
-		<config>
-			<offset>0x154</offset>       
-			<size>0x4</size> 
-		</config>
-		<content format='32bit'>115200</content>
-	</BinField>
+### Flash eMMC Image
 
-If you build openbmc, you can find this XML in
-tmp/work/evb_npcm845-openbmc-linux/obmc-phosphor-image/1.0-r0/recipe-sysroot-native/usr/share/npcm8xx-igps
+**Step 1: Transfer Image to BMC**
+
+Using TFTP in U-Boot:
+
+```bash
+U-Boot> tftp 10000000 image-emmc.gz
 ```
 
-* UBOOT
+**Step 2: Write to eMMC**
+
+```bash
+U-Boot> gzwrite mmc 0 10000000 ${filesize}
 ```
-Please add a config
+
+This command:
+- Decompresses the `.gz` image
+- Writes it directly to eMMC device 0
+- Creates the partition layout automatically
+
+### Configure Boot from eMMC
+
+Set up U-Boot environment variables to boot from eMMC:
+
+```bash
+# Basic boot arguments
+U-Boot> setenv bootargs earlycon=uart8250,mmio32,0xf0000000 console=ttyS0,115200n8
+
+# Set MMC-specific arguments
+U-Boot> setenv setmmcargs 'setenv bootargs ${bootargs} rootwait root=PARTLABEL=${rootfs}'
+
+# Boot from partition A (primary)
+U-Boot> setenv boota 'setenv bootpart 2; setenv rootfs rofs-a; run setmmcargs; ext4load mmc 0:${bootpart} ${loadaddr} fitImage && bootm; echo Error loading kernel FIT image'
+
+# Boot from partition B (backup)
+U-Boot> setenv bootb 'setenv bootpart 3; setenv rootfs rofs-b; run setmmcargs; ext4load mmc 0:${bootpart} ${loadaddr} fitImage && bootm; echo Error loading kernel FIT image'
+
+# MMC boot logic (tries primary, falls back to backup)
+U-Boot> setenv mmcboot 'if test "${bootside}" = "b"; then run bootb; run boota; else run boota; run bootb; fi'
+
+# Set default boot side
+U-Boot> setenv bootside a
+
+# Set kernel load address
+U-Boot> setenv loadaddr 0x10000000
+
+# Set boot command
+U-Boot> setenv bootcmd run mmcboot
+
+# Save configuration
+U-Boot> saveenv
+```
+
+### Boot Process
+
+The boot process follows this sequence:
+
+1. **Primary Boot**: Attempts to boot from the partition specified by `bootside` (default: A)
+2. **Fallback**: If primary fails, automatically tries the alternate partition
+3. **Dual-Bank Support**: Enables safe firmware updates with rollback capability
+
+### Partition Layout
+
+The eMMC image uses the following partition structure:
+
+| Partition | Number | Label | Purpose |
+|-----------|--------|-------|---------|
+| Boot | 1 | - | Boot partition (reserved) |
+| Root A | 2 | rofs-a | Primary root filesystem |
+| Root B | 3 | rofs-b | Backup root filesystem |
+| RW | 4 | rwfs | Read-write filesystem (persistent data) |
+
+### Troubleshooting
+
+**Image fails to write:**
+- Verify eMMC is detected: `mmc list`
+- Check available space: `mmc dev 0; mmc info`
+
+**Boot fails:**
+- Verify partition layout: `mmc part`
+- Check boot variables: `printenv bootcmd`
+- Manually load kernel: `ext4load mmc 0:2 ${loadaddr} fitImage`
+
+## Baudrate Configuration
+
+The NPCM845 BMC serial console baudrate can be customized. This requires changes to both the IGPS configuration and U-Boot.
+
+### Overview
+
+**Default Baudrate:** 115200
+
+**Supported Baudrates:**
+- 9600
+- 14400
+- 19200
+- 38400
+- 57600
+- 115200 (default)
+- 230400
+- 380400
+- 460800
+- 921600
+
+### Configuration Steps
+
+#### Step 1: Modify IGPS Configuration
+
+**Edit the BAUD_RATE Field:**
+
+1. Edit your custom `BootBlockAndHeader.xml` and enable `BAUD_RATE`
+2. Update `settings.json` in the `npcm8xx-bootloader` folder:
+
+```json
+{
+    "BootBlockAndHeader.xml": {
+        "BAUD_RATE": "57600"
+    },
+    "BootBlockAndHeader_no_tip.xml": {
+        "BAUD_RATE": "57600"
+    }
+}
+```
+
+#### Step 2: Configure U-Boot
+
+Add the following configuration to U-Boot to use the IGPS baudrate setting:
+
+```
 CONFIG_SYS_SKIP_UART_INIT=y
-
-This config will skip uart init and follow BB xml setting.
 ```
 
+**Purpose:** This configuration tells U-Boot to skip its own UART initialization and use the baudrate configured in the BootBlock XML.
 
+**Configuration File Location:**
+
+Add this to your U-Boot defconfig or configuration file:
+- `meta-nuvoton-obmc/meta-evb-npcm845/recipes-bsp/u-boot/u-boot-nuvoton/evb-npcm845.cfg`
+
+#### Step 3: Rebuild and Flash
+
+1. **Rebuild the bootloader:**
+   ```bash
+   $ bitbake u-boot-nuvoton -c cleansstate
+   $ bitbake u-boot-nuvoton
+   ```
+
+2. **Rebuild the complete image:**
+   ```bash
+   $ bitbake obmc-phosphor-image
+   ```
+
+3. **Flash the new image** using your preferred method (IGPS, ISP, or U-Boot TFTP)
+
+### Verification
+
+After flashing and rebooting:
+
+1. **Update your terminal settings** to match the new baudrate
+2. **Power cycle the BMC**
+3. **Verify console output** appears correctly
+
+**Note:** If you see garbled text, the baudrate mismatch between the BMC and your terminal. Double-check both settings.
+
+### Important Notes
+
+⚠️ **Warning:** 
+- Both the BMC firmware and your terminal application must use the **same baudrate**
+- Changing baudrate requires reflashing the bootloader
+- Keep a backup method to access the BMC (e.g., network) in case of misconfiguration
+
+💡 **Tip:** For production systems, 115200 is recommended for maximum compatibility.
 
 # BMC Modules
 
@@ -2635,114 +2880,3 @@ This emulates a Macronix MX66L1G45G 1Gbit SPI flash on the PSPI bus.
 ### Exit QEMU
 
 To exit QEMU, press: `Ctrl-A` then `X`
-
-
-# Troubleshooting
-
-## Failed to probe SPI0 CS0 in u-boot
-
-The original u-boot of the evb board may not correctly detect flash 0.
-
-**Symptom**
-```
-U-Boot>sf probe 0:0 20000000 0
-Failed to initialize SPI flash at 0:0 (error -22)
-```
-
-**Solution**
-
-Find a image-u-boot in build/evb-npcm845-stage/tmp/deploy/images/
-
-### Use [IGPS](#igps) tool
-1. BMC enters to FUP mode
-2. Rename image-u-boot to Kmt_TipFw_BootBlock_uboot.bin.
-3. Copy to igps/py_scripts\ImageGeneration\output_binaries\Secure
-4. Run ProgramAll_Secure.bat
-
-### Use [ISP](#isp) tool
-1. Please follow the [ISP](#isp) section to update bootloader.
-
-### Use a workable u-boot binary
-
-1. Find a u-boot.bin in build/evb-npcm845-stage/tmp/deploy/images/
-2. load this u-boot.bin to 0x8000
-```
-U-Boot>setenv gatewayip            192.168.0.254
-U-Boot>setenv serverip             192.168.0.128
-U-Boot>setenv ipaddr               192.168.0.12
-U-Boot>setenv netmask              255.255.255.0
-U-Boot>setenv ethact gmac2
-U-Boot>tftp 0x8000 u-boot.bin
-DMAMAC_SRST wait
-DMAMAC_SRST wait done
-Speed: 1000, full duplex
-Using gmac2 device
-TFTP from server 192.168.0.128; our IP address is 192.168.0.12
-Filename 'u-boot.bin'.
-Load address: 0x8000
-Loading: *#############################################
-	 9.1 MiB/s
-done
-Bytes transferred = 658135 (a0ad7 hex)
-```
-
-3. BMC jump to 0x8000
-```
-U-Boot>go 0x8000
-## Starting application at 0x00008000 ...
-
-U-Boot 2021.04-25882-ge79478e0eb (Nov 30 2021 - 03:27:28 +0000)
-
-CPU-0: NPCM845 Z1 @ Model: Nuvoton npcm845 EVB Development Board
-Board: Nuvoton npcm845 EVB Development Board
-DRAM:  848 MiB
-OTP: NPCM OTP module bind OK
-RNG: NPCM RNG module bind OK
-AES: NPCM AES module bind OK
-SHA: NPCM SHA module bind OK
-SGMII PCS PHY reset wait 
-SGMII PCS PHY reset done and clear Auto-Negotiation 
-NPCM845 EVB PCB version ID 0x2 -> version X01 
-MMC:   
-Loading Environment from SPIFlash... SF: Detected mx66l1g45g with page size 256 Bytes, erase size 4 KiB, total 128 MiB
-OK
-In:    serial0@f0000000
-Out:   serial0@f0000000
-Err:   serial0@f0000000
-Net:   
-Found phy_id=0x600d8595 addr=0x00 eth0: gmac1
-Found phy_id=0x600d84a2 addr=0x00 , eth1: gmac2
-Found phy_id=0x004061e4 addr=0x00 , eth3: gmac4
-Hit any key to stop autoboot:  2  0 
-U-Boot>
-```
-
-3. Programming image-u-boot
-```
-U-Boot>setenv gatewayip            192.168.0.254
-U-Boot>setenv serverip             192.168.0.128
-U-Boot>setenv ipaddr               192.168.0.12
-U-Boot>setenv netmask              255.255.255.0
-U-Boot>setenv ethact gmac2
-U-Boot>tftp 10000000 image-u-boot
-DMAMAC_SRST wait
-DMAMAC_SRST wait done
-Speed: 1000, full duplex
-Using gmac2 device
-TFTP from server 192.168.0.128; our IP address is 192.168.0.12
-Filename 'image-u-boot'.
-Load address: 0x10000000
-Loading: *######################################################
-	 10.4 MiB/s
-done
-Bytes transferred = 786432 (c0000 hex)
-U-Boot>sf probe 0:0
-SF: Detected mx66l1g45g with page size 256 Bytes, erase size 4 KiB, total 128 MiB
-U-Boot>sf update 0x10000000 0x0 ${filesize}
-device 0 offset 0x0, size 0xc0000
-   Updating, 29% 2261634 B/s   Updating, 58% 2239676 B/s   Updating, 79% 2016492 B/s4096 bytes written, 782336 bytes skipped in 0.392s, speed 2033601 B/s
-U-Boot>
-```
-
-4. Issue power on reset
-
