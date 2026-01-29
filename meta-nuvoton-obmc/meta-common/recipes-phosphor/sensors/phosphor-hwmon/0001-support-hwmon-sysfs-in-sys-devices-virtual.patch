@@ -94,9 +94,9 @@ index 4ff7a67..02aef16 100644
 +    }
 +    catch (const std::exception& e)
 +    {
-+       stdplus::print(stderr,
-+                   "Unable to find Virtual hwmon directory from the dev path: {}\n",
-+                   devPath.c_str());
++        lg2::error(
++                   "Unable to find Virtual hwmon directory from the dev path: {ERR}",
++                   "ERR", devPath);
 +    }
 +    return emptyString;
 +}
