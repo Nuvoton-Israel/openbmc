@@ -1,0 +1,114 @@
+From c3b3b272083a4d199a7fbac548697750a844f36f Mon Sep 17 00:00:00 2001
+From: Ban Feng <kcfeng0@nuvoton.com>
+Date: Thu, 5 Feb 2026 13:10:24 +0800
+Subject: [PATCH] dts: arm64: evb-npcm845: use voltage-divider
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
+---
+ .../boot/dts/nuvoton/nuvoton-npcm845-evb.dts  | 86 ++++++++++++++++++-
+ 1 file changed, 85 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+index 7699e0f56ef8..0e0c85f87c57 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+@@ -74,10 +74,94 @@ memory {
+ 		reg = <0x0 0x0 0x0 0x40000000>;
+ 	};
+ 
++	/*
++	 * Voltage dividers for ADC channels.
++	 * Adjust output-ohms and full-ohms according to your schematic.
++	 * Formula: Vin = Vout × (full-ohms / output-ohms)
++	 *
++	 * Example: If R1 = 100K, R2 = 10K (10:1 divider)
++	 *   output-ohms = 10000  (R2, resistor to GND)
++	 *   full-ohms = 110000   (R1 + R2)
++	 */
++	adc0_div: adc0-voltage-divider {
++		compatible = "voltage-divider";
++		io-channels = <&adc 0>;
++		io-channel-names = "parent";
++		#io-channel-cells = <0>;
++		output-ohms = <4700>;
++		full-ohms = <104700>;
++	};
++
++	adc1_div: adc1-voltage-divider {
++		compatible = "voltage-divider";
++		io-channels = <&adc 1>;
++		io-channel-names = "parent";
++		#io-channel-cells = <0>;
++		output-ohms = <10000>;
++		full-ohms = <110000>;
++	};
++
++	adc2_div: adc2-voltage-divider {
++		compatible = "voltage-divider";
++		io-channels = <&adc 2>;
++		io-channel-names = "parent";
++		#io-channel-cells = <0>;
++		output-ohms = <2000>;
++		full-ohms = <12000>;
++	};
++
++	adc3_div: adc3-voltage-divider {
++		compatible = "voltage-divider";
++		io-channels = <&adc 3>;
++		io-channel-names = "parent";
++		#io-channel-cells = <0>;
++		output-ohms = <4700>;
++		full-ohms = <14700>;
++	};
++
++	adc4_div: adc4-voltage-divider {
++		compatible = "voltage-divider";
++		io-channels = <&adc 4>;
++		io-channel-names = "parent";
++		#io-channel-cells = <0>;
++		output-ohms = <10000>;
++		full-ohms = <14700>;
++	};
++
++	adc5_div: adc5-voltage-divider {
++		compatible = "voltage-divider";
++		io-channels = <&adc 5>;
++		io-channel-names = "parent";
++		#io-channel-cells = <0>;
++		output-ohms = <10000>;
++		full-ohms = <12000>;
++	};
++
++	adc6_div: adc6-voltage-divider {
++		compatible = "voltage-divider";
++		io-channels = <&adc 6>;
++		io-channel-names = "parent";
++		#io-channel-cells = <0>;
++		output-ohms = <100000>;
++		full-ohms = <110000>;
++	};
++
++	adc7_div: adc7-voltage-divider {
++		compatible = "voltage-divider";
++		io-channels = <&adc 7>;
++		io-channel-names = "parent";
++		#io-channel-cells = <0>;
++		output-ohms = <100000>;
++		full-ohms = <104700>;
++	};
++
+ 	iio-hwmon {
+ 		compatible = "iio-hwmon";
++		/* Use voltage-dividers to get real voltage values */
+ 		io-channels = <&adc 0>, <&adc 1>, <&adc 2>, <&adc 3>,
+-			<&adc 4>, <&adc 5>, <&adc 6>, <&adc 7>;
++			<&adc 4>, <&adc 5>, <&adc 6>, <&adc 7>,
++			<&adc0_div>, <&adc1_div>, <&adc2_div>, <&adc3_div>,
++			<&adc4_div>, <&adc5_div>, <&adc6_div>, <&adc7_div>;
+ 	};
+ 
+ 	spi_gpio: spi-gpio {
+-- 
+2.34.1
+
