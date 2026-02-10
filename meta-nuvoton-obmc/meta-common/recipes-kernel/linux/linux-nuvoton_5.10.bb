@@ -1,7 +1,7 @@
 KSRC = "git://github.com/Nuvoton-Israel/linux;protocol=https;branch=${KBRANCH}"
 KBRANCH = "NPCM-5.10-OpenBMC"
 LINUX_VERSION = "5.10.222"
-SRCREV = "e1280ca32690da0579f3b2316055584a552b7ce9"
+SRCREV = "26629bc08c87764a6e45debfe2433c95eff66d9f"
 
 SRC_URI:append:nuvoton = " file://enable_emmc_510.cfg"
 SRC_URI:append:nuvoton = " file://disalbe_stackprotector.cfg"
