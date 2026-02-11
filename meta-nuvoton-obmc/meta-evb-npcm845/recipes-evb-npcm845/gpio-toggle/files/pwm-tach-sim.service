@@ -1,0 +1,12 @@
+[Unit]
+Description=PWM to TACH Simulation Service
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/pwm_tach_sim gpiochip2 16 0
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

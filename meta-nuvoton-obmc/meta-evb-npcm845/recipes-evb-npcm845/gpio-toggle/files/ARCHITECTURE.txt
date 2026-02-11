@@ -1,0 +1,128 @@
+┌─────────────────────────────────────────────────────────────────────┐
+│                   PWM to TACH Simulator System                      │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────┐
+│                         Hardware Layer                               │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌─────────────┐         ┌─────────────┐         ┌─────────────┐   │
+│  │   PWM0      │         │   GPIO03    │         │   GPIO04    │   │
+│  │  (Output)   │         │  (Output)   │         │  (Optional) │   │
+│  │             │         │             │         │             │   │
+│  │  PWM Signal │         │ TACH Signal │         │ PWM Capture │   │
+│  └─────────────┘         └─────────────┘         └─────────────┘   │
+│         │                       ▲                       │           │
+└─────────┼───────────────────────┼───────────────────────┼───────────┘
+          │                       │                       │
+          │                       │                       │
+┌─────────▼───────────────────────┼───────────────────────▼───────────┐
+│                         Software Layer                               │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────┐    │
+│  │              pwm_tach_sim (C Program)                      │    │
+│  │                                                            │    │
+│  │  ┌──────────────────────────────────────────────────┐     │    │
+│  │  │  PWM Reader                                      │     │    │
+│  │  │  - Reads /sys/class/pwm/pwmchip0/pwm0/period    │     │    │
+│  │  │  - Reads /sys/class/pwm/pwmchip0/pwm0/duty_cycle│     │    │
+│  │  │  - Calculates duty cycle percentage             │     │    │
+│  │  └──────────────────┬───────────────────────────────┘     │    │
+│  │                     │                                     │    │
+│  │                     ▼                                     │    │
+│  │  ┌──────────────────────────────────────────────────┐     │    │
+│  │  │  Frequency Calculator                            │     │    │
+│  │  │  - Maps 0% duty   → 10 Hz                        │     │    │
+│  │  │  - Maps 100% duty → 1000 Hz                      │     │    │
+│  │  │  - Linear interpolation                          │     │    │
+│  │  └──────────────────┬───────────────────────────────┘     │    │
+│  │                     │                                     │    │
+│  │                     ▼                                     │    │
+│  │  ┌──────────────────────────────────────────────────┐     │    │
+│  │  │  GPIO Controller (libgpiod)                      │     │    │
+│  │  │  - Toggles GPIO03 at calculated frequency        │     │    │
+│  │  │  - Generates square wave (50% duty cycle)        │     │    │
+│  │  └──────────────────────────────────────────────────┘     │    │
+│  │                                                            │    │
+│  └────────────────────────────────────────────────────────────┘    │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────┐    │
+│  │              pwm_test.sh (Test Script)                     │    │
+│  │                                                            │    │
+│  │  - setup:   Export and enable PWM                         │    │
+│  │  - set:     Set PWM duty cycle (0-100%)                   │    │
+│  │  - sweep:   Continuously sweep duty cycle                 │    │
+│  │  - status:  Show current PWM configuration                │    │
+│  │  - cleanup: Disable and unexport PWM                      │    │
+│  └────────────────────────────────────────────────────────────┘    │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────┐    │
+│  │         gpio_toggle.sh (Simple Test Script)                │    │
+│  │                                                            │    │
+│  │  - Simple infinite loop toggling GPIO03                   │    │
+│  │  - Fixed 3ms delay between toggles                        │    │
+│  │  - For basic GPIO functionality testing                   │    │
+│  └────────────────────────────────────────────────────────────┘    │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────┐
+│                      System Service Layer                            │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────┐    │
+│  │         pwm-tach-sim.service (systemd)                     │    │
+│  │                                                            │    │
+│  │  - Auto-starts pwm_tach_sim on boot                       │    │
+│  │  - Restarts on failure                                    │    │
+│  │  - Managed by systemctl                                   │    │
+│  └────────────────────────────────────────────────────────────┘    │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+
+
+Data Flow:
+══════════
+
+1. PWM Configuration:
+   User → pwm_test.sh → /sys/class/pwm/pwmchip0/pwm0/ → PWM0 Hardware
+
+2. TACH Simulation:
+   PWM0 → sysfs → pwm_tach_sim → libgpiod → GPIO03 → TACH Signal
+
+3. Closed Loop Test:
+   pwm_test.sh (sweep) → PWM duty cycle changes
+                      ↓
+   pwm_tach_sim reads duty cycle
+                      ↓
+   TACH frequency adjusts proportionally
+                      ↓
+   GPIO03 toggles faster/slower
+
+
+Frequency Mapping:
+═══════════════════
+
+  PWM Duty Cycle          TACH Frequency
+  ──────────────          ──────────────
+       0%          →           10 Hz
+      25%          →          257 Hz
+      50%          →          505 Hz
+      75%          →          752 Hz
+     100%          →         1000 Hz
+
+
+Example Usage:
+═══════════════
+
+Terminal 1:                    Terminal 2:
+──────────                     ──────────
+# Setup PWM                    # Start simulator
+pwm_test.sh setup              systemctl start pwm-tach-sim
+                               
+# Set 50% duty                 # Monitor output
+pwm_test.sh set 50             journalctl -u pwm-tach-sim -f
+
+# Sweep test                   # Observe frequency changes
+pwm_test.sh sweep              (TACH frequency varies with duty)
