@@ -1,0 +1,143 @@
+From 517cb2cd5489c46cd20c5566d610679b2b117b05 Mon Sep 17 00:00:00 2001
+From: Ban Feng <kcfeng0@nuvoton.com>
+Date: Wed, 11 Feb 2026 10:22:27 +0800
+Subject: [PATCH] enable i3c4 and disable i2c14~17
+
+disable i2c mctp-controller as well
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
+---
+ .../boot/dts/nuvoton/nuvoton-npcm845-evb.dts  | 56 +++++++++----------
+ drivers/i3c/i3cdev.c                          |  4 +-
+ 2 files changed, 28 insertions(+), 32 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+index cfb6ac0eaa3c..2aa74eb9a55a 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+@@ -5,6 +5,7 @@
+ #include "nuvoton-npcm845.dtsi"
+ #include "nuvoton-npcm845-pincfg-evb.dtsi"
+ #include <dt-bindings/i2c/i2c.h>
++#include <dt-bindings/i3c/i3c.h>
+ 
+ / {
+ 	model = "Nuvoton npcm845 Development Board (Device Tree)";
+@@ -50,10 +51,6 @@ aliases {
+ 		i2c11 = &i2c11;
+ 		i2c12 = &i2c12;
+ 		i2c13 = &i2c13;
+-		i2c14 = &i2c14;
+-		i2c15 = &i2c15;
+-		i2c16 = &i2c16;
+-		i2c17 = &i2c17;
+ 		i2c18 = &i2c18;
+ 		i2c19 = &i2c19;
+ 		i2c20 = &i2c20;
+@@ -552,11 +549,6 @@ partition@0 {
+ 
+ &i2c0 {
+ 	status = "okay";
+-	mctp-controller;
+-	mctp@10 {
+-		compatible = "mctp-i2c-controller";
+-		reg = <(0x11 | I2C_OWN_SLAVE_ADDRESS)>;
+-	};
+ };
+ 
+ &i2c1 {
+@@ -593,11 +585,6 @@ ipmb@11 {
+ 
+ &i2c4 {
+ 	status = "okay";
+-	mctp-controller;
+-	mctp@40 {
+-		compatible = "mctp-i2c-controller";
+-		reg = <(0x12 | I2C_OWN_SLAVE_ADDRESS)>;
+-	};
+ };
+ 
+ &i2c5 {
+@@ -649,22 +636,6 @@ &i2c13 {
+ 	status = "okay";
+ };
+ 
+-&i2c14 {
+-	status = "okay";
+-};
+-
+-&i2c15 {
+-	status = "okay";
+-};
+-
+-&i2c16 {
+-	status = "okay";
+-};
+-
+-&i2c17 {
+-	status = "okay";
+-};
+-
+ &i2c18 {
+ 	status = "okay";
+ };
+@@ -716,6 +687,29 @@ &i3c1 {
+ 	i2c-scl-hz = <400000>;
+ };
+ 
++&i3c4 {
++	status = "okay";
++	/*
++	 * With fclk ~48MHz (actual 48.076924MHz):
++	 * - fclk_period = 21ns
++	 * - PP minimum frequency limit (ppbaud=15, pplow=15):
++	 *       hi=16×21=336ns, lo=336+15×21=651ns
++	 *       total=987ns → 1.013MHz, duty=34%/66%
++	 *   Note: PP cannot reach 400KHz due to 4-bit register limits
++	 * - OD: odhpp=0, odbaud=7 → hi=1008ns (3×336), lo=2352ns (7×336)
++	 *       total=3360ns → 298KHz, duty=30%/70%
++	 *   Alternative OD: hi=1344ns, lo=1344ns → 372KHz, 50%/50%
++	 *
++	 * Current setting: PP at slowest possible 1.013MHz
++	 */
++	i3c-od-scl-hi-period-ns = <1344>;   // 4× PP high (336ns) → 50% duty
++	i3c-od-scl-lo-period-ns = <1344>;   // 4× PP high (336ns) → 50% duty, ~372KHz
++	i3c-pp-scl-hi-period-ns = <336>;    // PP high, ppbaud=15 (max)
++	i3c-pp-scl-lo-period-ns = <504>;    // PP low, pplow=15 (max) → slowest PP: 1.013MHz
++	i3c-scl-hz = <1000000>;
++	i2c-scl-hz = <400000>;
++};
++
+ &mc {
+ 	status = "okay";
+ };
+@@ -739,6 +733,8 @@ &pin240_slew
+ 			&pin241_slew
+ 			&pin242_slew
+ 			&pin243_slew
++			&pin33_slew
++			&pin34_slew
+ 			&pin96_oh>;
+ 
+ 		pin96_oh: pin96_oh {
+diff --git a/drivers/i3c/i3cdev.c b/drivers/i3c/i3cdev.c
+index 710a8592a62b..43bebc7a4390 100644
+--- a/drivers/i3c/i3cdev.c
++++ b/drivers/i3c/i3cdev.c
+@@ -369,10 +369,10 @@ static int i3cdev_notifier_call(struct notifier_block *nb,
+ 
+ 	switch (action) {
+ 	case BUS_NOTIFY_ADD_DEVICE:
+-	case BUS_NOTIFY_UNBOUND_DRIVER:
++	//case BUS_NOTIFY_UNBOUND_DRIVER:
+ 		return i3cdev_attach(dev, NULL);
+ 	case BUS_NOTIFY_DEL_DEVICE:
+-	case BUS_NOTIFY_BOUND_DRIVER:
++	//case BUS_NOTIFY_BOUND_DRIVER:
+ 	case BUS_NOTIFY_REMOVED_DEVICE:
+ 		return i3cdev_detach(dev, NULL);
+ 	}
+-- 
+2.34.1
+

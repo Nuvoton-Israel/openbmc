@@ -46,3 +46,6 @@ SRC_URI:append = " file://2001-add-jtm-spi-driver.patch"
 
 # Enable mmbi interface
 #SRC_URI:append = " file://0009-dts-arm64-npcm845-evb-enable-mmbi.patch"
+
+# FPGA test
+SRC_URI:append = " file://0001-enable-i3c4-and-disable-i2c14-17.patch"

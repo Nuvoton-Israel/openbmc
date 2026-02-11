@@ -2,7 +2,9 @@
     "BootBlockAndHeader.xml":
     {
         "MC_CONFIG": "0x04",
-        "NoECC_Region_0_End": "0x1000000"
+        "NoECC_Region_0_End": "0x1000000",
+        "I3C_CLK_DIVIDER": "13",
+        "PLL0_OVERRIDE": "625"
     },
     "key_setting_edit_me.json":
     {

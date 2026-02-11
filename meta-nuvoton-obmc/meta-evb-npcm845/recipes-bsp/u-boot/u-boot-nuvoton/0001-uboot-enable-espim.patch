@@ -1,0 +1,29 @@
+From c609f64d3f9f4a2ded63ccaceb3ec5f4d19df216 Mon Sep 17 00:00:00 2001
+From: Ban Feng <kcfeng0@nuvoton.com>
+Date: Fri, 19 Sep 2025 14:29:54 +0800
+Subject: [PATCH] uboot: enable espim
+
+Upstream-Status: Inappropriate [oe-specific]
+Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
+---
+ arch/arm/dts/nuvoton-npcm845-evb.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/dts/nuvoton-npcm845-evb.dts b/arch/arm/dts/nuvoton-npcm845-evb.dts
+index 755924b582..19180286e6 100644
+--- a/arch/arm/dts/nuvoton-npcm845-evb.dts
++++ b/arch/arm/dts/nuvoton-npcm845-evb.dts
+@@ -376,6 +376,10 @@
+ 	status = "okay";
+ };
+ 
++&host_intf {
++	type = "espim";
++};
++
+ &pinctrl {
+         pinctrl-names = "default";
+         pinctrl-0 = <
+-- 
+2.34.1
+

@@ -1,0 +1,74 @@
+From 7049ac96d5c8190fee1343f763ef09b3d63346d5 Mon Sep 17 00:00:00 2001
+From: Ban Feng <kcfeng0@nuvoton.com>
+Date: Fri, 23 Jan 2026 10:35:02 +0800
+Subject: [PATCH] change espi master to gpio0 26~31 pin and disable i2c14~17
+
+Upstream-Status: Inappropriate [oe-specific]
+Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
+---
+ arch/arm/dts/nuvoton-npcm845-evb.dts | 16 ----------------
+ cmd/espi.c                           | 14 +++++++-------
+ 2 files changed, 7 insertions(+), 23 deletions(-)
+
+diff --git a/arch/arm/dts/nuvoton-npcm845-evb.dts b/arch/arm/dts/nuvoton-npcm845-evb.dts
+index 19180286e66..e972ec7b0b1 100644
+--- a/arch/arm/dts/nuvoton-npcm845-evb.dts
++++ b/arch/arm/dts/nuvoton-npcm845-evb.dts
+@@ -324,22 +324,6 @@
+ 	status = "okay";
+ };
+ 
+-&i2c14 {
+-	status = "okay";
+-};
+-
+-&i2c15 {
+-	status = "okay";
+-};
+-
+-&i2c16 {
+-	status = "okay";
+-};
+-
+-&i2c17 {
+-	status = "okay";
+-};
+-
+ &i2c18 {
+ 	status = "okay";
+ };
+diff --git a/cmd/espi.c b/cmd/espi.c
+index b74ec494d5b..903a840d27f 100644
+--- a/cmd/espi.c
++++ b/cmd/espi.c
+@@ -20,7 +20,7 @@
+  * GPIO Assign Note:
+  * eSPI_CLK and eSPI_IO signals must assign on the same GPIO port.
+  */
+-#define PORT_BASE	0xF0015000	// GPIO5: 160~191
++#define PORT_BASE	0xF0010000	// GPIO0: 0~31
+ #define PORT_OUT	(PORT_BASE + 0xC)
+ #define PORT_IN		(PORT_BASE + 0x4)
+ #define PORT_POL	(PORT_BASE + 0x8)
+@@ -32,12 +32,12 @@
+ #define PORT_EVENS	(PORT_BASE + 0x44)
+ #define PORT_EVENC	(PORT_BASE + 0x48)
+ #define PORT_EVST	(PORT_BASE + 0x4C)
+-#define eSPI_nCS	BIT(1) //161
+-#define eSPI_CLK	BIT(3) //163
+-#define eSPI_IO0	BIT(4) //164
+-#define eSPI_IO1	BIT(5) //165
+-#define eSPI_nRST	BIT(6) //166
+-//#define eSPI_ALERT	BIT(8) //168
++#define eSPI_nCS	BIT(26) //26
++#define eSPI_CLK	BIT(27) //27
++#define eSPI_IO0	BIT(28) //28
++#define eSPI_IO1	BIT(29) //29
++#define eSPI_nRST	BIT(30) //30
++//#define eSPI_ALERT	BIT(31) //31
+ 
+ // eSPI command
+ #define CMD_SET_CONFIGURATION	0x22
+-- 
+2.34.1
+
