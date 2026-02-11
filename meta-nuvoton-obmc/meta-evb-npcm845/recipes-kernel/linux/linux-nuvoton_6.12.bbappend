@@ -49,3 +49,5 @@ SRC_URI:append = " file://2001-add-jtm-spi-driver.patch"
 
 # FPGA test
 SRC_URI:append = " file://0001-enable-i3c4-and-disable-i2c14-17.patch"
+
+SRC_URI:append = " file://0001-dts-disable-pwm-to-enable-gpio-mode.patch"

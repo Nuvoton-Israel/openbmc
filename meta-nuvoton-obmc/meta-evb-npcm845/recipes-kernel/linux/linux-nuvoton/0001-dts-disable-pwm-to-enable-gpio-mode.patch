@@ -1,0 +1,149 @@
+Upstream-Status: Pending [Not submitted to upstream yet]
+
+
+From 4acc06bea3eab3fcee1881446c40df27540896c5 Mon Sep 17 00:00:00 2001
+From: invalid_git config <unknown@unknown>
+Date: Wed, 11 Feb 2026 05:47:14 +0000
+Subject: [PATCH] dts: disable pwm to enable gpio mode
+
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ .../boot/dts/nuvoton/nuvoton-npcm845-evb.dts  | 63 +++----------------
+ .../nuvoton/nuvoton-npcm845-pincfg-evb.dtsi   | 40 ++++++++++++
+ 2 files changed, 50 insertions(+), 53 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+index 2aa74eb9a55a..5be9073f87cb 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+@@ -477,58 +477,7 @@ &watchdog1 {
+ };
+ 
+ &pwm_fan {
+-	status = "okay";
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pwm0_pins &pwm1_pins
+-		&pwm2_pins &pwm3_pins
+-		&pwm4_pins &pwm5_pins
+-		&pwm6_pins &pwm7_pins
+-		&fanin0_pins &fanin1_pins
+-		&fanin2_pins &fanin3_pins
+-		&fanin4_pins &fanin5_pins
+-		&fanin6_pins &fanin7_pins>;
+-	#address-cells = <1>;
+-	#size-cells = <0>;
+-	fan@0 {
+-		reg = <0x00>;
+-		fan-tach-ch = /bits/ 8 <0x00 0x01>;
+-		cooling-levels = <127 255>;
+-	};
+-	fan@1 {
+-		reg = <0x01>;
+-		fan-tach-ch = /bits/ 8 <0x02 0x03>;
+-		cooling-levels = /bits/ 8 <127 255>;
+-	};
+-	fan@2 {
+-		reg = <0x02>;
+-		fan-tach-ch = /bits/ 8 <0x04 0x05>;
+-		cooling-levels = /bits/ 8 <127 255>;
+-	};
+-	fan@3 {
+-		reg = <0x03>;
+-		fan-tach-ch = /bits/ 8 <0x06 0x07>;
+-		cooling-levels = /bits/ 8 <127 255>;
+-	};
+-	fan@4 {
+-		reg = <0x04>;
+-		fan-tach-ch = /bits/ 8 <0x08 0x09>;
+-		cooling-levels = /bits/ 8 <127 255>;
+-	};
+-	fan@5 {
+-		reg = <0x05>;
+-		fan-tach-ch = /bits/ 8 <0x0A 0x0B>;
+-		cooling-levels = /bits/ 8 <127 255>;
+-	};
+-	fan@6 {
+-		reg = <0x06>;
+-		fan-tach-ch = /bits/ 8 <0x0C 0x0D>;
+-		cooling-levels = /bits/ 8 <127 255>;
+-	};
+-	fan@7 {
+-		reg = <0x07>;
+-		fan-tach-ch = /bits/ 8 <0x0E 0x0F>;
+-		cooling-levels = /bits/ 8 <127 255>;
+-	};
++	status = "disabled";
+ };
+ 
+ &pspi {
+@@ -735,7 +684,15 @@ &pin242_slew
+ 			&pin243_slew
+ 			&pin33_slew
+ 			&pin34_slew
+-			&pin96_oh>;
++			&pin96_oh
++			&gpio64oh_pins
++			&gpio65oh_pins
++			&gpio66oh_pins
++			&gpio67oh_pins
++			&gpio80in_pins
++			&gpio81in_pins
++			&gpio82in_pins
++			&gpio83in_pins>;
+ 
+ 		pin96_oh: pin96_oh {
+ 			pins = "GPIO96/CP1_GPIO7/BU2_TXD/TP_GPIO7";
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-pincfg-evb.dtsi b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-pincfg-evb.dtsi
+index 81a3cdc19747..1bc781e9c400 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-pincfg-evb.dtsi
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-pincfg-evb.dtsi
+@@ -3,6 +3,46 @@
+ 
+ / {
+ 	pinctrl: pinctrl@f0010000 {
++		gpio64oh_pins: gpio64oh {
++			pins = "GPIO64/FANIN0";
++			bias-disable;
++			output-high;
++		};
++		gpio80in_pins: gpio80in {
++			pins = "GPIO80/PWM0";
++			bias-disable;
++			input-enable;
++		};
++		gpio65oh_pins: gpio65oh {
++			pins = "GPIO65/FANIN1";
++			bias-disable;
++			output-high;
++		};
++		gpio81in_pins: gpio81in {
++			pins = "GGPIO81/PWM1";
++			bias-disable;
++			input-enable;
++		};
++		gpio66oh_pins: gpio66oh {
++			pins = "GPIO66/FANIN2";
++			bias-disable;
++			output-high;
++		};
++		gpio82in_pins: gpio82in {
++			pins = "GPIO82/PWM2";
++			bias-disable;
++			input-enable;
++		};
++		gpio67oh_pins: gpio67oh {
++			pins = "GPIO67/FANIN3";
++			bias-disable;
++			output-high;
++		};
++		gpio83in_pins: gpio83in {
++			pins = "GPIO83/PWM3";
++			bias-disable;
++			input-enable;
++		};
+ 		pin4_slew: pin4_slew {
+ 			pins = "GPIO4/IOX2_DI/SMB1D_SDA";
+ 			slew-rate = <1>;
+-- 
+2.43.0
+
