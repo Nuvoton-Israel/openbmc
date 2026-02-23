@@ -1,7 +1,9 @@
 [Match]
 Name=usb0
-[Address]
-Address=169.254.95.118/16
+MACAddress=02:00:11:22:33:44
+
 [Network]
+Address=192.168.7.2/24
 LinkLocalAddressing=no
 IPv6AcceptRA=no
+ConfigureWithoutCarrier=yes

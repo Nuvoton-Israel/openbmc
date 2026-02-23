@@ -1,0 +1,15 @@
+[Unit]
+Description=Mount eMMC storage partition to /mnt/emmc
+Documentation=https://github.com/Nuvoton-Israel/openbmc
+After=dev-mmcblk0p1.device
+Requires=dev-mmcblk0p1.device
+ConditionPathExists=/dev/mmcblk0p1
+
+[Mount]
+What=/dev/mmcblk0p1
+Where=/mnt/emmc
+Type=ext4
+Options=defaults,noatime
+
+[Install]
+WantedBy=multi-user.target

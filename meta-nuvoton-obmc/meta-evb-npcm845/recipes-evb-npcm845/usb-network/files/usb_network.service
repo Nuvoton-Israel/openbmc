@@ -1,10 +1,13 @@
 [Unit]
-Description=enable usb network
+Description=Enable USB network (CDC ECM) with DHCP for RHEL host
 After=phosphor-ipmi-host.service
+After=systemd-networkd.service
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash -c '/usr/sbin/usb_network.sh'
+RemainAfterExit=yes
+ExecStart=/usr/sbin/usb_network.sh
+ExecStop=/bin/sh -c 'pkill -f "dnsmasq.*usb0" 2>/dev/null; kill $(cat /var/run/dnsmasq.usb0.pid 2>/dev/null) 2>/dev/null; rm -f /var/run/dnsmasq.usb0.pid; true'
 
 [Install]
 WantedBy=multi-user.target

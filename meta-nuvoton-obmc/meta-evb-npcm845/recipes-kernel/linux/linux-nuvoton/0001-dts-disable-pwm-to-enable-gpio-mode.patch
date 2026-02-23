@@ -117,7 +117,7 @@ index 81a3cdc19747..1bc781e9c400 100644
 +			output-high;
 +		};
 +		gpio81in_pins: gpio81in {
-+			pins = "GGPIO81/PWM1";
++			pins = "GPIO81/PWM1";
 +			bias-disable;
 +			input-enable;
 +		};
