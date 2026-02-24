@@ -1,0 +1,107 @@
+From 7c2bb9bcd1d57f7ddbbdad97ea85c678ba176c99 Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Tue, 24 Feb 2026 14:01:08 +0800
+Subject: [PATCH] arm64: dts: nuvoton: npcm845-evb: repurpose GPIO12/13 as
+ unit-ID strap inputs
+
+GPIO12 (GSPI_CK) and GPIO13 (GSPI_DO) were previously consumed by the
+spi-gpio / Atmel AT25 EEPROM node.  That node is removed so the two pins
+can be used as hardware strap inputs to identify which BMC unit (A/B/C/D)
+is installed in a multi-BMC system.
+
+Changes:
+- Remove spi-gpio node (sck=GPIO12, mosi=GPIO13, miso=GPIO14, cs=GPIO15)
+  and its child Atmel AT25 EEPROM device.
+- Add pin12_in / pin13_in pinctrl definitions (bias-disable, input-enable)
+  so the SoC drives no pull on these lines; the strap resistors on the
+  board set the logic level.
+- Reference both new pinctrl nodes from the board pinctrl state so they
+  are applied at boot.
+
+The two GPIO values encode the unit identity:
+  GPIO12=0 GPIO13=0 -> Unit A (192.168.7.x)
+  GPIO12=0 GPIO13=1 -> Unit B (192.168.8.x)
+  GPIO12=1 GPIO13=0 -> Unit C (192.168.9.x)
+  GPIO12=1 GPIO13=1 -> Unit D (192.168.10.x)
+
+This is consumed by usb_network.sh on the BMC to select the correct
+MAC address pair and USB network IP subnet at runtime.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ .../boot/dts/nuvoton/nuvoton-npcm845-evb.dts  | 37 ++++++++-----------
+ 1 file changed, 15 insertions(+), 22 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+index 0f5bf41d5394..67bf69b71d54 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+@@ -60,7 +60,6 @@ aliases {
+ 		i2c24 = &i2c24;
+ 		i2c25 = &i2c25;
+ 		i2c26 = &i2c26;
+-		spi1 = &spi_gpio;
+ 	};
+ 
+ 	chosen {
+@@ -77,26 +76,6 @@ iio-hwmon {
+ 			<&adc 4>, <&adc 5>, <&adc 6>, <&adc 7>;
+ 	};
+ 
+-	spi_gpio: spi-gpio {
+-		compatible = "spi-gpio";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-		sck-gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>;
+-		mosi-gpios = <&gpio0 13 GPIO_ACTIVE_HIGH>;
+-		miso-gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
+-		num-chipselects = <1>;
+-		cs-gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;
+-
+-		eeprom@0 {
+-			compatible = "atmel,at25";
+-			spi-max-frequency = <5000000>;
+-			size = <0x10000>;
+-			pagesize = <128>;
+-			reg = <0>;
+-			address-width = <16>;
+-		};
+-	};
+-
+ 	leds {
+ 		compatible = "gpio-leds";
+ 		heartbeat {
+@@ -692,7 +671,9 @@ &gpio67oh_pins
+ 			&gpio80in_pins
+ 			&gpio81in_pins
+ 			&gpio82in_pins
+-			&gpio83in_pins>;
++			&gpio83in_pins
++			&pin12_in
++			&pin13_in>;
+ 
+ 		pin96_oh: pin96_oh {
+ 			pins = "GPIO96/CP1_GPIO7/BU2_TXD/TP_GPIO7";
+@@ -700,6 +681,18 @@ pin96_oh: pin96_oh {
+ 			output-high;
+ 		};
+ 
++		pin12_in: pin12_in {
++			pins = "GPIO12/GSPI_CK/SMB5B_SCL";
++			bias-disable;
++			input-enable;
++		};
++
++		pin13_in: pin13_in {
++			pins = "GPIO13/GSPI_DO/SMB5B_SDA";
++			bias-disable;
++			input-enable;
++		};
++
+ 		gpio3: gpio@f0013000 {
+ 			/* SMC_FORCE_DL=gpio96 */
+ 			gpio-line-names =
+-- 
+2.43.0
+

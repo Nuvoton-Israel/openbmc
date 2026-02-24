@@ -11,7 +11,7 @@ SRC_URI:append = " file://enable-v4l2-kvm.cfg"
 # User must disale enable-v4l2-kvm.cfg to prvent conflict with obmc kvm application
 #SRC_URI:append = " file://enable-usb-video.cfg"
 
-# enable legavcy kvm driver, mutex vl42 driver 
+# enable legavcy kvm driver, mutex vl42 driver
 #SRC_URI:append = " file://enable-legacy-kvm.cfg"
 #SRC_URI:append = " file://0001-driver-misc-enable-the-FIFO-overrun-underrun-interru.patch"
 
@@ -34,20 +34,24 @@ SRC_URI:append = " file://af_mctp.cfg"
 SRC_URI:append = " file://0007-dts-evb-npcm845-enable-udc8.patch"
 
 # Enable ttyS1, ttyS2, ttyS3, ttyS4, ttyS5
-SRC_URI:append = " file://0001-arm64-dts-npcm845-evb-enable-more-serial-interfaces.patch"
-SRC_URI:append = " file://0001-arm64-dts-nuvoton-npcm845-set-gpio96-defaule-high.patch"
+SRC_URI:append = " file://0008-arm64-dts-npcm845-evb-enable-more-serial-interfaces.patch"
+SRC_URI:append = " file://0009-arm64-dts-nuvoton-npcm845-set-gpio96-defaule-high.patch"
 
 # Set high slew rate for PSPI pins
-SRC_URI:append = " file://0008-dts-arm64-npcm845-evb-Set-high-slew-rate-for-PSPI-pi.patch"
+SRC_URI:append = " file://0010-dts-arm64-npcm845-evb-Set-high-slew-rate-for-PSPI-pi.patch"
 
 # add jtm spi driver
-SRC_URI:append = " file://2001-add-jtm-spi-driver.patch"
+#SRC_URI:append = " file://2001-add-jtm-spi-driver.patch"
 #SRC_URI:append = " file://spi_jtm.cfg"
 
 # Enable mmbi interface
 #SRC_URI:append = " file://0009-dts-arm64-npcm845-evb-enable-mmbi.patch"
 
 # FPGA test
-SRC_URI:append = " file://0001-enable-i3c4-and-disable-i2c14-17.patch"
+SRC_URI:append = " file://0011-enable-i3c4-and-disable-i2c14-17.patch"
 
-SRC_URI:append = " file://0001-dts-disable-pwm-to-enable-gpio-mode.patch"
+# Disable PWM to enable GPIO mode
+SRC_URI:append = " file://0012-dts-disable-pwm-to-enable-gpio-mode.patch"
+
+# Repurpose GPIO12/13 as BMC unit-ID strap inputs
+SRC_URI:append = " file://0013-arm64-dts-nuvoton-npcm845-evb-repurpose-GPIO12-13-as.patch"

@@ -1,11 +1,9 @@
-Upstream-Status: Pending [Not submitted to upstream yet]
-
-
-From 4acc06bea3eab3fcee1881446c40df27540896c5 Mon Sep 17 00:00:00 2001
+From 3de47a8e9ef22e245c17ac70e8daaf2acd610c2b Mon Sep 17 00:00:00 2001
 From: invalid_git config <unknown@unknown>
 Date: Wed, 11 Feb 2026 05:47:14 +0000
 Subject: [PATCH] dts: disable pwm to enable gpio mode
 
+Upstream-Status: Pending [Not submitted to upstream yet]
 Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
 ---
  .../boot/dts/nuvoton/nuvoton-npcm845-evb.dts  | 63 +++----------------
@@ -13,7 +11,7 @@ Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
  2 files changed, 50 insertions(+), 53 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
-index 2aa74eb9a55a..5be9073f87cb 100644
+index 2aa74eb9a55a..0f5bf41d5394 100644
 --- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
 +++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
 @@ -477,58 +477,7 @@ &watchdog1 {
@@ -94,7 +92,7 @@ index 2aa74eb9a55a..5be9073f87cb 100644
  		pin96_oh: pin96_oh {
  			pins = "GPIO96/CP1_GPIO7/BU2_TXD/TP_GPIO7";
 diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-pincfg-evb.dtsi b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-pincfg-evb.dtsi
-index 81a3cdc19747..1bc781e9c400 100644
+index 81a3cdc19747..eebfaa52a86c 100644
 --- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-pincfg-evb.dtsi
 +++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-pincfg-evb.dtsi
 @@ -3,6 +3,46 @@

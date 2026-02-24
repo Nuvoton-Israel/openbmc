@@ -1,0 +1,46 @@
+# 99-bmc-usb-network.rules
+# Install on the RHEL/Linux HOST side (e.g. /etc/udev/rules.d/).
+#
+# Matches the BMC USB CDC ECM interface by the HOST-side MAC address
+# (host_addr written by usb_network.sh on the BMC).
+#
+# BMC unit identity is strapped by GPIO12 / GPIO13 on the BMC board:
+#
+#   Unit  GPIO12  GPIO13  Host MAC (host_addr)   Interface Name  Host Static IP    BMC IP
+#   ----  ------  ------  ---------------------  --------------  ----------------  -----------
+#    A      0       0     02:00:55:66:77:88      bmc-usb         192.168.7.1/24    192.168.7.2
+#    B      0       1     02:00:55:66:77:89      bmc-usb-b       192.168.8.1/24    192.168.8.2
+#    C      1       0     02:00:55:66:77:8a      bmc-usb-c       192.168.9.1/24    192.168.9.2
+#    D      1       1     02:00:55:66:77:8b      bmc-usb-d       192.168.10.1/24   192.168.10.2
+#
+# Each rule:
+#   1. Renames the interface to a stable name to prevent enx... predictable naming
+#   2. Brings the interface up and assigns the correct static IP (no DHCP)
+
+# ── Unit A (GPIO12=0, GPIO13=0) ───────────────────────────────────────────────
+SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="02:00:55:66:77:88", \
+    NAME="bmc-usb"
+
+SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="02:00:55:66:77:88", \
+    RUN+="/bin/sh -c 'sleep 1 && ip link set bmc-usb up && ip addr add 192.168.7.1/24 dev bmc-usb'"
+
+# ── Unit B (GPIO12=0, GPIO13=1) ───────────────────────────────────────────────
+SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="02:00:55:66:77:89", \
+    NAME="bmc-usb-b"
+
+SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="02:00:55:66:77:89", \
+    RUN+="/bin/sh -c 'sleep 1 && ip link set bmc-usb-b up && ip addr add 192.168.8.1/24 dev bmc-usb-b'"
+
+# ── Unit C (GPIO12=1, GPIO13=0) ───────────────────────────────────────────────
+SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="02:00:55:66:77:8a", \
+    NAME="bmc-usb-c"
+
+SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="02:00:55:66:77:8a", \
+    RUN+="/bin/sh -c 'sleep 1 && ip link set bmc-usb-c up && ip addr add 192.168.9.1/24 dev bmc-usb-c'"
+
+# ── Unit D (GPIO12=1, GPIO13=1) ───────────────────────────────────────────────
+SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="02:00:55:66:77:8b", \
+    NAME="bmc-usb-d"
+
+SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="02:00:55:66:77:8b", \
+    RUN+="/bin/sh -c 'sleep 1 && ip link set bmc-usb-d up && ip addr add 192.168.10.1/24 dev bmc-usb-d'"
