@@ -29,9 +29,6 @@ SRC_URI:append = " file://0006-dts-mctp-i2c-controller.patch"
 SRC_URI:append = " file://0007-dts-mctp-i3c-controller.patch"
 SRC_URI:append = " file://af_mctp.cfg"
 
-# Enable UDC8 on usb phy3
-SRC_URI:append = " file://0008-dts-evb-npcm845-enable-udc8.patch"
-
 # Enable ttyS1, ttyS2, ttyS3, ttyS4, ttyS5
 SRC_URI:append = " file://0009-arm64-dts-npcm845-evb-enable-more-serial-interfaces.patch"
 SRC_URI:append = " file://0010-arm64-dts-nuvoton-npcm845-set-gpio96-defaule-high.patch"
