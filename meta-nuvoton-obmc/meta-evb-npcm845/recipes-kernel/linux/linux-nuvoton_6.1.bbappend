@@ -22,9 +22,6 @@ SRC_URI:append = " file://0006-dts-mctp-i2c-controller.patch"
 SRC_URI:append = " file://0007-dts-mctp-i3c-controller.patch"
 SRC_URI:append = " file://af_mctp.cfg"
 
-# Enable UDC8 on usb phy3
-SRC_URI:append = " file://0008-dts-evb-npcm845-enable-udc8.patch"
-
 # CPLD UART
 # SRC_URI:append = " file://0015-support-CPLD-UART-16450.patch"
 
