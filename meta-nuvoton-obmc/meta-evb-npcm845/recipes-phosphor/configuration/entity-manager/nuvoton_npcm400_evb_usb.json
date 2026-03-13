@@ -7,15 +7,9 @@
             "Port": "1",
             "RootHubPath": "/sys/devices/platform/ahb/f0828100.usb",
             "Type": "MCTPUSBDevice"
-        },
-        {
-            "Address": "0x10",
-            "Bus": "0",
-            "Name": "MCTP I2C Device 0",
-            "Type": "MCTPI2CTarget"
         }
     ],
-    "Name": "NPCM400 SMC EVB",
+    "Name": "NPCM400 SMC EVB with MCTP USB",
     "Probe": "TRUE",
     "Type": "Board"
 }

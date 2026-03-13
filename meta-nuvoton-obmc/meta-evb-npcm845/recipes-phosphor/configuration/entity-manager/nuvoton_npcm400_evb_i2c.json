@@ -1,0 +1,13 @@
+{
+    "Exposes": [
+        {
+            "Address": "0x10",
+            "Bus": "0",
+            "Name": "MCTP I2C Device 0",
+            "Type": "MCTPI2CTarget"
+        }
+    ],
+    "Name": "NPCM400 SMC EVB with MCTP I2C",
+    "Probe": "FALSE",
+    "Type": "Board"
+}
