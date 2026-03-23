@@ -18,7 +18,7 @@ DEPENDS += " \
         phosphor-dbus-interfaces \
         ${PYTHON_PN}-sdbus++-native \
         "
-S = "${WORKDIR}/git"
+S = "${UNPACKDIR}/git"
 
 # This provides below 2 applications that are called into in case
 # of host checkstop and host watchdog timeout respectively.

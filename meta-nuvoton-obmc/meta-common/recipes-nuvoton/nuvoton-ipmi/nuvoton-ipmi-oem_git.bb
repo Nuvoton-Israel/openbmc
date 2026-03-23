@@ -15,7 +15,7 @@ DEPENDS += "phosphor-logging"
 DEPENDS += "phosphor-ipmi-host"
 DEPENDS += "nlohmann-json"
 
-S = "${WORKDIR}/git"
+S = "${UNPACKDIR}/git"
 SRCBRANCH = "master"
 SRC_URI = "git://github.com/Nuvoton-Israel/nuvoton-ipmi-oem;protocol=https;branch=${SRCBRANCH}"
 SRCREV = "46a294baaf0a5b6daee5fe8a2bf183a2b2c0a4c2"

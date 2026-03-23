@@ -13,8 +13,8 @@ SRC_URI = " file://boot-status-led.sh \
             file://boot-status-led.service \
           "
 
-S = "${WORKDIR}/sources"
-UNPACKDIR = "${S}"
+S = "${UNPACKDIR}/sources"
+
 
 do_install() {
     install -d ${D}${bindir}

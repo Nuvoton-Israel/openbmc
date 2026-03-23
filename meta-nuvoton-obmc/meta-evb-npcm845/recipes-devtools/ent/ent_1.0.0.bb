@@ -7,7 +7,7 @@ LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${S}/ent.c;endline=24;md5=376f7f7194e74c2639d66ef5f0309ef7"
 SRC_URI = "file://ent.tar.bz2"
 
-S = "${WORKDIR}/${PN}"
+S = "${UNPACKDIR}/${PN}"
 EXTRA_OEMAKE = "CROSS_COMPILE=${TARGET_PREFIX} CC="${CC}""
 INSANE_SKIP:${PN} += "ldflags"
 INSANE_SKIP:${PN}-dbg += "buildpaths"

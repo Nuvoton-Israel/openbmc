@@ -17,8 +17,8 @@ SRC_URI += " file://program-vbios.service \
              file://dontload.conf \
            "
 
-S = "${WORKDIR}/sources"
-UNPACKDIR = "${S}"
+S = "${UNPACKDIR}/sources"
+
 
 SYSTEMD_PACKAGES = "${PN}"
 SYSTEMD_SERVICE:${PN} = "program-vbios.service"

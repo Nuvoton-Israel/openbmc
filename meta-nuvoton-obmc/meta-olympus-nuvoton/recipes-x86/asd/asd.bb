@@ -7,10 +7,9 @@ PV = "0.1+git${SRCPV}"
 LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=0d1c657b2ba1e8877940a8d1614ec560"
 
-S = "${WORKDIR}/git"
 inherit cmake pkgconfig
 DEPENDS = "sdbusplus openssl libpam libgpiod safec"
 
-EXTRA_OECMAKE = "-DBUILD_UT=OFF -DAPB_FREQ=10000000"
+EXTRA_OECMAKE = "-DBUILD_UT=OFF -DAPB_FREQ=10000000 -DCMAKE_POLICY_VERSION_MINIMUM=3.5"
 TARGET_CFLAGS += "-DHAVE_C99"
 

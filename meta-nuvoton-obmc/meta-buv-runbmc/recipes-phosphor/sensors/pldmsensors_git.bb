@@ -15,7 +15,7 @@ SYSTEMD_SERVICE_${PN} = " xyz.openbmc_project.pldmsensor.service"
 DEPENDS = "boost nlohmann-json sdbusplus i2c-tools libgpiod libpldm-intel "
 inherit cmake systemd
 
-S = "${WORKDIR}/git"
+S = "${UNPACKDIR}/git"
 
 EXTRA_OECMAKE = "-DYOCTO=1"
 

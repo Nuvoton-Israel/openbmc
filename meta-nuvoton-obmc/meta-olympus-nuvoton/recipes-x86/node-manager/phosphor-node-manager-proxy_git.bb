@@ -24,5 +24,5 @@ DEPENDS = "sdbusplus \
            phosphor-logging \
            boost"
 
-S = "${WORKDIR}/git"
+S = "${UNPACKDIR}/git"
 inherit cmake systemd pkgconfig

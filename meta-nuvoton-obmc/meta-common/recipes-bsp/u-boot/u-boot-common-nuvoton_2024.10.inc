@@ -9,6 +9,4 @@ UBRANCH = "npcm-v2024.10"
 SRC_URI = "git://github.com/Nuvoton-Israel/u-boot.git;branch=${UBRANCH};protocol=https"
 SRCREV = "0f5b07f7861eaf3cf91f9881b60286b5aeb1172e"
 
-S = "${WORKDIR}/git"
-
 PV = "v2024.10+git${SRCPV}"

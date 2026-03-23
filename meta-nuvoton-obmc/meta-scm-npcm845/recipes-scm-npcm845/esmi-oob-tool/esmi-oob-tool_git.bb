@@ -13,7 +13,6 @@ SRC_URI = "git://github.com/amd/esmi_oob_library;protocol=https;branch=master"
 SRC_URI:append = " file://0001-fixed-header-incude.patch"
 SRCREV = "00cc0fb0265af1d240a0aff5ed96f90a73ff8c51"
 
-S = "${WORKDIR}/git"
 
 inherit cmake
 

@@ -6,7 +6,7 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=e3fc50a88d0a364313df4b21ef20c29e"
 
 TARGET_CC_ARCH += "${LDFLAGS}"
 
-S = "${WORKDIR}/git"
+
 SRCBRANCH = "master"
 SRC_URI = "git://github.com/Nuvoton-Israel/nist-linux-selftest;protocol=https;branch=${SRCBRANCH} \
            file://nist-linux-selftest.service \

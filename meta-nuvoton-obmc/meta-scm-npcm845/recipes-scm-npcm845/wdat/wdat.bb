@@ -11,8 +11,8 @@ FILESEXTRAPATHS:append := "${THISDIR}/files:"
 
 inherit cmake pkgconfig systemd
 
-S = "${WORKDIR}/sources"
-UNPACKDIR = "${S}"
+S = "${UNPACKDIR}/sources"
+
 SRC_URI = "file://CMakeLists.txt \
 		  file://wdat.cpp \
 		  file://wdat@.service \

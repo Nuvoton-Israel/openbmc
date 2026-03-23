@@ -7,7 +7,7 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=e3fc50a88d0a364313df4b21ef20c29e"
 SRC_URI = "git://git@github.com/Nuvoton-Israel/mctpd.git;protocol=ssh;branch=main"
 SRCREV = "a6bd68fd617797a6d72f147846d04bbed2dbfc9f"
 
-S = "${WORKDIR}/git"
+S = "${UNPACKDIR}/git"
 
 PV = "1.0+git${SRCPV}"
 

@@ -1,4 +1,4 @@
-From 66954023a562c9c4b14ebfe244cc2e10c91c9709 Mon Sep 17 00:00:00 2001
+From 9956d82a358e2661d6a39a82bf8cf7631fa2e57d Mon Sep 17 00:00:00 2001
 From: Ban Feng <kcfeng0@nuvoton.com>
 Date: Fri, 3 Mar 2023 11:17:05 +0800
 Subject: [PATCH] Add new type of settable interface - PowerSupply
@@ -12,10 +12,10 @@ Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/src/entity_manager/entity_manager.cpp b/src/entity_manager/entity_manager.cpp
-index 29ee89765..b89eda55c 100644
+index bc78ad06b..5fcee7576 100644
 --- a/src/entity_manager/entity_manager.cpp
 +++ b/src/entity_manager/entity_manager.cpp
-@@ -38,8 +38,8 @@
+@@ -37,8 +37,8 @@
  constexpr const char* tempConfigDir = "/tmp/configuration/";
  constexpr const char* lastConfiguration = "/tmp/configuration/last.json";
  
@@ -24,8 +24,8 @@ index 29ee89765..b89eda55c 100644
 +static constexpr std::array<const char*, 7> settableInterfaces = {
 +    "FanProfile", "Pid", "Pid.Zone", "Stepwise", "Thresholds", "Polling", "PowerSupply"};
  
- const std::regex illegalDbusPathRegex("[^A-Za-z0-9_.]");
- const std::regex illegalDbusMemberRegex("[^A-Za-z0-9_]");
+ sdbusplus::asio::PropertyPermission getPermission(const std::string& interface)
+ {
 -- 
 2.43.0
 
