@@ -5,7 +5,6 @@ QBRANCH = "npcm-v10.2.0"
 SRC_URI = "gitsm://github.com/Nuvoton-Israel/qemu.git;protocol=https;branch=${QBRANCH}"
 SRCREV = "48e6aea0574f1dcca3c7bc8fb5ea68a92728144a"
 
-S = "${WORKDIR}/git"
 PV = "10.2.0+git${SRCPV}"
 
 SRC_URI:append = " \

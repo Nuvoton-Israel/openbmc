@@ -11,7 +11,7 @@ SRCREV = "c8ac4ca68137127596ff59d065bfaa046718a56b"
 
 PV = "1.0+git${SRCPV}"
 PR = "r1"
-S = "${WORKDIR}/git"
+S = "${UNPACKDIR}/git"
 KEY_DIR = "${S}/libspdm/unit_test/sample_key"
 FILES:${PN}:append = " ${datadir}/spdm-emu"
 

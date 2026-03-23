@@ -15,8 +15,8 @@ SRC_URI = "file://dpinit \
            file://dpinit.service \
           "
 
-S = "${WORKDIR}/sources"
-UNPACKDIR = "${S}"
+S = "${UNPACKDIR}/sources"
+
 
 SYSTEMD_SERVICE:${PN} = "dpinit.service"
 

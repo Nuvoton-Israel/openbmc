@@ -9,8 +9,8 @@ RDEPENDS:${PN} += "bash"
 SRC_URI += "file://usb_emmc_storage.sh \
            file://usb_emmc_storage.service"
 
-S = "${WORKDIR}/sources"
-UNPACKDIR = "${S}"
+S = "${UNPACKDIR}/sources"
+
 
 do_install() {
     install -d ${D}/${sbindir}

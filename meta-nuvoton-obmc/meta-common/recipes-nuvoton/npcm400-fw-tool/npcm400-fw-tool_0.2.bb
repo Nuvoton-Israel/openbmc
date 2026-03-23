@@ -7,8 +7,8 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/GPL-2.0-only;md5=801f80980d171d
 #SRC_URI = "git://${HOME}/NpcmFwProg;protocol=file;branch=main"
 #SRCREV = "efe2304881e36a1bcaa5eccf668b6358b19c75d3"
 #PV = "1.0+git${SRCPV}"
-S = "${WORKDIR}/git"
-UNPACKDIR = "${S}"
+S = "${UNPACKDIR}"
+
 
 # Or use direct download approach:
 FILENAME = "NpcmFwProg_${PV}.bmc"

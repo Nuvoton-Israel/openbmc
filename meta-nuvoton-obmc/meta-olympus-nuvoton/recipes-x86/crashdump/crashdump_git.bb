@@ -17,7 +17,7 @@ SRC_URI = "git://github.com/Intel-BMC/crashdump.git;protocol=https;nobranch=1"
 #SRCREV = "wht-1.0.6"
 SRCREV = "edea231cc1df74576e5a46c70bf163bb2b365d99"
 
-S = "${WORKDIR}/git"
+S = "${UNPACKDIR}/git"
 
 SYSTEMD_SERVICE:${PN} += "com.intel.crashdump.service"
 DBUS_SERVICE:${PN} += "com.intel.crashdump.service"

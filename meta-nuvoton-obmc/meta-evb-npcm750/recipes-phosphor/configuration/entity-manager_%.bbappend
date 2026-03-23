@@ -1,14 +1,14 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 
-SRC_URI:append = " file://NUVOTON-POLEG-EVB.json"
+SRC_URI:append = " file://nuvoton_npcm7xx_evb.json"
 SRC_URI:append = " file://baseboard.fru.bin"
 SRC_URI:append = " file://blacklist.json"
 
 do_install:append() {
-    rm -f ${D}/usr/share/entity-manager/configurations/*.json
+    rm -rf ${D}${datadir}/entity-manager/configurations/*
     install -d ${D}${datadir}/entity-manager
-    install -m 0644 -D ${UNPACKDIR}/NUVOTON-POLEG-EVB.json \
-        ${D}${datadir}/entity-manager/configurations/NUVOTON-POLEG-EVB.json
+    install -m 0644 -D ${UNPACKDIR}/nuvoton_npcm7xx_evb.json \
+        ${D}${datadir}/entity-manager/configurations/nuvoton/nuvoton_npcm7xx_evb.json
     install -m 0644 -D ${UNPACKDIR}/blacklist.json\
         ${D}${datadir}/entity-manager/blacklist.json
     mkdir -p ${D}/etc/fru

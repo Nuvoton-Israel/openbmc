@@ -6,8 +6,8 @@ LIC_FILES_CHKSUM = "file://COPYING.MIT;md5=3da9cfbcb788c80a0384361b4de20420"
 
 TARGET_CC_ARCH += "${LDFLAGS}"
 
-S = "${WORKDIR}/sources"
-UNPACKDIR = "${S}"
+S = "${UNPACKDIR}/sources"
+
 
 
 SRC_URI = "file://Makefile \

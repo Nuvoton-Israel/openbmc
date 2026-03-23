@@ -1,9 +1,10 @@
-Upstream-Status: Submitted [https://gerrit.openbmc.org/c/openbmc/dbus-sensors/+/80452]
-
-From 8b698aa5ad627eb80d3111e004bb9a169183e2d1 Mon Sep 17 00:00:00 2001
+From f4392ee6ff01ebf951b9750d0492a7feb547d97b Mon Sep 17 00:00:00 2001
 From: Saptarsi Saha <saptarsis@nvidia.com>
 Date: Tue, 20 May 2025 21:38:37 +0530
-Subject: [PATCH] mctpreactor: Support configuration for USB MCTP devices
+Subject: [PATCH] From 8b698aa5ad627eb80d3111e004bb9a169183e2d1 Mon Sep 17
+ 00:00:00 2001 From: Saptarsi Saha <saptarsis@nvidia.com> Date: Tue, 20 May
+ 2025 21:38:37 +0530 Subject: [PATCH] mctpreactor: Support configuration for
+ USB MCTP devices
 
 Changes for MCTPUSBDevice reactor with schema defined in mctp.json[1]
 
@@ -20,17 +21,18 @@ MCTP over USB enumeration on Alon8 via this + [2].
 Change-Id: I2a2c30605b2738f64d30b3f3efcdefdece8e5652
 Signed-off-by: Saptarsi Saha <saptarsis@nvidia.com>
 Signed-off-by: Deepak Kodihalli <deepak.kodihalli.83@gmail.com>
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
 ---
  src/mctp/MCTPEndpoint.cpp    | 160 +++++++++++++++++++++++++++++++++++
  src/mctp/MCTPEndpoint.hpp    |  28 ++++++
- src/mctp/MCTPReactorMain.cpp |  12 ++-
- 3 files changed, 198 insertions(+), 2 deletions(-)
+ src/mctp/MCTPReactorMain.cpp |  11 ++-
+ 3 files changed, 197 insertions(+), 2 deletions(-)
 
 diff --git a/src/mctp/MCTPEndpoint.cpp b/src/mctp/MCTPEndpoint.cpp
-index 391085d67..4937d3681 100644
+index 4dbc2bc84..fa3204e3b 100644
 --- a/src/mctp/MCTPEndpoint.cpp
 +++ b/src/mctp/MCTPEndpoint.cpp
-@@ -20,6 +20,7 @@
+@@ -21,6 +21,7 @@
  #include <exception>
  #include <filesystem>
  #include <format>
@@ -38,7 +40,7 @@ index 391085d67..4937d3681 100644
  #include <functional>
  #include <map>
  #include <memory>
-@@ -27,6 +28,7 @@
+@@ -28,6 +29,7 @@
  #include <set>
  #include <stdexcept>
  #include <string>
@@ -46,7 +48,7 @@ index 391085d67..4937d3681 100644
  #include <system_error>
  #include <utility>
  #include <variant>
-@@ -503,3 +505,161 @@ std::string I3CMCTPDDevice::interfaceFromBus(int bus)
+@@ -562,3 +564,161 @@ std::string I3CMCTPDDevice::interfaceFromBus(int bus)
            "I3C_BUS", bus, "NET_DEVICE", netdir);
      throw MCTPException("No matching net device found for the specified bus");
  }
@@ -209,7 +211,7 @@ index 391085d67..4937d3681 100644
 +    }
 +}
 diff --git a/src/mctp/MCTPEndpoint.hpp b/src/mctp/MCTPEndpoint.hpp
-index 2abfc9551..c46bfdc77 100644
+index 2d0c4f1d7..2786c6a9e 100644
 --- a/src/mctp/MCTPEndpoint.hpp
 +++ b/src/mctp/MCTPEndpoint.hpp
 @@ -9,6 +9,7 @@
@@ -220,7 +222,7 @@ index 2abfc9551..c46bfdc77 100644
  #include <functional>
  #include <memory>
  #include <optional>
-@@ -349,3 +350,30 @@ class I3CMCTPDDevice : public MCTPDDevice
+@@ -355,3 +356,30 @@ class I3CMCTPDDevice : public MCTPDDevice
  
      static std::string interfaceFromBus(int bus);
  };
@@ -252,7 +254,7 @@ index 2abfc9551..c46bfdc77 100644
 +        uint8_t interfaceNum);
 +};
 diff --git a/src/mctp/MCTPReactorMain.cpp b/src/mctp/MCTPReactorMain.cpp
-index 6d333497a..f6a93bc34 100644
+index 8866759a6..b8c749b60 100644
 --- a/src/mctp/MCTPReactorMain.cpp
 +++ b/src/mctp/MCTPReactorMain.cpp
 @@ -93,6 +93,12 @@ static std::shared_ptr<MCTPDevice> deviceFromConfig(
@@ -278,16 +280,15 @@ index 6d333497a..f6a93bc34 100644
          {
              reactor->unmanageMCTPDevice(path.str);
          }
-@@ -248,7 +255,8 @@ int main()
+@@ -248,7 +255,7 @@ int main()
      boost::asio::post(io, [reactor, systemBus]() {
          auto gsc = std::make_shared<GetSensorConfiguration>(
              systemBus, std::bind_front(manageMCTPEntity, systemBus, reactor));
--        gsc->getConfiguration({"MCTPI2CTarget", "MCTPI3CTarget"});
-+        gsc->getConfiguration(
-+            {"MCTPI2CTarget", "MCTPI3CTarget", "MCTPUSBDevice"});
+-        std::vector<std::string_view> types{"MCTPI2CTarget", "MCTPI3CTarget"};
++        std::vector<std::string_view> types{"MCTPI2CTarget", "MCTPI3CTarget", "MCTPUSBDevice"};
+         gsc->getConfiguration(types);
      });
  
-     io.run();
 -- 
 2.43.0
 

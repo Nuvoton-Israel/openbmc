@@ -19,7 +19,7 @@ SRC_URI = "git://github.com/Nuvoton-Israel/loadmcu.git;branch=master;protocol=ht
            file://mcu-version@.service \
           "
 SRCREV = "12fed94b53f6fa0fe1c96bee264c7e363f2ed7d8"
-S = "${WORKDIR}/git"
+
 
 SYSTEMD_PACKAGES = "${PN}"
 SYSTEMD_SERVICE:${PN} = "mcu-update.service mcu-version@.service"

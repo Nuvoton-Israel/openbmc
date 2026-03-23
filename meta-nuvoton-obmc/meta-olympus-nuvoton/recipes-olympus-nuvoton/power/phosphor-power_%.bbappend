@@ -2,7 +2,7 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 inherit obmc-phosphor-systemd
 inherit entity-utils
 
-SRC_URI += "file://psu.json"
+SRC_URI:append = " file://psu.json"
 SRC_URI:append = " file://psu_em.json"
 SRC_URI:append = " file://0001-use-interface-xyz-openbmc_project.patch"
 SRC_URI:append = " file://0002-powerOn-always-return-true.patch"
@@ -10,8 +10,10 @@ SRC_URI:append = " file://0003-Modify-power-supply-monitor-.service.patch"
 SRC_URI:append = " file://0004-Fan-fault-test.patch"
 SRC_URI:append = " file://0005-Add-create-PSU-DBUs-obj.patch"
 SRC_URI:append = " file://0006-Light-up-LED-when-fan-fault.patch"
-SRC_URI:append = " file://0007-Support-Entity-Manager-for-power-supply-monitoring.patch"
-SRC_URI:append = " file://0008-Get-powersupplyName-from-config-setting.patch"
+SRC_URI:append = " file://0007-Get-powersupplyName-from-config-setting.patch"
+SRC_URI:append = " file://0008-Support-Entity-Manager-for-power-supply-monitoring.patch"
+SRC_URI:append = " file://0009-phosphor-power-support-bindUnbind-and-PSU-inserted-r.patch"
+SRC_URI:append = " file://0010-phosphor-power-support-PSU-hot-plug-DBus-property-an.patch"
 
 EXTRA_OEMESON:append = " \
     ${@entity_enabled(d, '-Dnuvoton-entity=true', '')} \

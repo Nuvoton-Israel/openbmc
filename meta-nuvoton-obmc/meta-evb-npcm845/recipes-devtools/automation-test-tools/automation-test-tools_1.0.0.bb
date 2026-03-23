@@ -7,8 +7,8 @@ SRC_URI += "file://cc_dry2 \
             file://i2c_slave_rw \
             file://setup_test.sh"
 
-S = "${WORKDIR}/sources"
-UNPACKDIR = "${S}"
+S = "${UNPACKDIR}/sources"
+
 
 INHIBIT_PACKAGE_DEBUG_SPLIT = "1"
 INHIBIT_PACKAGE_STRIP = "1"
