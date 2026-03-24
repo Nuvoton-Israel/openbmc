@@ -1,4 +1,4 @@
-FILESEXTRAPATHS:prepend := "${THISDIR}/linux-nuvoton:"
+FILESEXTRAPATHS:prepend := "${THISDIR}/linux-nuvoton-612:${THISDIR}/linux-nuvoton:"
 
 SRC_URI:append = " file://evb-npcm845-stage.cfg"
 SRC_URI:append = " file://luks.cfg"
