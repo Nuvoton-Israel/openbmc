@@ -13,8 +13,6 @@ SRC_URI = "file://program-edid.service \
            file://program-edid.sh \
            file://edid.json \
 "
-S = "${WORKDIR}/${BPN}"
-UNPACKDIR = "${S}"
 
 SYSTEMD_PACKAGES = "${PN}"
 SYSTEMD_SERVICE:${PN} = "program-edid.service"

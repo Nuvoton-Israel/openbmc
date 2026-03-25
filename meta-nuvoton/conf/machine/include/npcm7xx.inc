@@ -24,7 +24,7 @@ FLASH_UBI_RWFS_TXT_SIZE = "6MiB"
 
 DEFAULTTUNE ?= "arm7a-novfp"
 
-SERIAL_CONSOLES = "115200;ttyS0"
+SERIAL_CONSOLES = "115200;ttyS3"
 
 SOC_FAMILY = "npcm7xx"
 include conf/machine/include/soc-family.inc
