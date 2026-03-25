@@ -6,6 +6,7 @@ PREFERRED_PROVIDER_u-boot-fw-utils ?= "u-boot-fw-utils-nuvoton"
 WKS_FILE ?= "emmc-nuvoton.wks.in"
 WKS_FILE_DEPENDS ?= " \
     virtual/kernel \
+    linux-yocto-fitimage \
 "
 WKS_RWFS_SIZE ??= "256M"
 WKS_ROFS_SIZE ??= "256M"
