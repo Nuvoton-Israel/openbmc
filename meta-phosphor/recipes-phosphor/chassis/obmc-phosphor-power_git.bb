@@ -11,6 +11,4 @@ PR = "r1"
 
 SRC_URI = "git://github.com/openbmc/phosphor-power-control;branch=master;protocol=https"
 
-S = "${WORKDIR}/git"
-
 inherit meson pkgconfig

@@ -4,13 +4,11 @@ HOMEPAGE = "http://github.com/openbmc/phosphor-ipmi-ethstats"
 LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=86d3f3a95c324c9479bd8986968f4327"
 DEPENDS += "phosphor-ipmi-host"
-SRCREV = "fcd6e28c83ed1afe3ad3bace7b9192bdf0a8f95f"
+SRCREV = "055142a043e0016ce0bcae87ae7faf9e2c685391"
 PV = "0.1+git${SRCPV}"
 PR = "r1"
 
 SRC_URI = "git://github.com/openbmc/phosphor-ipmi-ethstats;branch=master;protocol=https"
-
-S = "${WORKDIR}/git"
 
 inherit meson pkgconfig
 inherit obmc-phosphor-ipmiprovider-symlink

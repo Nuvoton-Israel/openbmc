@@ -8,8 +8,7 @@ inherit native
 PROVIDES += "virtual/phosphor-led-manager-config-native"
 
 SRC_URI += "file://led.json"
-S = "${WORKDIR}/sources"
-UNPACKDIR = "${S}"
+S = "${UNPACKDIR}"
 
 do_install() {
     install -m 0644 ${UNPACKDIR}/led.json ${D}${datadir}/phosphor-led-manager/

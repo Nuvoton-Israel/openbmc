@@ -12,7 +12,6 @@ PR = "r1"
 
 SRC_URI = "git://github.com/openbmc/phosphor-ecc.git;branch=master;protocol=https"
 
-S = "${WORKDIR}/git"
 SYSTEMD_SERVICE:${PN} = " ${PN}.service"
 
 inherit meson pkgconfig

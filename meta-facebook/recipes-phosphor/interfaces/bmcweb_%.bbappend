@@ -16,6 +16,7 @@ PACKAGECONFIG:append = " \
 
 PACKAGECONFIG:remove = " \
     redfish-oem-manager-fan-data \
+    vm-websocket \
 "
 
 MUTUAL_TLS_PARSING = "UserPrincipalName"

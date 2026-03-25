@@ -64,7 +64,6 @@ SYSTEMD_SERVICE:${PN}-i2cvr-software-update += "${@bb.utils.contains('PACKAGECON
 SYSTEMD_SERVICE:${PN}-eepromdevice-software-update += "${@bb.utils.contains('PACKAGECONFIG', 'eepromdevice-software-update', 'xyz.openbmc_project.Software.EEPROMDevice.service', '', d)}"
 SYSTEMD_SERVICE:${PN}-cpld-software-update += "${@bb.utils.contains('PACKAGECONFIG', 'cpld-software-update', 'xyz.openbmc_project.Software.CPLD.service', '', d)}"
 SYSTEMD_SERVICE:${PN}-tpm-software-update += "${@bb.utils.contains('PACKAGECONFIG', 'tpm-software-update', 'xyz.openbmc_project.Software.TPM.service', '', d)}"
-S = "${WORKDIR}/git"
 
 inherit meson pkgconfig
 inherit obmc-phosphor-dbus-service

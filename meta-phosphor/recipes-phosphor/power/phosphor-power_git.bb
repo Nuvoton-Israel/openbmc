@@ -11,8 +11,6 @@ inherit python3native
 
 require ${BPN}.inc
 
-S = "${WORKDIR}/git"
-
 POWER_SERVICE_PACKAGES = " \
     ${PN}-chassis \
     ${PN}-cold-redundancy \
@@ -72,7 +70,7 @@ EXTRA_OEMESON:append = " -Dtests=disabled"
 # TODO: cold-redundancy is not installed in the repo yet
 # FILES:${PN}-cold-redundancy = "${bindir}/cold-redundancy"
 
-FILES:${PN}-chassis = "${libexecdir}/phosphor-power/phosphor-chassis-power"
+FILES:${PN}-chassis = "${libexecdir}/phosphor-power/phosphor-chassis-power ${datadir}/phosphor-chassis-power"
 FILES:${PN}-monitor = "${bindir}/psu-monitor"
 FILES:${PN}-psu-monitor = "${bindir}/phosphor-psu-monitor ${datadir}/phosphor-psu-monitor"
 FILES:${PN}-regulators = "${bindir}/phosphor-regulators ${datadir}/phosphor-regulators"

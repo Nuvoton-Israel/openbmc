@@ -7,7 +7,7 @@ def fb_get_consoles_usb(d):
     if not usbs:
         return ""
 
-    consoles = [f"ttyUSBdevice{int(i)}" for i in range(60)]
+    consoles = [f"ttyUSBdevice{int(i)}" for i in range(61)]
     return " ".join(consoles)
 fb_get_consoles_usb[vardeps] += "OBMC_USB_INSTANCES"
 

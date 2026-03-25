@@ -3,8 +3,6 @@ PROVIDES += "virtual/phosphor-led-manager-config-native"
 PV = "1.0+git${SRCPV}"
 PR = "r1"
 
-S = "${WORKDIR}/git"
-
 inherit native
 
 # Copies example led layout json file

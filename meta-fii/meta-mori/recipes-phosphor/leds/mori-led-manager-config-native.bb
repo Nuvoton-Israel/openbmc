@@ -6,8 +6,7 @@ PR = "r1"
 
 SRC_URI = "file://led.json"
 
-S = "${WORKDIR}/sources"
-UNPACKDIR = "${S}"
+S = "${UNPACKDIR}/sources"
 
 inherit native
 

@@ -35,7 +35,6 @@ PR = "r1"
 
 SRC_URI = "git://github.com/openbmc/phosphor-ipmi-flash;branch=master;protocol=https"
 
-S = "${WORKDIR}/git"
 SYSTEMD_PACKAGES = "${PN}"
 SYSTEMD_SERVICE:${PN} += " \
   phosphor-ipmi-flash-bmc-prepare.target \

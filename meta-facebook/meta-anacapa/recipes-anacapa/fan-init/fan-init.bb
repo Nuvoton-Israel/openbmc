@@ -16,7 +16,6 @@ SRC_URI:append = " \
     file://fan-init.service \
 "
 
-
 SYSTEMD_PACKAGES = "${PN}"
 SYSTEMD_SERVICE:${PN} = "fan-init.service"
 

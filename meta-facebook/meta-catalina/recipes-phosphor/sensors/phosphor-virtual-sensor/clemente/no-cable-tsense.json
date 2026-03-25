@@ -75,9 +75,9 @@
         },
         "Expression": [
             "max(6.95927258, ",
-            "((2.825758 * (avg(FAN0_PWM_PCT, FAN1_PWM_PCT, FAN2_PWM_PCT, FAN3_PWM_PCT, FAN4_PWM_PCT, FAN5_PWM_PCT, FAN6_PWM_PCT, FAN7_PWM_PCT)^2)) + ",
-            "(91.27348 * avg(FAN0_PWM_PCT, FAN1_PWM_PCT, FAN2_PWM_PCT, FAN3_PWM_PCT, FAN4_PWM_PCT, FAN5_PWM_PCT, FAN6_PWM_PCT, FAN7_PWM_PCT)) - ",
-            "2.196333))"
+            "((0.0006272484 * (avg(FAN0_PWM_PCT, FAN1_PWM_PCT, FAN2_PWM_PCT, FAN3_PWM_PCT, FAN4_PWM_PCT, FAN5_PWM_PCT, FAN6_PWM_PCT, FAN7_PWM_PCT)^2)) + ",
+            "(1.109243 * avg(FAN0_PWM_PCT, FAN1_PWM_PCT, FAN2_PWM_PCT, FAN3_PWM_PCT, FAN4_PWM_PCT, FAN5_PWM_PCT, FAN6_PWM_PCT, FAN7_PWM_PCT)) - ",
+            "3.311263))"
         ]
     },
     {

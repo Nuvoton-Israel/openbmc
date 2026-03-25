@@ -9,8 +9,7 @@ PROVIDES += "virtual/phosphor-led-manager-config-native"
 
 SRC_URI += "file://led.json"
 
-S = "${WORKDIR}/sources"
-UNPACKDIR = "${S}"
+S = "${UNPACKDIR}"
 
 # Copies led layout json file
 do_install() {

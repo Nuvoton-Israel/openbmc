@@ -21,7 +21,6 @@ do_install:append:ibm-ac-server() {
         install -D ${UNPACKDIR}/fan-errors.yaml ${D}${config_dir}/fan-errors.yaml
 }
 
-
 FILES:${PN} += "${config_dir}/air-cooled.yaml"
 FILES:${PN}:append:ibm-ac-server = " ${config_dir}/water-cooled.yaml"
 FILES:${PN} += "${config_dir}/fan-errors.yaml"

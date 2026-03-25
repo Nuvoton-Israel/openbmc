@@ -2,13 +2,11 @@ SUMMARY = "Binary Encoded JSON library"
 DESCRIPTION = "Used to decode Redfish Device Enablement (RDE) BEJ"
 LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=e3fc50a88d0a364313df4b21ef20c29e"
-SRCREV = "644e6156149a871b67b85536cf18235d15e9dc06"
+SRCREV = "637f46238e3061bc457d665afaf6521cb183afb9"
 PV = "0.1+git${SRCPV}"
 PR = "r1"
 
 SRC_URI = "git://github.com/openbmc/libbej;branch=main;protocol=https"
-
-S = "${WORKDIR}/git"
 
 inherit meson pkgconfig
 

@@ -34,8 +34,7 @@ SRC_URI += " \
   file://00-ncsi.conf \
   "
 
-S = "${WORKDIR}/sources"
-UNPACKDIR = "${S}"
+S = "${UNPACKDIR}"
 
 RDEPENDS:${PN} += " \
   bash \

@@ -46,7 +46,6 @@ SYSTEMD_PACKAGES = "${PN}-monitor"
 SYSTEMD_SUBSTITUTIONS += "BMC_DUMP_PATH:${bmc_dump_path}:${MGR_SVC}"
 SYSTEMD_SERVICE:${PN}-monitor += "obmc-dump-monitor.service"
 SYSTEMD_SERVICE:${PN}-monitor += "ramoops-monitor.service"
-S = "${WORKDIR}/git"
 
 inherit pkgconfig meson \
         obmc-phosphor-dbus-service \

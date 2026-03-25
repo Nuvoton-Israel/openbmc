@@ -7,13 +7,11 @@ DEPENDS += " \
         stdplus \
         systemd \
         "
-SRCREV = "c3fb820143af91bcaf8da9745c631c12cecf3353"
+SRCREV = "857171a82d6cb3c098c99a94ecb043118963ecc9"
 PV = "0.1+git${SRCPV}"
 PR = "r1"
 
 SRC_URI = "git://github.com/openbmc/sdeventplus;branch=master;protocol=https"
-
-S = "${WORKDIR}/git"
 
 inherit meson pkgconfig
 

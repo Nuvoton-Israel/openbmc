@@ -1,0 +1,8 @@
+#!/bin/sh
+
+cd @PTEST_PATH@/tests/
+
+# Clear old data
+rm -rf testsuite.dir testsuite.log
+
+./testsuite --am-fmt

@@ -24,7 +24,6 @@ SRC_URI = "git://github.com/openbmc/phosphor-hwmon;branch=master;protocol=https"
 SYSTEMD_PACKAGES = "${PN} max31785-msl"
 SYSTEMD_SERVICE:${PN} = "xyz.openbmc_project.Hwmon@.service"
 SYSTEMD_SERVICE:max31785-msl = "${@bb.utils.contains('PACKAGECONFIG', 'max31785-msl', 'phosphor-max31785-msl@.service', '', d)}"
-S = "${WORKDIR}/git"
 
 inherit pkgconfig meson
 inherit obmc-phosphor-systemd

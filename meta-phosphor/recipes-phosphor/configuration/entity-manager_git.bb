@@ -14,7 +14,7 @@ DEPENDS = " \
     valijson \
     zlib \
 "
-SRCREV = "83c8e49400667e88453e25636128a8a61b878b81"
+SRCREV = "1ecb5f15011b6509cf955e776397f75760a60fec"
 PACKAGECONFIG ??= "ipmi-fru gpio-presence"
 
 PACKAGECONFIG[dts-vpd] = "-Ddevicetree-vpd=true, -Ddevicetree-vpd=false"
@@ -30,7 +30,6 @@ SRC_URI = "git://github.com/openbmc/entity-manager.git;branch=master;protocol=ht
            file://blocklist.json \
           "
 
-S = "${WORKDIR}/git"
 SYSTEMD_PACKAGES = "${PN} ${EXTRA_ENTITY_MANAGER_PACKAGES}"
 SYSTEMD_SERVICE:${PN} = "xyz.openbmc_project.EntityManager.service"
 SYSTEMD_SERVICE:fru-device = "xyz.openbmc_project.FruDevice.service"

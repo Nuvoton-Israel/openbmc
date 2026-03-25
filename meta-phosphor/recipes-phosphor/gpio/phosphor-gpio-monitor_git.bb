@@ -12,7 +12,7 @@ DEPENDS += "boost"
 DEPENDS += "libgpiod"
 DEPENDS += "cli11"
 DEPENDS += "nlohmann-json"
-SRCREV = "efcb301e20e579619c2920d8c2adad7f17de2d8a"
+SRCREV = "8100d8a9dbbae4429e28c85b9e087217076f48cb"
 PV = "1.0+git${SRCPV}"
 PR = "r1"
 
@@ -24,7 +24,6 @@ SYSTEMD_SERVICE:${PN}-monitor += "phosphor-multi-gpio-monitor.service"
 SYSTEMD_SERVICE:${PN}-monitor += "phosphor-gpio-monitor@.service"
 SYSTEMD_SERVICE:${PN}-presence += "phosphor-gpio-presence@.service"
 SYSTEMD_SERVICE:${PN}-presence += "phosphor-multi-gpio-presence.service"
-S = "${WORKDIR}/git"
 
 inherit meson pkgconfig
 inherit obmc-phosphor-dbus-service

@@ -28,7 +28,6 @@ do_install:append() {
 }
 
 SYSTEMD_PACKAGES = "${PN} ${PN}-faultmonitor"
-S = "${WORKDIR}/git"
 SYSTEMD_SERVICE:${PN} += "obmc-led-group-start@.service obmc-led-group-stop@.service"
 SYSTEMD_SERVICE:${PN}-faultmonitor += "obmc-fru-fault-monitor.service"
 SYSTEMD_LINK:${PN} += "../obmc-led-group-start@.service:multi-user.target.wants/obmc-led-group-start@bmc_booted.service"
