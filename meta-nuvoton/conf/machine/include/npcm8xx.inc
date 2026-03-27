@@ -5,6 +5,7 @@
 require conf/machine/include/nuvoton.inc
 
 KERNEL_IMAGETYPE ?= "Image"
+KERNEL_IMAGETYPES ?= "Image"
 
 KERNEL_IMAGETYPE:df-obmc-static-norootfs = "Image"
 KERNEL_IMAGETYPES:df-obmc-static-norootfs = "${KERNEL_IMAGETYPE}"
@@ -51,3 +52,5 @@ OPTEEMACHINE ?= "nuvoton"
 TIP_IMAGE ?= "True"
 
 SA_TIP_IMAGE ?= "False"
+
+UBOOT_MKIMAGE:npcm8xx = "uboot-mkimage-npcm8xx"

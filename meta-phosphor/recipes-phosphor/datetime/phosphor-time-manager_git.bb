@@ -8,13 +8,11 @@ DEPENDS += "sdbusplus"
 DEPENDS += "${PYTHON_PN}-sdbus++-native"
 DEPENDS += "phosphor-logging"
 DEPENDS += "phosphor-dbus-interfaces"
-SRCREV = "fc018f947ee601a2ebd9cdce7721f10a4c6f4cc3"
+SRCREV = "3307677fb43bbb39c63d5070275bce8b4dea607b"
 PV = "1.0+git${SRCPV}"
 PR = "r1"
 
 SRC_URI = "git://github.com/openbmc/phosphor-time-manager;branch=master;protocol=https"
-
-S = "${WORKDIR}/git"
 
 inherit meson pkgconfig python3native
 inherit obmc-phosphor-dbus-service

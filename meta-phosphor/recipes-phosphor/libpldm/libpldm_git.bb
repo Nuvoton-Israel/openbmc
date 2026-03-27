@@ -3,7 +3,7 @@ DESCRIPTION = "PLDM library implementing various PLDM specifications"
 HOMEPAGE = "https://github.com/openbmc/libpldm"
 LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=86d3f3a95c324c9479bd8986968f4327"
-SRCREV = "d7d744815181e3fdc5ba2f9340ffd1d00dbe1627"
+SRCREV = "4509e841f6a4cad2411aa00db7cefac52330f9d2"
 
 LIBPLDM_ABI_DEVELOPMENT = "deprecated,stable,testing"
 LIBPLDM_ABI_MAINTENANCE = "stable,testing"
@@ -19,8 +19,6 @@ PACKAGECONFIG[oem] = "-Doem=${LIBPLDM_OEM},-Doem=[],,"
 PV = "git${SRCPV}"
 PR = "r1"
 SRC_URI = "git://github.com/openbmc/libpldm;branch=main;protocol=https"
-
-S = "${WORKDIR}/git"
 
 inherit meson
 

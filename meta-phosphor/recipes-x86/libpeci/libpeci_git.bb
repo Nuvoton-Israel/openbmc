@@ -9,7 +9,6 @@ PV = "0.1+git${SRCPV}"
 
 SRC_URI = "git://github.com/openbmc/libpeci;branch=master;protocol=https"
 
-S = "${WORKDIR}/git"
 SYSTEMD_SERVICE:${PN} += "${@bb.utils.contains('PACKAGECONFIG', 'dbus-raw-peci', 'com.intel.peci.service', '', d)}"
 
 inherit meson pkgconfig systemd

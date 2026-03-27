@@ -199,7 +199,11 @@ gbmc_br_gw_src_update() {
       fi
     done
     (( new_len >= 16 )) && continue
-    if [[ "$new_src" == "$primary_ip" ]]; then
+    local rt_metric=4096  # Use a default that will be recognized as invalid
+    if [[ "$route" =~ ' metric '([^ ]+) ]]; then
+      rt_metric="${BASH_REMATCH[1]}"
+    fi
+    if (( rt_metric <= 1536 )) && [[ "$new_src" == "$primary_ip" ]]; then
       # Add primary src ip for the GW
       gbmc_br_config_primary_ip "$route src $new_src" "replace"
     fi

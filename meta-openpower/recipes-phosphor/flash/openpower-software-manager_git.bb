@@ -63,8 +63,6 @@ RDEPENDS:${PN} += " \
 
 FILES:${PN} += "${datadir}/dbus-1/system.d/org.open_power.Software.Host.Updater.conf"
 
-S = "${WORKDIR}/git"
-
 SRC_URI = "git://github.com/openbmc/openpower-pnor-code-mgmt;branch=master;protocol=https"
 
 SRCREV = "c83875a18710300055b7fd89cd4aa741a3590488"

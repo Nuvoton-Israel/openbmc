@@ -8,15 +8,13 @@
 LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=e3fc50a88d0a364313df4b21ef20c29e"
 DEPENDS:prepend = "nodejs-native "
-SRCREV = "e5b9cca7a85b49ae95d629765529b872d6a4d57e"
+SRCREV = "5c4f4611b3da83a6f67e2bbd23c5dcb142981685"
 PV = "1.0+git${SRCPV}"
 # This recipe requires online access to build, as it uses NPM for dependency
 # management and resolution.
 PR = "r1"
 
 SRC_URI = "git://github.com/openbmc/webui-vue.git;branch=master;protocol=https"
-
-S = "${WORKDIR}/git"
 
 inherit allarch
 

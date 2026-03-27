@@ -20,8 +20,7 @@ SRC_URI += " \
   file://gbmc-nic-ra@.service \
   file://gbmc-nic-devlab-config.sh.in \
   "
-S = "${WORKDIR}/sources"
-UNPACKDIR = "${S}"
+S = "${UNPACKDIR}"
 
 FILES:${PN} += " \
   ${systemd_unitdir}/network \

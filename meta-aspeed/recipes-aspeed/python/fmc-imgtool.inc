@@ -11,4 +11,3 @@ SRC_URI = "git://github.com/AspeedTech-BMC/fmc_imgtool.git;protocol=https;branch
 SRCREV = "e0ffd8e066c7ddd251be27f007ac290ddfb8415d"
 
 PV = "1.0+git"
-S = "${WORKDIR}/git"

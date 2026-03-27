@@ -13,8 +13,6 @@ DEPENDS += " \
         systemd \
         "
 
-S = "${WORKDIR}/git"
-
 inherit pkgconfig meson
 inherit python3native
 

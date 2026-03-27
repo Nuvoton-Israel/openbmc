@@ -2,7 +2,7 @@ HOMEPAGE = "https://github.com/openbmc/pldm"
 LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=86d3f3a95c324c9479bd8986968f4327"
 SRC_URI = "git://github.com/openbmc/pldm;branch=master;protocol=https"
-SRCREV = "51b05d55c55530fb6c546c94d4f7209822df2862"
+SRCREV = "8bb94e2e642a5326b444d10f9b8e7b36e24b39f9"
 
 SUMMARY = "PLDM Stack"
 DESCRIPTION = "Implementation of the PLDM specifications"
@@ -20,7 +20,6 @@ PR = "r1"
 PACKAGE_BEFORE_PN:append = " pldmtool pldm-libs"
 RRECOMMENDS:${PN}:append = "pldmtool"
 
-S = "${WORKDIR}/git"
 SYSTEMD_SERVICE:${PN} += "pldmd.service"
 SYSTEMD_SERVICE:${PN} += "${@bb.utils.contains('PACKAGECONFIG', 'softoff', 'pldmSoftPowerOff.service', '', d)}"
 

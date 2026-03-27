@@ -1,0 +1,56 @@
+From bcf7da314d4cd1db1708d48c908ab7da797a733b Mon Sep 17 00:00:00 2001
+From: Naveen Saini <naveen.kumar.saini@intel.com>
+Date: Fri, 2 Aug 2019 10:41:26 +0800
+Subject: [PATCH] configure.ac: skip running test program when cross-compiling
+
+Upstream-Status: Inappropriate [OE-Specific]
+
+Signed-off-by: Naveen Saini <naveen.kumar.saini@intel.com>
+---
+ configure.ac | 19 ++-----------------
+ 1 file changed, 2 insertions(+), 17 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index 7d16afb..65cd194 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -152,7 +152,7 @@ AC_CHECK_FUNCS([backtrace_symbols_fd memrchr sysctl sysctlbyname \
+ AC_FUNC_SELECT_ARGTYPES
+ 
+ AC_MSG_CHECKING([for strlcpy])
+-AC_RUN_IFELSE([AC_LANG_PROGRAM([[#include <string.h>]],[[
++AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <string.h>]],[[
+                char a[2];
+                if (strlcpy(a, "yes", 2) != 3)
+                    return 1;]])],
+@@ -168,7 +168,7 @@ AC_RUN_IFELSE([AC_LANG_PROGRAM([[#include <string.h>]],[[
+               ])
+ 
+ AC_MSG_CHECKING([for strlcat])
+-AC_RUN_IFELSE([AC_LANG_PROGRAM([[#include <string.h>]],[[
++AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <string.h>]],[[
+                char a[4] = "no";
+                if (strlcat(a, "yes", 4) != 5)
+                    return 1;]])],
+@@ -183,21 +183,6 @@ AC_RUN_IFELSE([AC_LANG_PROGRAM([[#include <string.h>]],[[
+                            [Define to 1 if you have the strlcat function.])
+               ])
+ 
+-AC_MSG_CHECKING([for C++11 by default])
+-AC_RUN_IFELSE([AC_LANG_PROGRAM([[#include <regex>]],[[
+-               if (__cplusplus < 201103L) return 1;]])],
+-              [AC_MSG_RESULT([yes])],
+-              [AC_MSG_RESULT([no])
+-               AC_MSG_CHECKING([for C++11 when forced])
+-               CXXFLAGS="$CXXFLAGS -std=c++11"
+-               AC_RUN_IFELSE([AC_LANG_PROGRAM([[#include <regex>]],[[
+-                              if (__cplusplus < 201103L) return 1;]])],
+-                             [AC_MSG_RESULT([yes])],
+-                             [AC_MSG_RESULT([no])
+-                              AC_MSG_ERROR([Need C++11. Please set CXXFLAGS.])
+-                             ])
+-              ])
+-
+ PKG_CHECK_MODULES([CORE],[fontconfig xrender xcomposite xdamage xfixes xext x11])
+ AC_SUBST([CORE_CFLAGS])
+ AC_SUBST([CORE_LIBS])

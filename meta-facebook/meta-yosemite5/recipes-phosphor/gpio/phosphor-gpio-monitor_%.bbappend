@@ -1,8 +1,9 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 
-inherit obmc-phosphor-systemd systemd
+inherit systemd
 
-SRC_URI += "file://yosemite5-phosphor-multi-gpio-monitor.json \
+SRC_URI += "file://phosphor-multi-gpio-monitor.json \
+            file://phosphor-multi-gpio-monitor-evt.json \
             file://reset_btn \
             file://reset_btn@.service \
             file://multi-gpios-sys-init \
@@ -24,6 +25,7 @@ SRC_URI += "file://yosemite5-phosphor-multi-gpio-monitor.json \
             file://smc-assert-log@.service \
             file://smc-deassert-log@.service \
             file://smc-event-logger \
+            file://phosphor-multi-gpio-monitor.conf \
             "
 
 RDEPENDS:${PN}:append = " bash"
@@ -48,10 +50,12 @@ SYSTEMD_SERVICE:${PN} += " \
 
 SYSTEMD_AUTO_ENABLE = "enable"
 
-do_install:append:() {
-    install -d ${D}${datadir}/phosphor-gpio-monitor
-    install -m 0644 ${UNPACKDIR}/yosemite5-phosphor-multi-gpio-monitor.json \
-                    ${D}${datadir}/phosphor-gpio-monitor/phosphor-multi-gpio-monitor.json
+do_install:append() {
+    install -d ${D}${datadir}/${PN}
+    install -m 0644 ${UNPACKDIR}/phosphor-multi-gpio-monitor.json \
+                    ${D}${datadir}/${PN}/phosphor-multi-gpio-monitor.json
+    install -m 0644 ${UNPACKDIR}/phosphor-multi-gpio-monitor-evt.json \
+                    ${D}${datadir}/${PN}/phosphor-multi-gpio-monitor-evt.json
 
     install -d ${D}${systemd_system_unitdir}/
     install -m 0644 ${UNPACKDIR}/*.service ${D}${systemd_system_unitdir}/
@@ -65,6 +69,8 @@ do_install:append:() {
     install -m 0755 ${UNPACKDIR}/smc-event-logger ${D}${libexecdir}/${PN}/
     install -m 0755 ${UNPACKDIR}/assert-power-good-drop ${D}${libexecdir}/${PN}/
     install -m 0755 ${UNPACKDIR}/deassert-power-good-drop ${D}${libexecdir}/${PN}/
-}
 
-SYSTEMD_OVERRIDE:${PN}-monitor += "phosphor-multi-gpio-monitor.conf:phosphor-multi-gpio-monitor.service.d/phosphor-multi-gpio-monitor.conf"
+    install -d ${D}${systemd_system_unitdir}/phosphor-multi-gpio-monitor.service.d
+    install -m 0644 ${UNPACKDIR}/phosphor-multi-gpio-monitor.conf \
+        ${D}${systemd_system_unitdir}/phosphor-multi-gpio-monitor.service.d/phosphor-multi-gpio-monitor.conf
+}
