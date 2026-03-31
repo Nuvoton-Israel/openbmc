@@ -25,8 +25,8 @@ PACKAGECONFIG:append = " \
     ${@entity_enabled(d, ' monitor-em', ' monitor')} \
     "
 
-PSU_MONITOR_TMPL = "${@entity_enabled(d, 'power-supply-monitor-em@.service', 'power-supply-monitor@.service')}"
-SYSTEMD_SERVICE:${PN}-monitor-em = "${@bb.utils.contains('PACKAGECONFIG', 'monitor-em', '${PSU_MONITOR_TMPL}', '', d)}"
+PSU_MONITOR_TMPL = "${@entity_enabled(d, 'power-supply-monitor-em@{0}.service', 'power-supply-monitor@{0}.service')}"
+SYSTEMD_SERVICE:${PN}-monitor-em = "${@bb.utils.contains('PACKAGECONFIG', 'monitor-em', compose_list(d, 'PSU_MONITOR_TMPL', 'OBMC_POWER_SUPPLY_INSTANCES'), '', d)}"
 
 PSU_MONITOR_ENV_FMT = " \
     ${@entity_enabled(d, '', 'obmc/power-supply-monitor/power-supply-monitor-{0}.conf')} \
@@ -42,6 +42,8 @@ FILES:${PN}-monitor = " \
     "
 FILES:${PN}-monitor-em = " \
     ${@entity_enabled(d, '${bindir}/psu-monitor', '')} \
+    ${systemd_system_unitdir}/power-supply-monitor-em@.service \
+    ${systemd_system_unitdir}/power-supply-monitor@.service \
     "
 
 is_entity = "${@entity_enabled(d, 'yes', '')}"

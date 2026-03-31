@@ -21,7 +21,7 @@ MCTP over USB enumeration on Alon8 via this + [2].
 Change-Id: I2a2c30605b2738f64d30b3f3efcdefdece8e5652
 Signed-off-by: Saptarsi Saha <saptarsis@nvidia.com>
 Signed-off-by: Deepak Kodihalli <deepak.kodihalli.83@gmail.com>
-Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+Upstream-Status: Submitted [https://gerrit.openbmc.org/c/openbmc/dbus-sensors/+/80452]
 ---
  src/mctp/MCTPEndpoint.cpp    | 160 +++++++++++++++++++++++++++++++++++
  src/mctp/MCTPEndpoint.hpp    |  28 ++++++

@@ -22,8 +22,9 @@ SRCREV = "12fed94b53f6fa0fe1c96bee264c7e363f2ed7d8"
 
 
 SYSTEMD_PACKAGES = "${PN}"
-SYSTEMD_SERVICE:${PN} = "mcu-update.service mcu-version@.service"
+SYSTEMD_SERVICE:${PN} = "mcu-update.service"
 SYSTEMD_SERVICE:${PN} += "mcu-version@13.service"
+FILES:${PN} += "${systemd_system_unitdir}/mcu-version@.service"
 
 do_install:append() {
     install -d ${D}${bindir}
