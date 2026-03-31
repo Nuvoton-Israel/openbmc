@@ -28,7 +28,8 @@ class Partition():
         self.align = args.align
         self.disk = args.disk
         self.device = None
-        self.extra_space = args.extra_space
+        self.extra_filesystem_space = args.extra_filesystem_space
+        self.extra_partition_space = args.extra_partition_space
         self.exclude_path = args.exclude_path
         self.include_path = args.include_path
         self.change_directory = args.change_directory
@@ -64,6 +65,58 @@ class Partition():
 
         self.lineno = lineno
         self.source_file = ""
+        self.sector_size = 512
+
+    def _mkdosfs_extraopts(self):
+        """
+        Build mkdosfs extra options ensuring the CLI sector size is applied.
+
+        Generate cmdline options for mkdosfs. A user can supply options
+        they want to see used via a wks file. Check that the user has
+        not supplied an "-S <logical-sector-size>" option, if they
+        have not, we define "-S <logical-sector-size>" option based on
+        the value of self.sector_size.
+        """
+        extraopts = self.mkfs_extraopts
+        for token in extraopts.split():
+            if token == '-S' or (token.startswith('-S') and token[2:].isdigit()):
+                # Nothing to do, the user already supplied a value
+                return extraopts
+
+        # Supply the default based on the partitioning sector_size
+        return extraopts + " -S %d" % (self.sector_size)
+
+    def _mkfs_ext_extraopts(self, base_opts):
+        """
+        Build mkfs.ext* extra options ensuring the CLI sector size is applied.
+
+        Generate cmdline options for mkfs.ext*. Different parts of the
+        code want to provide different default sets of ext* options for
+        mkfs. But the user can provide their own options via the wks
+        file; in which case the user options completely replace the
+        in-code default options. If the user does not specify an option
+        as long as sector-size != 512 we supply an additional
+        "-b <block-size>" argument to align the filesystem with the
+        overall block-size.
+
+        NOTE: the default sector/block size for an ext* filesystem depends on
+        a number of factors and it is generally best to allow the tools to
+        determine the sector/block size heuristically. Therefore only specify
+        the size explicitly when it is not the default. Specifying a sector-size
+        of 512, for example, for an ext4 filesystem will result in:
+            ERROR: mkfs.ext4: invalid block size - 512
+        See the mkfs.ext4 man page for details on the -b option.
+        """
+        extraopts = self.mkfs_extraopts or base_opts
+        for token in extraopts.split():
+            if token == '-b' or (token.startswith('-b') and token[2:].isdigit()):
+                # Nothing to do, the user already supplied a value
+                return extraopts
+
+        if self.sector_size != 512:
+            # Supply the default based on the partitioning sector_size
+            return extraopts + " -b %d" % (self.sector_size)
+        return extraopts
 
     def get_extra_block_count(self, current_blocks):
         """
@@ -91,21 +144,20 @@ class Partition():
     def get_rootfs_size(self, actual_rootfs_size=0):
         """
         Calculate the required size of rootfs taking into consideration
-        --size/--fixed-size flags as well as overhead and extra space, as
-        specified in kickstart file. Raises an error if the
-        `actual_rootfs_size` is larger than fixed-size rootfs.
-
+        --size/--fixed-size and --extra-partition-space flags as well as overhead
+        and extra space, as specified in kickstart file. Raises an error
+        if the `actual_rootfs_size` is larger than fixed-size rootfs.
         """
         if self.fixed_size:
-            rootfs_size = self.fixed_size
+            rootfs_size = self.fixed_size - self.extra_partition_space
             if actual_rootfs_size > rootfs_size:
                 raise WicError("Actual rootfs size (%d kB) is larger than "
                                "allowed size %d kB" %
                                (actual_rootfs_size, rootfs_size))
         else:
             extra_blocks = self.get_extra_block_count(actual_rootfs_size)
-            if extra_blocks < self.extra_space:
-                extra_blocks = self.extra_space
+            if extra_blocks < self.extra_filesystem_space:
+                extra_blocks = self.extra_filesystem_space
 
             rootfs_size = actual_rootfs_size + extra_blocks
             rootfs_size = int(rootfs_size * self.overhead_factor)
@@ -119,10 +171,18 @@ class Partition():
     def disk_size(self):
         """
         Obtain on-disk size of partition taking into consideration
-        --size/--fixed-size options.
+        --size/--fixed-size and --extra-partition-space options.
 
         """
-        return self.fixed_size if self.fixed_size else self.size
+        return self.fixed_size if self.fixed_size else self.size + self.extra_partition_space
+
+    @property
+    def fs_size(self):
+        """
+        Obtain on-disk size of filesystem inside the partition taking into
+        consideration --size/--fixed-size and --extra-partition-space options.
+        """
+        return self.fixed_size - self.extra_partition_space if self.fixed_size else self.size
 
     def prepare(self, creator, cr_workdir, oe_builddir, rootfs_dir,
                 bootimg_dir, kernel_dir, native_sysroot, updated_fstab_path):
@@ -130,6 +190,8 @@ class Partition():
         Prepare content for individual partitions, depending on
         partition command parameters.
         """
+        # capture the sector size requested on the CLI for mkdosfs invocations
+        self.sector_size = getattr(creator, 'sector_size', 512)
         self.updated_fstab_path = updated_fstab_path
         if self.updated_fstab_path and not (self.fstype.startswith("ext") or self.fstype == "msdos"):
             self.update_fstab_in_rootfs = True
@@ -170,7 +232,7 @@ class Partition():
         if self.source not in plugins:
             raise WicError("The '%s' --source specified for %s doesn't exist.\n\t"
                            "See 'wic list source-plugins' for a list of available"
-                           " --sources.\n\tSee 'wic help source-plugins' for "
+                           " --sources.\n\tSee 'wic help plugins' for "
                            "details on adding a new source plugin." %
                            (self.source, self.mountpoint))
 
@@ -202,10 +264,10 @@ class Partition():
                            "This a bug in source plugin %s and needs to be fixed." %
                            (self.mountpoint, self.source))
 
-        if self.fixed_size and self.size > self.fixed_size:
+        if self.fixed_size and self.size + self.extra_partition_space > self.fixed_size:
             raise WicError("File system image of partition %s is "
-                           "larger (%d kB) than its allowed size %d kB" %
-                           (self.mountpoint, self.size, self.fixed_size))
+                           "larger (%d kB + %d kB extra part space) than its allowed size %d kB" %
+                           (self.mountpoint, self.size, self.extra_partition_space, self.fixed_size))
 
     def prepare_rootfs(self, cr_workdir, oe_builddir, rootfs_dir,
                        native_sysroot, real_rootfs = True, pseudo_dir = None):
@@ -267,7 +329,7 @@ class Partition():
         self.source_file = rootfs
 
         # get the rootfs size in the right units for kickstart (kB)
-        du_cmd = "du -Lbks %s" % rootfs
+        du_cmd = "du --apparent-size -Lks %s" % rootfs
         out = exec_cmd(du_cmd)
         self.size = int(out.split()[0])
 
@@ -285,7 +347,7 @@ class Partition():
         with open(rootfs, 'w') as sparse:
             os.ftruncate(sparse.fileno(), rootfs_size * 1024)
 
-        extraopts = self.mkfs_extraopts or "-F -i 8192"
+        extraopts = self._mkfs_ext_extraopts("-F -i 8192")
 
         # use hash_seed to generate reproducible ext4 images
         (extraopts, pseudo) = self.get_hash_seed_ext4(extraopts, pseudo)
@@ -381,7 +443,7 @@ class Partition():
         """
         Prepare content for a msdos/vfat rootfs partition.
         """
-        du_cmd = "du -bks %s" % rootfs_dir
+        du_cmd = "du --apparent-size -ks %s" % rootfs_dir
         out = exec_cmd(du_cmd)
         blocks = int(out.split()[0])
 
@@ -393,7 +455,7 @@ class Partition():
 
         size_str = ""
 
-        extraopts = self.mkfs_extraopts or '-S 512'
+        extraopts = self._mkdosfs_extraopts()
 
         dosfs_cmd = "mkdosfs %s -i %s %s %s -C %s %d" % \
                     (label_str, self.fsuuid, size_str, extraopts, rootfs,
@@ -440,11 +502,11 @@ class Partition():
         """
         Prepare an empty ext2/3/4 partition.
         """
-        size = self.disk_size
+        size = self.fs_size
         with open(rootfs, 'w') as sparse:
             os.ftruncate(sparse.fileno(), size * 1024)
 
-        extraopts = self.mkfs_extraopts or "-i 8192"
+        extraopts = self._mkfs_ext_extraopts("-i 8192")
 
         # use hash_seed to generate reproducible ext4 images
         (extraopts, pseudo) = self.get_hash_seed_ext4(extraopts, None)
@@ -464,7 +526,7 @@ class Partition():
         """
         Prepare an empty btrfs partition.
         """
-        size = self.disk_size
+        size = self.fs_size
         with open(rootfs, 'w') as sparse:
             os.ftruncate(sparse.fileno(), size * 1024)
 
@@ -482,7 +544,7 @@ class Partition():
         """
         Prepare an empty vfat partition.
         """
-        blocks = self.disk_size
+        blocks = self.fs_size
 
         label_str = "-n boot"
         if self.label:
@@ -490,7 +552,7 @@ class Partition():
 
         size_str = ""
 
-        extraopts = self.mkfs_extraopts or '-S 512'
+        extraopts = self._mkdosfs_extraopts()
 
         dosfs_cmd = "mkdosfs %s -i %s %s %s -C %s %d" % \
                     (label_str, self.fsuuid, extraopts, size_str, rootfs,
@@ -551,4 +613,3 @@ class Partition():
                     logger.warn("%s Inodes (of size %d) are too small." %
                                 (get_err_str(self), size))
                 break
-

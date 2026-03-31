@@ -355,7 +355,7 @@ class IsoImagePlugin(SourcePlugin):
             # Default to 100 blocks of extra space for file system overhead
             esp_extra_blocks = int(source_params.get('esp_extra_blocks', '100'))
 
-            du_cmd = "du -bks %s/EFI" % isodir
+            du_cmd = "du --apparent-size -ks %s/EFI" % isodir
             out = exec_cmd(du_cmd)
             blocks = int(out.split()[0])
             blocks += esp_extra_blocks
@@ -367,8 +367,9 @@ class IsoImagePlugin(SourcePlugin):
 
             esp_label = source_params.get('esp_label', 'EFIimg')
 
-            dosfs_cmd = 'mkfs.vfat -n \'%s\' -S 512 -C %s %d' \
-                        % (esp_label, bootimg, blocks)
+            sector_size = getattr(creator, 'sector_size', 512)
+            dosfs_cmd = "mkfs.vfat -n '%s' -S %d -C %s %d" % \
+                        (esp_label, sector_size, bootimg, blocks)
             exec_native_cmd(dosfs_cmd, native_sysroot)
 
             mmd_cmd = "mmd -i %s ::/EFI" % bootimg
@@ -429,7 +430,7 @@ class IsoImagePlugin(SourcePlugin):
 
         shutil.rmtree(isodir)
 
-        du_cmd = "du -Lbks %s" % iso_img
+        du_cmd = "du --apparent-size -Lks %s" % iso_img
         out = exec_cmd(du_cmd)
         isoimg_size = int(out.split()[0])
 

@@ -10,7 +10,6 @@ DEFAULT_IMAGE_LINGUAS:libc-glibc = "c en-us en-gb"
 IMAGE_LINGUAS ?= "${DEFAULT_IMAGE_LINGUAS}"
 
 ENABLE_BINARY_LOCALE_GENERATION ?= "1"
-LOCALE_UTF8_ONLY ?= "0"
 LOCALE_UTF8_IS_DEFAULT ?= "1"
 LOCALE_UTF8_IS_DEFAULT:class-nativesdk = "0"
 
@@ -63,4 +62,4 @@ KERNEL_IMAGETYPES ??= "${KERNEL_IMAGETYPE}"
 # fetch from the network (and warn you if not). To disable the test set
 # the variable to be empty.
 # Git example url: git://git.yoctoproject.org/yocto-firewall-test;protocol=git;rev=master;branch=master
-CONNECTIVITY_CHECK_URIS ?= "https://yoctoproject.org/connectivity.html"
+CONNECTIVITY_CHECK_URIS ?= "https://www.yoctoproject.org/connectivity.html"

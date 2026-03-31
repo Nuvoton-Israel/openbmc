@@ -73,8 +73,6 @@ require ../conf/image-uefi.conf
 
 INITRAMFS_IMAGE ?= "core-image-minimal-initramfs"
 
-INITRD_ARCHIVE ?= "${INITRAMFS_IMAGE}-${MACHINE}.${INITRAMFS_FSTYPES}"
-
 do_image_complete[depends] += "${INITRAMFS_IMAGE}:do_image_complete"
 
 UKIFY_CMD ?= "ukify build"
@@ -82,6 +80,7 @@ UKI_CONFIG_FILE ?= "${UNPACKDIR}/uki.conf"
 UKI_FILENAME ?= "uki.efi"
 UKI_KERNEL_FILENAME ?= "${KERNEL_IMAGETYPE}"
 UKI_CMDLINE ?= "rootwait root=LABEL=root"
+UKI_DEVICETREE ?= "${KERNEL_DEVICETREE}"
 # secure boot keys and cert, needs sbsign-tools-native (meta-secure-core)
 #UKI_SB_KEY ?= ""
 #UKI_SB_CERT ?= ""
@@ -127,7 +126,8 @@ python do_uki() {
     ukify_cmd += " --stub %s" % (stub)
 
     # initrd
-    initramfs_image = "%s" % (d.getVar('INITRD_ARCHIVE'))
+    uki_fstype = d.getVar("INITRAMFS_FSTYPES").split()[0]
+    initramfs_image = "%s-%s.%s" % (d.getVar('INITRAMFS_IMAGE'), d.getVar('MACHINE'), uki_fstype)
     ukify_cmd += " --initrd=%s" % (os.path.join(deploy_dir_image, initramfs_image))
 
     # kernel
@@ -150,9 +150,12 @@ python do_uki() {
         ukify_cmd += " --cmdline='%s'" % (cmdline)
 
     # dtb
-    if d.getVar('KERNEL_DEVICETREE'):
-        for dtb in d.getVar('KERNEL_DEVICETREE').split():
-            dtb_path = "%s/%s" % (deploy_dir_image, dtb)
+    uki_devicetree = d.getVar('UKI_DEVICETREE')
+    if uki_devicetree:
+        for dtb in uki_devicetree.split():
+            # DTBs are without sub-directories in deploy_dir
+            dtb_name = os.path.basename(dtb)
+            dtb_path = "%s/%s" % (deploy_dir_image, dtb_name)
             if not os.path.exists(dtb_path):
                 bb.fatal(f"ERROR: cannot find {dtb_path}.")
             ukify_cmd += " --devicetree %s" % (dtb_path)

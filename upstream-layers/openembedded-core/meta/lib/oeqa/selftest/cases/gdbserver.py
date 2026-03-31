@@ -7,6 +7,7 @@ import os
 import time
 import tempfile
 import shutil
+import tarfile
 import concurrent.futures
 
 from oeqa.selftest.case import OESelftestTestCase
@@ -19,6 +20,7 @@ class GdbServerTest(OESelftestTestCase):
 
         features = """
 IMAGE_GEN_DEBUGFS = "1"
+IMAGE_FSTYPES += "tar.bz2"
 IMAGE_FSTYPES_DEBUGFS = "tar.bz2"
 CORE_IMAGE_EXTRA_INSTALL = "gdbserver"
         """
@@ -40,7 +42,8 @@ CORE_IMAGE_EXTRA_INSTALL = "gdbserver"
             filename = os.path.join(bb_vars['DEPLOY_DIR_IMAGE'], "%s-dbg.tar.bz2" % bb_vars['IMAGE_LINK_NAME'])
             shutil.unpack_archive(filename, debugfs)
             filename = os.path.join(bb_vars['DEPLOY_DIR_IMAGE'], "%s.tar.bz2" % bb_vars['IMAGE_LINK_NAME'])
-            shutil.unpack_archive(filename, debugfs)
+            with tarfile.open(filename) as tar:
+                tar.extract("./bin/kmod", path=debugfs)
 
             with runqemu("core-image-minimal", runqemuparams="nographic") as qemu:
                 status, output = qemu.run_serial("kmod --help")

@@ -2,7 +2,7 @@ SUMMARY = "Inspect and manipulate eBPF programs and maps"
 DESCRIPTION = "bpftool is a kernel tool for inspection and simple manipulation \
 of eBPF programs and maps."
 LICENSE = "GPL-2.0-only"
-DEPENDS = "binutils elfutils elfutils-native"
+DEPENDS = "binutils elfutils elfutils-native openssl"
 PROVIDES = "virtual/bpftool"
 
 inherit bash-completion kernelsrc kernel-arch
@@ -27,7 +27,6 @@ SECURITY_CFLAGS = ""
 do_configure[depends] += "virtual/kernel:do_shared_workdir"
 
 COMPATIBLE_HOST = "(x86_64|aarch64|riscv64).*-linux"
-COMPATIBLE_HOST:libc-musl = 'null'
 
 do_compile() {
     oe_runmake
@@ -47,4 +46,4 @@ B = "${WORKDIR}/${BPN}-${PV}"
 
 FILES:${PN} += "${exec_prefix}/sbin/*"
 
-BBCLASSEXTEND = "native nativesdk"
+BBCLASSEXTEND = "nativesdk"

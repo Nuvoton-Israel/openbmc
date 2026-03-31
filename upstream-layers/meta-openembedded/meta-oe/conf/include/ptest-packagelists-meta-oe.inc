@@ -8,21 +8,32 @@
 # ptests which take less than ~30s each
 PTESTS_FAST_META_OE = "\
     asio \
+    audiofile \
+    botan \
+    cjson \
+    cli11 \
     cmocka \
+    conserver \
     cunit \
+    ${@bb.utils.contains('DISTRO_FEATURES', 'systemd', 'dbus-broker', '', d)} \
     duktape \
+    exiv2 \
+    freerdp3 \
     fuse3 \
     function2 \
     fwupd \
     gcab \
+    imagemagick \
     jemalloc \
     jq \
     leveldb \
     libcereal \
+    libdbi-perl \
     libgpiod \
     libjcat \
     libio-pty-perl \
     libmanette \
+    libplist \
     librelp \
     libssh \
     libteam \
@@ -31,6 +42,7 @@ PTESTS_FAST_META_OE = "\
     libxml++-5.0 \
     libyang \
     lmdb \
+    mbedtls \
     microsoft-gsl \
     minicoredumper \
     minizip-ng \
@@ -40,28 +52,32 @@ PTESTS_FAST_META_OE = "\
     onig \
     oprofile \
     pegtl \
-    protobuf \
     pv \
     sdbus-c++ \
     tomlplusplus \
+    uriparser \
+    utf8proc \
     uthash \
-    xmlsec1 \
+    ${@bb.utils.contains('DISTRO_FEATURES', 'pam', 'xrdp', '', d)} \
     zeromq \
-    cjson \
 "
 PTESTS_FAST_META_OE:append:x86 = " mcelog"
 PTESTS_FAST_META_OE:append:x86-64 = " mcelog"
 
 PTESTS_FAST_META_OE:remove:libc-musl = "jemalloc minicoredumper oprofile"
 PTESTS_FAST_META_OE:remove:riscv64 = "nodejs oprofile"
-PTESTS_FAST_META_OE:remove:riscv32 = "nodejs oprofile"
+# botan needs go
+PTESTS_FAST_META_OE:remove:riscv32 = "botan nodejs oprofile"
 
 PTESTS_SLOW_META_OE = "\
     c-ares \
+    ${@bb.utils.contains('DISTRO_FEATURES', 'x11', 'freerdp', '', d)} \
     fftw \
     libusb-compat \
-    rocksdb \
+    mariadb \
+    postgresql \
     re2 \
+    rocksdb \
 "
 PTESTS_SLOW_META_OE:append:x86 = " kernel-selftest"
 PTESTS_SLOW_META_OE:append:x86-64 = " kernel-selftest"
@@ -69,8 +85,6 @@ PTESTS_SLOW_META_OE:remove:libc-musl = "kernel-selftest"
 
 PTESTS_PROBLEMS_META_OE = "\
     keyutils \
-    libdbi-perl \
-    mariadb \
     ostree \
     poco \
     psqlodbc \

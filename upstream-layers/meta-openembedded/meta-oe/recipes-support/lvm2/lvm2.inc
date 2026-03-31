@@ -7,7 +7,7 @@ LIC_FILES_CHKSUM = "file://COPYING;md5=12713b4d9386533feeb07d6e4831765a \
 
 DEPENDS += "libaio"
 
-SRC_URI = "git://sourceware.org/git/lvm2.git;branch=main \
+SRC_URI = "git://sourceware.org/git/lvm2.git;branch=main;tag=${PV_TAG} \
            file://lvm.conf \
            file://0001-implement-libc-specific-reopen_stream.patch \
            file://0004-tweak-MODPROBE_CMD-for-cross-compile.patch \
@@ -18,8 +18,9 @@ SRC_URI = "git://sourceware.org/git/lvm2.git;branch=main \
            file://0001-include-libgen.h-for-basename.patch \
            "
 
-SRCREV = "0e01a5d3ae1100a6641772ab295e0185d8d6a6b0"
-PV = "2.03.33"
+SRCREV = "6c5b6cee9f21908bdaff830c210222cc7e08f1ab"
+PV = "2.03.39"
+PV_TAG = "v${@d.getVar('PV').replace('.', '_')}"
 
 UPSTREAM_CHECK_GITTAGREGEX = "v(?P<pver>\d+(\_\d+)+)"
 

@@ -15,17 +15,18 @@ SRC_URI = "https://archive.mariadb.org/${BP}/source/${BP}.tar.gz \
            file://fix-arm-atomic.patch \
            file://0001-Fix-library-LZ4-lookup.patch \
            file://0001-innobase-Define-__NR_futex-if-it-does-not-exist.patch \
-           file://0001-aio_linux-Check-if-syscall-exists-before-using-it.patch \
+           file://0001-aio_libaio-Check-if-syscall-exists-before-using-it.patch \
            file://ssize_t.patch \
            file://sys_futex.patch \
            file://cross-compiling.patch \
            file://0001-sql-CMakeLists.txt-fix-gen_lex_hash-not-found.patch \
            file://lfs64.patch \
            file://0001-Add-missing-includes-cstdint-and-cstdio.patch \
-           file://0001-Ensure-compatibility-with-ARMv9-by-updating-.arch-di.patch \
            file://riscv32.patch \
+           file://0001-support-reproducible-builds.patch \
+           file://0001-storage-mroonga-CMakeLists.txt-fix-reproducible-buil.patch \
           "
-SRC_URI[sha256sum] = "1b26c0bb2d025dbfac3b9852d2b7eafda56a171b67ac2e27831ec0414fb7df07"
+SRC_URI[sha256sum] = "14783ddc5edd966ff05aa0efd5ed6d3d369ed5b9e4080a448f00f87a9f0a4a6b"
 
 UPSTREAM_CHECK_URI = "https://github.com/MariaDB/server/tags"
 

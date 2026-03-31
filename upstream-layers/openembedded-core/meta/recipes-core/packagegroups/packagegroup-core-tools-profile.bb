@@ -30,12 +30,13 @@ SYSTEMTAP = "systemtap"
 SYSTEMTAP:libc-musl = ""
 SYSTEMTAP:nios2 = ""
 SYSTEMTAP:riscv32 = ""
+SYSTEMTAP:loongarch64 = ""
 
-LTTNGTOOLS = "lttng-tools"
+LTTNGTOOLS = "lttng-tools lttng-modules"
 LTTNGTOOLS:arc = ""
 LTTNGTOOLS:riscv32 = ""
+LTTNGTOOLS:riscv64 = "lttng-tools"
 
-BABELTRACE = "babeltrace"
 BABELTRACE2 = "babeltrace2"
 
 # valgrind does not work on the following configurations/architectures
@@ -59,7 +60,6 @@ VALGRIND:loongarch64 = ""
 RDEPENDS:${PN} = "\
     ${PROFILETOOLS} \
     ${LTTNGTOOLS} \
-    ${BABELTRACE} \
     ${BABELTRACE2} \
     ${SYSTEMTAP} \
     ${VALGRIND} \

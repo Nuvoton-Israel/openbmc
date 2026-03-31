@@ -52,6 +52,7 @@ RDEPENDS:packagegroup-meta-oe = "\
 
 RDEPENDS:packagegroup-meta-oe-benchmarks = "\
     bonnie++ \
+    cpupower \
     dbench \
     dhrystone \
     fio \
@@ -67,6 +68,7 @@ RDEPENDS:packagegroup-meta-oe-benchmarks = "\
     nbench-byte \
     phoronix-test-suite \
     qperf \
+    rtla \
     s-suite \
     stressapptest \
     tinymembench \
@@ -212,6 +214,7 @@ RDEPENDS:packagegroup-meta-oe-dbs = "\
     soci \
 "
 RDEPENDS:packagegroup-meta-oe-dbs:remove:libc-musl:powerpc = "rocksdb"
+RDEPENDS:packagegroup-meta-oe-dbs:remove:riscv32 = "influxdb"
 
 RDEPENDS:packagegroup-meta-oe-devtools = "\
     abseil-cpp \
@@ -280,6 +283,8 @@ RDEPENDS:packagegroup-meta-oe-devtools = "\
     protobuf-c \
     pugixml \
     python3-distutils-extra \
+    python3-kconfiglib \
+    python3-pcpp \
     python3-pycups \
     rapidjson \
     serialcheck \
@@ -292,10 +297,9 @@ RDEPENDS:packagegroup-meta-oe-devtools = "\
     xerces-c-samples \
     xmlrpc-c \
     yajl \
-    yasm \
 "
-RDEPENDS:packagegroup-meta-oe-devtools:append:x86 = " cpuid msr-tools pahole"
-RDEPENDS:packagegroup-meta-oe-devtools:append:x86-64 = " cpuid msr-tools pahole pcimem"
+RDEPENDS:packagegroup-meta-oe-devtools:append:x86 = " cpuid pahole"
+RDEPENDS:packagegroup-meta-oe-devtools:append:x86-64 = " cpuid pahole pcimem"
 RDEPENDS:packagegroup-meta-oe-devtools:append:riscv64 = " pcimem"
 RDEPENDS:packagegroup-meta-oe-devtools:append:arm = " pcimem"
 RDEPENDS:packagegroup-meta-oe-devtools:append:aarch64 = " pahole pcimem"
@@ -309,8 +313,8 @@ RDEPENDS:packagegroup-meta-oe-devtools:remove:mips64el = "luajit nodejs"
 RDEPENDS:packagegroup-meta-oe-devtools:remove:powerpc = "android-tools breakpad lshw luajit uftrace"
 RDEPENDS:packagegroup-meta-oe-devtools:remove:powerpc64 = "android-tools breakpad lshw luajit ply uftrace"
 RDEPENDS:packagegroup-meta-oe-devtools:remove:powerpc64le = "android-tools breakpad lshw luajit ply uftrace"
-RDEPENDS:packagegroup-meta-oe-devtools:remove:riscv64 = "breakpad concurrencykit heaptrack lshw ltrace luajit nodejs ply"
-RDEPENDS:packagegroup-meta-oe-devtools:remove:riscv32 = "breakpad concurrencykit heaptrack lshw ltrace luajit nodejs ply uftrace"
+RDEPENDS:packagegroup-meta-oe-devtools:remove:riscv64 = "breakpad concurrencykit lshw ltrace luajit nodejs ply"
+RDEPENDS:packagegroup-meta-oe-devtools:remove:riscv32 = "android-tools breakpad concurrencykit heaptrack lshw ltrace luajit nodejs ply uftrace"
 RDEPENDS:packagegroup-meta-oe-devtools:remove:libc-musl:riscv32 = "php"
 RDEPENDS:packagegroup-meta-oe-devtools:remove:aarch64 = "concurrencykit"
 RDEPENDS:packagegroup-meta-oe-devtools:remove:x86 = "ply"
@@ -348,7 +352,6 @@ RDEPENDS:packagegroup-meta-oe-extended = "\
     jpnevulator \
     libblockdev \
     libcec \
-    libconfig \
     libdivecomputer \
     libfastjson \
     libfile-fnmatch-perl \
@@ -712,7 +715,7 @@ RDEPENDS:packagegroup-meta-oe-support = "\
     c-ares \
     ccid \
     ckermit \
-    clinfo \
+    ${@bb.utils.contains("DISTRO_FEATURES", "opencl", "clinfo", "", d)} \
     cmark \
     ${@bb.utils.contains("DISTRO_FEATURES", "polkit gobject-introspection-data", "colord", "", d)} \
     consolation \
@@ -820,8 +823,8 @@ RDEPENDS:packagegroup-meta-oe-support = "\
     lvm2 \
     mailcap \
     mbuffer \
+    media-types \
     mg \
-    mime-support \
     minini \
     monit \
     mscgen \
@@ -876,6 +879,7 @@ RDEPENDS:packagegroup-meta-oe-support = "\
     ${@bb.utils.contains("DISTRO_FEATURES", "x11", "synergy", "", d)} \
     syslog-ng \
     tbb \
+    thin-provisioning-tools \
     tokyocabinet \
     tree \
     uchardet \

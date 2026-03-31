@@ -14,6 +14,12 @@ from resulttool import regression as regression
 from resulttool import resultutils as resultutils
 from oeqa.selftest.case import OESelftestTestCase
 
+from resulttool.junit import junit_tree, PtestSummary
+import xml.etree.ElementTree as ET
+import logging
+import json
+
+
 class ResultToolTests(OESelftestTestCase):
     base_results_data = {'base_result1': {'configuration': {"TEST_TYPE": "runtime",
                                                             "TESTSERIES": "series1",
@@ -373,3 +379,293 @@ class ResultToolTests(OESelftestTestCase):
             self.logger, "A", "B", base_configuration["a"]["conf_X"], target_configuration["a"]["conf_Y"])
         self.assertDictEqual(
             result, {}, msg=f"ptests should be compared: {resultstring}")
+
+    @property
+    def _get_junit_testresults_1(self):
+        base_testresults = {
+            "a": {
+                "runtime_a-image": {
+                    "configuration": {"TEST_TYPE": "runtime", "MACHINE": "qemux86"},
+                    "result": {
+                        # Image test skipped
+                        "ptest.PtestRunnerTest.test_ptestrunner_expectfail": {
+                            "duration": 0,
+                            "log": "Cannot run ptests with @expectedFailure as ptests are required to pass",
+                            "status": "SKIPPED",
+                        },
+                        # Image test passed
+                        "ptest.PtestRunnerTest.test_ptestrunner_expectsuccess": {
+                            "duration": 7,
+                            "status": "PASSED",
+                        },
+                        # Passed and skipped tests: passed
+                        "ptestresult.package-passed.test_passed": {"status": "PASSED"},
+                        "ptestresult.package-passed.test_skipped": {
+                            "status": "SKIPPED"
+                        },
+                        # All tests are skipped: skipped
+                        "ptestresult.package-skipped.test_skipped": {
+                            "status": "SKIPPED"
+                        },
+                        # One or more errors: error
+                        "ptestresult.package-error.test_error": {"status": "ERROR"},
+                        "ptestresult.package-error.test_failed": {"status": "FAILED"},
+                        "ptestresult.package-error.test_skipped": {"status": "SKIPPED"},
+                        "ptestresult.package-error.test_passed": {"status": "PASSED"},
+                        # No error and one or more failed: failed
+                        "ptestresult.package-failed.test_failed": {"status": "FAILED"},
+                        "ptestresult.package-failed.test_passed": {"status": "PASSED"},
+                        "ptestresult.sections": {
+                            "package-passed": {
+                                "duration": "2",
+                                "log": "PASS: package-passed.test_passed\nPASS: package-passed.test_skipped\n",
+                            },
+                            "package-skipped": {
+                                "duration": "1",
+                                "log": "SKIPPED: package-skipped.test_skipped\n",
+                            },
+                            "package-error": {
+                                "duration": "4",
+                                "log": "ERROR: ERROR: package-error.test_error\nFAILED: package-error.test_failed\nSKIPPED: package-error.test_skipped\nPASSED: package-error.test_passed\n",
+                            },
+                            "package-failed": {
+                                "duration": "2",
+                                "log": "FAILED: package-failed.test_failed\nPASS: package-failed.test_passed\n",
+                            },
+                            # Test with exitcode without ptestresult
+                            "package-error-noresult": {
+                                "duration": "6",
+                                "exitcode": "123",
+                                "log": "ERROR: -bash: testerror: command not found\nERROR: Exit status is 123\n",
+                            },
+                        },
+                    },
+                }
+            }
+        }
+        return base_testresults
+
+    def _dump_junit_tree(self, testresults, tree, files_name="junit"):
+        if self.logger.level <= logging.DEBUG:
+            junit_json_path = files_name + ".json"
+            with open(junit_json_path, "w") as f:
+                json.dump(testresults, f, indent=4)
+            self.logger.debug(
+                "Saved testresults json %s" % os.path.abspath(junit_json_path)
+            )
+            junit_xml_path = files_name + ".xml"
+            tree.write(junit_xml_path, encoding="UTF-8", xml_declaration=True)
+            self.logger.debug(
+                "Saved JUnit XML report as %s" % os.path.abspath(junit_xml_path)
+            )
+
+    def _check_junit_testresults_1(self, testsuites_node):
+        self.assertEqual(testsuites_node.attrib["errors"], "2")
+        self.assertEqual(testsuites_node.attrib["failures"], "1")
+        self.assertEqual(testsuites_node.attrib["skipped"], "2")
+        self.assertEqual(testsuites_node.attrib["tests"], "7")
+        self.assertEqual(testsuites_node.attrib["time"], "22")
+
+        testsuites = testsuites_node.findall("testsuite")
+        self.assertEqual(testsuites[0].attrib["name"], "runtime_a-image")
+        inner_testsuites = testsuites[0].findall("testsuite")
+        self.assertEqual(inner_testsuites[0].attrib["name"], "Image Tests")
+        self.assertEqual(inner_testsuites[1].attrib["name"], "Package Tests")
+
+        ptests_suite = testsuites_node.find(".//testsuite[@name='Package Tests']")
+        testcases = ptests_suite.findall("testcase")
+        self.assertEqual(testcases[0].attrib["name"], "package-passed")
+        self.assertEqual(testcases[1].attrib["name"], "package-skipped")
+        self.assertEqual(testcases[2].attrib["name"], "package-error")
+        self.assertEqual(testcases[3].attrib["name"], "package-failed")
+        self.assertEqual(testcases[4].attrib["name"], "package-error-noresult")
+        self.assertEqual(testcases[0].attrib["time"], "2")
+        self.assertEqual(testcases[1].attrib["time"], "1")
+        self.assertEqual(testcases[2].attrib["time"], "4")
+        self.assertEqual(testcases[3].attrib["time"], "2")
+        self.assertEqual(testcases[4].attrib["time"], "6")
+
+    def test_junit_log_inline(self):
+        testresults = self._get_junit_testresults_1
+        tree, test_logfiles = junit_tree(testresults)
+        self._dump_junit_tree(testresults, tree)
+        testsuites_node = tree.getroot()
+
+        # Verify the common part
+        self._check_junit_testresults_1(testsuites_node)
+
+        # Verify the inlined log files
+        ptests_suite = testsuites_node.find(".//testsuite[@name='Package Tests']")
+        testcases = ptests_suite.findall("testcase")
+        ptestresult_sections = testresults["a"]["runtime_a-image"]["result"][
+            "ptestresult.sections"
+        ]
+        # The inline system-out now includes a PtestSummary section followed by the raw section log.
+        # Build expected summaries and verify both parts are present.
+        pkg_error_summary = PtestSummary()
+        pkg_error_summary.add_status("test_error", "ERROR")
+        pkg_error_summary.add_status("test_failed", "FAILED")
+        pkg_error_summary.add_status("test_skipped", "SKIPPED")
+        pkg_failed_summary = PtestSummary()
+        pkg_failed_summary.add_status("test_failed", "FAILED")
+
+        pkg_error_out = testcases[2].find("system-out").text
+        self.assertIn(pkg_error_summary.log_summary, pkg_error_out)
+        self.assertIn(ptestresult_sections["package-error"]["log"], pkg_error_out)
+
+        pkg_failed_out = testcases[3].find("system-out").text
+        self.assertIn(pkg_failed_summary.log_summary, pkg_failed_out)
+        self.assertIn(ptestresult_sections["package-failed"]["log"], pkg_failed_out)
+
+        # Check the ptest log messages are inline
+        self.assertDictEqual(test_logfiles, {})
+
+    def test_junit_log_attached(self):
+        testresults_1 = self._get_junit_testresults_1
+        test_logdir = "test-logs"
+        tree, test_logfiles = junit_tree(testresults_1, test_logdir)
+        self._dump_junit_tree(testresults_1, tree, "junit_attached")
+        testsuites_node = tree.getroot()
+
+        # Verify the common part
+        self._check_junit_testresults_1(testsuites_node)
+
+        # Verify the attached log files
+        ptests_suite = testsuites_node.find(".//testsuite[@name='Package Tests']")
+        testcases = ptests_suite.findall("testcase")
+        # Passed and skipped testcases do not include system-out attachments
+        self.assertIsNone(testcases[0].find("system-out"))
+        self.assertIsNone(testcases[1].find("system-out"))
+        self.assertIn(
+            "[[ATTACHMENT|test-logs/package-error.log]]",
+            testcases[2].find("system-out").text,
+        )
+        self.assertIn(
+            "[[ATTACHMENT|test-logs/package-failed.log]]",
+            testcases[3].find("system-out").text,
+        )
+        self.assertIn(
+            "[[ATTACHMENT|test-logs/package-error-noresult.log]]",
+            testcases[4].find("system-out").text,
+        )
+
+        self.maxDiff = None
+        self.assertDictEqual(
+            test_logfiles,
+            {
+                "test-logs/package-passed.log": "PASS: package-passed.test_passed\nPASS: package-passed.test_skipped\n",
+                "test-logs/package-skipped.log": "SKIPPED: package-skipped.test_skipped\n",
+                "test-logs/package-error.log": "ERROR: ERROR: package-error.test_error\nFAILED: package-error.test_failed\nSKIPPED: package-error.test_skipped\nPASSED: package-error.test_passed\n",
+                "test-logs/package-failed.log": "FAILED: package-failed.test_failed\nPASS: package-failed.test_passed\n",
+                "test-logs/package-error-noresult.log": "ERROR: -bash: testerror: command not found\nERROR: Exit status is 123\n",
+            },
+        )
+
+    def test_junit_empty_testresults(self):
+        """Test junit_tree with empty testresults (e.g., missing testresults.json)"""
+        testresults = {}
+        tree, test_logfiles = junit_tree(testresults)
+        self._dump_junit_tree(testresults, tree, "junit_empty")
+        testsuites_node = tree.getroot()
+
+        # Should have zero counts for everything
+        self.assertEqual(testsuites_node.attrib["errors"], "0")
+        self.assertEqual(testsuites_node.attrib["failures"], "0")
+        self.assertEqual(testsuites_node.attrib["skipped"], "0")
+        self.assertEqual(testsuites_node.attrib["tests"], "0")
+        self.assertEqual(testsuites_node.attrib["time"], "0")
+
+        # Should have no testsuites
+        testsuites = testsuites_node.findall("testsuite")
+        self.assertEqual(len(testsuites), 0)
+
+        # No log files
+        self.assertDictEqual(test_logfiles, {})
+
+    def test_junit_missing_image_tests(self):
+        """Test junit_tree with only ptest results, no image tests"""
+        testresults = {
+            "a": {
+                "runtime_a-image": {
+                    "configuration": {"TEST_TYPE": "runtime", "MACHINE": "qemux86"},
+                    "result": {
+                        # Only ptest results, no image tests
+                        "ptestresult.package-test.test_example": {"status": "PASSED"},
+                        "ptestresult.sections": {
+                            "package-test": {
+                                "duration": "3",
+                                "log": "PASS: package-test.test_example\n",
+                            }
+                        },
+                    },
+                }
+            }
+        }
+        tree, test_logfiles = junit_tree(testresults)
+        self._dump_junit_tree(testresults, tree, "junit_no_image")
+        testsuites_node = tree.getroot()
+
+        # Should have 1 test total (only ptest)
+        self.assertEqual(testsuites_node.attrib["errors"], "0")
+        self.assertEqual(testsuites_node.attrib["failures"], "0")
+        self.assertEqual(testsuites_node.attrib["skipped"], "0")
+        self.assertEqual(testsuites_node.attrib["tests"], "1")
+        self.assertEqual(testsuites_node.attrib["time"], "3")
+
+        # Should have one main testsuite with 2 sub-testsuites
+        testsuites = testsuites_node.findall("testsuite")
+        self.assertEqual(len(testsuites), 1)
+        inner_testsuites = testsuites[0].findall("testsuite")
+        self.assertEqual(len(inner_testsuites), 2)
+
+        # Image testsuite should be empty
+        image_suite = testsuites_node.find(".//testsuite[@name='Image Tests']")
+        self.assertEqual(image_suite.attrib["tests"], "0")
+        self.assertEqual(image_suite.attrib["time"], "0")
+
+        # Package testsuite should have 1 test
+        package_suite = testsuites_node.find(".//testsuite[@name='Package Tests']")
+        self.assertEqual(package_suite.attrib["tests"], "1")
+        self.assertEqual(package_suite.attrib["time"], "3")
+
+    def test_junit_missing_ptests(self):
+        """Test junit_tree with only image tests, no ptest results"""
+        testresults = {
+            "a": {
+                "runtime_a-image": {
+                    "configuration": {"TEST_TYPE": "runtime", "MACHINE": "qemux86"},
+                    "result": {
+                        # Only image tests, no ptests
+                        "test.ImageTest.test_example": {
+                            "duration": 5,
+                            "status": "PASSED",
+                        },
+                    },
+                }
+            }
+        }
+        tree, test_logfiles = junit_tree(testresults)
+        self._dump_junit_tree(testresults, tree, "junit_no_ptest")
+        testsuites_node = tree.getroot()
+
+        # Should have 1 test total (only image test)
+        self.assertEqual(testsuites_node.attrib["errors"], "0")
+        self.assertEqual(testsuites_node.attrib["failures"], "0")
+        self.assertEqual(testsuites_node.attrib["skipped"], "0")
+        self.assertEqual(testsuites_node.attrib["tests"], "1")
+        self.assertEqual(testsuites_node.attrib["time"], "5")
+
+        # Should have one main testsuite with 1 sub-testsuite (only Image Tests)
+        testsuites = testsuites_node.findall("testsuite")
+        self.assertEqual(len(testsuites), 1)
+        inner_testsuites = testsuites[0].findall("testsuite")
+        self.assertEqual(len(inner_testsuites), 1)
+
+        # Image testsuite should have 1 test
+        image_suite = testsuites_node.find(".//testsuite[@name='Image Tests']")
+        self.assertEqual(image_suite.attrib["tests"], "1")
+        self.assertEqual(image_suite.attrib["time"], "5")
+
+        # Package testsuite should not exist (no ptestresult.sections)
+        package_suite = testsuites_node.find(".//testsuite[@name='Package Tests']")
+        self.assertIsNone(package_suite)

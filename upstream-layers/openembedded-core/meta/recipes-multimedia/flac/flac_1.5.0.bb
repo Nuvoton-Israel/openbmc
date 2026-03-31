@@ -26,11 +26,15 @@ EXTRA_OECONF = "--disable-oggtest \
                 --without-libiconv-prefix \
                 "
 
+# /usr/src/debug/flac/1.5.0/src/libFLAC++/metadata.cpp:913:
+# (.text+0x2032): undefined reference to `__stack_chk_fail_local'
+LDFLAGS:append:libc-musl = " -lssp_nonshared"
+
 PACKAGECONFIG ??= " \
     ogg \
 "
 PACKAGECONFIG[avx] = "--enable-avx,--disable-avx"
-PACKAGECONFIG[ogg] = "--enable-ogg --with-ogg-libraries=${STAGING_LIBDIR} --with-ogg-includes=${STAGING_INCDIR},--disable-ogg,libogg"
+PACKAGECONFIG[ogg] = "--enable-ogg --with-ogg=${STAGING_DIR_HOST},--disable-ogg,libogg"
 
 PACKAGES += "libflac libflac++"
 FILES:${PN} = "${bindir}/*"

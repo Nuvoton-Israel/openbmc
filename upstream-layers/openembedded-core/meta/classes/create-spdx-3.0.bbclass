@@ -50,6 +50,17 @@ SPDX_INCLUDE_TIMESTAMPS[doc] = "Include time stamps in SPDX output. This is \
     useful if you want to know when artifacts were produced and when builds \
     occurred, but will result in non-reproducible SPDX output"
 
+SPDX_INCLUDE_KERNEL_CONFIG ??= "0"
+SPDX_INCLUDE_KERNEL_CONFIG[doc] = "If set to '1', the .config file for the kernel will be parsed \
+and each CONFIG_* value will be included in the Build.build_parameter list as DictionaryEntry \
+items. Set to '0' to disable exporting kernel configuration to improve performance or reduce \
+SPDX document size."
+
+SPDX_INCLUDE_PACKAGECONFIG ??= "0"
+SPDX_INCLUDE_PACKAGECONFIG[doc] = "If set to '1', each PACKAGECONFIG feature is recorded in the \
+build_Build object's build_parameter list as a DictionaryEntry with key \
+'PACKAGECONFIG:<feature>' and value 'enabled' or 'disabled'"
+
 SPDX_IMPORTS ??= ""
 SPDX_IMPORTS[doc] = "SPDX_IMPORTS is the base variable that describes how to \
     reference external SPDX ids. Each import is defined as a key in this \
@@ -113,6 +124,16 @@ SPDX_ON_BEHALF_OF[doc] = "The base variable name to describe the Agent on who's 
 SPDX_PACKAGE_SUPPLIER[doc] = "The base variable name to describe the Agent who \
     is supplying artifacts produced by the build"
 
+SPDX_IMAGE_SUPPLIER[doc] = "The base variable name to describe the Agent who \
+    is supplying the image SBOM. The supplier will be set on all root elements \
+    of the image SBOM using the suppliedBy property. If not set, no supplier \
+    information will be added to the image SBOM."
+
+SPDX_SDK_SUPPLIER[doc] = "The base variable name to describe the Agent who \
+    is supplying the SDK SBOM. The supplier will be set on all root elements \
+    of the SDK SBOM using the suppliedBy property. If not set, no supplier \
+    information will be added to the SDK SBOM."
+
 SPDX_PACKAGE_VERSION ??= "${PV}"
 SPDX_PACKAGE_VERSION[doc] = "The version of a package, software_packageVersion \
     in software_Package"
@@ -120,7 +141,27 @@ SPDX_PACKAGE_VERSION[doc] = "The version of a package, software_packageVersion \
 SPDX_PACKAGE_URL ??= ""
 SPDX_PACKAGE_URL[doc] = "Provides a place for the SPDX data creator to record \
 the package URL string (in accordance with the Package URL specification) for \
-a software Package."
+a software Package. DEPRECATED - use SPDX_PACKAGE_URLS instead"
+
+SPDX_PACKAGE_URLS ?= "${SPDX_PACKAGE_URL} ${@oe.purl.get_base_purl(d)}"
+SPDX_PACKAGE_URLS[doc] = "A space separated list of Package URLs (purls) for \
+    the software Package. The first item in this list will be listed as the \
+    packageUrl property of the packages, and all purls (including the first \
+    one) will be listed as external references. The default value is an auto \
+    generated pkg:yocto purl based on the recipe name, version, and layer name. \
+    Override this variable to replace the default, otherwise append or prepend \
+    to add additional purls."
+
+SPDX_RECIPE_SBOM_NAME ?= "${PN}-recipe-sbom"
+SPDX_RECIPE_SBOM_NAME[doc] = "The name of output recipe SBoM when using \
+    create_recipe_sbom"
+
+SPDX_GIT_PURL_MAPPINGS ??= ""
+SPDX_GIT_PURL_MAPPINGS[doc] = "A space separated list of domain:purl_type \
+    mappings to configure PURL generation for Git source downloads. \
+    For example, 'gitlab.example.com:pkg:gitlab' maps repositories hosted \
+    on gitlab.example.com to the pkg:gitlab PURL type. \
+    github.com is always mapped to pkg:github by default."
 
 IMAGE_CLASSES:append = " create-spdx-image-3.0"
 SDK_CLASSES += "create-spdx-sdk-3.0"
@@ -133,16 +174,13 @@ oe.spdx30_tasks.collect_dep_objsets[vardepsexclude] = "SPDX_MULTILIB_SSTATE_ARCH
 # SPDX library code makes heavy use of classes, which bitbake cannot easily
 # parse out dependencies. As such, the library code files that make use of
 # classes are explicitly added as file checksum dependencies.
-SPDX3_LIB_DEP_FILES = "\
+SPDX3_DEP_FILES = "\
     ${COREBASE}/meta/lib/oe/sbom30.py:True \
-    ${COREBASE}/meta/lib/oe/spdx30.py:True \
+    ${COREBASE}/meta/lib/oe/spdx30/model.py:True \
+    ${SPDX_LICENSES}:True \
     "
 
-python do_create_spdx() {
-    import oe.spdx30_tasks
-    oe.spdx30_tasks.create_spdx(d)
-}
-do_create_spdx[vardeps] += "\
+SPDX3_VAR_DEPS = "\
     SPDX_INCLUDE_BITBAKE_PARENT_BUILD \
     SPDX_PACKAGE_ADDITIONAL_PURPOSE \
     SPDX_PROFILES \
@@ -150,8 +188,33 @@ do_create_spdx[vardeps] += "\
     SPDX_UUID_NAMESPACE \
     "
 
+python do_create_recipe_spdx() {
+    import oe.spdx30_tasks
+    oe.spdx30_tasks.create_recipe_spdx(d)
+}
+addtask do_create_recipe_spdx
+
+SSTATETASKS += "do_create_recipe_spdx"
+do_create_recipe_spdx[sstate-inputdirs] = "${SPDXRECIPEDEPLOY}"
+do_create_recipe_spdx[sstate-outputdirs] = "${DEPLOY_DIR_SPDX}"
+do_create_recipe_spdx[file-checksums] += "${SPDX3_DEP_FILES}"
+do_create_recipe_spdx[cleandirs] = "${SPDXRECIPEDEPLOY}"
+do_create_recipe_spdx[deptask] += "do_create_recipe_spdx"
+do_create_recipe_spdx[vardeps] += "${SPDX3_VAR_DEPS}"
+
+python do_create_recipe_spdx_setscene () {
+    sstate_setscene(d)
+}
+addtask do_create_recipe_spdx_setscene
+
+python do_create_spdx() {
+    import oe.spdx30_tasks
+    oe.spdx30_tasks.create_spdx(d)
+}
 addtask do_create_spdx after \
-    do_collect_spdx_deps \
+    do_unpack \
+    do_patch \
+    do_create_recipe_spdx \
     do_deploy_source_date_epoch \
     do_populate_sysroot do_package do_packagedata \
     before do_populate_sdk do_populate_sdk_ext do_build do_rm_work
@@ -159,19 +222,20 @@ addtask do_create_spdx after \
 SSTATETASKS += "do_create_spdx"
 do_create_spdx[sstate-inputdirs] = "${SPDXDEPLOY}"
 do_create_spdx[sstate-outputdirs] = "${DEPLOY_DIR_SPDX}"
-do_create_spdx[file-checksums] += "${SPDX3_LIB_DEP_FILES}"
-
-python do_create_spdx_setscene () {
-    sstate_setscene(d)
-}
-addtask do_create_spdx_setscene
-
+do_create_spdx[file-checksums] += "${SPDX3_DEP_FILES}"
+do_create_spdx[deptask] += "do_create_spdx"
 do_create_spdx[dirs] = "${SPDXWORK}"
 do_create_spdx[cleandirs] = "${SPDXDEPLOY} ${SPDXWORK}"
 do_create_spdx[depends] += " \
     ${PATCHDEPENDENCY} \
     ${@create_spdx_source_deps(d)} \
 "
+do_create_spdx[vardeps] += "${SPDX3_VAR_DEPS}"
+
+python do_create_spdx_setscene () {
+    sstate_setscene(d)
+}
+addtask do_create_spdx_setscene
 
 python do_create_package_spdx() {
     import oe.spdx30_tasks
@@ -183,16 +247,39 @@ addtask do_create_package_spdx after do_create_spdx before do_build do_rm_work
 SSTATETASKS += "do_create_package_spdx"
 do_create_package_spdx[sstate-inputdirs] = "${SPDXRUNTIMEDEPLOY}"
 do_create_package_spdx[sstate-outputdirs] = "${DEPLOY_DIR_SPDX}"
-do_create_package_spdx[file-checksums] += "${SPDX3_LIB_DEP_FILES}"
+do_create_package_spdx[file-checksums] += "${SPDX3_DEP_FILES}"
+do_create_package_spdx[dirs] = "${SPDXRUNTIMEDEPLOY}"
+do_create_package_spdx[cleandirs] = "${SPDXRUNTIMEDEPLOY}"
+do_create_package_spdx[deptask] = "do_create_spdx"
+do_create_package_spdx[rdeptask] = "do_create_spdx"
+do_create_package_spdx[vardeps] += "${SPDX3_VAR_DEPS}"
 
 python do_create_package_spdx_setscene () {
     sstate_setscene(d)
 }
 addtask do_create_package_spdx_setscene
 
-do_create_package_spdx[dirs] = "${SPDXRUNTIMEDEPLOY}"
-do_create_package_spdx[cleandirs] = "${SPDXRUNTIMEDEPLOY}"
-do_create_package_spdx[rdeptask] = "do_create_spdx"
+addtask do_create_recipe_sbom after create_recipe_spdx
+python do_create_recipe_sbom() {
+    import oe.spdx30_tasks
+    from pathlib import Path
+    deploydir = Path(d.getVar("SPDXRECIPESBOMDEPLOY"))
+    oe.spdx30_tasks.create_recipe_sbom(d, deploydir)
+}
+
+SSTATETASKS += "do_create_recipe_sbom"
+do_create_recipe_sbom[recrdeptask] = "do_create_recipe_spdx"
+do_create_recipe_sbom[nostamp] = "1"
+do_create_recipe_sbom[sstate-inputdirs] = "${SPDXRECIPESBOMDEPLOY}"
+do_create_recipe_sbom[sstate-outputdirs] = "${DEPLOY_DIR_IMAGE}"
+do_create_recipe_sbom[file-checksums] += "${SPDX3_DEP_FILES}"
+do_create_recipe_sbom[cleandirs] = "${SPDXRECIPESBOMDEPLOY}"
+do_create_recipe_sbom[vardeps] += "${SPDX3_VAR_DEPS}"
+
+python do_create_recipe_sbom_setscene () {
+    sstate_setscene(d)
+}
+addtask do_create_recipe_sbom_setscene
 
 python spdx30_build_started_handler () {
     import oe.spdx30_tasks

@@ -45,7 +45,7 @@ def getOutput(o):
 class QemuRunner:
 
     def __init__(self, machine, rootfs, display, tmpdir, deploy_dir_image, logfile, boottime, dump_dir, use_kvm, logger, use_slirp=False,
-     serial_ports=2, boot_patterns = defaultdict(str), use_ovmf=False, workdir=None, tmpfsdir=None):
+     serial_ports=2, boot_patterns = defaultdict(str), use_ovmf=False, workdir=None, tmpfsdir=None, native_sysroot=None):
 
         # Popen object for runqemu
         self.runqemu = None
@@ -76,6 +76,8 @@ class QemuRunner:
         self.msg = ''
         self.boot_patterns = boot_patterns
         self.tmpfsdir = tmpfsdir
+        self.native_sysroot = native_sysroot
+        self.kernel_messages_disabled = False
 
         self.runqemutime = 300
         if not workdir:
@@ -129,7 +131,7 @@ class QemuRunner:
 
     def log(self, msg, extension=""):
         if self.logfile:
-            with codecs.open(self.logfile + extension, "ab") as f:
+            with open(file=self.logfile + extension, mode="ab") as f:
                 f.write(msg)
         self.msg += self.decode_qemulog(msg)
 
@@ -148,7 +150,7 @@ class QemuRunner:
             # interact badly with screensavers.
             env["QEMU_DONT_GRAB"] = "1"
         if not os.path.exists(self.rootfs):
-            self.logger.error("Invalid rootfs %s" % self.rootfs)
+            self.logger.error("rootfs %s does not exist" % self.rootfs)
             return False
         if not os.path.exists(self.tmpdir):
             self.logger.error("Invalid TMPDIR path %s" % self.tmpdir)
@@ -171,8 +173,6 @@ class QemuRunner:
                 launch_cmd += ' kvm'
             else:
                 self.logger.debug('Not using kvm for runqemu')
-            if not self.display:
-                launch_cmd += ' nographic'
             if self.use_slirp:
                 launch_cmd += ' slirp'
             if self.use_ovmf:
@@ -186,17 +186,16 @@ class QemuRunner:
         return self.launch(launch_cmd, qemuparams=qemuparams, get_ip=get_ip, extra_bootparams=extra_bootparams, env=env)
 
     def launch(self, launch_cmd, get_ip = True, qemuparams = None, extra_bootparams = None, env = None):
-        # use logfile to determine the recipe-sysroot-native path and
-        # then add in the site-packages path components and add that
-        # to the python sys.path so the qmp module can be found.
-        python_path = os.path.dirname(os.path.dirname(self.logfile))
-        python_path += "/recipe-sysroot-native/usr/lib/qemu-python"
+        if not self.native_sysroot:
+            self.logger.error("qemurunner: native_sysroot not provided; cannot locate qmp bindings")
+            return False
+        python_path = os.path.join(self.native_sysroot, "usr/lib/qemu-python")
         sys.path.append(python_path)
         importlib.invalidate_caches()
         try:
             qmp = importlib.import_module("qmp")
         except Exception as e:
-            self.logger.error("qemurunner: qmp module missing, please ensure it's installed in %s (%s)" % (python_path, str(e)))
+            self.logger.error("qemurunner: qmp module missing in %s (%s)" % (python_path, str(e)))
             return False
         # Path relative to tmpdir used as cwd for qemu below to avoid unix socket path length issues
         qmp_file = "." + next(tempfile._get_candidate_names())
@@ -660,6 +659,11 @@ class QemuRunner:
 
     def run_serial(self, command, raw=False, timeout=60):
         # Returns (status, output) where status is 1 on success and 0 on error
+
+        # Disable kernel messages before running the first non-raw command
+        if not raw and not self.kernel_messages_disabled:
+            self.kernel_messages_disabled = True
+            self.run_serial("dmesg -n 1\n", raw=True)
 
         # We assume target system have echo to get command status
         if not raw:

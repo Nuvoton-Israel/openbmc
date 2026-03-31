@@ -4,72 +4,11 @@
 # SPDX-License-Identifier: MIT
 #
 
-import json
-import os
 import textwrap
 import hashlib
-from pathlib import Path
 from oeqa.selftest.case import OESelftestTestCase
-from oeqa.utils.commands import bitbake, get_bb_var, get_bb_vars, runCmd
+from oeqa.utils.commands import bitbake, get_bb_var, get_bb_vars
 import oe.spdx30
-
-
-class SPDX22Check(OESelftestTestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        bitbake("python3-spdx-tools-native")
-        bitbake("-c addto_recipe_sysroot python3-spdx-tools-native")
-
-    def check_recipe_spdx(self, high_level_dir, spdx_file, target_name):
-        config = textwrap.dedent(
-            """\
-            INHERIT:remove = "create-spdx"
-            INHERIT += "create-spdx-2.2"
-            """
-        )
-        self.write_config(config)
-
-        deploy_dir = get_bb_var("DEPLOY_DIR")
-        arch_dir = get_bb_var("PACKAGE_ARCH", target_name)
-        spdx_version = get_bb_var("SPDX_VERSION")
-        # qemux86-64 creates the directory qemux86_64
-        #arch_dir = arch_var.replace("-", "_")
-
-        full_file_path = os.path.join(
-            deploy_dir, "spdx", spdx_version, arch_dir, high_level_dir, spdx_file
-        )
-
-        try:
-            os.remove(full_file_path)
-        except FileNotFoundError:
-            pass
-
-        bitbake("%s -c create_spdx" % target_name)
-
-        def check_spdx_json(filename):
-            with open(filename) as f:
-                report = json.load(f)
-                self.assertNotEqual(report, None)
-                self.assertNotEqual(report["SPDXID"], None)
-
-            python = os.path.join(
-                get_bb_var("STAGING_BINDIR", "python3-spdx-tools-native"),
-                "nativepython3",
-            )
-            validator = os.path.join(
-                get_bb_var("STAGING_BINDIR", "python3-spdx-tools-native"), "pyspdxtools"
-            )
-            result = runCmd("{} {} -i {}".format(python, validator, filename))
-
-        self.assertExists(full_file_path)
-        result = check_spdx_json(full_file_path)
-
-    def test_spdx_base_files(self):
-        self.check_recipe_spdx("packages", "base-files.spdx.json", "base-files")
-
-    def test_spdx_tar(self):
-        self.check_recipe_spdx("packages", "tar.spdx.json", "tar")
 
 
 class SPDX3CheckBase(object):
@@ -89,15 +28,12 @@ class SPDX3CheckBase(object):
         return objset
 
     def check_recipe_spdx(self, target_name, spdx_path, *, task=None, extraconf=""):
-        config = (
-            textwrap.dedent(
-                f"""\
+        config = textwrap.dedent(
+            f"""\
                 INHERIT:remove = "create-spdx"
                 INHERIT += "{self.SPDX_CLASS}"
                 """
-            )
-            + textwrap.dedent(extraconf)
-        )
+        ) + textwrap.dedent(extraconf)
 
         self.write_config(config)
 
@@ -146,13 +82,27 @@ class SPDX30Check(SPDX3CheckBase, OESelftestTestCase):
     def test_base_files(self):
         self.check_recipe_spdx(
             "base-files",
+            "{DEPLOY_DIR_SPDX}/{MACHINE_ARCH}/static/static-base-files.spdx.json",
+            task="create_recipe_spdx",
+        )
+        self.check_recipe_spdx(
+            "base-files",
             "{DEPLOY_DIR_SPDX}/{MACHINE_ARCH}/packages/package-base-files.spdx.json",
         )
+
+    def test_world_sbom(self):
+        objset = self.check_recipe_spdx(
+            "meta-world-recipe-sbom",
+            "{DEPLOY_DIR_IMAGE}/world-recipe-sbom.spdx.json",
+        )
+
+        # Document should be fully linked
+        self.check_objset_missing_ids(objset)
 
     def test_gcc_include_source(self):
         objset = self.check_recipe_spdx(
             "gcc",
-            "{DEPLOY_DIR_SPDX}/{SSTATE_PKGARCH}/recipes/recipe-gcc.spdx.json",
+            "{DEPLOY_DIR_SPDX}/{SSTATE_PKGARCH}/builds/build-gcc.spdx.json",
             extraconf="""\
                 SPDX_INCLUDE_SOURCES = "1"
                 """,
@@ -165,12 +115,12 @@ class SPDX30Check(SPDX3CheckBase, OESelftestTestCase):
             if software_file.name == filename:
                 found = True
                 self.logger.info(
-                    f"The spdxId of {filename} in recipe-gcc.spdx.json is {software_file.spdxId}"
+                    f"The spdxId of {filename} in build-gcc.spdx.json is {software_file.spdxId}"
                 )
                 break
 
         self.assertTrue(
-            found, f"Not found source file {filename} in recipe-gcc.spdx.json\n"
+            found, f"Not found source file {filename} in build-gcc.spdx.json\n"
         )
 
     def test_core_image_minimal(self):
@@ -286,3 +236,210 @@ class SPDX30Check(SPDX3CheckBase, OESelftestTestCase):
                 break
         else:
             self.assertTrue(False, "Unable to find imported Host SpdxID")
+
+    def test_custom_annotation_vars(self):
+        """
+        Test that SPDX_CUSTOM_ANNOTATION_VARS properly creates annotations
+        without runtime errors. This is a regression test for the bug where
+        new_annotation() was called as a standalone function instead of as
+        a method on build_objset, causing a NameError.
+
+        The test verifies:
+        1. The build completes successfully (no NameError)
+        2. Each configured annotation variable appears exactly once
+        3. The annotation values match the configured variables
+
+        We check for exact equality (not >=) to prevent regressions where
+        one annotation might appear multiple times while another is missing.
+        """
+        ANNOTATION_VAR1 = "TestAnnotation1"
+        ANNOTATION_VAR2 = "TestAnnotation2"
+
+        # This will fail with NameError if new_annotation() is called incorrectly
+        objset = self.check_recipe_spdx(
+            "base-files",
+            "{DEPLOY_DIR_SPDX}/{MACHINE_ARCH}/builds/build-base-files.spdx.json",
+            extraconf=textwrap.dedent(
+                f"""\
+                ANNOTATION1 = "{ANNOTATION_VAR1}"
+                ANNOTATION2 = "{ANNOTATION_VAR2}"
+                SPDX_CUSTOM_ANNOTATION_VARS = "ANNOTATION1 ANNOTATION2"
+                """
+            ),
+        )
+
+        # If we got here, the build succeeded (no NameError)
+        # Now verify the annotations were actually created
+
+        # Find the build element
+        build = None
+        for o in objset.foreach_type(oe.spdx30.build_Build):
+            build = o
+            break
+
+        self.assertIsNotNone(build, "Unable to find Build element")
+
+        # Find annotation objects that reference our build
+        found_annotations = []
+        for obj in objset.objects:  # <-- Remove parentheses
+            if isinstance(obj, oe.spdx30.Annotation):
+                if hasattr(obj, "subject") and build._id == obj.subject._id:
+                    found_annotations.append(obj)
+
+        # Check each annotation separately to ensure exactly one occurrence of each
+        annotation1_count = 0
+        annotation2_count = 0
+
+        for annotation in found_annotations:
+            if hasattr(annotation, "statement"):
+                if f"ANNOTATION1={ANNOTATION_VAR1}" in annotation.statement:
+                    annotation1_count += 1
+                    self.logger.info(f"Found ANNOTATION1: {annotation.statement}")
+                if f"ANNOTATION2={ANNOTATION_VAR2}" in annotation.statement:
+                    annotation2_count += 1
+                    self.logger.info(f"Found ANNOTATION2: {annotation.statement}")
+
+        # Each annotation should appear exactly once
+        self.assertEqual(
+            annotation1_count,
+            1,
+            f"Expected exactly 1 occurrence of ANNOTATION1, found {annotation1_count}",
+        )
+        self.assertEqual(
+            annotation2_count,
+            1,
+            f"Expected exactly 1 occurrence of ANNOTATION2, found {annotation2_count}",
+        )
+
+    def test_kernel_config_spdx(self):
+        kernel_recipe = get_bb_var("PREFERRED_PROVIDER_virtual/kernel")
+        spdx_file = f"build-{kernel_recipe}.spdx.json"
+        spdx_path = f"{{DEPLOY_DIR_SPDX}}/{{SSTATE_PKGARCH}}/builds/{spdx_file}"
+
+        # Make sure kernel is configured first
+        bitbake(f"-c configure {kernel_recipe}")
+
+        objset = self.check_recipe_spdx(
+            kernel_recipe,
+            spdx_path,
+            task="do_create_spdx",
+            extraconf="""\
+                INHERIT += "create-spdx"
+                SPDX_INCLUDE_KERNEL_CONFIG = "1"
+                """,
+        )
+
+        # Check that at least one CONFIG_* entry exists
+        found_kernel_config = False
+        for build_obj in objset.foreach_type(oe.spdx30.build_Build):
+            if getattr(build_obj, "build_buildType", "") == "https://openembedded.org/kernel-configuration":
+                found_kernel_config = True
+                self.assertTrue(
+                    len(getattr(build_obj, "build_parameter", [])) > 0,
+                    "Kernel configuration build_Build has no CONFIG_* entries"
+                )
+                break
+
+        self.assertTrue(found_kernel_config, "Kernel configuration build_Build not found in SPDX output")
+
+    def test_packageconfig_spdx(self):
+        objset = self.check_recipe_spdx(
+            "tar",
+            "{DEPLOY_DIR_SPDX}/{SSTATE_PKGARCH}/builds/build-tar.spdx.json",
+            extraconf="""\
+                SPDX_INCLUDE_PACKAGECONFIG = "1"
+                """,
+        )
+
+        found_entries = []
+        for build_obj in objset.foreach_type(oe.spdx30.build_Build):
+            for param in getattr(build_obj, "build_parameter", []):
+                if param.key.startswith("PACKAGECONFIG:"):
+                    found_entries.append((param.key, param.value))
+
+        self.assertTrue(
+            found_entries,
+            "No PACKAGECONFIG entries found in SPDX output for 'tar'"
+        )
+
+        for key, value in found_entries:
+            self.assertIn(
+                value, ["enabled", "disabled"],
+                f"Unexpected PACKAGECONFIG value '{value}' for {key}"
+            )
+
+    def test_download_location_defensive_handling(self):
+        """Test that download_location handling is defensive.
+
+        Verifies SPDX generation succeeds and external references are
+        properly structured when download_location retrieval works.
+        """
+        objset = self.check_recipe_spdx(
+            "m4",
+            "{DEPLOY_DIR_SPDX}/{SSTATE_PKGARCH}/builds/build-m4.spdx.json",
+        )
+
+        found_external_refs = False
+        for pkg in objset.foreach_type(oe.spdx30.software_Package):
+            if pkg.externalRef:
+                found_external_refs = True
+                for ref in pkg.externalRef:
+                    self.assertIsNotNone(ref.externalRefType)
+                    self.assertIsNotNone(ref.locator)
+                    self.assertGreater(len(ref.locator), 0, "Locator should have at least one entry")
+                    for loc in ref.locator:
+                        self.assertIsInstance(loc, str)
+                break
+
+        self.logger.info(
+            f"External references {'found' if found_external_refs else 'not found'} "
+            f"in SPDX output (defensive handling verified)"
+        )
+
+    def test_version_extraction_patterns(self):
+        """Test that version extraction works for various package formats.
+
+        Verifies that Git source downloads carry extracted versions and that
+        the reported version strings are well-formed.
+        """
+        objset = self.check_recipe_spdx(
+            "opkg-utils",
+            "{DEPLOY_DIR_SPDX}/{SSTATE_PKGARCH}/builds/build-opkg-utils.spdx.json",
+        )
+
+        # Collect all packages with versions
+        packages_with_versions = []
+        for pkg in objset.foreach_type(oe.spdx30.software_Package):
+            if pkg.software_packageVersion:
+                packages_with_versions.append((pkg.name, pkg.software_packageVersion))
+
+        self.assertGreater(
+            len(packages_with_versions), 0,
+            "Should find packages with extracted versions"
+        )
+
+        for name, version in packages_with_versions:
+            self.assertRegex(
+                version,
+                r"^[0-9a-f]{40}$",
+                f"Expected Git source version for {name} to be a full SHA-1",
+            )
+
+        self.logger.info(f"Found {len(packages_with_versions)} packages with versions")
+
+        # Log some examples for debugging
+        for name, version in packages_with_versions[:5]:
+            self.logger.info(f"  {name}: {version}")
+
+        # Verify that versions follow expected patterns
+        for name, version in packages_with_versions:
+            # Version should not be empty
+            self.assertIsNotNone(version)
+            self.assertNotEqual(version, "")
+
+            # Version should contain digits
+            self.assertRegex(
+                version,
+                r'\d',
+                f"Version '{version}' for package '{name}' should contain digits"
+            )
