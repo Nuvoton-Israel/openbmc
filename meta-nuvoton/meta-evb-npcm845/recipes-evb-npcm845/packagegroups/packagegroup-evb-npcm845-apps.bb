@@ -58,4 +58,6 @@ RDEPENDS:${PN}-system = " \
         optee-client \
         optee-test \
         persistent-net-name \
+        libnpcm-jtag \
+        openocd \
         "
