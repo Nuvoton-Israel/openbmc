@@ -9,6 +9,7 @@ SRC_URI += "file://usb_network_acm.sh \
            file://usb_network_acm.service \
            file://00-bmc-usb0-acm.network \
            file://10-bmc-usb-acm.link \
+           file://99-bmc-usb-network.rules \
            "
 
 S = "${UNPACKDIR}"
@@ -25,6 +26,9 @@ do_install() {
 
     install -d ${D}${base_libdir}/systemd/network/
     install -m 0644 ${UNPACKDIR}/10-bmc-usb-acm.link ${D}${base_libdir}/systemd/network
+
+    install -d ${D}${sysconfdir}/udev/rules.d/
+    install -m 0644 ${UNPACKDIR}/99-bmc-usb-network.rules ${D}${sysconfdir}/udev/rules.d
 }
 
 NATIVE_SYSTEMD_SUPPORT = "1"
@@ -32,5 +36,6 @@ SYSTEMD_PACKAGES = "${PN}"
 SYSTEMD_SERVICE:${PN} = "usb_network_acm.service"
 FILES:${PN} += "${sysconfdir}/systemd/network/00-bmc-usb0-acm.network"
 FILES:${PN} += "${base_libdir}/systemd/network/10-bmc-usb-acm.link"
+FILES:${PN} += "${sysconfdir}/udev/rules.d/99-bmc-usb-network.rules"
 
 inherit allarch systemd
