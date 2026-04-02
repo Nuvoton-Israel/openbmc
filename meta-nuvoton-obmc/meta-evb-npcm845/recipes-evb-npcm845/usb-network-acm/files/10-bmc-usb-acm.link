@@ -1,0 +1,11 @@
+# 10-bmc-usb-acm.link
+# Renames the CDC ECM USB gadget interface to a stable name (acm0)
+# by matching the BMC-side MAC address (dev_addr set in usb_network_acm.sh).
+# Processed by systemd-udevd at interface creation time.
+
+[Match]
+MACAddress=02:00:11:22:33:44
+Type=ether
+
+[Link]
+Name=acm0

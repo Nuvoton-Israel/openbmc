@@ -1,0 +1,9 @@
+[Match]
+Name=acm0
+MACAddress=02:00:11:22:33:44
+
+[Network]
+Address=192.168.7.1/24
+LinkLocalAddressing=no
+IPv6AcceptRA=no
+ConfigureWithoutCarrier=yes

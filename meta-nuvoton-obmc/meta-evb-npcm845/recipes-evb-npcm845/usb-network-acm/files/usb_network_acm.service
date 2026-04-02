@@ -1,0 +1,10 @@
+[Unit]
+Description=Enable USB network (CDC ECM) with DHCP for RHEL host
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/usb_network_acm.sh
+
+[Install]
+WantedBy=multi-user.target

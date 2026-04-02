@@ -1,0 +1,11 @@
+# 10-bmc-usb-rndis.link
+# Renames the RNDIS USB gadget interface to a stable name (rndis0)
+# by matching the BMC-side MAC address (dev_addr set in usb_network_rndis.sh).
+# Processed by systemd-udevd at interface creation time.
+
+[Match]
+MACAddress=02:00:11:22:33:45
+Type=ether
+
+[Link]
+Name=rndis0

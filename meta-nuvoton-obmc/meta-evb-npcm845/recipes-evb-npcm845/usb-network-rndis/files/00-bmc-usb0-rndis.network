@@ -1,7 +1,8 @@
 [Match]
-Name=usb0
+Name=rndis0
+MACAddress=02:00:11:22:33:45
 [Address]
-Address=169.254.95.118/16
+Address=192.168.8.1/24
 [Network]
 LinkLocalAddressing=no
 IPv6AcceptRA=no
