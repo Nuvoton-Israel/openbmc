@@ -88,6 +88,7 @@ echo "${UDC_NAME}" > UDC
 
 echo "USB RNDIS gadget started (UDC: ${UDC_NAME})"
 
+(
 # Wait for kernel to create the gadget net interface (usb0, usb1, …).
 # Scan ALL net interfaces by MAC — handles the case where udev .link already
 # renamed usb0 to ${IFACE} before this script checks.
@@ -122,5 +123,6 @@ fi
 
 # IP assignment is handled by systemd-networkd via 00-bmc-usb0-rndis.network
 echo "Interface ${IFACE} ready — IP will be assigned by systemd-networkd"
+) &
 
 exit 0

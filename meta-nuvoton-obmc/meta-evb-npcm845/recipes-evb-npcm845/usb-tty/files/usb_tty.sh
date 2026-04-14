@@ -60,6 +60,7 @@ echo "${UDC_NAME}" > UDC
 
 echo "USB TTY gadget started (UDC: ${UDC_NAME})"
 
+(
 # ── Wait for ttyGS0 to appear ────────────────────────────────────────────────
 RETRY=0
 while [ ${RETRY} -lt 10 ]; do
@@ -79,5 +80,6 @@ fi
 #   /sbin/getty -L 115200 ttyGS0 vt100)
 systemctl start serial-getty@ttyGS0.service
 echo "getty started on ttyGS0"
+) &
 
 exit 0
