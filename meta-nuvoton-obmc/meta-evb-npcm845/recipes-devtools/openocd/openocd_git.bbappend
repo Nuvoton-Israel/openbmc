@@ -10,11 +10,13 @@ SRC_URI:append = " \
     file://0003-svf-suuport-loop-command.patch \
     file://0004-add-support-for-nct6694-flash.patch \
     file://cm4.cfg \
+    file://cm7.cfg \
 "
 
 do_install:append() {
     install -d ${D}${datadir}/openocd/scripts
     install -m 0644 ${UNPACKDIR}/cm4.cfg ${D}${datadir}/openocd/scripts/cm4.cfg
+    install -m 0644 ${UNPACKDIR}/cm7.cfg ${D}${datadir}/openocd/scripts/cm7.cfg
 }
 
 # Override PACKAGECONFIG to only enable linuxgpiod and npcm-jtag
