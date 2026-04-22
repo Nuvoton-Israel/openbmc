@@ -9,14 +9,18 @@ SRC_URI:append = " \
     file://0002-add-npcm-jtag-configure-option.patch \
     file://0003-svf-suuport-loop-command.patch \
     file://0004-add-support-for-nct6694-flash.patch \
+    file://0005-add-support-for-npcm500-flash.patch \
     file://cm4.cfg \
     file://cm7.cfg \
+    file://cm7.cfg \
+    file://npcm500_evb.cfg \
 "
 
 do_install:append() {
     install -d ${D}${datadir}/openocd/scripts
     install -m 0644 ${UNPACKDIR}/cm4.cfg ${D}${datadir}/openocd/scripts/cm4.cfg
     install -m 0644 ${UNPACKDIR}/cm7.cfg ${D}${datadir}/openocd/scripts/cm7.cfg
+    install -m 0644 ${UNPACKDIR}/npcm500_evb.cfg ${D}${datadir}/openocd/scripts/npcm500_evb.cfg
 }
 
 # Override PACKAGECONFIG to only enable linuxgpiod and npcm-jtag
