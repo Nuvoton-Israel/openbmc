@@ -17,3 +17,4 @@ SRC_URI:append = " file://0002-Enable-openbmc-copy-base-file-to-ram-feature.patc
 # FPGA test
 SRC_URI:append = " file://0001-uboot-enable-espim.patch"
 SRC_URI:append = " file://0001-change-espi-master-to-gpio0-26-31-pin-and-disable-i2.patch"
+SRC_URI:append = " file://0001-cmd-espi-support-dual-quad-eSPI_ALERT-feature.patch"

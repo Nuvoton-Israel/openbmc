@@ -1,0 +1,1754 @@
+From ca2c6a1bb4d093b9c176f2eefa72109e8f2b2730 Mon Sep 17 00:00:00 2001
+From: Ban Feng <kcfeng0@nuvoton.com>
+Date: Wed, 8 Apr 2026 14:27:51 +0800
+Subject: [PATCH] cmd: espi: support dual/quad/eSPI_ALERT feature
+
+Upstream-Status: Inappropriate [oe-specific]
+Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
+---
+ cmd/espi.c | 1172 +++++++++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 1067 insertions(+), 105 deletions(-)
+
+diff --git a/cmd/espi.c b/cmd/espi.c
+index 903a840d27f..10618c80450 100644
+--- a/cmd/espi.c
++++ b/cmd/espi.c
+@@ -20,11 +20,13 @@
+  * GPIO Assign Note:
+  * eSPI_CLK and eSPI_IO signals must assign on the same GPIO port.
+  */
+-#define PORT_BASE	0xF0010000	// GPIO0: 0~31
++//#define PORT_BASE	0xF0015000	// GPIO5: 160~191
++#define PORT_BASE	0xF0014000	// GPIO4: 128~159
+ #define PORT_OUT	(PORT_BASE + 0xC)
+ #define PORT_IN		(PORT_BASE + 0x4)
+ #define PORT_POL	(PORT_BASE + 0x8)
+ #define PORT_OES	(PORT_BASE + 0x70)
++#define PORT_OEC	(PORT_BASE + 0x74)
+ #define PORT_IEM	(PORT_BASE + 0x58)
+ #define PORT_EVTYP	(PORT_BASE + 0x28)
+ #define PORT_EVBE	(PORT_BASE + 0x2C)
+@@ -32,12 +34,36 @@
+ #define PORT_EVENS	(PORT_BASE + 0x44)
+ #define PORT_EVENC	(PORT_BASE + 0x48)
+ #define PORT_EVST	(PORT_BASE + 0x4C)
+-#define eSPI_nCS	BIT(26) //26
+-#define eSPI_CLK	BIT(27) //27
+-#define eSPI_IO0	BIT(28) //28
+-#define eSPI_IO1	BIT(29) //29
+-#define eSPI_nRST	BIT(30) //30
+-//#define eSPI_ALERT	BIT(31) //31
++//#define eSPI_nCS	BIT(1) //161
++//#define eSPI_CLK	BIT(3) //163
++//#define eSPI_IO0	BIT(4) //164
++//#define eSPI_IO1	BIT(5) //165
++//#define eSPI_IO2	BIT(6) //166
++//#define eSPI_IO3	BIT(7) //167
++//#define eSPI_ALERT	BIT(8) //168
++#define eSPI_nCS	BIT(0) //128
++#define eSPI_CLK	BIT(1) //129
++#define eSPI_IO0	BIT(2) //130
++#define eSPI_IO1	BIT(3) //131
++#define eSPI_IO2	BIT(4) //132
++#define eSPI_IO3	BIT(5) //133
++#define eSPI_ALERT	BIT(6) //134
++/* eSPI_nRST is on GPIO2 (GPIO95 = bit 31 of the GPIO2 port) */
++//#define RST_BASE	0xF0012000	// GPIO2: 64~95
++#define RST_BASE	0xF0010000	// GPIO0: 0~31
++#define RST_OUT		(RST_BASE + 0xC)
++#define RST_OES		(RST_BASE + 0x70)
++//#define eSPI_nRST	BIT(31) //95
++#define eSPI_nRST	BIT(26) //26
++/* Mask of all eSPI-related bits on GPIO5 port, used for clrsetbits_le32
++ * to avoid overwriting other pins' bits in RW registers (IEM, EVTYP, EVBE) */
++#define ALL_ESPI_PORT_PINS	(eSPI_nCS | eSPI_CLK | eSPI_IO0 | eSPI_IO1 | \
++				 eSPI_IO2 | eSPI_IO3 | eSPI_ALERT)
++
++/* eSPI I/O mode */
++#define ESPI_IO_MODE_SINGLE	0
++#define ESPI_IO_MODE_DUAL	1
++#define ESPI_IO_MODE_QUAD	2
+ 
+ // eSPI command
+ #define CMD_SET_CONFIGURATION	0x22
+@@ -327,8 +353,23 @@ struct put_oob_req {
+ } __attribute__((__packed__));
+ 
+ static u32 espi_port_state = 0;
++static u32 rst_port_state = 0;  /* GPIO2 state for eSPI_nRST (GPIO95) */
+ static u8 wait_state = 16;
+ static bool debug = false;
++static u8 io_mode = ESPI_IO_MODE_SINGLE; /* current I/O mode: single/dual/quad */
++/*
++ * use_alert_pin: select which pin carries the slave ALERT signal.
++ *   false (default) = IO1-based alert (eSPI "In-Band ALERT" mode)
++ *                     IO1 doubles as data line and alert line; only
++ *                     usable when io_mode == SINGLE.
++ *   true            = dedicated ALERT# pin (eSPI_ALERT, BIT(8), GPIO168)
++ *                     always an input regardless of IO mode; event
++ *                     detection works in Single, Dual, and Quad modes.
++ * Set via the "alertmode <0|1>" CLI command before (or after) "init".
++ * Re-calling espi_init() after changing this variable reconfigures the
++ * edge-event register on the selected pin.
++ */
++static bool use_alert_pin = false;
+ 
+ void inline espi_port_update(u32 set, u32 clear)
+ {
+@@ -349,39 +390,134 @@ void inline espi_port_clear(u32 state)
+ 	writel(espi_port_state, PORT_OUT);
+ }
+ 
++/*
++ * espi_port_replace - clear a mask of bits, then set new values in one write.
++ * Unlike espi_port_update (set-then-clear), this does clear-then-set, so bits
++ * that appear in both `mask` and `val` are correctly driven HIGH.
++ * Use this when atomically switching IO lines (e.g. quad TX nibble change).
++ */
++void inline espi_port_replace(u32 mask, u32 val)
++{
++	espi_port_state &= ~mask;   /* clear all bits in the field */
++	espi_port_state |= val;     /* set desired bits */
++	writel(espi_port_state, PORT_OUT);
++}
++
++/*
++ * rst_nrst_assert / rst_nrst_deassert
++ * Drive eSPI_nRST (GPIO95, GPIO2 bit 31) low/high.
++ * These operate on RST_OUT/rst_port_state, which is separate from the
++ * GPIO5 espi_port_state used by the espi_port_* helpers above.
++ */
++void inline rst_nrst_assert(void)
++{
++	rst_port_state &= ~eSPI_nRST;
++	writel(rst_port_state, RST_OUT);
++}
++
++void inline rst_nrst_deassert(void)
++{
++	rst_port_state |= eSPI_nRST;
++	writel(rst_port_state, RST_OUT);
++}
++
++/*
++ * Switch I/O mode. Must be called after espi_init().
++ * mode: ESPI_IO_MODE_SINGLE / ESPI_IO_MODE_DUAL / ESPI_IO_MODE_QUAD
++ *
++ * GPIO direction rules:
++ *   Single: IO0=out, IO1=in
++ *   Dual:   during CMD phase IO0/IO1=out; during resp phase IO0/IO1=in
++ *           (espi_tar_dual handles the switch at TAR boundary)
++ *   Quad:   during CMD phase IO0~IO3=out; during resp phase IO0~IO3=in
++ *           (espi_tar_quad handles the switch at TAR boundary)
++ */
++static void espi_set_io_mode(u8 mode)
++{
++	io_mode = mode;
++	switch (mode) {
++	case ESPI_IO_MODE_DUAL:
++		printf("espi: switch to Dual I/O mode\n");
++		/* Clear IO2/IO3 output enable in case we are downgrading from Quad */
++		writel(eSPI_IO2 | eSPI_IO3, PORT_OEC);
++		/* input->output: IEM must be cleared before OES is set.
++		 * IO1 may have been input (single mode); clear it from IEM first. */
++		clrsetbits_le32(PORT_IEM, ALL_ESPI_PORT_PINS, use_alert_pin ? eSPI_ALERT : 0);
++		/* IO0/IO1 start as output (command phase) */
++		writel(eSPI_nCS | eSPI_CLK | eSPI_IO0 | eSPI_IO1, PORT_OES);
++		break;
++	case ESPI_IO_MODE_QUAD:
++		printf("espi: switch to Quad I/O mode\n");
++		/* input->output: IEM must be cleared before OES is set.
++		 * IO1 may have been input (single mode); clear it from IEM first. */
++		clrsetbits_le32(PORT_IEM, ALL_ESPI_PORT_PINS, use_alert_pin ? eSPI_ALERT : 0);
++		/* IO0~IO3 start as output (command phase) */
++		writel(eSPI_nCS | eSPI_CLK | eSPI_IO0 | eSPI_IO1 | eSPI_IO2 | eSPI_IO3, PORT_OES);
++		break;
++	case ESPI_IO_MODE_SINGLE:
++	default:
++		printf("espi: switch to Single I/O mode\n");
++		io_mode = ESPI_IO_MODE_SINGLE;
++		/* Clear IO1/IO2/IO3 output enable in case we are downgrading from Dual or Quad */
++		writel(eSPI_IO1 | eSPI_IO2 | eSPI_IO3, PORT_OEC);
++		writel(eSPI_nCS | eSPI_CLK | eSPI_IO0, PORT_OES);
++		/* IO1 is always data input in single mode; additionally enable
++		 * ALERT# input buffer when use_alert_pin is selected */
++		clrsetbits_le32(PORT_IEM, ALL_ESPI_PORT_PINS, eSPI_IO1 | (use_alert_pin ? eSPI_ALERT : 0));
++		break;
++	}
++}
++
+ static void espi_init(void)
+ {
+ 	u32 reg;
+ 
+-	// clear MFSEL1.26 & MFSEL4.8
+-	reg = readl(0xF0800260) & ~BIT(26);
+-	writel(reg, 0xF0800260);
+-	reg = readl(0xF080026C) & ~BIT(8);
+-	writel(reg, 0xF080026C);
++	if (IS_ENABLED(CONFIG_ARCH_NPCM8XX)) {
++		// clear MFSEL1.26 & MFSEL4.8
++		reg = readl(0xF0800260) & ~BIT(26);
++		writel(reg, 0xF0800260);
++		reg = readl(0xF080026C) & ~BIT(8);
++		writel(reg, 0xF080026C);
++	} else {
++		// set MFSEL1.26 & clear MFSEL4.8
++		reg = readl(0xF080000C) | BIT(26);
++		writel(reg, 0xF080000C);
++		reg = readl(0xF08000B0) & ~BIT(8);
++		writel(reg, 0xF08000B0);
++	}
+ 
+ 	printf("espi: init gpios\n");
+-	// initial state: nCS high, nRST high, CLK low
++	// initial state GPIO5: nCS high, CLK low, IO0 high, IO2/IO3 low
+ 	espi_port_state = readl(PORT_OUT);
+-	espi_port_update(eSPI_nCS | eSPI_nRST | eSPI_IO0, 0);
+-	// set output enable
+-	writel(eSPI_nCS | eSPI_CLK | eSPI_IO0 | eSPI_nRST, PORT_OES);
+-	// set input enable
+-	writel(eSPI_IO1, PORT_IEM);
+-
+-	// set event enable
+-	writel(eSPI_IO1, PORT_EVENC);
+-	writel(eSPI_IO1, PORT_EVST);
+-	writel(eSPI_IO1, PORT_EVENS);
+-	writel(eSPI_IO1, PORT_EVTYP);
+-	writel(eSPI_IO1, PORT_EVBE);
++	espi_port_update(eSPI_nCS | eSPI_IO0, eSPI_CLK | eSPI_IO2 | eSPI_IO3);
++	// initial state GPIO2: nRST high; configure as output
++	rst_port_state = readl(RST_OUT);
++	rst_nrst_deassert();
++	writel(eSPI_nRST, RST_OES);
++	/*
++	 * After reset, slave always comes up in single mode per eSPI spec.
++	 * Reset io_mode to single and apply the matching GPIO direction via
++	 * espi_set_io_mode() so PORT_OES/IEM are always consistent with io_mode.
++	 */
++	io_mode = ESPI_IO_MODE_SINGLE;
++	espi_set_io_mode(ESPI_IO_MODE_SINGLE);
++
++	// set event on alert pin (IO1 or ALERT# depending on use_alert_pin)
++	u32 alert_bit = use_alert_pin ? eSPI_ALERT : eSPI_IO1;
++
++	writel(alert_bit, PORT_EVENC);
++	writel(alert_bit, PORT_EVST);
++	writel(alert_bit, PORT_EVENS);
++	clrsetbits_le32(PORT_EVTYP, ALL_ESPI_PORT_PINS, alert_bit);
++	clrsetbits_le32(PORT_EVBE, ALL_ESPI_PORT_PINS, alert_bit);
+ 
+ 	printf("espi reset\n");
+ 	udelay(100);
+-	// assert eSPI_nRST
+-	espi_port_update(0, eSPI_nRST);
++	// assert eSPI_nRST (GPIO95, GPIO2)
++	rst_nrst_assert();
+ 	udelay(100);
+ 	// deassert eSPI_nRST
+-	espi_port_update(eSPI_nRST, 0);
++	rst_nrst_deassert();
+ 	udelay(100);
+ }
+ 
+@@ -394,6 +530,8 @@ static void espi_init(void)
+  * of the clock. The master could implement a more flexible sampling scheme since it
+  * controls the clock.
+  */
++
++/* Single mode: 1 bit per clock on IO0 (TX), IO1 (RX). 8 clocks per byte. */
+ static void espi_sendbyte(u8 data)
+ {
+ 	int i;
+@@ -416,6 +554,62 @@ static void espi_sendbyte(u8 data)
+ 	espi_port_clear(eSPI_CLK); //clk_low
+ }
+ 
++/*
++ * Dual mode: 2 bits per clock on IO0/IO1 (both output during TX).
++ * MSB first: bit[7:6], bit[5:4], bit[3:2], bit[1:0]. 4 clocks per byte.
++ * IO line assignment per eSPI spec (IO0=LSB, IO1=MSB):
++ *   IO1 = high bit of pair, IO0 = low bit of pair
++ */
++static void espi_sendbyte_dual(u8 data)
++{
++	int i;
++	u32 io;
++
++	/* Pairs: [7,6], [5,4], [3,2], [1,0] — IO1=high bit, IO0=low bit */
++	for (i = 7; i >= 1; i -= 2) {
++		io = 0;
++		if (data & BIT(i))
++			io |= eSPI_IO1;     /* high bit of pair → IO1 (MSB) */
++		if (data & BIT(i - 1))
++			io |= eSPI_IO0;     /* low bit of pair  → IO0 (LSB) */
++		espi_port_replace(eSPI_CLK | eSPI_IO0 | eSPI_IO1, io); /* CLK low, set IO */
++		espi_port_set(eSPI_CLK);                               /* CLK high */
++	}
++	/* CLK left high on exit; caller (espi_send) issues final CLK low */
++}
++
++/*
++ * Quad mode: 4 bits per clock on IO0~IO3 (all output during TX).
++ * High nibble first: bit[7:4], then bit[3:0]. 2 clocks per byte.
++ * IO line assignment per eSPI spec (IO0=LSB, IO3=MSB):
++ *   High nibble: IO3=bit7, IO2=bit6, IO1=bit5, IO0=bit4
++ *   Low  nibble: IO3=bit3, IO2=bit2, IO1=bit1, IO0=bit0
++ */
++static void espi_sendbyte_quad(u8 data)
++{
++	u32 io;
++
++	/* High nibble: IO3=bit7, IO2=bit6, IO1=bit5, IO0=bit4 */
++	io = 0;
++	if (data & BIT(4)) io |= eSPI_IO0;
++	if (data & BIT(5)) io |= eSPI_IO1;
++	if (data & BIT(6)) io |= eSPI_IO2;
++	if (data & BIT(7)) io |= eSPI_IO3;
++	espi_port_replace(eSPI_CLK | eSPI_IO0 | eSPI_IO1 | eSPI_IO2 | eSPI_IO3, io); /* CLK low, set IO */
++	espi_port_set(eSPI_CLK);                                                       /* CLK high */
++
++	/* Low nibble: IO3=bit3, IO2=bit2, IO1=bit1, IO0=bit0 */
++	io = 0;
++	if (data & BIT(0)) io |= eSPI_IO0;
++	if (data & BIT(1)) io |= eSPI_IO1;
++	if (data & BIT(2)) io |= eSPI_IO2;
++	if (data & BIT(3)) io |= eSPI_IO3;
++	espi_port_replace(eSPI_CLK | eSPI_IO0 | eSPI_IO1 | eSPI_IO2 | eSPI_IO3, io); /* CLK low, set IO */
++	espi_port_set(eSPI_CLK);                                                       /* CLK high */
++	/* CLK left high on exit; caller (espi_send) issues final CLK low */
++}
++
++/* Single mode RX: 1 bit per clock on IO1. 8 clocks per byte. */
+ static u8 espi_recv_byte_single(void)
+ {
+ 	// Clock start high -- ended at high.
+@@ -424,23 +618,105 @@ static u8 espi_recv_byte_single(void)
+ 	u8 in = 0;
+ 
+ 	for (i = 7; i >= 0; i--) {
+-		//writel(eSPI_CLK | eSPI_IO0, PORT_OUT); // clk_high
+ 		espi_port_set(eSPI_CLK | eSPI_IO0); // clk_high
+ 		val = readl(PORT_IN);
+ 		if (val & eSPI_IO1)
+ 			in |= BIT(i);
+-		//writel(eSPI_IO0, PORT_OUT); // clk_low
+ 		espi_port_clear(eSPI_CLK);
+ 	}
+ 	return in;
+ }
+ 
++/*
++ * Dual mode RX: 2 bits per clock on IO0/IO1 (both input during RX).
++ * IO line assignment per eSPI spec (IO0=LSB, IO1=MSB):
++ *   IO1 = high bit of pair, IO0 = low bit of pair
++ */
++static u8 espi_recv_byte_dual(void)
++{
++	int i;
++	u32 val;
++	u8 in = 0;
++
++	/* Pairs: [7,6], [5,4], [3,2], [1,0] — IO1=high bit, IO0=low bit */
++	for (i = 7; i >= 1; i -= 2) {
++		espi_port_set(eSPI_CLK);
++		val = readl(PORT_IN);
++		if (val & eSPI_IO1)
++			in |= BIT(i);       /* IO1 (MSB) → high bit of pair */
++		if (val & eSPI_IO0)
++			in |= BIT(i - 1);   /* IO0 (LSB) → low bit of pair */
++		espi_port_clear(eSPI_CLK);
++	}
++	return in;
++}
++
++/*
++ * Quad mode RX: 4 bits per clock on IO0~IO3 (all input during RX).
++ * IO line assignment per eSPI spec (IO0=LSB, IO3=MSB):
++ *   High nibble: IO3=bit7, IO2=bit6, IO1=bit5, IO0=bit4
++ *   Low  nibble: IO3=bit3, IO2=bit2, IO1=bit1, IO0=bit0
++ */
++static u8 espi_recv_byte_quad(void)
++{
++	u32 val;
++	u8 in = 0;
++
++	/* First clock: high nibble, IO3=bit7 IO2=bit6 IO1=bit5 IO0=bit4 */
++	espi_port_set(eSPI_CLK);
++	val = readl(PORT_IN);
++	if (val & eSPI_IO0) in |= BIT(4);
++	if (val & eSPI_IO1) in |= BIT(5);
++	if (val & eSPI_IO2) in |= BIT(6);
++	if (val & eSPI_IO3) in |= BIT(7);
++	espi_port_clear(eSPI_CLK);
++
++	/* Second clock: low nibble, IO3=bit3 IO2=bit2 IO1=bit1 IO0=bit0 */
++	espi_port_set(eSPI_CLK);
++	val = readl(PORT_IN);
++	if (val & eSPI_IO0) in |= BIT(0);
++	if (val & eSPI_IO1) in |= BIT(1);
++	if (val & eSPI_IO2) in |= BIT(2);
++	if (val & eSPI_IO3) in |= BIT(3);
++	espi_port_clear(eSPI_CLK);
++
++	return in;
++}
++
+ static void espi_send(u8 *out, int len)
+ {
+ 	int i;
+ 
+-	for (i = 0; i < len; i++)
+-		espi_sendbyte(out[i]);
++	for (i = 0; i < len; i++) {
++		switch (io_mode) {
++		case ESPI_IO_MODE_DUAL:
++			espi_sendbyte_dual(out[i]);
++			break;
++		case ESPI_IO_MODE_QUAD:
++			espi_sendbyte_quad(out[i]);
++			break;
++		default:
++			espi_sendbyte(out[i]);
++			break;
++		}
++	}
++	/* For dual/quad, sendbyte leaves CLK high after the last clock.
++	 * Pull CLK low here once so TAR and subsequent logic see CLK=low. */
++	if (io_mode != ESPI_IO_MODE_SINGLE)
++		espi_port_clear(eSPI_CLK);
++}
++
++/* Dispatch recv according to current io_mode */
++static inline u8 espi_recv_byte(void)
++{
++	switch (io_mode) {
++	case ESPI_IO_MODE_DUAL:
++		return espi_recv_byte_dual();
++	case ESPI_IO_MODE_QUAD:
++		return espi_recv_byte_quad();
++	default:
++		return espi_recv_byte_single();
++	}
+ }
+ 
+ static int espi_wait_response(u8 *code)
+@@ -449,7 +725,7 @@ static int espi_wait_response(u8 *code)
+ 	int rc = 0;
+ 
+ 	do {
+-		*code = espi_recv_byte_single();
++		*code = espi_recv_byte();
+ 		if (*code != RESP_WAIT && *code != RESP_ACCEPT && *code != RESP_DEFER) {
+ 			rc = -EIO;
+ 			break;
+@@ -470,9 +746,9 @@ static void espi_read_status(u16 *status)
+ {
+ 	u8 *in = (u8 *)status;
+ 
+-	*in++ = espi_recv_byte_single();
+-	*in = espi_recv_byte_single();
+-	espi_recv_byte_single(); // read crc
++	*in++ = espi_recv_byte();
++	*in = espi_recv_byte();
++	espi_recv_byte(); // read crc
+ }
+ 
+ static u16 espi_read_response(u8 *resp, int len)
+@@ -498,23 +774,82 @@ static u16 espi_read_response(u8 *resp, int len)
+ 	resp++;
+ 	len--;
+ 	for (i = 0; i < len; i++, resp++)
+-		*resp = espi_recv_byte_single();
++		*resp = espi_recv_byte();
+ 
+ 	return status;
+ }
+ 
+ /*
+- * After the last bit of the Command Phase has been sent out on the data lines, the data
+- * lines enter the Turn-Around window. The eSPI master is required to drive all the data
+- * lines to logic �1�for the first clock of the Turn-Around window and tri-state the data
+- * lines thereafter. The number of clocks for the Turn-Around window is a fixed 2 serial
++ * Turn-Around (TAR): master drives all active IO lines high for 1st clock,
++ * then tri-states them. Total 2 clocks.
++ *
++ * Single: drives IO0 high for 1st clock, floats on 2nd (IO1 stays input).
++ * Dual:   drives IO0+IO1 high for 1st clock, tri-states + switches to input.
++ * Quad:   drives IO0~IO3 high for 1st clock, tri-states + switches to input.
+  */
+ static void espi_tar(void)
+ {
+-	espi_port_set(eSPI_CLK | eSPI_IO0);
+-	espi_port_clear(eSPI_CLK);
+-	espi_port_set(eSPI_CLK);
+-	espi_port_clear(eSPI_CLK);
++	switch (io_mode) {
++	case ESPI_IO_MODE_DUAL:
++		/* 1st TAR clock: drive IO0/IO1 high */
++		espi_port_update(eSPI_IO0 | eSPI_IO1, eSPI_CLK);
++		espi_port_set(eSPI_CLK);
++		espi_port_clear(eSPI_CLK);
++		/* 2nd TAR clock: tri-state IO0/IO1, switch to input for response phase.
++		 * IO0/IO1 must be in IEM for DATA receive regardless of alert mode.
++		 * Additionally enable ALERT# input buffer when use_alert_pin is set.
++		 * nRST is on GPIO2 (RST_OES) so it is NOT included here. */
++		writel(eSPI_IO0 | eSPI_IO1, PORT_OEC);
++		clrsetbits_le32(PORT_IEM, ALL_ESPI_PORT_PINS, eSPI_IO0 | eSPI_IO1 | (use_alert_pin ? eSPI_ALERT : 0));
++		espi_port_set(eSPI_CLK);
++		espi_port_clear(eSPI_CLK);
++		break;
++	case ESPI_IO_MODE_QUAD:
++		/* 1st TAR clock: drive IO0~IO3 high */
++		espi_port_update(eSPI_IO0 | eSPI_IO1 | eSPI_IO2 | eSPI_IO3, eSPI_CLK);
++		espi_port_set(eSPI_CLK);
++		espi_port_clear(eSPI_CLK);
++		/* 2nd TAR clock: tri-state IO0~IO3, switch to input for response phase.
++		 * IO0~IO3 must be in IEM for DATA receive regardless of alert mode.
++		 * Additionally enable ALERT# input buffer when use_alert_pin is set.
++		 * nRST is on GPIO2 (RST_OES) so it is NOT included here. */
++		writel(eSPI_IO0 | eSPI_IO1 | eSPI_IO2 | eSPI_IO3, PORT_OEC);
++		clrsetbits_le32(PORT_IEM, ALL_ESPI_PORT_PINS, eSPI_IO0 | eSPI_IO1 | eSPI_IO2 | eSPI_IO3 | (use_alert_pin ? eSPI_ALERT : 0));
++		espi_port_set(eSPI_CLK);
++		espi_port_clear(eSPI_CLK);
++		break;
++	default: /* single */
++		espi_port_set(eSPI_CLK | eSPI_IO0);
++		espi_port_clear(eSPI_CLK);
++		espi_port_set(eSPI_CLK);
++		espi_port_clear(eSPI_CLK);
++		break;
++	}
++}
++
++/*
++ * After the response phase, restore IO direction back to output
++ * so the next command phase can drive the lines.
++ * Only needed for dual/quad where TAR switched lines to input.
++ */
++static void espi_restore_io_output(void)
++{
++	switch (io_mode) {
++	case ESPI_IO_MODE_DUAL:
++		/* ALERT# pin stays as input during command phase when selected.
++		 * nRST is on GPIO2 (RST_OES) and stays output regardless. */
++		clrsetbits_le32(PORT_IEM, ALL_ESPI_PORT_PINS, use_alert_pin ? eSPI_ALERT : 0);
++		writel(eSPI_nCS | eSPI_CLK | eSPI_IO0 | eSPI_IO1, PORT_OES);
++		break;
++	case ESPI_IO_MODE_QUAD:
++		/* ALERT# pin stays as input during command phase when selected.
++		 * nRST is on GPIO2 (RST_OES) and stays output regardless. */
++		clrsetbits_le32(PORT_IEM, ALL_ESPI_PORT_PINS, use_alert_pin ? eSPI_ALERT : 0);
++		writel(eSPI_nCS | eSPI_CLK | eSPI_IO0 | eSPI_IO1 | eSPI_IO2 | eSPI_IO3, PORT_OES);
++		break;
++	default:
++		break;
++	}
+ }
+ 
+ static u16 espi_get_status(void)
+@@ -534,6 +869,7 @@ static u16 espi_get_status(void)
+ 	espi_send((u8 *)&req, sizeof(req));
+ 	espi_tar();
+ 	espi_read_response((u8 *)&resp, sizeof(resp));
++	espi_restore_io_output();
+ 	espi_port_set(eSPI_nCS);
+ 
+ 	debug("resp.code 0x%x\n", resp.code);
+@@ -561,6 +897,7 @@ static int espi_get_flash_c(int len, u32 dest)
+ 	espi_send((u8 *)&req, sizeof(req));
+ 	espi_tar();
+ 	status = espi_read_response((u8 *)&resp, sizeof(resp) - (FLASH_R_LENGTH - len));
++	espi_restore_io_output();
+ 	espi_port_set(eSPI_nCS);
+ 
+ 	debug("resp.code 0x%x\n", resp.code);
+@@ -612,6 +949,7 @@ static int espi_put_flash_c(u8 type, int tag_len_L, int len_H)
+ 	}
+ 	espi_tar();
+ 	status = espi_read_response((u8 *)&resp, sizeof(resp));
++	espi_restore_io_output();
+ 	espi_port_set(eSPI_nCS);
+ 
+ 	if (debug) {
+@@ -697,6 +1035,7 @@ static int espi_put_flash_np(u8 type, u32 addr, int len, u32 data_addr, u8 tag)
+ 	espi_send((u8 *)&req, req_len);
+ 	espi_tar();
+ 	status = espi_read_response((u8 *)&resp, sizeof(resp));
++	espi_restore_io_output();
+ 	espi_port_set(eSPI_nCS);
+ 
+ 	debug("resp.code 0x%x\n", resp.code);
+@@ -752,6 +1091,7 @@ static int espi_put_flash_np_rpmc(u8 type, int len, u32 data_addr, u8 tag)
+ 	espi_send((u8 *)&req, req_len);
+ 	espi_tar();
+ 	status = espi_read_response((u8 *)&resp, sizeof(resp));
++	espi_restore_io_output();
+ 	espi_port_set(eSPI_nCS);
+ 
+ 	if (debug) {
+@@ -787,6 +1127,7 @@ static int espi_get_flash_np(u8 index, int count, u8 *in)
+ 	} else if (index == CYCLE_FLASH_WRITE) {
+ 		status = espi_read_response((u8 *)resp, sizeof(*resp) + count - (FLASH_R_LENGTH));
+ 	}
++	espi_restore_io_output();
+ 	espi_port_set(eSPI_nCS);
+ 
+ 	if (debug) {
+@@ -815,15 +1156,99 @@ static int espi_get_flash_np(u8 index, int count, u8 *in)
+ 	return STATUS_OK;
+ }
+ 
++/*
++ * wait_alert_and_dispatch() - wait for ALERT# / IO1 edge then return the
++ * channel(s) that have data pending, identified via GET_STATUS.
++ *
++ * Background: in U-Boot there are no interrupts, threads, or background
++ * tasks.  The GPIO edge-event register (PORT_EVST) latches the falling edge
++ * of the alert signal, but it is only observed when this code actively polls
++ * it.  ALERT# / IO1 alone does not tell the master *which* channel raised
++ * the alert; that requires a GET_STATUS command.
++ *
++ * This helper is intended for slave-initiated events (e.g. target pushing
++ * SLV_BOOT_DONE on the VW channel after channel enable), where the master
++ * has not just issued a transaction and therefore has no natural place to
++ * call wait_alert().
++ *
++ * Usage pattern:
++ *   u16 pending;
++ *   if (wait_alert_and_dispatch(&pending) == 0) {
++ *       if (pending & BIT(6))  espi_get_vwire(...);   // VW_AVAIL
++ *       if (pending & BIT(4))  espi_get_pc(...);       // PC_AVAIL
++ *       if (pending & BIT(7))  espi_get_oob(...);      // OOB_AVAIL
++ *       if (pending & BIT(12)) espi_get_flash_c(...);  // FLASH_C_AVAIL
++ *   }
++ *
++ * Alternative when ALERT# hardware is not wired (IO1-alert in dual/quad):
++ *   Skip wait_alert_and_dispatch() and go straight to GET_STATUS polling
++ *   (the existing wait_for_vw_avail() / wait_for_oob_avail() etc.).  Those
++ *   functions already do exactly that and are always safe to call.
++ *
++ * Returns 0 on alert detected, -ETIMEDOUT on timeout.
++ * *status_out receives the raw GET_STATUS value (0 if timed out).
++ */
++static int wait_alert_and_dispatch(u16 *status_out)
++{
++	u32 val;
++	int count = 1000000;
++	u32 alert_bit = use_alert_pin ? eSPI_ALERT : eSPI_IO1;
++
++	if (status_out)
++		*status_out = 0;
++
++	/*
++	 * In IO1-alert + dual/quad mode the edge event will never fire because
++	 * IO1 is a data line.  Skip directly to GET_STATUS.
++	 */
++	if (io_mode != ESPI_IO_MODE_SINGLE && !use_alert_pin)
++		goto get_status;
++
++	/* Wait for falling-edge latch on the alert pin */
++	do {
++		val = readl(PORT_EVST);
++		if (val & alert_bit) {
++			writel(alert_bit, PORT_EVST); /* clear latch */
++			debug("eSPI_ALERT (dispatch)\n");
++			break;
++		}
++		if (count-- == 0) {
++			printf("\nwait_alert_and_dispatch: timeout waiting for alert\n");
++			return -ETIMEDOUT;
++		}
++		udelay(1);
++	} while (1);
++
++get_status:
++	if (status_out)
++		*status_out = espi_get_status();
++	return 0;
++}
++
+ static int wait_alert(void)
+ {
+ 	u32 val;
+ 	int count = 1000000;
++	u32 alert_bit = use_alert_pin ? eSPI_ALERT : eSPI_IO1;
++
++	/*
++	 * In IO1-alert mode, IO1 is a shared data/alert line.  In dual/quad
++	 * mode it is actively driven as a data line so the edge-event register
++	 * will never fire.  Fall back to a short delay and let the caller use
++	 * GET_STATUS polling instead.
++	 *
++	 * In ALERT#-pin mode the dedicated pin is always an input regardless
++	 * of IO mode, so edge-event detection works correctly in all modes.
++	 */
++	if (io_mode != ESPI_IO_MODE_SINGLE && !use_alert_pin) {
++		udelay(100); /* give slave time to post the completion */
++		return 0;
++	}
+ 
+ 	do {
+ 		val = readl(PORT_EVST);
+-		if (val & eSPI_IO1) {
+-			writel(eSPI_IO1, PORT_EVST);
++		if (val & alert_bit) {
++			writel(alert_bit, PORT_EVST);
+ 			debug("eSPI_ALERT\n");
+ 			break;
+ 		}
+@@ -891,7 +1316,9 @@ static int espi_flash_read(u32 addr, int count, u32 dest, u8 tag)
+ 	time_start = get_timer(0);
+ 
+ 	printf("Load address: 0x%x\n", dest);
+-	puts("Loading: *\b");
++	if (debug) {
++		puts("Loading: *\b");
++	}
+ 
+ 	index = count /FLASH_R_LENGTH;
+ 	if (count % FLASH_R_LENGTH)
+@@ -917,19 +1344,25 @@ static int espi_flash_read(u32 addr, int count, u32 dest, u8 tag)
+ 
+ 		//status = espi_get_status();
+ 		//printf("status = 0x%x\n", status);
+-		putc('#');
+-		if ((i % FLASH_R_LENGTH) == 0 && i > 0)
+-			puts("\n\t ");
++		if (debug) {
++			putc('#');
++			if ((i % FLASH_R_LENGTH) == 0 && i > 0)
++				puts("\n\t ");
++		}
+ 
+ 		//udelay(20);
+ 	}
+ 	time_start = get_timer(time_start);
+ 	if (time_start > 0) {
+-		puts("\n\t ");	/* Line up with "Loading: " */
+-		print_size(count / time_start * 1000, "/s");
++		if (debug) {
++			puts("\n\t ");	/* Line up with "Loading: " */
++			print_size(count / time_start * 1000, "/s");
++		}
+ 	}
+ 
+-	printf("\ndone\n");
++	if (debug) {
++		printf("\ndone\n");
++	}
+ 
+ 	return STATUS_OK;
+ }
+@@ -943,7 +1376,8 @@ static int espi_flash_write(u32 addr, int count, u32 data_addr, u8 tag)
+ 	time_start = get_timer(0);
+ 
+ 	printf("Save mem address 0x%x to flash address 0x%x\n", data_addr, addr);
+-	printf("Saving..\n");
++	if (debug)
++		printf("Saving..\n");
+ 
+ 	index = count /FLASH_R_LENGTH;
+ 	if (count % FLASH_R_LENGTH)
+@@ -969,17 +1403,23 @@ static int espi_flash_write(u32 addr, int count, u32 data_addr, u8 tag)
+ 			return STATUS_ERR;
+ 
+ 		data_addr += len;
+-		putc('#');
+-		if ((i % FLASH_R_LENGTH) == 0 && i > 0)
+-			puts("\n\t ");
++		if (debug) {
++			putc('#');
++			if ((i % FLASH_R_LENGTH) == 0 && i > 0)
++				puts("\n\t ");
++		}
+ 	}
+ 	time_start = get_timer(time_start);
+ 	if (time_start > 0) {
+-		puts("\n\t ");	/* Line up with "Loading: " */
+-		print_size(count / time_start * 1000, "/s");
++		if (debug) {
++			puts("\n\t ");	/* Line up with "Loading: " */
++			print_size(count / time_start * 1000, "/s");
++		}
+ 	}
+ 
+-	printf("\ndone\n");
++	if (debug) {
++		printf("\ndone\n");
++	}
+ 
+ 	return STATUS_OK;
+ }
+@@ -1003,7 +1443,9 @@ static int espi_flash_erase(u32 addr, u8 tag)
+ 	if (espi_get_flash_c(0, 0))
+ 		return STATUS_ERR;
+ 
+-	printf("\ndone\n");
++	if (debug) {
++		printf("\ndone\n");
++	}
+ 
+ 	return STATUS_OK;
+ }
+@@ -1011,7 +1453,6 @@ static int espi_flash_erase(u32 addr, u8 tag)
+ static int espi_flash_rpmc_op1(u8 flash_dev, int count, u32 data_addr, u8 tag)
+ {
+ 	printf("Get mem address 0x%x to flash device 0x%x\n", data_addr, flash_dev);
+-	printf("Saving..\n");
+ 
+ 	if (espi_put_flash_np_rpmc((CYCLE_FLASH_RPMC_OP1 | (flash_dev << 5)), count, data_addr, tag))
+ 		return STATUS_ERR;
+@@ -1025,7 +1466,9 @@ static int espi_flash_rpmc_op1(u8 flash_dev, int count, u32 data_addr, u8 tag)
+ 	if (espi_get_flash_c(0, 0))
+ 		return STATUS_ERR;
+ 
+-	printf("\ndone\n");
++	if (debug) {
++		printf("\ndone\n");
++	}
+ 
+ 	return STATUS_OK;
+ }
+@@ -1033,7 +1476,6 @@ static int espi_flash_rpmc_op1(u8 flash_dev, int count, u32 data_addr, u8 tag)
+ static int espi_flash_rpmc_op2(u8 flash_dev, int count, u32 dest, u8 tag)
+ {
+ 	printf("Read flash device 0x%x to 0x%x\n", flash_dev, dest);
+-	printf("Reading..\n");
+ 
+ 	if (espi_put_flash_np_rpmc((CYCLE_FLASH_RPMC_OP2 | (flash_dev << 5)), count, 0, tag))
+ 		return STATUS_ERR;
+@@ -1047,7 +1489,9 @@ static int espi_flash_rpmc_op2(u8 flash_dev, int count, u32 dest, u8 tag)
+ 	if (espi_get_flash_c(count, dest))
+ 		return STATUS_ERR;
+ 
+-	printf("\ndone\n");
++	if (debug) {
++		printf("\ndone\n");
++	}
+ 
+ 	return STATUS_OK;
+ }
+@@ -1066,7 +1510,7 @@ static int espi_caf_flash(u8 index, int count)
+ 	if (espi_put_flash_c(data[1], data[2], data[3]))
+ 		return STATUS_ERR;
+ 
+-	printf("\ndone\n");
++	printf("cycle_type: %d done\n", index);
+ 
+ 	return STATUS_OK;
+ }
+@@ -1088,6 +1532,7 @@ static int espi_get_configuration(u16 addr, u8 *in)
+ 	espi_send((u8 *)&req, sizeof(req));
+ 	espi_tar();
+ 	status = espi_read_response((u8 *)resp, sizeof(*resp));
++	espi_restore_io_output();
+ 	espi_port_set(eSPI_nCS);
+ 
+ 	if (status) {
+@@ -1122,7 +1567,7 @@ static int espi_set_configuration(u16 addr, u32 data, u8 *in)
+ 		wait_state = ((data >> 8) & 0xF0) >> 4;
+ 		if (wait_state ==0)
+ 			wait_state = 16;
+-		printf("wait_state=0x%x\n", wait_state);
++		//printf("wait_state=0x%x\n", wait_state);
+ 	}
+ 
+ 	//CS_low, CLK_low, IO0
+@@ -1131,6 +1576,7 @@ static int espi_set_configuration(u16 addr, u32 data, u8 *in)
+ 	espi_send((u8 *)&req, sizeof(req));
+ 	espi_tar();
+ 	status = espi_read_response((u8 *)resp, sizeof(*resp));
++	espi_restore_io_output();
+ 	espi_port_set(eSPI_nCS);
+ 	if (status) {
+ 		printf("%s: espi response error: code=0x%02x, status=0x%04x\n",
+@@ -1157,6 +1603,7 @@ static int espi_get_vwire(u8 *in)
+ 	espi_send((u8 *)&req, sizeof(req));
+ 	espi_tar();
+ 	status = espi_read_response((u8 *)resp, sizeof(*resp));
++	espi_restore_io_output();
+ 	espi_port_set(eSPI_nCS);
+ 
+ 	if (status) {
+@@ -1165,9 +1612,11 @@ static int espi_get_vwire(u8 *in)
+ 		resp->status = status;
+ 		return STATUS_ERR;
+ 	} else {
+-		printf("get_vwire: ");
+-		printf("index(%d)=0x%02x\n", resp->index, resp->data);
+-		//printf("status=%04x\n", resp->status);
++		if (debug) {
++			printf("get_vwire: ");
++			printf("index(%d)=0x%02x\n", resp->index, resp->data);
++			//printf("status=%04x\n", resp->status);
++		}
+ 	}
+ 	return STATUS_OK;
+ }
+@@ -1178,7 +1627,8 @@ static int espi_put_vwire(u8 index, u8 data, u8 *in)
+ 	struct espi_common_resp *resp = (struct espi_common_resp *)in;
+ 	u16 status;
+ 
+-	printf("put_vwire: index(%d)=0x%02x\n", index, data);
++	if (debug)
++		printf("put_vwire: index(%d)=0x%02x\n", index, data);
+ 	req.cmd = CMD_PUT_VWIRE;
+ 	req.len = 0;
+ 	req.index = index;
+@@ -1191,6 +1641,7 @@ static int espi_put_vwire(u8 index, u8 data, u8 *in)
+ 	espi_send((u8 *)&req, sizeof(req));
+ 	espi_tar();
+ 	status = espi_read_response((u8 *)resp, sizeof(*resp));
++	espi_restore_io_output();
+ 	espi_port_set(eSPI_nCS);
+ 	if (status) {
+ 		printf("%s: espi response error: code=0x%02x, status=0x%04x\n",
+@@ -1228,6 +1679,7 @@ static int espi_put_iowr(u16 addr, u8 *data, int count, u8 *in)
+ 	espi_send((u8 *)&req, count + 4);
+ 	espi_tar();
+ 	status = espi_read_response((u8 *)resp, sizeof(*resp));
++	espi_restore_io_output();
+ 	espi_port_set(eSPI_nCS);
+ 	if (status) {
+ 		printf("%s: espi response error: code=0x%02x, status=0x%04x\n",
+@@ -1255,6 +1707,7 @@ static int espi_put_iord(u16 addr, int count, u8 *in)
+ 	espi_send((u8 *)&req, sizeof(req));
+ 	espi_tar();
+ 	status = espi_read_response((u8 *)resp, count + 4);
++	espi_restore_io_output();
+ 	espi_port_set(eSPI_nCS);
+ 
+ 	if (status) {
+@@ -1293,6 +1746,7 @@ static int espi_get_pc(int len)
+ 	espi_send((u8 *)&req, sizeof(req));
+ 	espi_tar();
+ 	status = espi_read_response((u8 *)&resp, sizeof(resp) - (4 - len));
++	espi_restore_io_output();
+ 	espi_port_set(eSPI_nCS);
+ 
+ 	if (resp.cycle_type == 0xf) {
+@@ -1369,6 +1823,7 @@ static int espi_put_memwr32(u32 addr, u8 *data, int count, u8 *in)
+ 	espi_send((u8 *)&req, count + 6);
+ 	espi_tar();
+ 	status = espi_read_response((u8 *)resp, sizeof(*resp));
++	espi_restore_io_output();
+ 	espi_port_set(eSPI_nCS);
+ 	if (status) {
+ 		printf("%s: espi response error: code=0x%02x, status=0x%04x\n",
+@@ -1380,8 +1835,10 @@ static int espi_put_memwr32(u32 addr, u8 *data, int count, u8 *in)
+ 	if (wait_alert())
+ 		return STATUS_ERR;
+ 
+-	status = espi_get_status();
+-	printf("%s: memwr32 status=0x%04x\n", __func__, status);
++	if (debug) {
++		status = espi_get_status();
++		printf("%s: memwr32 status=0x%04x\n", __func__, status);
++	}
+ 
+ 	return STATUS_OK;
+ }
+@@ -1405,6 +1862,7 @@ static int espi_put_memrd32(u32 addr, int count, u8 *in)
+ 	espi_send((u8 *)&req, sizeof(req));
+ 	espi_tar();
+ 	status = espi_read_response((u8 *)resp, count + 4);
++	espi_restore_io_output();
+ 	espi_port_set(eSPI_nCS);
+ 
+ 	if (debug) {
+@@ -1466,6 +1924,7 @@ static int espi_put_oob(void)
+ 	espi_send((u8 *)&req, sizeof(req) + 5 - OOB_R_LENGTH);
+ 	espi_tar();
+ 	status = espi_read_response((u8 *)&resp, sizeof(resp));
++	espi_restore_io_output();
+ 	espi_port_set(eSPI_nCS);
+ 
+ 	if (debug) {
+@@ -1500,6 +1959,7 @@ static int espi_get_oob(int count)
+ 	espi_send((u8 *)&req, sizeof(req));
+ 	espi_tar();
+ 	status = espi_read_response((u8 *)&resp, sizeof(resp) + count - OOB_R_LENGTH);
++	espi_restore_io_output();
+ 	espi_port_set(eSPI_nCS);
+ 
+ 	if (debug) {
+@@ -1551,8 +2011,6 @@ static int do_oob_test(int count)
+ 	if (espi_put_oob())
+ 		return STATUS_ERR;
+ 
+-	printf("\ndone\n");
+-
+ 	return STATUS_OK;
+ }
+ 
+@@ -1639,6 +2097,7 @@ static int do_espi_auto_test(void)
+ 	u32 data;
+ 	bool test_result = false;
+ 	u8 crc1, crc2;
++	u8 pass_cnt = 0; // should be 9 if all tests passed
+ 
+ 	espi_set_configuration(0x20, 0x00000001, resp);
+ 	espi_get_configuration(0x20, resp);
+@@ -1716,7 +2175,7 @@ static int do_espi_auto_test(void)
+ 	espi_iowr8(SIO_DATA, KCS_CMD_REG & 0xFF);
+ 	espi_iowr8(SIO_IDX, 0x30);
+ 	espi_iowr8(SIO_DATA, 1);
+-        if (espi_put_iord(SIO_DATA, 1, (u8 *)&resp_iord))
++	if (espi_put_iord(SIO_DATA, 1, (u8 *)&resp_iord))
+ 		test_result = false;
+ 	if ((u8)(resp_iord.data & 0xFF) != 0x01)
+ 		test_result = false;
+@@ -1741,6 +2200,9 @@ static int do_espi_auto_test(void)
+ 	if ((u8)(resp_iord.data & 0xFF) != 0x01)
+ 		test_result = false;
+ 
++	if (test_result)
++		pass_cnt++;
++
+ 	printf("peripheral: put_iord_short + put_iowr_short: %s\n", test_result ? "Pass" : "Fail");
+ 	printf("=================================================\n");
+ 
+@@ -1762,6 +2224,9 @@ static int do_espi_auto_test(void)
+ 	}
+ 	espi_put_memrd32(0x10000004, 4, resp);
+ 
++	if (test_result)
++		pass_cnt++;
++
+ 	printf("peripheral: put_memrd32_short + put_memwr32_short: %s\n", test_result ? "Pass" : "Fail");
+ 	printf("=======================================================\n");
+ 
+@@ -1770,44 +2235,74 @@ static int do_espi_auto_test(void)
+ 	printf("=============\n");
+ 	printf("vw: IRQ start\n");
+ 
++	/*
++	 * SLV_BOOT_DONE scenario: after VW channel is enabled the target will
++	 * push a VW packet on its own initiative (no master command).  In U-Boot
++	 * there is no interrupt handler, so we must poll for the alert / status.
++	 *
++	 * Two equivalent paths:
++	 *
++	 * Path A – alert-driven dispatch (preferred when ALERT#/IO1 is wired):
++	 *   wait_alert_and_dispatch() latches the GPIO edge, then calls
++	 *   GET_STATUS once to find out which channel(s) need service.
++	 *   Use this path to avoid sending repeated GET_STATUS transactions
++	 *   while the bus is otherwise idle.
++	 *
++	 * Path B – direct GET_STATUS polling (always safe, used here as
++	 *   fallback for IO1-alert in dual/quad mode):
++	 *   wait_for_vw_avail() spins on GET_STATUS until VW_AVAIL (bit 6)
++	 *   is set.  Other wait_for_xxx_avail() helpers work the same way.
++	 *
++	 * In this autotest we use Path B (wait_for_vw_avail) because the test
++	 * must also work in dual/quad + IO1-alert mode where the edge event
++	 * cannot fire.  To exercise Path A, call wait_alert_and_dispatch()
++	 * and check the returned status word.
++	 */
+ 	if (wait_for_vw_avail()) {
+ 		test_result = false;
+ 	} else {
+ 		count = 10;
+-		while (count-- > 0) {
++		while (count > 0) {
+ 			espi_get_vwire(resp);
+ 			if (resp[2] == 0x0 && resp[3] == 0x81)
+ 				break;
+-			mdelay(1);
++			mdelay(500);
++			count--;
+ 		}
+ 
+ 		if (count == 0)
+ 			test_result = false;
+ 
+ 		count = 10;
+-		while (count-- > 0) {
++		while (count > 0) {
+ 			espi_put_iord(KCS_STATUS_REG, 1, (u8 *)&resp_iord);
+ 			if ((u8)(resp_iord.data & 0x01) == 0x1)
+ 				break;
+ 			mdelay(1);
++			count--;
+ 		}
+ 
+ 		if (count == 0)
+ 			test_result = false;
+ 
+ 		espi_put_iord(KCS_DATA_REG, 1, (u8 *)&resp_iord);
++
+ 		count = 10;
+-		while (count-- > 0) {
++		while (count > 0) {
+ 			espi_get_vwire(resp);
+ 			if (resp[2] == 0x0 && resp[3] == 0x01)
+ 				break;
+-			mdelay(1);
++			mdelay(500);
++			count--;
+ 		}
+ 
+ 		if (count == 0)
+ 			test_result = false;
+ 	}
+ 
++	if (test_result)
++		pass_cnt++;
++
+ 	printf("vw: IRQ: %s\n", test_result ? "Pass" : "Fail");
+ 	printf("=============\n");
+ 
+@@ -1818,29 +2313,42 @@ static int do_espi_auto_test(void)
+ 
+ 	/* assert HOST_RST_WARN# */
+ 	espi_put_vwire(7, 0x11, resp);
+-	count = 10;
+-	while (count-- > 0) {
+-		espi_get_vwire(resp);
+-		if (resp[2] == 0x6 && ((resp[3] & 0x88) == 0x88))
+-			break;
+-		mdelay(1);
+-	}
+-
+-	if (count == 0)
++	if (wait_for_vw_avail()) {
+ 		test_result = false;
++	} else {
++		count = 10;
++		while (count > 0) {
++			espi_get_vwire(resp);
++			if (resp[2] == 0x6 && ((resp[3] & 0x88) == 0x88))
++				break;
++			mdelay(1);
++			count--;
++		}
++
++		if (count == 0)
++			test_result = false;
++	}
+ 
+ 	/* deassert HOST_RST_WARN# */
+ 	espi_put_vwire(7, 0x10, resp);
+-	count = 10;
+-	while (count-- > 0) {
+-		espi_get_vwire(resp);
+-		if (resp[2] == 0x6 && ((resp[3] & 0x88) == 0x80))
+-			break;
+-		mdelay(1);
++	if (wait_for_vw_avail()) {
++		test_result = false;
++	} else {
++		count = 10;
++		while (count > 0) {
++			espi_get_vwire(resp);
++			if (resp[2] == 0x6 && ((resp[3] & 0x88) == 0x80))
++				break;
++			mdelay(1);
++			count--;
++		}
++
++		if (count == 0)
++			test_result = false;
+ 	}
+ 
+-	if (count == 0)
+-		test_result = false;
++	if (test_result)
++		pass_cnt++;
+ 
+ 	printf("vw: get_vwire + put_vwire: %s\n", test_result ? "Pass" : "Fail");
+ 	printf("===============================\n");
+@@ -1853,6 +2361,9 @@ static int do_espi_auto_test(void)
+ 	if (!do_oob_test(4)) // Request length for PCH get Temperature
+ 		test_result = true;
+ 
++	if (test_result)
++		pass_cnt++;
++
+ 	printf("oob: get_oob + put_oob: %s\n", test_result ? "Pass" : "Fail");
+ 	printf("============================\n");
+ 
+@@ -1860,8 +2371,8 @@ static int do_espi_auto_test(void)
+ 
+ 	test_result = true;
+ 	/* Flash */
+-	printf("=================\n");
+-	printf("flash: TAFS start\n");
++	printf("==================================\n");
++	printf("flash: TAFS read/write/erase start\n");
+ 
+ 	espi_flash_read(0x10000, 0x40, 0x10000000, 0x0);
+ 	crc1 = crc8(0, (const unsigned char *)(uintptr_t)0x10000000, 0x40);
+@@ -1882,6 +2393,16 @@ static int do_espi_auto_test(void)
+ 	if (crc1 != crc2)
+ 		test_result = false;
+ 
++	if (test_result) {
++		pass_cnt++;
++	}
++
++	printf("flash: TAFS read/write/erase: %s\n", test_result ? "Pass" : "Fail");
++	printf("==================================\n");
++
++	test_result = true;
++	printf("===============================\n");
++	printf("flash: TAFS tag overwrite start\n");
+ 	// should consider the test for tag overwrite
+ 	if (!espi_flash_read(0x0, 0x40, 0x10000000, 0x1))
+ 		test_result = false;
+@@ -1890,6 +2411,16 @@ static int do_espi_auto_test(void)
+ 	if (!espi_flash_write(0x0, 0x40, 0x10010000, 0x1))
+ 		test_result = false;
+ 
++	if (test_result) {
++		pass_cnt++;
++	}
++
++	printf("flash: TAFS tag overwrite: %s\n", test_result ? "Pass" : "Fail");
++	printf("===============================\n");
++
++	test_result = true;
++	printf("=================================\n");
++	printf("flash: TAFS RPMC operations start\n");
+ 	if (espi_flash_rpmc_op1(0x0, 0x40, 0x10000000, 0x0))
+ 		test_result = false;
+ 	if (espi_flash_rpmc_op1(0x1, 0x40, 0x10000000, 0x0))
+@@ -1907,8 +2438,12 @@ static int do_espi_auto_test(void)
+ 	if (espi_flash_rpmc_op2(0x3, 0x40, 0x10000000, 0x0))
+ 		test_result = false;
+ 
+-	printf("flash: TAFS: %s\n", test_result ? "Pass" : "Fail");
+-	printf("=================\n");
++	if (test_result) {
++		pass_cnt++;
++	}
++
++	printf("flash: TAFS RPMC operations: %s\n", test_result ? "Pass" : "Fail");
++	printf("=================================\n");
+ 
+ 	test_result = true;
+ 	/* Flash */
+@@ -1935,8 +2470,16 @@ static int do_espi_auto_test(void)
+ 	if (espi_caf_flash(CYCLE_FLASH_ERASE, 0x0))
+ 		test_result = false;
+ 
++	if (test_result) {
++		pass_cnt++;
++	}
++
+ 	printf("flash: CAFS: %s\n", test_result ? "Pass" : "Fail");
+ 	printf("=================\n");
++	if (pass_cnt == 9)
++		printf("All tests passed\n");
++	else
++		printf("%d/9 tests passed\n", pass_cnt);
+ 
+ 	return 0;
+ }
+@@ -1974,7 +2517,7 @@ static int kcs_wait_ibf(u8 *status)
+ static int kcs_wait_obf(u8 *status)
+ {
+ 	*status = 0xC0; //STATE_ERR
+-	int count = 100;
++	int count = 10000;
+ 	u8 data;
+ 
+ 	while (count--) {
+@@ -2245,12 +2788,50 @@ static int do_espi_master_start(void)
+ 	espi_iowr8(SIO_DATA, 0x00);
+ 	espi_iowr8(SIO_IDX, 0xF7);
+ 	espi_iowr8(SIO_DATA, 0x10);
++	// SHAW2BA_0~3
++	espi_iowr8(SIO_IDX, 0xF8);
++	espi_iowr8(SIO_DATA, 0x00);
++	espi_iowr8(SIO_IDX, 0xF9);
++	espi_iowr8(SIO_DATA, 0x10);
++	espi_iowr8(SIO_IDX, 0xFA);
++	espi_iowr8(SIO_DATA, 0x00);
++	espi_iowr8(SIO_IDX, 0xFB);
++	espi_iowr8(SIO_DATA, 0x10);
+ 	// enable LDN
+ 	espi_iowr8(SIO_IDX, 0x30);
+ 	espi_iowr8(SIO_DATA, 0x1);
+ 	// set HOFS1L/HOFS1H
+ 	espi_iowr8(0x726, 0x00);
+ 	espi_iowr8(0x727, 0x08);
++
++    printf("configure ESHM\n");
++    // configure ESHM
++    espi_iowr8(SIO_IDX, 0x7);
++    espi_iowr8(SIO_DATA, 0x1D);
++    // disable LDN
++    espi_iowr8(SIO_IDX, 0x30);
++    espi_iowr8(SIO_DATA, 0x0);
++    // SHAW3BA_0~3
++    espi_iowr8(SIO_IDX, 0xF4);
++    espi_iowr8(SIO_DATA, 0x00);
++    espi_iowr8(SIO_IDX, 0xF5);
++    espi_iowr8(SIO_DATA, 0x20);
++    espi_iowr8(SIO_IDX, 0xF6);
++    espi_iowr8(SIO_DATA, 0x00);
++    espi_iowr8(SIO_IDX, 0xF7);
++    espi_iowr8(SIO_DATA, 0x10);
++    // SHAW4BA_0~3
++    espi_iowr8(SIO_IDX, 0xF8);
++    espi_iowr8(SIO_DATA, 0x00);
++    espi_iowr8(SIO_IDX, 0xF9);
++    espi_iowr8(SIO_DATA, 0x30);
++    espi_iowr8(SIO_IDX, 0xFA);
++    espi_iowr8(SIO_DATA, 0x00);
++    espi_iowr8(SIO_IDX, 0xFB);
++    espi_iowr8(SIO_DATA, 0x10);
++    // enable LDN
++    espi_iowr8(SIO_IDX, 0x30);
++    espi_iowr8(SIO_DATA, 0x1);
+ #endif
+ #if 0
+ 	// configure sp2
+@@ -2272,6 +2853,117 @@ static int do_espi_master_start(void)
+ 	return 0;
+ }
+ 
++/*
++ * Negotiate I/O mode with the slave via General Capabilities register (addr 0x08).
++ *
++ * eSPI spec General Capabilities register (0x08):
++ *   bits[25:24] IO Mode Support (slave reports what it can do):
++ *     00 = Single only
++ *     01 = Single and Dual
++ *     10 = Single and Quad
++ *     11 = Single, Dual and Quad
++ *   bits[27:26] IO Mode Select (master writes desired mode):
++ *     00 = Single
++ *     01 = Dual
++ *     10 = Quad
++ *
++ * This function reads the slave capability, selects the highest common mode
++ * (or the requested mode if specified), issues SET_CONFIGURATION, then calls
++ * espi_set_io_mode() to switch GPIO directions accordingly.
++ */
++static int espi_negotiate_io_mode(u8 requested_mode)
++{
++	u8 resp[16];
++	struct get_configuration_resp *config_resp = (struct get_configuration_resp *)resp;
++	u32 cap, new_cap;
++	u8 slave_support, selected;
++	u8 saved_mode = io_mode;
++
++	/*
++	 * The GET_CONFIGURATION and SET_CONFIGURATION packets that perform the
++	 * negotiation must always be sent in Single mode, regardless of the
++	 * current io_mode state. If io_mode is already non-single (e.g. a
++	 * previous failed negotiation), we temporarily revert to single so
++	 * the slave can understand the packets.
++	 */
++	if (io_mode != ESPI_IO_MODE_SINGLE) {
++		printf("espi: temporarily reverting to Single for negotiation\n");
++		espi_set_io_mode(ESPI_IO_MODE_SINGLE);
++	}
++
++	/* Read General Capabilities */
++	if (espi_get_configuration(0x08, resp)) {
++		espi_set_io_mode(saved_mode);
++		return STATUS_ERR;
++	}
++
++	cap = config_resp->data;
++	/* IO Mode Support: register 0x08 bits[25:24] */
++	slave_support = (cap >> 24) & 0x3;
++	//printf("espi: slave IO mode support bits[25:24]=0x%x\n", slave_support);
++
++	/* Validate requested mode against slave capability */
++	if (requested_mode == ESPI_IO_MODE_QUAD) {
++		if (slave_support == 0x2 || slave_support == 0x3)
++			selected = ESPI_IO_MODE_QUAD;
++		else {
++			printf("espi: slave does not support Quad, falling back\n");
++			if (slave_support == 0x1 || slave_support == 0x3)
++				selected = ESPI_IO_MODE_DUAL;
++			else
++				selected = ESPI_IO_MODE_SINGLE;
++		}
++	} else if (requested_mode == ESPI_IO_MODE_DUAL) {
++		if (slave_support == 0x1 || slave_support == 0x3)
++			selected = ESPI_IO_MODE_DUAL;
++		else {
++			printf("espi: slave does not support Dual, using Single\n");
++			selected = ESPI_IO_MODE_SINGLE;
++		}
++	} else {
++		selected = ESPI_IO_MODE_SINGLE;
++	}
++
++	/*
++	 * Write IO Mode Select into bits[27:26] and Alert Mode into bit[28].
++	 *   bits[27:26]: 00=Single, 01=Dual, 10=Quad
++	 *   bit[28]:     0=IO1 In-Band Alert, 1=ALERT# pin Out-of-Band Alert
++	 * SET_CONFIGURATION is sent in Single mode (io_mode is still SINGLE here).
++	 */
++	new_cap = (cap & ~((0x3 << 26) | BIT(28))) | ((u32)(selected & 0x3) << 26);
++	if (use_alert_pin)
++		new_cap |= BIT(28);
++	if (espi_set_configuration(0x08, new_cap, resp)) {
++		espi_set_io_mode(saved_mode);
++		return STATUS_ERR;
++	}
++
++	/* Switch GPIO directions to the negotiated mode */
++	espi_set_io_mode(selected);
++
++	return STATUS_OK;
++}
++
++/*
++ * Reconfigure GPIO edge-event registers and IEM for the currently selected
++ * alert pin (eSPI_IO1 or eSPI_ALERT#) WITHOUT resetting the eSPI bus.
++ * Safe to call while the bus is active.
++ */
++static void espi_reconfigure_alert_pin(void)
++{
++	u32 alert_bit = use_alert_pin ? eSPI_ALERT : eSPI_IO1;
++
++	/* Disable events on both candidate pins and clear any pending status */
++	writel(eSPI_IO1 | eSPI_ALERT, PORT_EVENC);
++	writel(eSPI_IO1 | eSPI_ALERT, PORT_EVST);
++	/* Re-arm edge-event on the selected pin */
++	writel(alert_bit, PORT_EVENS);
++	clrsetbits_le32(PORT_EVTYP, ALL_ESPI_PORT_PINS, alert_bit);
++	clrsetbits_le32(PORT_EVBE, ALL_ESPI_PORT_PINS, alert_bit);
++	/* Refresh GPIO input-enable so ALERT# buffer tracks the selection */
++	espi_set_io_mode(io_mode);
++}
++
+ static int do_espi_command(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
+ {
+ 	u32 addr, index, data, count, space, tag;
+@@ -2294,8 +2986,35 @@ static int do_espi_command(struct cmd_tbl *cmdtp, int flag, int argc, char * con
+ 		return 0;
+ 	}
+ 	if (strcmp(argv[1], "autotest") == 0) {
++		u8 mode = ESPI_IO_MODE_SINGLE;
++		u8 alert = 0; /* default: IO1 In-Band */
++
++		if (argc >= 3) {
++			mode = (u8)simple_strtoul(argv[2], NULL, 10);
++			if (mode > ESPI_IO_MODE_QUAD) {
++				printf("espi autotest: invalid iomode %u (0=single,1=dual,2=quad)\n", mode);
++				return CMD_RET_USAGE;
++			}
++		}
++		if (argc >= 4) {
++			alert = (u8)simple_strtoul(argv[3], NULL, 10);
++			if (alert > 1) {
++				printf("espi autotest: invalid alertmode %u (0=IO1,1=ALERT#)\n", alert);
++				return CMD_RET_USAGE;
++			}
++		}
++		use_alert_pin = (alert != 0);
++		printf("espi autotest: iomode=%u alertmode=%u (%s)\n",
++		       mode, alert, use_alert_pin ? "ALERT# pin" : "IO1 In-Band");
++
+ 		espi_init();
++		if (espi_negotiate_io_mode(mode) != 0) {
++			printf("[autotest] negotiate_io_mode failed\n");
++			return -1;
++		}
++
+ 		do_espi_auto_test();
++		espi_init();
+ 		return 0;
+ 	}
+ 
+@@ -2314,7 +3033,9 @@ static int do_espi_command(struct cmd_tbl *cmdtp, int flag, int argc, char * con
+ 		data=simple_strtoul(argv[3], NULL, 16);
+ 		espi_set_configuration(addr, data, resp);
+ 	} else if (!strcmp(argv[1], "getvw")) {
++		debug = true;
+ 		espi_get_vwire(resp);
++		debug = false;
+ 	} else if (!strcmp(argv[1], "putvw")) {
+ 		if (argc < 4)
+ 			return CMD_RET_USAGE;
+@@ -2363,14 +3084,18 @@ static int do_espi_command(struct cmd_tbl *cmdtp, int flag, int argc, char * con
+ 		tag = hextoul(argv[5], NULL);
+ 		if (count < 1)
+ 			return CMD_RET_USAGE;
++		debug = true;
+ 		espi_flash_write(addr, count, space, tag);
++		debug = false;
+ 	} else if (!strcmp(argv[1], "flash_erase")) {
+ 		if (argc < 4)
+ 			return CMD_RET_USAGE;
+ 
+ 		addr = hextoul(argv[2], NULL);
+ 		tag = hextoul(argv[3], NULL);
++		debug = true;
+ 		espi_flash_erase(addr, tag);
++		debug = false;
+ 	} else if (!strcmp(argv[1], "flash_rpmc_op1")) {
+ 		if (argc < 6)
+ 			return CMD_RET_USAGE;
+@@ -2422,7 +3147,218 @@ static int do_espi_command(struct cmd_tbl *cmdtp, int flag, int argc, char * con
+ 			return CMD_RET_USAGE;
+ 		count=simple_strtoul(argv[2], NULL, 16);
+ 		do_oob_test(count);
+-	}else {
++	} else if (!strcmp(argv[1], "iowrtest")) {
++		if (argc < 6)
++			return CMD_RET_USAGE;
++		addr=simple_strtoul(argv[2], NULL, 16);
++		data=simple_strtoul(argv[3], NULL, 16);
++		count=simple_strtoul(argv[4], NULL, 16);
++		tag=simple_strtoul(argv[5], NULL, 16);
++		if (count < 1 || count > 4)
++			return CMD_RET_USAGE;
++		if (tag < 2)
++			debug = true;
++		for (int i=0; i<tag; i++) {
++			espi_put_iowr(addr, (u8 *)&data, count, resp);
++			if (count == 1)
++				data = (data+1)%0xff;
++		}
++		debug = false;
++	} else if (!strcmp(argv[1], "getvwtest")) {
++		int i=0;
++		if (argc < 3)
++			return CMD_RET_USAGE;
++		tag=simple_strtoul(argv[2], NULL, 16);
++		if (tag < 2)
++			debug = true;
++		for (i=0; i<tag; i++) {
++			if (wait_for_vw_avail()) {
++				printf("getvwtest avail err\n");
++			} else {
++				int count = 10;
++				while (count > 0) {
++					espi_get_vwire(resp);
++					if (resp[2] == 0x83 && resp[3] == 0x11) {
++						break;
++					} else if (resp[2] == 0x83 && resp[3] == 0x10) {
++						break;
++					}
++					mdelay(1);
++					count--;
++				}
++
++				if (count == 0) {
++					printf("getvwtest cnt=0\n");
++					break;
++				}
++			}
++		}
++		if (i==tag)
++			printf("getvwtest pass\n");
++		else
++			printf("getvwtest fail\n");
++		debug = false;
++	} else if (!strcmp(argv[1], "putvwtest")) {
++		if (argc < 5)
++			return CMD_RET_USAGE;
++		index=simple_strtoul(argv[2], NULL, 16);
++		data=simple_strtoul(argv[3], NULL, 16);
++		tag=simple_strtoul(argv[4], NULL, 16);
++		if (tag < 2)
++			debug = true;
++		for (int i=0; i<tag; i++) {
++			espi_put_vwire(index, data, resp);
++			data ^= 0x08;
++		}
++		debug = false;
++		printf("putvwtest finish\n");
++	} else if (!strcmp(argv[1], "kcsstress")) {
++		int i=0;
++		if (argc < 3)
++			return CMD_RET_USAGE;
++		tag=simple_strtoul(argv[2], NULL, 16);
++		for (i=0; i<tag; i++) {
++			do_kcs_test();
++		}
++	} else if (!strcmp(argv[1], "setiomode")) {
++		/*
++		 * setiomode <mode>
++		 *   0 = Single (default)
++		 *   1 = Dual
++		 *   2 = Quad
++		 * Negotiates with slave via SET_CONFIGURATION and switches GPIO dirs.
++		 */
++		if (argc < 3)
++			return CMD_RET_USAGE;
++		data = simple_strtoul(argv[2], NULL, 10);
++		if (data > ESPI_IO_MODE_QUAD) {
++			printf("invalid mode %u (0=single, 1=dual, 2=quad)\n", data);
++			return CMD_RET_USAGE;
++		}
++		rc = espi_negotiate_io_mode((u8)data);
++		if (rc)
++			printf("setiomode: negotiation failed\n");
++	} else if (!strcmp(argv[1], "getiomode")) {
++		const char *mode_str[] = {"single", "dual", "quad"};
++		printf("current io_mode: %u (%s)\n", io_mode,
++		       io_mode <= ESPI_IO_MODE_QUAD ? mode_str[io_mode] : "unknown");
++	} else if (!strcmp(argv[1], "testiomode")) {
++		if (argc < 3)
++			return CMD_RET_USAGE;
++		data = simple_strtoul(argv[2], NULL, 10);
++		if (data > ESPI_IO_MODE_QUAD) {
++			printf("invalid mode %u (0=single, 1=dual, 2=quad)\n", data);
++			return CMD_RET_USAGE;
++		}
++
++		struct get_configuration_resp *config_resp = (struct get_configuration_resp *)&resp[0];
++
++		// start test
++		espi_init();
++		if (espi_negotiate_io_mode((u8)data) != 0) {
++			printf("[testiomode] negotiate_io_mode failed\n");
++			return -1;
++		}
++
++		espi_set_configuration(0x20, 0x00000001, resp);
++
++		espi_get_configuration(0x20, resp);
++		if (config_resp->status & STATUS_VW_AVAIL)
++			espi_get_vwire(resp);
++
++		/* wait VW channle ready */
++		count = 10;
++		while (count-- > 0) {
++			espi_get_configuration(0x20, resp);
++			if (config_resp->data & BIT(1)) {
++				printf("VW channel ready\n");
++				break;
++			}
++			mdelay(1);
++		}
++		/* deassert PLTRST# & SUS_STAT# */
++		espi_put_vwire(3, 0x33, resp);
++		if (config_resp->status & STATUS_VW_AVAIL)
++			espi_get_vwire(resp);
++
++		espi_set_configuration(0x10, 0x00001113, resp);
++		/* wait peripheral channle ready */
++		count = 10;
++		while (count-- > 0) {
++			espi_get_configuration(0x10, resp);
++			if (config_resp->data & BIT(1)) {
++				printf("Peripheral channel ready\n");
++				break;
++			}
++			mdelay(1);
++		}
++
++		// enable KCS1
++		u8 temp = 0x7;
++		espi_put_iowr(0x4e, &temp, 0x1, resp);
++		temp = 0x11;
++		espi_put_iowr(0x4f, &temp, 0x1, resp);
++		temp = 0x30;
++		espi_put_iowr(0x4e, &temp, 0x1, resp);
++		temp = 0x1;
++		espi_put_iowr(0x4f, &temp, 0x1, resp);
++
++		return 0;
++	} else if (!strcmp(argv[1], "alertmode")) {
++		/*
++		 * alertmode <0|1>
++		 *   0 = IO1-based alert (In-Band ALERT, default)
++		 *   1 = Dedicated ALERT# pin (GPIO168, Out-of-Band ALERT)
++		 *
++		 * Only reconfigures the local GPIO edge-event registers and IEM.
++		 * Does NOT send any bus transaction to the slave.  Bit[28] of the
++		 * General Capabilities register (0x08) is written to the slave
++		 * later by "espi setiomode", which negotiates both the I/O mode
++		 * (bits[27:26]) and the alert mode (bit[28]) in a single
++		 * SET_CONFIGURATION(0x08) command.
++		 *
++		 * Intended usage:
++		 *   espi init
++		 *   espi alertmode <0|1>
++		 *   espi setiomode <0|1|2>   <- notifies slave of both settings
++		 */
++		if (argc < 3)
++			return CMD_RET_USAGE;
++		data = simple_strtoul(argv[2], NULL, 10);
++		use_alert_pin = (data != 0);
++		printf("espi: alert mode -> %s (run 'espi setiomode' to apply to slave)\n",
++		       use_alert_pin ? "ALERT# pin (GPIO168)" : "IO1 (In-Band)");
++		/* Reconfigure GPIO event/IEM only — no bus transaction */
++		espi_reconfigure_alert_pin();
++	} else if (!strcmp(argv[1], "alertdispatch")) {
++		/*
++		 * Wait for ALERT#/IO1 edge then print which channel(s) have data.
++		 * Useful for observing slave-initiated events (e.g. SLV_BOOT_DONE)
++		 * without polling GET_STATUS in a loop from the console.
++		 *
++		 * Usage: espi alertdispatch
++		 *
++		 * Status register bits reported:
++		 *   BIT(4)  PC_AVAIL       BIT(5)  NP_AVAIL
++		 *   BIT(6)  VW_AVAIL       BIT(7)  OOB_AVAIL
++		 *   BIT(12) FLASH_C_AVAIL  BIT(13) FLASH_NP_FREE
++		 */
++		u16 st = 0;
++		printf("espi: waiting for alert...\n");
++		if (wait_alert_and_dispatch(&st)) {
++			printf("espi: alertdispatch timed out\n");
++		} else {
++			printf("espi: alert received, status=0x%04x\n", st);
++			if (st & BIT(4))  printf("  -> PC_AVAIL\n");
++			if (st & BIT(5))  printf("  -> NP_AVAIL\n");
++			if (st & BIT(6))  printf("  -> VW_AVAIL\n");
++			if (st & BIT(7))  printf("  -> OOB_AVAIL\n");
++			if (st & BIT(12)) printf("  -> FLASH_C_AVAIL\n");
++			if (st & BIT(13)) printf("  -> FLASH_NP_FREE\n");
++			if (!(st & (BIT(4)|BIT(5)|BIT(6)|BIT(7)|BIT(12)|BIT(13))))
++				printf("  (no channel bits set in status)\n");
++		}
++	} else {
+ 		rc = CMD_RET_USAGE;
+ 	}
+ 
+@@ -2647,6 +3583,8 @@ U_BOOT_CMD(
+ 	" start - start espi master auto config\n"
+ 	" kcstest - do the kcs transfer\n"
+ 	" autotest - do the espi auto test\n"
++	"  	<argument1> - optional I/O mode: 0=single(default), 1=dual, 2=quad\n"
++	"  	<argument2> - optional alert mode: 0=IO1 In-Band(default), 1=ALERT# pin\n"
+ 	" getconfig - get_configuration\n"
+ 	"  	<argument1> - address\n"
+ 	" setconfig - set_configuration.\n"
+@@ -2697,6 +3635,30 @@ U_BOOT_CMD(
+ 	"       <argument2> - data\n"
+ 	"       <argument3> - data len (bytes)\n"
+ 	" oobtest - get_oob and put_oob.\n"
++	" iowrtest - put_iowr_short.\n"
++	"       <argument2> - data\n"
++	"       <argument3> - data len (bytes)\n"
++	"       <argument4> - count\n"
++	" putvwtest - put_vwire \n"
++	"       <argument1> - count\n"
++        "       <argument1> - vw index\n"
++        "       <argument2> - vw data\n"
++        "       <argument3> - count\n"
++	" getvwtest - get_vwire \n"
++        "       <argument1> - address\n"
++	" kcsstress - do the kcs transfer\n"
++	"       <argument1> - count\n"
++	" setiomode - negotiate and switch I/O mode with slave.\n"
++	"       <argument1> - mode: 0=single, 1=dual, 2=quad\n"
++	"       Issues GET_CONFIGURATION(0x08) to check slave capability,\n"
++	"       then SET_CONFIGURATION to select the mode, and switches GPIOs.\n"
++	" getiomode - print current I/O mode (single/dual/quad).\n"
++	" testiomode - test IO mode stability\n"
++	"		<argument1> - mode: 0=single, 1=dual, 2=quad\n"
++	" alertmode - select alert pin and reconfigure GPIO/IEM (no bus transaction)\n"
++	"		<argument1> - mode: 0=IO1 In-Band, 1=ALERT# pin\n"
++	" alertdispatch - wait for ALERT#/IO1 edge then print pending channel(s)\n"
++	"		(uses wait_alert_and_dispatch + GET_STATUS)\n"
+ );
+ 
+ U_BOOT_CMD(
+-- 
+2.34.1
+

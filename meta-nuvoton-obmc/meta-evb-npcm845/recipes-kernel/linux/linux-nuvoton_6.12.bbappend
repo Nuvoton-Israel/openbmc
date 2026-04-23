@@ -55,3 +55,6 @@ SRC_URI:append = " file://0012-dts-disable-pwm-to-enable-gpio-mode.patch"
 
 # Repurpose GPIO12/13 as BMC unit-ID strap inputs
 SRC_URI:append = " file://0013-arm64-dts-nuvoton-npcm845-evb-repurpose-GPIO12-13-as.patch"
+
+# FPGA test
+SRC_URI:append = " file://0014-dts-remove-i2c5-8-11-and-24-26.patch"
