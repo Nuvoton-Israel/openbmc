@@ -1,0 +1,101 @@
+From 7463ea0ca674a13650cb82880b8c7f92b4c150d5 Mon Sep 17 00:00:00 2001
+From: Ban Feng <kcfeng0@nuvoton.com>
+Date: Wed, 11 Mar 2026 09:44:35 +0800
+Subject: [PATCH] dts: remove i2c5, 8-11 and 24-26
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
+---
+ .../boot/dts/nuvoton/nuvoton-npcm845-evb.dts  | 46 -------------------
+ 1 file changed, 46 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+index 67bf69b71d54..70598efbcdea 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+@@ -42,13 +42,8 @@ aliases {
+ 		i2c2 = &i2c2;
+ 		i2c3 = &i2c3;
+ 		i2c4 = &i2c4;
+-		i2c5 = &i2c5;
+ 		i2c6 = &i2c6;
+ 		i2c7 = &i2c7;
+-		i2c8 = &i2c8;
+-		i2c9 = &i2c9;
+-		i2c10 = &i2c10;
+-		i2c11 = &i2c11;
+ 		i2c12 = &i2c12;
+ 		i2c13 = &i2c13;
+ 		i2c18 = &i2c18;
+@@ -57,9 +52,6 @@ aliases {
+ 		i2c21 = &i2c21;
+ 		i2c22 = &i2c22;
+ 		i2c23 = &i2c23;
+-		i2c24 = &i2c24;
+-		i2c25 = &i2c25;
+-		i2c26 = &i2c26;
+ 	};
+ 
+ 	chosen {
+@@ -515,10 +507,6 @@ &i2c4 {
+ 	status = "okay";
+ };
+ 
+-&i2c5 {
+-	status = "okay";
+-};
+-
+ &i2c6 {
+ 	status = "okay";
+ 	#address-cells = <1>;
+@@ -534,28 +522,6 @@ &i2c7 {
+ 	status = "okay";
+ };
+ 
+-&i2c8 {
+-	status = "okay";
+-};
+-
+-&i2c9 {
+-	status = "okay";
+-};
+-
+-&i2c10 {
+-	status = "okay";
+-};
+-
+-&i2c11 {
+-	status = "okay";
+-	slave_eeprom:slave_eeprom@40000050 {
+-		compatible = "slave-24c02";
+-		reg = <0x40000050>;
+-		status = "okay";
+-	};
+-	
+-};
+-
+ &i2c12 {
+ 	status = "okay";
+ };
+@@ -588,18 +554,6 @@ &i2c23 {
+ 	status = "okay";
+ };
+ 
+-&i2c24 {
+-	status = "okay";
+-};
+-
+-&i2c25 {
+-	status = "okay";
+-};
+-
+-&i2c26 {
+-	status = "okay";
+-};
+-
+ &i3c0 {
+ 	status = "okay";
+ 	i3c-scl-hz = <12500000>;
+-- 
+2.34.1
+
