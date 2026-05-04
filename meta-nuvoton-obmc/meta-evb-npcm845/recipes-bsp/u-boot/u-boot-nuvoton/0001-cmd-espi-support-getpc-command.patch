@@ -1,0 +1,94 @@
+From 54a4288cb5fb21416d6937bca6031ed2d59679c6 Mon Sep 17 00:00:00 2001
+From: Ban Feng <kcfeng0@nuvoton.com>
+Date: Mon, 4 May 2026 09:26:06 +0800
+Subject: [PATCH] cmd: espi: support getpc command
+
+Upstream-Status: Inappropriate [oe-specific]
+Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
+---
+ cmd/espi.c | 48 +++++++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 41 insertions(+), 7 deletions(-)
+
+diff --git a/cmd/espi.c b/cmd/espi.c
+index 10618c80450..35efa424ad7 100644
+--- a/cmd/espi.c
++++ b/cmd/espi.c
+@@ -1794,6 +1794,31 @@ static int wait_for_pc_avail(void)
+ 	return -ETIMEDOUT;
+ }
+ 
++/**
++ * espi_wait_and_get_pc() - Wait for ALERT#, poll until PC_AVAIL, then fetch
++ *                          the Peripheral Channel completion via GET_PC.
++ *
++ * This encapsulates the standard post-DEFER flow on the Peripheral Channel:
++ * the slave signals readiness via ALERT# (or IO1 in single-IO mode), the host
++ * polls the status register until PC_AVAIL is set, then issues GET_PC to
++ * retrieve the completion payload.
++ *
++ * @count: data length in bytes (1, 2, or 4)
++ * Return: STATUS_OK on success, STATUS_ERR on any step failure.
++ */
++static int espi_wait_and_get_pc(int count)
++{
++	if (wait_alert())
++		return STATUS_ERR;
++
++	if (wait_for_pc_avail())
++		return STATUS_ERR;
++
++	if (espi_get_pc(count))
++		return STATUS_ERR;
++
++	return STATUS_OK;
++}
+ static int espi_put_memwr32(u32 addr, u8 *data, int count, u8 *in)
+ {
+ 	struct put_memwr32_req req;
+@@ -1886,13 +1911,7 @@ static int espi_put_memrd32(u32 addr, int count, u8 *in)
+ 
+ 	if (resp->code == RESP_DEFER) {
+ 		printf("MEM rd32 DEFER\n");
+-		if (wait_alert())
+-			return STATUS_ERR;
+-
+-		if (wait_for_pc_avail())
+-			return STATUS_ERR;
+-
+-		if (espi_get_pc(count))
++		if (espi_wait_and_get_pc(count))
+ 			return STATUS_ERR;
+ 	}
+ 
+@@ -3142,6 +3161,18 @@ static int do_espi_command(struct cmd_tbl *cmdtp, int flag, int argc, char * con
+ 		debug = true;
+ 		espi_put_memwr32(addr, (u8 *)&data, count, resp);
+ 		debug = false;
++	} else if (!strcmp(argv[1], "getpc")) {
++		count = (argc >= 3) ? simple_strtoul(argv[2], NULL, 10) : 1;
++		if (count != 1 && count != 2 && count != 4) {
++			printf("getpc: invalid len %u (must be 1, 2, or 4)\n", count);
++			return CMD_RET_USAGE;
++		}
++		printf("getpc: waiting for ALERT...\n");
++		debug = true;
++		rc = espi_wait_and_get_pc(count);
++		debug = false;
++		if (rc)
++			return CMD_RET_FAILURE;
+ 	} else if (!strcmp(argv[1], "oobtest")) {
+ 		if (argc < 3)
+ 			return CMD_RET_USAGE;
+@@ -3634,6 +3665,9 @@ U_BOOT_CMD(
+ 	"       <argument1> - address\n"
+ 	"       <argument2> - data\n"
+ 	"       <argument3> - data len (bytes)\n"
++	" getpc - wait for ALERT, poll PC_AVAIL, then issue GET_PC.\n"
++	"         Used to retrieve completion after a DEFER response.\n"
++	"       <argument1> - data len in bytes: 1, 2, or 4 (default 1)\n"
+ 	" oobtest - get_oob and put_oob.\n"
+ 	" iowrtest - put_iowr_short.\n"
+ 	"       <argument2> - data\n"
+-- 
+2.34.1
+
