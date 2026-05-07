@@ -1,0 +1,50 @@
+From eb1b098527bb9b640e0bd64bd2b305661a522b3b Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Tue, 5 May 2026 15:17:35 +0800
+Subject: [PATCH] platform-mc: add support for fan_pwm
+
+Map PLDM_SENSOR_UNIT_PERCENTAGE to /xyz/openbmc_project/sensors/fan_pwm/
+with SensorUnit::Percent for PWM duty cycle sensors. Also fix
+PLDM_SENSOR_UNIT_RPM to correctly map to fan_tach namespace.
+
+Upstream-Status: Inappropriate [oe-specific]
+
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ platform-mc/numeric_sensor.cpp | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/platform-mc/numeric_sensor.cpp b/platform-mc/numeric_sensor.cpp
+index 31d1cf5b8..b3973901c 100644
+--- a/platform-mc/numeric_sensor.cpp
++++ b/platform-mc/numeric_sensor.cpp
+@@ -128,8 +128,12 @@ void NumericSensor::setSensorUnit(uint8_t baseUnit)
+             sensorNameSpace = "/xyz/openbmc_project/sensors/current/";
+             sensorUnit = SensorUnit::Amperes;
+             break;
+-        case PLDM_SENSOR_UNIT_RPM:
++        case PLDM_SENSOR_UNIT_PERCENTAGE:
+             sensorNameSpace = "/xyz/openbmc_project/sensors/fan_pwm/";
++            sensorUnit = SensorUnit::Percent;
++            break;
++        case PLDM_SENSOR_UNIT_RPM:
++            sensorNameSpace = "/xyz/openbmc_project/sensors/fan_tach/";
+             sensorUnit = SensorUnit::RPMS;
+             break;
+         case PLDM_SENSOR_UNIT_WATTS:
+@@ -140,10 +144,11 @@ void NumericSensor::setSensorUnit(uint8_t baseUnit)
+             sensorNameSpace = "/xyz/openbmc_project/sensors/energy/";
+             sensorUnit = SensorUnit::Joules;
+             break;
+-        case PLDM_SENSOR_UNIT_PERCENTAGE:
++        /* case PLDM_SENSOR_UNIT_PERCENTAGE:
+             sensorNameSpace = "/xyz/openbmc_project/sensors/utilization/";
+             sensorUnit = SensorUnit::Percent;
+             break;
++        */
+         case PLDM_SENSOR_UNIT_HERTZ:
+             sensorNameSpace = "/xyz/openbmc_project/sensors/frequency/";
+             sensorUnit = SensorUnit::Hertz;
+-- 
+2.43.0
+
