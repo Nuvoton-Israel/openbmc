@@ -54,6 +54,8 @@ RDEPENDS:${PN}-system = " \
     nist-linux-selftest \
     mctp \
     pldm \
+    net-tools \
+    usbutils  \
     "
 
 RDEPENDS:${PN}-system:append = " \

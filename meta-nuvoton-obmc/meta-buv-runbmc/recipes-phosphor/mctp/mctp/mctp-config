@@ -2,7 +2,6 @@
 
 localEid=8
 
-
-mctp addr add ${localEid} dev mctpi2c0
+mctp addr add ${localEid} dev mctpi2c2
 mctp link set mctpi2c2 up
 

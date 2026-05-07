@@ -5,6 +5,12 @@
             "Bus": "2",
             "Name": "MCTP I2C Device 0",
             "Type": "MCTPI2CTarget"
+        },
+        {
+            "Address": "0x20",
+            "Bus": "2",
+            "Name": "MCTP I2C Device 1",
+            "Type": "MCTPI2CTarget"
         }
     ],
     "Name": "MCTP_DEV",
