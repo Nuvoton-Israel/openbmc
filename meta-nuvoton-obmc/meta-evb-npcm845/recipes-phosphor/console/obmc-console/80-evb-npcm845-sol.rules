@@ -1,3 +1,4 @@
 SUBSYSTEM=="tty", ATTRS{iomem_base}=="0xF0001000", ENV{SYSTEMD_WANTS}="obmc-console@ttyS1" SYMLINK+="ttyS1", TAG+="systemd"
 SUBSYSTEM=="tty", ATTRS{iomem_base}=="0xF0004000", ENV{SYSTEMD_WANTS}="obmc-console@ttyS4" SYMLINK+="ttyS4", TAG+="systemd"
 SUBSYSTEM=="tty", ATTRS{iomem_base}=="0xF0005000", ENV{SYSTEMD_WANTS}="obmc-console@ttyS5" SYMLINK+="ttyS5", TAG+="systemd"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6015", ENV{SYSTEMD_WANTS}="obmc-console@ttyUSB0" SYMLINK+="ttyUSB0", TAG+="systemd"
