@@ -21,6 +21,7 @@ SRC_URI = "${GNU_MIRROR}/inetutils/inetutils-${PV}.tar.gz \
            file://CVE-2026-24061-01.patch \
            file://CVE-2026-24061-02.patch \
            file://CVE-2026-28372.patch \
+           file://CVE-2026-32746.patch \
            "
 
 inherit autotools gettext update-alternatives texinfo
@@ -49,6 +50,8 @@ EXTRA_OECONF:append:libc-musl = " --with-path-utmpx=/dev/null/utmpx --with-path-
 # These are horrible for security, disable them
 EXTRA_OECONF:append = " --disable-rsh --disable-rshd --disable-rcp \
         --disable-rlogin --disable-rlogind --disable-rexec --disable-rexecd"
+
+SECURITY_STRINGFORMAT:remove:toolchain-clang = "-Werror=format-security"
 
 # The configure script guesses many paths in cross builds, check for this happening
 do_configure_cross_check() {

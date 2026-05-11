@@ -1679,8 +1679,8 @@ system and gives an overview of their function and contents.
 
       .. note::
 
-         When :term:`COMPATIBLE_MACHINE` is set in a recipe inherits from
-         native, the recipe is always skipped. All native recipes must be
+         When :term:`COMPATIBLE_MACHINE` is set in a native recipe,
+         the recipe is always skipped. All native recipes must be
          entirely target independent and should not rely on :term:`MACHINE`.
 
    :term:`COMPLEMENTARY_GLOB`
@@ -1712,7 +1712,7 @@ system and gives an overview of their function and contents.
          (set via :term:`RRECOMMENDS`) are always ignored.
 
    :term:`COMPONENTS_DIR`
-      Stores sysroot components for each recipe. The OpenEmbedded build
+      Stores sysroot components provided by each recipe. The OpenEmbedded build
       system uses :term:`COMPONENTS_DIR` when constructing recipe-specific
       sysroots for other recipes.
 
@@ -2056,6 +2056,10 @@ system and gives an overview of their function and contents.
 
          CVE_PRODUCT = "vendor:package"
 
+      Since Wrynose (6.0), special characters must not be escaped. For example,
+      the :term:`CVE_PRODUCT` variable for the ``webkitgtk`` recipe must no
+      longer be written as ``webkitgtk\+`` but rather ``webkitgtk+``.
+
    :term:`CVE_STATUS`
       The CVE ID which is patched or should be ignored. Here is
       an example from the :oe_layerindex:`Python3 recipe</layerindex/recipe/23823>`::
@@ -2225,7 +2229,7 @@ system and gives an overview of their function and contents.
 
       The practical effect of the previous assignment is that all files
       installed by bar will be available in the appropriate staging sysroot,
-      given by the :term:`STAGING_DIR* <STAGING_DIR>` variables, by the time
+      given by the :term:`STAGING_DIR* <STAGING_DIR_HOST>` variables, by the time
       the :ref:`ref-tasks-configure` task for ``foo`` runs. This mechanism is
       implemented by having :ref:`ref-tasks-configure` depend on the
       :ref:`ref-tasks-populate_sysroot` task of each recipe listed in
@@ -2481,41 +2485,13 @@ system and gives an overview of their function and contents.
       list of features that ships with the Yocto Project and that you can
       provide with this variable, see the ":ref:`ref-features-distro`" section.
 
-   :term:`DISTRO_FEATURES_BACKFILL`
-      A space-separated list of features to be added to :term:`DISTRO_FEATURES`
-      if not also present in :term:`DISTRO_FEATURES_BACKFILL_CONSIDERED`.
+   :term:`DISTRO_FEATURES_DEFAULTS`
+      Specifies a space-separated list of default distro features provided by
+      the :term:`OpenEmbedded Build System`. This list should not be modified
+      directly, but instead :term:`DISTRO_FEATURES_OPTED_OUT` should be used to
+      prevent default distro features from being enabled.
 
-      This variable is set in the ``meta/conf/bitbake.conf`` file. It is
-      not intended to be user-configurable. It is best to just reference
-      the variable to see which distro features are being
-      :ref:`backfilled <ref-features-backfill>` for all distro configurations.
-
-   :term:`DISTRO_FEATURES_BACKFILL_CONSIDERED`
-      A space-separated list of features from :term:`DISTRO_FEATURES_BACKFILL`
-      that should not be :ref:`backfilled <ref-features-backfill>` (i.e. added
-      to :term:`DISTRO_FEATURES`) during the build.
-
-      This corresponds to an opt-out mechanism. When new default distro
-      features are introduced, distribution maintainers can review (`consider`)
-      them and decide to exclude them from the
-      :ref:`backfilled <ref-features-backfill>` features. Therefore, the
-      combination of :term:`DISTRO_FEATURES_BACKFILL` and
-      :term:`DISTRO_FEATURES_BACKFILL_CONSIDERED` makes it possible to
-      add new default features without breaking existing distributions.
-
-
-   :term:`DISTRO_FEATURES_DEFAULT`
-      A convenience variable that gives you the default list of distro
-      features with the exception of any features specific to the C library
-      (``libc``).
-
-      When creating a custom distribution, you might find it useful to be
-      able to reuse the default
-      :term:`DISTRO_FEATURES` options without the
-      need to write out the full set. Here is an example that uses
-      :term:`DISTRO_FEATURES_DEFAULT` from a custom distro configuration file::
-
-         DISTRO_FEATURES ?= "${DISTRO_FEATURES_DEFAULT} myfeature"
+      See :ref:`ref-manual/features:Default Features` for more information.
 
    :term:`DISTRO_FEATURES_FILTER_NATIVE`
       Specifies a list of features that if present in the target
@@ -2546,6 +2522,17 @@ system and gives an overview of their function and contents.
       :ref:`ref-classes-nativesdk` recipes. This variable is used
       in addition to the features filtered using the
       :term:`DISTRO_FEATURES_FILTER_NATIVESDK` variable.
+
+   :term:`DISTRO_FEATURES_OPTED_OUT`
+      Specifies a space-separated list of distro features to opt out from
+      when they are provided by the :term:`DISTRO_FEATURES_DEFAULTS` variable.
+
+      You can also opt out of all default features by setting
+      :term:`DISTRO_FEATURES_OPTED_OUT` to ``*``::
+
+         DISTRO_FEATURES_OPTED_OUT = "*"
+
+      See :ref:`ref-manual/features:Default Features` for more information.
 
    :term:`DISTRO_NAME`
       The long name of the distribution. For information on the short name
@@ -3509,6 +3496,184 @@ system and gives an overview of their function and contents.
       Format for the public key certificate used for signing the FIT image.
       The default value is set to "x509" by the
       :ref:`ref-classes-kernel-fit-image` class.
+
+   :term:`FIT_LOADABLE_ARCH`
+      Architecture the loadables defined in :term:`FIT_LOADABLES`; the value
+      will be used for the ``arch`` property of the loadable.
+      If no value is defined for a specific loadable, the kernel architecture
+      will be used.
+
+      This variable cannot be used directly, but only defining flags on it.
+
+      Example::
+
+         FIT_LOADABLES = "foo"
+         FIT_LOADABLE_ARCH[foo] = "arm"
+
+   :term:`FIT_LOADABLE_COMPRESSION`
+      Compression type for the loadables defined in :term:`FIT_LOADABLES`; the
+      value will be used for the ``compression`` property of the loadable.
+      If no value is defined for a specific loadable, its ``compression``
+      property will be set to ``none``.
+
+      This variable cannot be used directly, but only defining flags on it.
+
+      Example::
+
+         FIT_LOADABLES = "foo"
+         FIT_LOADABLE_COMPRESSION[foo] = "gzip"
+
+      .. note::
+
+         The binary should already be compressed, as no compression is
+         performed by the :ref:`ref-classes-kernel-fit-image` class.
+
+   :term:`FIT_LOADABLE_DESCRIPTION`
+      Description for the loadables defined in :term:`FIT_LOADABLES`; the value
+      will be used for the ``description`` property of the loadable.
+      If no value is defined for a specific loadable, its description will be
+      set to the loadable name followed by a space plus the string ``loadable``.
+
+      This variable cannot be used directly, but only defining flags on it.
+
+      Example::
+
+         FIT_LOADABLES = "foo"
+         FIT_LOADABLE_DESCRIPTION[foo] = "Foo firmware binary"
+
+   :term:`FIT_LOADABLE_ENTRYPOINT`
+      Entry point for the loadables defined in :term:`FIT_LOADABLES`; the value
+      will be used for the ``entry`` property of the loadable.
+      If no value is defined for a specific loadable, the ``entry`` property
+      will be omitted.
+
+      This variable cannot be used directly, but only defining flags on it.
+
+      Example::
+
+         FIT_LOADABLES = "foo"
+         FIT_LOADABLE_ENTRYPOINT[foo] = "0x80234000"
+
+   :term:`FIT_LOADABLE_FILENAME`
+      Filename (or relative path) for the loadables defined in
+      :term:`FIT_LOADABLES`; this will be used to search for the binary to
+      include and is therefore mandatory for each loadable. Binary files to be
+      included need to be located in :term:`DEPLOY_DIR_IMAGE`.
+
+      This variable cannot be used directly, but only defining flags on it.
+
+      Example::
+
+         FIT_LOADABLES = "foo"
+         FIT_LOADABLE_FILENAME[foo] = "foo-firmware.bin"
+
+   :term:`FIT_LOADABLE_LOADADDRESS`
+      Load address for the loadables defined in :term:`FIT_LOADABLES`; the
+      value will be used for the ``load`` property of the loadable.
+      This is mandatory for each loadable.
+
+      This variable cannot be used directly, but only defining flags on it.
+
+      Example::
+
+         FIT_LOADABLES = "foo"
+         FIT_LOADABLE_LOADADDRESS[foo] = "0x80230000"
+
+   :term:`FIT_LOADABLE_OS`
+      Operating system for the loadables defined in :term:`FIT_LOADABLES`; the
+      value will be used for the ``os`` property of the loadable.
+      If no value is defined for a specific loadable, the ``os`` property will
+      be set to ``linux``.
+
+      This variable cannot be used directly, but only defining flags on it.
+
+      Example::
+
+         FIT_LOADABLES = "foo"
+         FIT_LOADABLE_OS[foo] = "linux"
+
+   :term:`FIT_LOADABLE_TYPE`
+      Type for the loadables defined in :term:`FIT_LOADABLES`; the value will
+      be used for the ``type`` property of the loadable.
+      If no value is defined for a specific loadable, the ``type`` property
+      will be set to ``firmware``.
+
+      This variable cannot be used directly, but only defining flags on it.
+
+      Example::
+
+         FIT_LOADABLES = "foo"
+         FIT_LOADABLE_TYPE[foo] = "firmware"
+
+   :term:`FIT_LOADABLES`
+      Space-separated list of loadables to add to a FIT image in addition to
+      regular ones (kernel, initramfs, dtsb etc.).
+      Values specified here will be used as node names inside the FIT image;
+      all of them will be included in all configurations by using the
+      ``loadables`` property.
+
+      For each loadable specified in this variable, additional parameters can be
+      defined using :term:`FIT_LOADABLE_ARCH`, :term:`FIT_LOADABLE_COMPRESSION`,
+      :term:`FIT_LOADABLE_DESCRIPTION`, :term:`FIT_LOADABLE_ENTRYPOINT`,
+      :term:`FIT_LOADABLE_FILENAME`, :term:`FIT_LOADABLE_LOADADDRESS`,
+      :term:`FIT_LOADABLE_OS` and :term:`FIT_LOADABLE_TYPE`.
+
+      This variable is used by the :ref:`ref-classes-kernel-fit-image` class and
+      is empty by default.
+
+      For example, the following configuration adds as loadables a TF-A BL31
+      firmware and a (compressed) TEE firmware, to be loaded respectively at
+      0x204E0000 and 0x96000000::
+
+         FIT_LOADABLES = "atf tee"
+
+         FIT_LOADABLE_FILENAME[atf] = "bl31.bin"
+         FIT_LOADABLE_DESCRIPTION[atf] = "TF-A Firmware"
+         FIT_LOADABLE_TYPE[atf] = "tfa-bl31"
+         FIT_LOADABLE_ARCH[atf] = "arm64"
+         FIT_LOADABLE_OS[atf] = "arm-trusted-firmware"
+         FIT_LOADABLE_LOADADDRESS[atf] = "0x204E0000"
+         FIT_LOADABLE_ENTRYPOINT[atf] = "0x204E0000"
+
+         FIT_LOADABLE_FILENAME[tee] = "tee.bin.gz"
+         FIT_LOADABLE_COMPRESSION[tee] = "gzip"
+         FIT_LOADABLE_TYPE[tee] = "tee"
+         FIT_LOADABLE_OS[tee] = "tee"
+         FIT_LOADABLE_LOADADDRESS[tee] = "0x96000000"
+
+      and will be converted to the following FIT source::
+
+         images {
+                 atf {
+                         description = "TF-A Firmware";
+                         type = "tfa-bl31";
+                         compression = "none";
+                         data = /incbin/("<DEPLOY_DIR_IMAGE>/bl31.bin");
+                         arch = "arm64";
+                         os = "arm-trusted-firmware";
+                         load = <0x204E0000>;
+                         entry = <0x204E0000>;
+                 };
+                 tee {
+                         description = "tee loadable";
+                         type = "tee";
+                         compression = "gzip";
+                         data = /incbin/("<DEPLOY_DIR_IMAGE>/tee.bin.gz");
+                         arch = "arm64";
+                         os = "tee";
+                         load = <0x96000000>;
+                 };
+         };
+
+         configurations {
+                 default = "<my-board>.dtb";
+                 <my-board>.dtb {
+                         description = "1 Linux kernel, FDT blob, loadables";
+                         kernel = "kernel-1";
+                         fdt = "<my-board>.dtb";
+                         loadables = "atf", "tee";
+                 };
+         };
 
    :term:`FIT_MKIMAGE_EXTRA_OPTS`
       When inheriting the :ref:`ref-classes-kernel-fit-image`, the
@@ -4889,7 +5054,7 @@ system and gives an overview of their function and contents.
          configuration file. You cannot set the variable in a recipe file.
 
       See the
-      :yocto_git:`local.conf.sample.extended </meta-yocto/tree/meta-poky/conf/templates/default/local.conf.sample.extended>`
+      :oecore_path:`local.conf.sample.extended <meta/conf/templates/default/local.conf.sample.extended>`
       file for additional information. Also, for information on creating an
       :term:`Initramfs`, see the ":ref:`dev-manual/building:building an initial ram filesystem (Initramfs) image`" section
       in the Yocto Project Development Tasks Manual.
@@ -5158,6 +5323,11 @@ system and gives an overview of their function and contents.
       For more details see the :ref:`ref-classes-kernel-yocto` class and the
       :yocto_git:`symbol_why.py </yocto-kernel-tools/tree/tools/symbol_why.py>`
       script in :yocto_git:`yocto-kernel-tools </yocto-kernel-tools>`.
+
+   :term:`KCONFIG_CONFIG_ROOTDIR`
+      The :term:`KCONFIG_CONFIG_ROOTDIR` variable allows overriding the default
+      location of the ``.config`` file for recipes using the
+      :ref:`ref-classes-cml1` class.
 
    :term:`KCONFIG_MODE`
       When used with the :ref:`ref-classes-kernel-yocto`
@@ -5890,6 +6060,13 @@ system and gives an overview of their function and contents.
       For the directory containing logs specific to each task, see the
       :term:`T` variable.
 
+   :term:`LTO`
+      The :term:`LTO` variable defines the flags specific to the ``lto``
+      :term:`distro feature <DISTRO_FEATURES>`. The value of this variable is
+      appended to the :term:`TARGET_LDFLAGS` variable, adding `Link-Time
+      Optimisation <https://wiki.gentoo.org/wiki/LTO>`__ flags to the linker
+      in-use.
+
    :term:`MACHINE`
       Specifies the target device for which the image is built. You define
       :term:`MACHINE` in the ``local.conf`` file found in the
@@ -6060,28 +6237,24 @@ system and gives an overview of their function and contents.
       For a list of hardware features supported by the Yocto Project as
       shipped, see the ":ref:`ref-features-machine`" section.
 
-   :term:`MACHINE_FEATURES_BACKFILL`
-      A list of space-separated features to be added to
-      :term:`MACHINE_FEATURES` if not also present in
-      :term:`MACHINE_FEATURES_BACKFILL_CONSIDERED`.
+   :term:`MACHINE_FEATURES_DEFAULTS`
+      Specifies a space-separated list of default machine features provided by
+      the :term:`OpenEmbedded Build System`. This list should not be modified
+      directly, but instead :term:`MACHINE_FEATURES_OPTED_OUT` should be used to
+      prevent default machine features from being enabled.
 
-      This variable is set in the ``meta/conf/bitbake.conf`` file. It is not
-      intended to be user-configurable. It is best to just reference the
-      variable to see which machine features are being
-      :ref:`backfilled <ref-features-backfill>` for all machine configurations.
+      See :ref:`ref-manual/features:Default Features` for more information.
 
-   :term:`MACHINE_FEATURES_BACKFILL_CONSIDERED`
-      A list of space-separated features from :term:`MACHINE_FEATURES_BACKFILL`
-      that should not be :ref:`backfilled <ref-features-backfill>` (i.e. added
-      to :term:`MACHINE_FEATURES`) during the build.
+   :term:`MACHINE_FEATURES_OPTED_OUT`
+      Specifies a space-separated list of machine features to opt out from
+      when they are provided by the :term:`MACHINE_FEATURES_DEFAULTS` variable.
 
-      This corresponds to an opt-out mechanism. When new default machine
-      features are introduced, machine definition maintainers can review
-      (`consider`) them and decide to exclude them from the
-      :ref:`backfilled <ref-features-backfill>` features. Therefore, the
-      combination of :term:`MACHINE_FEATURES_BACKFILL` and
-      :term:`MACHINE_FEATURES_BACKFILL_CONSIDERED` makes it possible to
-      add new default features without breaking existing machine definitions.
+      You can also opt out of all default features by setting
+      :term:`MACHINE_FEATURES_OPTED_OUT` to ``*``::
+
+         MACHINE_FEATURES_OPTED_OUT = "*"
+
+      See :ref:`ref-manual/features:Default Features` for more information.
 
    :term:`MACHINEOVERRIDES`
       A colon-separated list of overrides that apply to the current
@@ -7308,19 +7481,17 @@ system and gives an overview of their function and contents.
       Points to a shared, global-state directory that holds data generated
       during the packaging process. During the packaging process, the
       :ref:`ref-tasks-packagedata` task packages data
-      for each recipe and installs it into this temporary, shared area.
+      for each recipe and installs it into this shared area.
       This directory defaults to the following, which you should not
       change::
 
-         ${STAGING_DIR_HOST}/pkgdata
+         ${TMPDIR}/pkgdata/${MACHINE}
 
       For examples of how this data is used, see the
       ":ref:`overview-manual/concepts:automatically added runtime dependencies`"
       section in the Yocto Project Overview and Concepts Manual and the
       ":ref:`dev-manual/debugging:viewing package information with ``oe-pkgdata-util```"
-      section in the Yocto Project Development Tasks Manual. For more
-      information on the shared, global-state directory, see
-      :term:`STAGING_DIR_HOST`.
+      section in the Yocto Project Development Tasks Manual.
 
    :term:`PKGDEST`
       Points to the parent directory for files to be packaged after they
@@ -7850,6 +8021,153 @@ system and gives an overview of their function and contents.
 
          QA_EMPTY_DIRS_RECOMMENDATION:/dev = "but all devices must be created at runtime"
 
+   :term:`QB_CMDLINE_IP_SLIRP`
+
+      If :term:`QB_NETWORK_DEVICE` adds more than one network interface to QEMU,
+      usually the ``ip=`` Linux kernel command line argument needs to be changed
+      accordingly. The :term:`QB_CMDLINE_IP_SLIRP` variable allows controlling
+      this value. See the Linux kernel documentation for more details:
+      https://www.kernel.org/doc/Documentation/filesystems/nfs/nfsroot.txt.
+
+   :term:`QB_CMDLINE_IP_TAP`
+
+      This variable is similar to the :term:`QB_CMDLINE_IP_SLIRP` variable.
+
+      Use as follows::
+
+         QB_CMDLINE_IP_TAP = "ip=192.168.7.@CLIENT@::192.168.7.@GATEWAY@:255.255.255.0::eth0"
+
+      Since the tap interface requires static IP configuration, ``runqemu``
+      replaces the ``@CLIENT@`` and ``@GATEWAY@`` place holders by the IP and
+      the gateway address of the QEMU guest.
+
+   :term:`QB_DEFAULT_FSTYPE`
+
+      The :term:`QB_DEFAULT_FSTYPE` variable controls the default filesystem
+      type to boot. It is represented as the file extension of one of the root
+      filesystem image extension found in :term:`DEPLOY_DIR_IMAGE`. For example:
+      ``ext4.zst``.
+
+   :term:`QB_DEFAULT_KERNEL`
+
+      When using ``runqemu``, the :term:`QB_DEFAULT_KERNEL` variable controls
+      the default Linux kernel image to boot, found in :term:`DEPLOY_DIR_IMAGE`. For
+      example: ``bzImage``.
+
+   :term:`QB_DRIVE_TYPE`
+
+      When using ``runqemu``, the :term:`QB_DRIVE_TYPE` variable specifies the
+      type of drive to emulate when starting the emulated machine.
+      Valid values are:
+
+      -  ``/dev/hd``: emulates an IDE drive.
+      -  ``/dev/mmcblk``: emulates an SD Card.
+      -  ``/dev/sd``: emulates an SCSI drive.
+      -  ``/dev/vd``: emulates a VirtIO drive.
+      -  ``/dev/vdb``: emulates a block VirtIO drive.
+
+   :term:`QB_GRAPHICS`
+
+      When using ``runqemu``, the :term:`QB_GRAPHICS` variable controls the QEMU
+      video card type to emulate. For example: ``-vga std``.
+
+      This value is appended to the argument list when running ``qemu``.
+
+   :term:`QB_KERNEL_CMDLINE_APPEND`
+
+      The :term:`QB_KERNEL_CMDLINE_APPEND` variable controls the options passed
+      to the Linux kernel's ``-append`` QEMU options, which controls the Linux kernel
+      command-line.
+
+      For example::
+
+         QB_KERNEL_CMDLINE_APPEND = "console=ttyS0"
+
+   :term:`QB_MEM`
+
+      The :term:`QB_MEM` variable controls the amount of memory allocated to the
+      emulated machine. Specify as follows::
+
+         QB_MEM = "-m 512"
+
+   :term:`QB_NETWORK_DEVICE`
+
+      When using ``runqemu``, the :term:`QB_NETWORK_DEVICE` variable controls
+      the network device instantiated by QEMU. This value needs to be compatible
+      with the :term:`QB_TAP_OPT` variable.
+
+      Example::
+
+         QB_NETWORK_DEVICE = "-device virtio-net-pci,netdev=net0,mac=@MAC@"
+
+      ``runqemu`` replaces ``@MAC@`` with a predefined mac address.
+
+   :term:`QB_NFSROOTFS_EXTRA_OPT`
+
+      When using ``runqemu``, the :term:`QB_NFSROOTFS_EXTRA_OPT` variable
+      controls extra options to be appended to the NFS rootfs options in the
+      Linux kernel command-line.
+
+      For example::
+
+         QB_NFSROOTFS_EXTRA_OPT = "wsize=4096,rsize=4096"
+
+   :term:`QB_OPT_APPEND`
+
+      When using ``runqemu``, the :term:`QB_OPT_APPEND` variable controls
+      general options to append to QEMU when starting.
+
+   :term:`QB_RNG`
+
+      When using ``runqemu``, the :term:`QB_RNG` variable controls
+      pass-through for host random number generator, it can speedup boot
+      in system mode, where system is experiencing entropy starvation.
+
+      For example::
+
+         QB_RNG = "-object rng-random,filename=/dev/urandom,id=rng0 -device virtio-rng-pci,rng=rng0"
+
+   :term:`QB_ROOTFS_EXTRA_OPT`
+
+      When using ``runqemu``, the :term:`QB_ROOTFS_EXTRA_OPT` variable controls
+      extra options to be appended to the rootfs device options.
+
+   :term:`QB_SERIAL_OPT`
+
+      When using ``runqemu``, the :term:`QB_SERIAL_OPT` variable controls the
+      serial port option.
+
+      For example::
+
+         QB_SERIAL_OPT = "-serial mon:stdio"
+
+   :term:`QB_SMP`
+
+      When using ``runqemu``, the :term:`QB_SMP` variable controls
+      amount of CPU cores made availalble inside the QEMU guest, each mapped to
+      a thread on the host.
+
+      For example::
+
+         QB_SMP = "-smp 8".
+
+   :term:`QB_TAP_NAMESERVER`
+
+      When using ``runqemu``, the :term:`QB_TAP_NAMESERVER` variable controls
+      the default :wikipedia:`name server <Name_server>` used in the QEMU guest.
+
+   :term:`QB_TAP_OPT`
+
+      When using ``runqemu``, the :term:`QB_TAP_OPT` variable controls
+      the network option for "tap" mode.
+
+      For example::
+
+         QB_TAP_OPT = "-netdev tap,id=net0,ifname=@TAP@,script=no,downscript=no"
+
+      Note that ``runqemu`` will replace ``@TAP@`` with the tap interface in
+      use, such as ``tap0``, ``tap1``, etc.
+
    :term:`RANLIB`
       The minimal command and arguments to run :manpage:`ranlib <ranlib(1)>`.
 
@@ -8015,13 +8333,13 @@ system and gives an overview of their function and contents.
       section.
 
    :term:`RECIPE_SYSROOT`
-      This variable points to the directory that holds all files populated from
+      This variable points to the directory populated with all files provided by
       recipes specified in :term:`DEPENDS`. As the name indicates,
-      think of this variable as a custom root (``/``) for the recipe that will be
+      think of this variable as a custom root (``/``) for the recipe, that will be
       used by the compiler in order to find headers and other files needed to complete
       its job.
 
-      This variable is related to :term:`STAGING_DIR_HOST` or :term:`STAGING_DIR_TARGET`
+      This variable is used to define :term:`STAGING_DIR_HOST` or :term:`STAGING_DIR_TARGET`
       according to the type of the recipe and the build target.
 
       To better understand this variable, consider the following examples:
@@ -8035,11 +8353,11 @@ system and gives an overview of their function and contents.
       Do not modify it.
 
    :term:`RECIPE_SYSROOT_NATIVE`
-      This is similar to :term:`RECIPE_SYSROOT` but the populated files are from
-      ``-native`` recipes. This allows a recipe built for the target machine to
-      use ``native`` tools.
+      This is similar to :term:`RECIPE_SYSROOT` but files in it are provided by
+      native recipes. This allows a recipe built for the target machine to
+      use native tools.
 
-      This variable is related to :term:`STAGING_DIR_NATIVE`.
+      This variable is used to define :term:`STAGING_DIR_NATIVE`.
 
       The default value is ``"${WORKDIR}/recipe-sysroot-native"``.
       Do not modify it.
@@ -8355,13 +8673,19 @@ system and gives an overview of their function and contents.
    :term:`RSUGGESTS`
       A list of additional packages that you can suggest for installation
       by the package manager at the time a package is installed. Not all
-      package managers support this functionality.
+      package managers support this functionality. This feature takes effect
+      only when the package manager is being used to install packages on
+      the target system from a package feed.
 
       As with all package-controlling variables, you must always use this
       variable in conjunction with a package name override. Here is an
       example::
 
          RSUGGESTS:${PN} = "useful_package another_package"
+
+      For more information on package management, see the
+      :ref:`dev-manual/packages:Using Runtime Package Management` section
+      of the Yocto Project Development Tasks Manual.
 
    :term:`RUST_CHANNEL`
       Specifies which version of Rust to build - "stable", "beta" or "nightly".
@@ -8404,6 +8728,44 @@ system and gives an overview of their function and contents.
       :term:`NATIVELSBSTRING` does not appear in the
       list, then the build system reports a warning that indicates the
       current host distribution has not been tested as a build host.
+
+   :term:`SBOM_CVE_CHECK_EXPORT_VARS`
+      When inheriting the :ref:`ref-classes-sbom-cve-check` class, this variable
+      holds the list of variables that declare export files to generate.
+
+      Each variable must have a ``type`` and an ``ext`` flag set:
+
+      -  The ``type`` flag contains the value that is passed to the
+         ``--export-type`` command line argument of ``sbom-cve-check``.
+
+      -  The ``ext`` flag contains the filename extension (suffix). The output
+         filename is going will be ``${IMAGE_NAME}${ext}``.
+
+      For example::
+
+         SBOM_CVE_CHECK_EXPORT_VARS = "SBOM_CVE_CHECK_EXPORT_SPDX3"
+         SBOM_CVE_CHECK_EXPORT_SPDX3[type] = "spdx3"
+         SBOM_CVE_CHECK_EXPORT_SPDX3[ext] = ".sbom-cve-check.spdx.json"
+
+   :term:`SBOM_CVE_CHECK_EXTRA_ARGS`
+      When inheriting the :ref:`ref-classes-sbom-cve-check` class, this variable
+      can be used to pass extra arguments to the ``sbom-cve-check`` command-line
+      tool.
+
+      See the `documentation <https://sbom-cve-check.readthedocs.io/en/latest/index.html>`__
+      of ``sbom-cve-check`` for more information.
+
+   :term:`SBOM_CVE_CHECK_SCAN_SCOPE`
+      When inheriting the :ref:`ref-classes-sbom-cve-check` class, this
+      variable controls whether to scan target and native, just target, or just
+      native recipes.
+
+      Valid values are:
+
+      -  ``target`` (default): recipes are scanned in their target context
+      -  ``native``: recipes are scanned in their :ref:`ref-classes-native` context
+      -  ``both``: recipes are scanned in both their target and
+         :ref:`ref-classes-native` context
 
    :term:`SDK_ARCH`
       The target architecture for the SDK. Typically, you do not directly
@@ -8987,55 +9349,37 @@ system and gives an overview of their function and contents.
 
             SOURCE_MIRROR_URL = "http://example.com/my_source_mirror;user=<user>;pswd=<password>"
 
-   :term:`SPDX_ARCHIVE_PACKAGED`
-      This option allows to add to :term:`SPDX` output compressed archives
-      of the files in the generated target packages.
+   :term:`SPDX_BUILD_HOST`
+      The base variable name describing the build host on which the build is
+      running. The value must name a key from ``SPDX_IMPORTS``, allowing
+      the generated SPDX to reference externally defined host identity data.
 
-      Such archives are available in
-      ``tmp/deploy/spdx/MACHINE/packages/packagename.tar.zst``
-      under the :term:`Build Directory`.
+      Requires :term:`SPDX_INCLUDE_BITBAKE_PARENT_BUILD` to be set to ``"1"``.
 
-      Enable this option as follows::
+      .. warning::
 
-         SPDX_ARCHIVE_PACKAGED = "1"
+         Setting this variable will result in non-reproducible SPDX output,
+         because the build host identity may vary across builds.
 
-      According to our tests on release 4.1 "langdale", building
-      ``core-image-minimal`` for the ``qemux86-64`` machine, enabling this
-      option multiplied the size of the ``tmp/deploy/spdx`` directory by a
-      factor of 13 (+1.6 GiB for this image), compared to just using the
-      :ref:`ref-classes-create-spdx` class with no option.
+      See also :term:`SPDX_INCLUDE_BITBAKE_PARENT_BUILD`,
+      ``SPDX_IMPORTS``, :term:`SPDX_INVOKED_BY`,
+      and :term:`SPDX_ON_BEHALF_OF`.
 
-      Note that this option doesn't increase the size of :term:`SPDX`
-      files in ``tmp/deploy/images/MACHINE``.
+   :term:`SPDX_CONCLUDED_LICENSE`
+      The :term:`SPDX_CONCLUDED_LICENSE` variable allows overriding the
+      ``hasConcludedLicense`` object to individual SBOM packages. This can be
+      used when the license of a package was determined to be different than the
+      original license string value, after analysis.
 
-   :term:`SPDX_ARCHIVE_SOURCES`
-      This option allows to add to :term:`SPDX` output compressed archives
-      of the sources for packages installed on the target. It currently
-      only works when :term:`SPDX_INCLUDE_SOURCES` is set.
+      This variable can be set in two ways:
 
-      This is one way of fulfilling "source code access" license
-      requirements.
+      -  For the entire recipe::
 
-      Such source archives are available in
-      ``tmp/deploy/spdx/MACHINE/recipes/recipe-packagename.tar.zst``
-      under the :term:`Build Directory`.
+            SPDX_CONCLUDED_LICENSE = "MIT & Apache-2.0"
 
-      Enable this option as follows::
+      -  For an individual package produced by the recipe::
 
-         SPDX_INCLUDE_SOURCES = "1"
-         SPDX_ARCHIVE_SOURCES = "1"
-
-      According to our tests on release 4.1 "langdale", building
-      ``core-image-minimal`` for the ``qemux86-64`` machine, enabling
-      these options multiplied the size of the ``tmp/deploy/spdx``
-      directory by a factor of 11 (+1.4 GiB for this image),
-      compared to just using the :ref:`ref-classes-create-spdx`
-      class with no option.
-
-      Note that using this option only marginally increases the size
-      of the :term:`SPDX` output in ``tmp/deploy/images/MACHINE/``
-      (+ 0.07\% with the tested image), compared to just enabling
-      :term:`SPDX_INCLUDE_SOURCES`.
+            SPDX_CONCLUDED_LICENSE:${PN} = "MIT & Apache-2.0"
 
    :term:`SPDX_CUSTOM_ANNOTATION_VARS`
       This option allows to associate `SPDX annotations
@@ -9062,6 +9406,89 @@ system and gives an overview of their function and contents.
              "comment": "ANNOTATION2=Second annotation for recipe"
            }
          ],
+
+   :term:`SPDX_FILE_EXCLUDE_PATTERNS`
+      A space-separated list of Python regular expressions used to exclude files
+      from the SPDX output when :term:`SPDX_INCLUDE_SOURCES` is enabled.
+      Files whose paths match any of the patterns, via ``re.search()``, are
+      filtered out from the generated SBOM.
+
+      By default this variable is empty, meaning no files are excluded.
+
+      Example usage::
+
+         SPDX_FILE_EXCLUDE_PATTERNS = "\\.patch$ \\.diff$ /test/ \\.pyc$ \\.o$"
+
+      See also :term:`SPDX_INCLUDE_SOURCES`.
+
+   :term:`SPDX_GIT_PURL_MAPPINGS`
+      A space separated list of ``domain:purl_type`` mappings to configure PURL
+      (Package URLs) generation for Git source downloads.
+
+      For example, adding ``gitlab.example.com:pkg:gitlab`` to this variable
+      will map repositories hosted on "gitlab.example.com" to the ``pkg:gitlab``
+      PURL type.
+
+      See also the :term:`SPDX_PACKAGE_URLS` variable for more information on
+      PURLs.
+
+   :term:`SPDX_IMAGE_SUPPLIER`
+      The name of an agent variable prefix describing the organization or
+      person who supplies the image SBOM. When set, the supplier is attached
+      to all root elements of the image SBOM using the ``suppliedBy`` property.
+
+      The value of this variable is the base prefix used to look up the
+      agent's details. The following sub-variables are read using that prefix:
+
+      -  ``<PREFIX>_name``: display name of the supplier (required)
+      -  ``<PREFIX>_type``: agent type: ``organization``, ``person``,
+         ``software``, or ``agent`` (optional, defaults to ``agent``)
+      -  ``<PREFIX>_comment``: free-text comment (optional)
+      -  ``<PREFIX>_id_email``: contact e-mail address (optional)
+
+      The simplest approach is to use the variable itself as its own prefix,
+      so the sub-variable names follow directly from
+      ``SPDX_IMAGE_SUPPLIER``.
+
+      Example (set in the image recipe or in a :term:`configuration file`)::
+
+         SPDX_IMAGE_SUPPLIER = "SPDX_IMAGE_SUPPLIER"
+         SPDX_IMAGE_SUPPLIER_name = "Acme Corp"
+         SPDX_IMAGE_SUPPLIER_type = "organization"
+
+      Alternatively, you can use any other prefix name, which is useful for
+      sharing an agent definition across multiple supplier variables::
+
+         MY_COMPANY_name = "Acme Corp"
+         MY_COMPANY_type = "organization"
+         SPDX_IMAGE_SUPPLIER = "MY_COMPANY"
+         SPDX_SDK_SUPPLIER = "MY_COMPANY"
+
+      If not set, no supplier information is added to the image SBOM.
+
+      See also :term:`SPDX_PACKAGE_SUPPLIER` and :term:`SPDX_SDK_SUPPLIER`.
+
+   :term:`SPDX_INCLUDE_BITBAKE_PARENT_BUILD`
+      When set to ``"1"``, the SPDX output will include a ``Build`` object
+      representing the parent :term:`BitBake` invocation. This allows consumers
+      of the SBOM to trace which CI/CD job or orchestration system triggered
+      the build.
+
+      This variable is required for :term:`SPDX_INVOKED_BY`,
+      :term:`SPDX_ON_BEHALF_OF`, and :term:`SPDX_BUILD_HOST` to have any
+      effect.
+
+      .. warning::
+
+         Enabling this variable will result in non-reproducible SPDX output,
+         because the build invocation identity changes with every run.
+
+      Enable as follows::
+
+         SPDX_INCLUDE_BITBAKE_PARENT_BUILD = "1"
+
+      See also :term:`SPDX_BUILD_HOST`, :term:`SPDX_INVOKED_BY`,
+      and :term:`SPDX_ON_BEHALF_OF`.
 
    :term:`SPDX_INCLUDE_COMPILED_SOURCES`
       This option allows the same as :term:`SPDX_INCLUDE_SOURCES` but including
@@ -9161,6 +9588,47 @@ system and gives an overview of their function and contents.
       increases the SBOM size (potentially by several gigabytes for typical
       images).
 
+   :term:`SPDX_INCLUDE_VEX`
+      This option controls what `VEX <https://cyclonedx.org/capabilities/vex/>`__
+      information will be present in the output SPDX documents.
+
+      It can take three different values:
+
+      -  ``none``: disable all VEX data.
+
+      -  ``current`` (default): include VEX data for vulnerabilities not already
+         fixed in the upstream source code.
+
+      -  ``all``: get all known historical vulnerabilities, including those
+         already fixed upstream (warning: this can be large and slow).
+
+   :term:`SPDX_INVOKED_BY`
+      The base variable name describing the agent that invoked the build.
+      Each ``Build`` object in the SPDX output is linked to this agent with an
+      ``invokedBy`` relationship. Requires
+      :term:`SPDX_INCLUDE_BITBAKE_PARENT_BUILD` to be set to ``"1"``.
+
+      The sub-variables follow the same agent prefix convention as
+      :term:`SPDX_IMAGE_SUPPLIER`:
+
+      -  ``SPDX_INVOKED_BY_name``: display name of the invoking agent
+      -  ``SPDX_INVOKED_BY_type``: agent type, such as ``software`` for a CI system
+
+      Example (CI pipeline invoking the build)::
+
+         SPDX_INCLUDE_BITBAKE_PARENT_BUILD = "1"
+         SPDX_INVOKED_BY = "SPDX_INVOKED_BY"
+         SPDX_INVOKED_BY_name = "GitLab CI"
+         SPDX_INVOKED_BY_type = "software"
+
+      .. warning::
+
+         Setting this variable will likely result in non-reproducible SPDX
+         output, because the invoking agent identity varies across builds.
+
+      See also :term:`SPDX_INCLUDE_BITBAKE_PARENT_BUILD`,
+      :term:`SPDX_ON_BEHALF_OF`, and :term:`SPDX_BUILD_HOST`.
+
    :term:`SPDX_LICENSES`
       Path to the JSON file containing SPDX license identifier mappings.
       This file maps common license names to official SPDX license
@@ -9189,11 +9657,66 @@ system and gives an overview of their function and contents.
       and the prefix of ``documentNamespace``. It is set by default to
       ``http://spdx.org/spdxdoc``.
 
+   :term:`SPDX_ON_BEHALF_OF`
+      The base variable name describing the agent on whose behalf the invoking
+      agent (:term:`SPDX_INVOKED_BY`) is running the build. Requires
+      :term:`SPDX_INCLUDE_BITBAKE_PARENT_BUILD` to be set to ``"1"``.
+      Has no effect if :term:`SPDX_INVOKED_BY` is not also set.
+
+      The sub-variables follow the same agent prefix convention as
+      :term:`SPDX_IMAGE_SUPPLIER`:
+
+      -  ``SPDX_ON_BEHALF_OF_name``: display name of the commissioning agent
+      -  ``SPDX_ON_BEHALF_OF_type``: agent type, such as ``organization``
+
+      Example (CI system building on behalf of a customer organization)::
+
+         SPDX_INCLUDE_BITBAKE_PARENT_BUILD = "1"
+         SPDX_INVOKED_BY = "SPDX_INVOKED_BY"
+         SPDX_INVOKED_BY_name = "GitLab CI"
+         SPDX_INVOKED_BY_type = "software"
+         SPDX_ON_BEHALF_OF = "SPDX_ON_BEHALF_OF"
+         SPDX_ON_BEHALF_OF_name = "Acme Corp"
+         SPDX_ON_BEHALF_OF_type = "organization"
+
+      .. warning::
+
+         Setting this variable will likely result in non-reproducible SPDX
+         output, because the agent identity varies across builds.
+
+      See also :term:`SPDX_INCLUDE_BITBAKE_PARENT_BUILD`,
+      :term:`SPDX_INVOKED_BY`, and :term:`SPDX_BUILD_HOST`.
+
+   :term:`SPDX_PACKAGE_SUPPLIER`
+      The base variable name describing the agent who supplies the artifacts
+      produced by the build. Works identically to :term:`SPDX_IMAGE_SUPPLIER`
+      but applies to individual packages rather than the image SBOM.
+
+      Typically set in a distro :term:`configuration file` to apply globally
+      to all packages, or in a specific software recipe (or a ``.bbappend``)
+      to apply only to packages of that recipe. Recipe-level overrides
+      (``SPDX_PACKAGE_SUPPLIER:pn-<recipe>``) are also supported::
+
+         SPDX_PACKAGE_SUPPLIER = "SPDX_PACKAGE_SUPPLIER"
+         SPDX_PACKAGE_SUPPLIER_name = "Acme Corp"
+         SPDX_PACKAGE_SUPPLIER_type = "organization"
+
+      See also :term:`SPDX_IMAGE_SUPPLIER` and :term:`SPDX_SDK_SUPPLIER`.
+
    :term:`SPDX_PACKAGE_URL`
       Provides a place for the SPDX data creator to record the package URL
-      string (``software_packageUrl``, in accordance with the Package URL
+      string (``software_packageUrl``), in accordance with the Package URL
       specification) for a software Package. The default value of this variable
       is an empty string.
+
+   :term:`SPDX_PACKAGE_URLS`
+      A space separated list of Package URLs ("PURLs") for the software package.
+      The first item in this list will be listed as the ``packageUrl`` property
+      of the packages, and all PURLs (including the first one) will be listed as
+      external references. The default value is an auto generated ``pkg:yocto``
+      PURL based on the recipe name, version, and layer name. Override this
+      variable to replace the default, otherwise append or prepend to add
+      additional PURLs.
 
    :term:`SPDX_PACKAGE_VERSION`
       This variable controls the package version as seen in the SPDX 3.0 JSON
@@ -9210,6 +9733,22 @@ system and gives an overview of their function and contents.
       The generated SPDX files are approximately 20% bigger, but
       this option is recommended if you want to inspect the SPDX
       output files with a text editor.
+
+   :term:`SPDX_SDK_SUPPLIER`
+      The base variable name describing the agent who supplies the SDK SBOM.
+      When set, the supplier is attached to all root elements of the SDK
+      SBOM using the ``suppliedBy`` property.
+
+      Works identically to :term:`SPDX_IMAGE_SUPPLIER` but applies to SDK
+      builds. This includes image-based SDKs produced by
+      ``bitbake <image> -c populate_sdk`` as well as toolchain SDKs produced
+      by ``bitbake meta-toolchain``.
+
+      Typically set in the image recipe or in a :term:`configuration file`.
+
+      If not set, no supplier information is added to the SDK SBOM.
+
+      See also :term:`SPDX_IMAGE_SUPPLIER` and :term:`SPDX_PACKAGE_SUPPLIER`.
 
    :term:`SPDX_UUID_NAMESPACE`
       The namespace used for generating UUIDs in SPDX documents. This
@@ -9635,8 +10174,7 @@ system and gives an overview of their function and contents.
       directory for the build host.
 
    :term:`STAGING_DIR`
-      Helps construct the ``recipe-sysroot*`` directories, which are used
-      during packaging.
+      Used for constructing directory trees used during staging.
 
       For information on how staging for recipe-specific sysroots occurs,
       see the :ref:`ref-tasks-populate_sysroot`
@@ -9656,31 +10194,31 @@ system and gives an overview of their function and contents.
          those files into the sysroot.
 
    :term:`STAGING_DIR_HOST`
-      Specifies the path to the sysroot directory for the system on which
-      the component is built to run (the system that hosts the component).
-      For most recipes, this sysroot is the one in which that recipe's
-      :ref:`ref-tasks-populate_sysroot` task copies
-      files. Exceptions include ``-native`` recipes, where the
-      :ref:`ref-tasks-populate_sysroot` task instead uses
-      :term:`STAGING_DIR_NATIVE`. Depending on
-      the type of recipe and the build target, :term:`STAGING_DIR_HOST` can
-      have the following values:
+      Specifies the path to the recipe's input sysroot directory, populated with files
+      for the system on which the component is built to run
+      (the system that hosts the component).
+      For most recipes, this sysroot is populated by their
+      :ref:`ref-tasks-populate_sysroot` task (when sharing files
+      between recipes). Exceptions include native recipes, for which the files from
+      :ref:`ref-tasks-populate_sysroot` task are instead copied to
+      :term:`STAGING_DIR_NATIVE`. Depending on the type of recipe and the build target,
+      :term:`STAGING_DIR_HOST` can have the following values:
 
       -  For recipes building for the target machine, the value is
-         "${:term:`STAGING_DIR`}/${:term:`MACHINE`}".
+         ``"${RECIPE_SYSROOT}"``, check :term:`RECIPE_SYSROOT`.
 
-      -  For native recipes building for the build host, the value is empty
-         given the assumption that when building for the build host, the
-         build host's own directories should be used.
+      -  For native recipes (building for the :term:`build host`), the value is empty
+         given the assumption that when building for the :term:`build host`, the
+         :term:`build host`'s own directories should be used.
 
          .. note::
 
-            ``-native`` recipes are not installed into host paths like such
-            as ``/usr``. Rather, these recipes are installed into
-            :term:`STAGING_DIR_NATIVE`. When compiling ``-native`` recipes,
+            Native recipe files are not installed into host paths such
+            as ``/usr``. Rather, such files are installed into
+            :term:`STAGING_DIR_NATIVE`. When compiling native recipes,
             standard build environment variables such as
             :term:`CPPFLAGS` and
-            :term:`CFLAGS` are set up so that both host paths
+            :term:`CFLAGS` are set up so that both :term:`build host`'s paths
             and :term:`STAGING_DIR_NATIVE` are searched for libraries and
             headers using, for example, GCC's ``-isystem`` option.
 
@@ -9688,16 +10226,15 @@ system and gives an overview of their function and contents.
             should be viewed as input variables by tasks such as
             :ref:`ref-tasks-configure`,
             :ref:`ref-tasks-compile`, and
-            :ref:`ref-tasks-install`. Having the real system
-            root correspond to :term:`STAGING_DIR_HOST` makes conceptual sense
-            for ``-native`` recipes, as they make use of host headers and
-            libraries.
-
-      Check :term:`RECIPE_SYSROOT` and :term:`RECIPE_SYSROOT_NATIVE`.
+            :ref:`ref-tasks-install`. Having the real system root
+            (the :term:`build host`'s root) play the role of :term:`STAGING_DIR_HOST`
+            makes conceptual sense for native recipes, as they make use
+            of the :term:`build host`'s headers and libraries.
 
    :term:`STAGING_DIR_NATIVE`
-      Specifies the path to the sysroot directory used when building
-      components that run on the build host itself.
+      Specifies the path to the recipe's input sysroot directory, populated with
+      files provided by native recipes (recipes building components that
+      run on the :term:`build host` itself).
 
       The default value is ``"${RECIPE_SYSROOT_NATIVE}"``,
       check :term:`RECIPE_SYSROOT_NATIVE`.
@@ -11369,6 +11906,11 @@ system and gives an overview of their function and contents.
       <https://www.freedesktop.org/software/systemd/man/latest/ukify.html>`__
       command.
 
+   :term:`UKI_DEVICETREE`
+      When inheriting the :ref:`ref-classes-uki` class, the :term:`UKI_DEVICETREE`
+      variable holds the list of device tree blobs to include to the `Unified
+      Kernel Image (UKI) <https://uapi-group.org/specifications/specs/unified_kernel_image/>`__.
+
    :term:`UKI_FILENAME`
       When inheriting the :ref:`ref-classes-uki` class, the output file name
       for the generated `Unified Kernel Image (UKI)
@@ -11742,6 +12284,13 @@ system and gives an overview of their function and contents.
       Wic creation process.
 
    :term:`WIC_SECTOR_SIZE`
+
+      .. warning::
+
+         This variable is deprecated in favor of the ``--sector-size`` wic
+         command-line argument. See :ref:`ref-migration-6-0-wic-sector-size-change`
+         for more information.
+
       The variable :term:`WIC_SECTOR_SIZE` controls the sector size of Wic
       images. In the background, this controls the value of the
       ``PARTED_SECTOR_SIZE`` environment variable passed to the ``parted``

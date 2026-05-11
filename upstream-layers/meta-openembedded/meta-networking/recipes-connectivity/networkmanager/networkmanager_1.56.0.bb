@@ -48,7 +48,6 @@ SRC_URI:append:libc-musl = "${@bb.utils.contains('DISTRO_FEATURES', 'ld-is-lld',
 
 SRCREV = "56b51b98fbb8627c4c09a483702e18fd8aee7ce1"
 
-
 # ['auto', 'symlink', 'file', 'netconfig', 'resolvconf']
 NETWORKMANAGER_DNS_RC_MANAGER_DEFAULT ??= "auto"
 
@@ -72,25 +71,12 @@ EXTRA_OEMESON = "\
     -Dman=false \
 "
 
-# stolen from https://github.com/void-linux/void-packages/blob/master/srcpkgs/NetworkManager/template
-# avoids:
-# | ../NetworkManager-1.16.0/libnm-core/nm-json.c:106:50: error: 'RTLD_DEEPBIND' undeclared (first use in this function); did you mean 'RTLD_DEFAULT'?
-CFLAGS:append:libc-musl = " \
-    -DRTLD_DEEPBIND=0 \
-"
-
-# networkmanager-1.52.0/src/nmcli/agent.c:88:29: error: incompatible function pointer types assigning to 'rl_hook_func_t *' (aka 'int (*)(void)') from 'int (const char *, int)' [-Wincompatible-function-pointer-types]
-#   88 |             rl_startup_hook = set_deftext;
-#      |                             ^ ~~~~~~~~~~~
-
-CFLAGS:append:toolchain-clang = " -Wno-error=incompatible-function-pointer-types"
-
 PACKAGECONFIG ??= "readline nss ifupdown dnsmasq nmcli \
     ${@bb.utils.contains('DISTRO_FEATURES', 'systemd', 'systemd', bb.utils.contains('DISTRO_FEATURES', 'x11', 'consolekit', '', d), d)} \
     ${@bb.utils.contains('DISTRO_FEATURES', 'bluetooth', 'bluez5', '', d)} \
     ${@bb.utils.filter('DISTRO_FEATURES', 'wifi polkit ppp', d)} \
     ${@bb.utils.contains('DISTRO_FEATURES', 'selinux', 'selinux audit', '', d)} \
-    ${@bb.utils.contains('DISTRO_FEATURES_BACKFILL_CONSIDERED', 'gobject-introspection-data', '', 'vala', d)} \
+    ${@bb.utils.contains('DISTRO_FEATURES_OPTED_OUT', 'gobject-introspection-data', '', 'vala', d)} \
 "
 
 inherit ${@bb.utils.contains('PACKAGECONFIG', 'vala', 'vala', '', d)}
@@ -325,4 +311,9 @@ do_install:append() {
     if ${@bb.utils.contains('PACKAGECONFIG','dhcpcd','true','false',d)}; then
         install -Dm 0644 ${UNPACKDIR}/enable-dhcpcd.conf ${D}${nonarch_libdir}/NetworkManager/conf.d/enable-dhcpcd.conf
     fi
+
+    # Don't ship initrd specific services into rootfs to avoid the conflict with the main services
+    rm -f ${D}${systemd_system_unitdir}/NetworkManager-config-initrd.service
+    rm -f ${D}${systemd_system_unitdir}/NetworkManager-initrd.service
+    rm -f ${D}${systemd_system_unitdir}/NetworkManager-wait-online-initrd.service
 }

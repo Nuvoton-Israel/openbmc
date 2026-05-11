@@ -4,6 +4,7 @@ SECTION = "libs"
 LICENSE = "GPL-2.0-only & LGPL-2.0-only"
 
 DEPENDS = "flex flex-native"
+RRECOMMENDS:${PN} = "kernel-module-atm-tcp"
 
 SRC_URI = "${SOURCEFORGE_MIRROR}/${BPN}/${BPN}/${PV}/${BP}.tar.gz \
            file://link-with-ldflags.patch \
@@ -30,6 +31,8 @@ file://COPYING.GPL;md5=ac2db169b9309e240555bc77be4f1a33 \
 file://COPYING.LGPL;md5=6e29c688d912da12b66b73e32b03d812"
 
 inherit autotools pkgconfig
+
+CACHED_CONFIGUREVARS += "ac_cv_prog_cc_c23=no"
 
 EXTRA_OEMAKE += "ROOTPREFIX=${root_prefix}"
 
