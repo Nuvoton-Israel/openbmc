@@ -8,37 +8,59 @@ Upstream-Status: Inappropriate [oe-specific]
 Signed-off-by: Stanley Chu <yschu@nuvoton.com>
 Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
 ---
- readd.cpp | 24 ++++++++++++++++++------
+ readd.cpp | 34 ++++++++++++++++++++++------------
  sysfs.cpp | 37 +++++++++++++++++++++++++++++++++++++
  sysfs.hpp |  1 +
- 3 files changed, 56 insertions(+), 6 deletions(-)
+ 3 files changed, 60 insertions(+), 12 deletions(-)
 
-diff --git a/readd.cpp b/readd.cpp
-index 733e9bc..c5ffb81 100644
---- a/readd.cpp
-+++ b/readd.cpp
-@@ -51,7 +51,11 @@ int main(int argc, char** argv)
-     {
-         // This path may either be a device path (starts with
-         // /devices), or an open firmware device tree path.
--        if (path.substr(0, 8) == "/devices")
-+        if (path.substr(0, 16) == "/devices/virtual")
-+        {
-+            path = sysfs::findHwmonFromVirtualDevPath(path);
-+        }
-+        else if (path.substr(0, 8) == "/devices")
+--- a/readd.cpp	2026-05-11 14:53:12.152817074 +0800
++++ b/readd.cpp	2026-05-11 14:53:27.890901489 +0800
+@@ -71,25 +71,24 @@
+         else
          {
-             path = sysfs::findHwmonFromDevPath(path);
+             // When disabled, use the original logic based on path format
+-            if (devpath.starts_with("/devices"))
++            if (devpath.starts_with("/devices/virtual"))
++            {
++                path = sysfs::findHwmonFromVirtualDevPath(devpath);
++            }
++            else if (devpath.starts_with("/devices"))
+             {
+                 path = sysfs::findHwmonFromDevPath(devpath);
+-                if (path.empty())
+-                {
+-                    exit_with_error(
+-                        app.help("", CLI::AppFormatMode::All),
+-                        "Unable to find hwmon device from device path.");
+-                }
+             }
+             else
+             {
+                 path = sysfs::findHwmonFromOFPath(devpath);
+-                if (path.empty())
+-                {
+-                    exit_with_error(
+-                        app.help("", CLI::AppFormatMode::All),
+-                        "Unable to find hwmon device from OF path.");
+-                }
++            }
++
++            if (path.empty())
++            {
++                exit_with_error(
++                    app.help("", CLI::AppFormatMode::All),
++                    "Unable to find hwmon device from path.");
+             }
          }
-@@ -73,12 +77,20 @@ int main(int argc, char** argv)
-                         "Path not specified or invalid.");
+     }
+@@ -106,11 +105,19 @@
      }
  
--    // Determine the physical device sysfs path.
+     // Determine the physical device sysfs path.
 -    auto calloutPath = sysfs::findCalloutPath(path);
 -    if (calloutPath.empty())
 +    std::string calloutPath;
-+    if (path.substr(0, 20) == "/sys/devices/virtual")
++    if (path.starts_with("/sys/devices/virtual"))
      {
 -        exit_with_error(app.help("", CLI::AppFormatMode::All),
 -                        "Unable to determine callout path.");
@@ -46,21 +68,18 @@ index 733e9bc..c5ffb81 100644
 +    }
 +    else
 +    {
-+        // Determine the physical device sysfs path.
 +        calloutPath = sysfs::findCalloutPath(path);
 +        if (calloutPath.empty())
 +        {
 +            exit_with_error(app.help("", CLI::AppFormatMode::All),
-+                "Unable to determine callout path.");
++                            "Unable to determine callout path.");
 +        }
      }
  
      hwmonio::HwmonIO io(path);
-diff --git a/sysfs.cpp b/sysfs.cpp
-index 4ff7a67..02aef16 100644
---- a/sysfs.cpp
-+++ b/sysfs.cpp
-@@ -239,4 +239,41 @@ std::string findHwmonFromDevPath(const std::string& devPath)
+--- a/sysfs.cpp	2026-05-11 14:53:12.152817074 +0800
++++ b/sysfs.cpp	2026-05-11 14:53:27.890901489 +0800
+@@ -255,6 +255,43 @@
      return emptyString;
  }
  
@@ -72,8 +91,8 @@ index 4ff7a67..02aef16 100644
 +    try
 +    {
 +        // This path is also used as a filesystem path to an environment
-+        // file, and that has issues with ':'s in the path so they've
-+        // been converted to '--'s.  Convert them back now.
++        // file, and that has issues with ":"s in the path so they"ve
++        // been converted to "--"s.  Convert them back now.
 +        size_t pos = 0;
 +        std::string path = p;
 +        while ((pos = path.find("--")) != std::string::npos)
@@ -95,25 +114,24 @@ index 4ff7a67..02aef16 100644
 +    catch (const std::exception& e)
 +    {
 +        lg2::error(
-+                   "Unable to find Virtual hwmon directory from the dev path: {ERR}",
-+                   "ERR", devPath);
++            "Unable to find Virtual hwmon directory from the dev path: {ERR}",
++            "ERR", devPath);
 +    }
 +    return emptyString;
 +}
 +
- } // namespace sysfs
-diff --git a/sysfs.hpp b/sysfs.hpp
-index 6a84cba..5098603 100644
---- a/sysfs.hpp
-+++ b/sysfs.hpp
-@@ -60,6 +60,7 @@ std::string findHwmonFromOFPath(const std::string& ofNode);
+ static std::string resolveI2CDevicePath(std::string_view deviceName)
+ {
+     fs::path sysPath{"/sys/bus/i2c/devices"};
+--- a/sysfs.hpp	2026-05-11 14:53:12.152817074 +0800
++++ b/sysfs.hpp	2026-05-11 14:53:27.890901489 +0800
+@@ -60,6 +60,7 @@
   *            string if no match is found.
   */
  std::string findHwmonFromDevPath(const std::string& devPath);
 +std::string findHwmonFromVirtualDevPath(const std::string& devPath);
  
- /** @brief Return the path to use for a call out.
+ /** @brief Finds the full device path from the bus device identifier
   *
 -- 
 2.43.0
-

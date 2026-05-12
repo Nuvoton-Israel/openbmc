@@ -1,7 +1,6 @@
 IMAGE_INSTALL:append = " x86-power-control"
 IMAGE_INSTALL:append = " phosphor-pid-control"
 IMAGE_INSTALL:append = " phosphor-ipmi-flash"
-IMAGE_INSTALL:append = " webui-vue"
 IMAGE_INSTALL:append = " obmc-ikvm"
 IMAGE_INSTALL:append = " iperf3"
 #IMAGE_INSTALL:append = " nmon"

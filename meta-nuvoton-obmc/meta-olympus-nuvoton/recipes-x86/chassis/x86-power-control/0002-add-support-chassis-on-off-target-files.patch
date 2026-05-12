@@ -1,4 +1,4 @@
-From 3dc30fb1ad2ca81a6dccf2018c1a6c17f2ff0b20 Mon Sep 17 00:00:00 2001
+From 12e0675e1226e3651591a0131276be05f07bf751 Mon Sep 17 00:00:00 2001
 From: Eason Yang <yhyang2@nuvoton.com>
 Date: Fri, 6 Sep 2024 13:26:46 +0800
 Subject: [PATCH] add support chassis on/off target files
@@ -13,10 +13,10 @@ Signed-off-by: Eason Yang <yhyang2@nuvoton.com>
  1 file changed, 43 insertions(+), 3 deletions(-)
 
 diff --git a/src/power_control.cpp b/src/power_control.cpp
-index d90e6c4..31bcffb 100644
+index 81f8819..9fe0ded 100644
 --- a/src/power_control.cpp
 +++ b/src/power_control.cpp
-@@ -33,7 +33,6 @@
+@@ -35,7 +35,6 @@
  #include <optional>
  #include <regex>
  #include <string_view>
@@ -24,7 +24,7 @@ index d90e6c4..31bcffb 100644
  
  namespace power_control
  {
-@@ -553,8 +552,44 @@ static void setBootProgress(const BootProgressStage stage)
+@@ -526,8 +525,44 @@ static void setBootProgress(const BootProgressStage stage)
  {
      bootIface->set_property("BootProgress",
                              std::string(getBootProgressStage(stage)));
@@ -71,7 +71,7 @@ index d90e6c4..31bcffb 100644
  }
  
  static constexpr std::string_view getHostState(const PowerState state)
-@@ -1631,6 +1666,8 @@ static void currentHostStateMonitor()
+@@ -1588,6 +1623,8 @@ static void currentHostStateMonitor()
          pohCounterTimerStart();
          // Clear the restart cause set for the next restart
          clearRestartCause();
@@ -80,7 +80,7 @@ index d90e6c4..31bcffb 100644
      }
      else
      {
-@@ -1640,6 +1677,7 @@ static void currentHostStateMonitor()
+@@ -1597,6 +1634,7 @@ static void currentHostStateMonitor()
          osIface->set_property("OperatingSystemState", std::string("Inactive"));
          setBootProgress(BootProgressStage::Unspecified);
  
@@ -88,7 +88,7 @@ index d90e6c4..31bcffb 100644
          // Set the restart cause set for this restart
          setRestartCause();
      }
-@@ -2359,12 +2397,14 @@ static void postCompleteHandler(bool state)
+@@ -2309,12 +2347,14 @@ static void postCompleteHandler(bool state)
          sendPowerControlEvent(Event::postCompleteAssert);
          setOperatingSystemState(OperatingSystemStateStage::Standby);
          setBootProgress(BootProgressStage::OSStart);
@@ -103,6 +103,3 @@ index d90e6c4..31bcffb 100644
      }
  }
  
--- 
-2.34.1
-

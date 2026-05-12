@@ -51,10 +51,10 @@ Signed-off-by: Apparao Puli <apuli@nvidia.com>
  create mode 100644 platform-mc/state_sensor.hpp
 
 diff --git a/meson.build b/meson.build
-index 84ef90d3b..92ab3a569 100644
+index dfd41c320..1d0438246 100644
 --- a/meson.build
 +++ b/meson.build
-@@ -287,6 +287,7 @@ executable(
+@@ -277,6 +277,7 @@ executable(
      'platform-mc/manager.cpp',
      'platform-mc/sensor_manager.cpp',
      'platform-mc/numeric_sensor.cpp',
@@ -643,10 +643,10 @@ index 000000000..937f5f003
 +} // namespace platform_mc
 +} // namespace pldm
 diff --git a/platform-mc/terminus.cpp b/platform-mc/terminus.cpp
-index cc8618465..1f6b2273f 100644
+index 2afbbc767..7092ca10f 100644
 --- a/platform-mc/terminus.cpp
 +++ b/platform-mc/terminus.cpp
-@@ -139,6 +139,20 @@ void Terminus::parseTerminusPDRs()
+@@ -158,6 +158,20 @@ void Terminus::parseTerminusPDRs()
                  sensorAuxiliaryNamesTbl.emplace_back(std::move(sensorAuxNames));
                  break;
              }
@@ -667,7 +667,7 @@ index cc8618465..1f6b2273f 100644
              case PLDM_NUMERIC_SENSOR_PDR:
              {
                  auto parsedPdr = parseNumericSensorPDR(pdr);
-@@ -254,6 +268,17 @@ void Terminus::addNextSensorFromPDRs()
+@@ -273,6 +287,17 @@ void Terminus::addNextSensorFromPDRs()
              event, std::bind(std::mem_fn(&Terminus::addCompactNumericSensor),
                               this, pdr));
      }
@@ -685,7 +685,7 @@ index cc8618465..1f6b2273f 100644
      else
      {
          sensorPdrIt = 0;
-@@ -406,6 +431,54 @@ std::shared_ptr<EntityAuxiliaryNames> Terminus::parseEntityAuxiliaryNamesPDR(
+@@ -447,6 +472,54 @@ std::shared_ptr<EntityAuxiliaryNames> Terminus::parseEntityAuxiliaryNamesPDR(
      return std::make_shared<EntityAuxiliaryNames>(key, nameStrings);
  }
  
@@ -741,18 +741,18 @@ index cc8618465..1f6b2273f 100644
      const std::vector<uint8_t>& pdr)
  {
 diff --git a/platform-mc/terminus.hpp b/platform-mc/terminus.hpp
-index 147e6e70a..2d775c4a2 100644
+index 462773780..186913adc 100644
 --- a/platform-mc/terminus.hpp
 +++ b/platform-mc/terminus.hpp
-@@ -4,6 +4,7 @@
+@@ -3,6 +3,7 @@
+ #include "common/types.hpp"
  #include "dbus_impl_fru.hpp"
  #include "numeric_sensor.hpp"
- #include "requester/handler.hpp"
 +#include "state_sensor.hpp"
- #include "terminus.hpp"
  
  #include <libpldm/fru.h>
-@@ -146,6 +147,9 @@ class Terminus
+ #include <libpldm/platform.h>
+@@ -143,6 +144,9 @@ class Terminus
      /** @brief A list of numericSensors */
      std::vector<std::shared_ptr<NumericSensor>> numericSensors{};
  
@@ -762,7 +762,7 @@ index 147e6e70a..2d775c4a2 100644
      /** @brief The flag indicates that the terminus FIFO contains a large
       *         message that will require a multipart transfer via the
       *         PollForPlatformEvent command
-@@ -192,6 +196,8 @@ class Terminus
+@@ -189,6 +193,8 @@ class Terminus
      void addNumericSensor(
          const std::shared_ptr<pldm_numeric_sensor_value_pdr> pdr);
  
@@ -771,7 +771,7 @@ index 147e6e70a..2d775c4a2 100644
      /** @brief Parse the numeric sensor PDRs
       *
       *  @param[in] pdrData - the response PDRs from GetPDR command
-@@ -200,6 +206,10 @@ class Terminus
+@@ -197,6 +203,10 @@ class Terminus
      std::shared_ptr<pldm_numeric_sensor_value_pdr> parseNumericSensorPDR(
          const std::vector<uint8_t>& pdrData);
  
@@ -782,7 +782,7 @@ index 147e6e70a..2d775c4a2 100644
      /** @brief Parse the sensor Auxiliary name PDRs
       *
       *  @param[in] pdrData - the response PDRs from GetPDR command
-@@ -315,6 +325,9 @@ class Terminus
+@@ -323,6 +333,9 @@ class Terminus
      std::vector<std::shared_ptr<pldm_compact_numeric_sensor_pdr>>
          compactNumericSensorPdrs{};
  
@@ -793,11 +793,11 @@ index 147e6e70a..2d775c4a2 100644
      SensorID sensorPdrIt = 0;
  };
 diff --git a/platform-mc/test/meson.build b/platform-mc/test/meson.build
-index 2d722e936..ca20e8e86 100644
+index e2411db18..2ffdcd27a 100644
 --- a/platform-mc/test/meson.build
 +++ b/platform-mc/test/meson.build
-@@ -7,6 +7,7 @@ test_src = declare_dependency(
-         '../dbus_impl_fru.cpp',
+@@ -6,6 +6,7 @@ test_src = declare_dependency(
+         '../manager.cpp',
          '../sensor_manager.cpp',
          '../numeric_sensor.cpp',
 +        '../state_sensor.cpp',

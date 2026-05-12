@@ -1,7 +1,8 @@
-From f4392ee6ff01ebf951b9750d0492a7feb547d97b Mon Sep 17 00:00:00 2001
+From 36d66b75e0e74520372f82ee8a98e7c6a3a2110f Mon Sep 17 00:00:00 2001
 From: Saptarsi Saha <saptarsis@nvidia.com>
 Date: Tue, 20 May 2025 21:38:37 +0530
 Subject: [PATCH] From 8b698aa5ad627eb80d3111e004bb9a169183e2d1 Mon Sep 17
+
  00:00:00 2001 From: Saptarsi Saha <saptarsis@nvidia.com> Date: Tue, 20 May
  2025 21:38:37 +0530 Subject: [PATCH] mctpreactor: Support configuration for
  USB MCTP devices
@@ -29,7 +30,7 @@ Upstream-Status: Submitted [https://gerrit.openbmc.org/c/openbmc/dbus-sensors/+/
  3 files changed, 197 insertions(+), 2 deletions(-)
 
 diff --git a/src/mctp/MCTPEndpoint.cpp b/src/mctp/MCTPEndpoint.cpp
-index 4dbc2bc84..fa3204e3b 100644
+index 986e3e0..5bb94ae 100644
 --- a/src/mctp/MCTPEndpoint.cpp
 +++ b/src/mctp/MCTPEndpoint.cpp
 @@ -21,6 +21,7 @@
@@ -211,7 +212,7 @@ index 4dbc2bc84..fa3204e3b 100644
 +    }
 +}
 diff --git a/src/mctp/MCTPEndpoint.hpp b/src/mctp/MCTPEndpoint.hpp
-index 2d0c4f1d7..2786c6a9e 100644
+index deed905..7e268ca 100644
 --- a/src/mctp/MCTPEndpoint.hpp
 +++ b/src/mctp/MCTPEndpoint.hpp
 @@ -9,6 +9,7 @@
@@ -254,7 +255,7 @@ index 2d0c4f1d7..2786c6a9e 100644
 +        uint8_t interfaceNum);
 +};
 diff --git a/src/mctp/MCTPReactorMain.cpp b/src/mctp/MCTPReactorMain.cpp
-index 8866759a6..b8c749b60 100644
+index 9d2d321..06d9a0a 100644
 --- a/src/mctp/MCTPReactorMain.cpp
 +++ b/src/mctp/MCTPReactorMain.cpp
 @@ -93,6 +93,12 @@ static std::shared_ptr<MCTPDevice> deviceFromConfig(
@@ -270,8 +271,8 @@ index 8866759a6..b8c749b60 100644
      }
      catch (const std::invalid_argument& ex)
      {
-@@ -133,7 +139,8 @@ static void removeInventory(const std::shared_ptr<MCTPReactor>& reactor,
-         msg.unpack<sdbusplus::message::object_path, std::set<std::string>>();
+@@ -132,7 +138,8 @@ static void removeInventory(const std::shared_ptr<MCTPReactor>& reactor,
+         msg.unpack<sdbusplus::object_path, std::set<std::string>>();
      try
      {
 -        if (I2CMCTPDDevice::match(removed) || I3CMCTPDDevice::match(removed))
@@ -280,7 +281,7 @@ index 8866759a6..b8c749b60 100644
          {
              reactor->unmanageMCTPDevice(path.str);
          }
-@@ -248,7 +255,7 @@ int main()
+@@ -247,7 +254,7 @@ int main()
      boost::asio::post(io, [reactor, systemBus]() {
          auto gsc = std::make_shared<GetSensorConfiguration>(
              systemBus, std::bind_front(manageMCTPEntity, systemBus, reactor));
@@ -289,6 +290,3 @@ index 8866759a6..b8c749b60 100644
          gsc->getConfiguration(types);
      });
  
--- 
-2.43.0
-
