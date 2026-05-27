@@ -1,0 +1,3 @@
+ACTION=="add", SUBSYSTEM=="net", KERNEL=="mctpusb*", KERNELS=="1-1", \
+  RUN+="/bin/sh -c '/usr/bin/mctp link set %k up; /usr/bin/mctp addr add 8 dev %k'"
+

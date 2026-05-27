@@ -1,0 +1,281 @@
+From 0d5c11b904e2204650bf1b37814f573ef66dd5ef Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Tue, 26 May 2026 13:49:20 +0800
+Subject: [PATCH] mctp: Add USB hot-plug support with static EID assignment
+
+Support MCTP USB devices inserted after boot by monitoring mctpd
+interface events and re-triggering device configuration when a new
+USB interface appears.
+
+Allow MCTPUSBDevice entries in entity-manager to specify a fixed peer
+EID via an optional "EID" property, which causes mctpreactor to use
+AssignEndpointStatic instead of dynamic assignment.
+
+Skip redundant re-assignment for already-configured devices when an
+unrelated USB event triggers a configuration refresh.
+
+Upstream-Status: Inappropriate [oe-specific]
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ src/mctp/MCTPEndpoint.cpp    | 59 +++++++++++++++++++++++++++++++++++-
+ src/mctp/MCTPEndpoint.hpp    | 22 ++++++++++++--
+ src/mctp/MCTPReactor.cpp     | 42 +++++++++++++++++++++++++
+ src/mctp/MCTPReactor.hpp     |  1 +
+ src/mctp/MCTPReactorMain.cpp | 36 ++++++++++++++++++++++
+ 5 files changed, 157 insertions(+), 3 deletions(-)
+
+diff --git a/src/mctp/MCTPEndpoint.cpp b/src/mctp/MCTPEndpoint.cpp
+index 5bb94ae9c..2a948d88c 100644
+--- a/src/mctp/MCTPEndpoint.cpp
++++ b/src/mctp/MCTPEndpoint.cpp
+@@ -125,6 +125,44 @@ void MCTPDDevice::setup(
+         mctpdControlInterface, "AssignEndpoint", physaddr);
+ }
+ 
++void MCTPDDevice::setupWithStaticEid(
++    uint8_t eid,
++    std::function<void(const std::error_code& ec,
++                       const std::shared_ptr<MCTPEndpoint>& ep)>&& added)
++{
++    auto onSetup = [weak{weak_from_this()}, added{std::move(added)}](
++                       const boost::system::error_code& ec, uint8_t eid,
++                       int network, const std::string& objpath,
++                       bool allocated [[maybe_unused]]) mutable {
++        if (ec)
++        {
++            added(ec, {});
++            return;
++        }
++        if (auto self = weak.lock())
++        {
++            self->finaliseEndpoint(objpath, eid, network, added);
++        }
++    };
++    connection->async_method_call(
++        onSetup, mctpdBusName,
++        mctpdControlPath + std::string("/interfaces/") + interface,
++        mctpdControlInterface, "AssignEndpointStatic", physaddr, eid);
++}
++
++void USBMCTPDDevice::setup(
++    std::function<void(const std::error_code& ec,
++                       const std::shared_ptr<MCTPEndpoint>& ep)>&& added)
++{
++    if (!staticEid)
++    {
++        // No static EID configured: delegate to base class (AssignEndpoint)
++        MCTPDDevice::setup(std::move(added));
++        return;
++    }
++    setupWithStaticEid(*staticEid, std::move(added));
++}
++
+ void MCTPDDevice::endpointRemoved()
+ {
+     if (endpoint)
+@@ -707,12 +745,31 @@ std::shared_ptr<USBMCTPDDevice> USBMCTPDDevice::from(
+         throw std::invalid_argument("Bad Interface value");
+     }
+ 
++    // Optional static EID: if present, AssignEndpointStatic will be used
++    std::optional<uint8_t> staticEid;
++    auto mEID = iface.find("EID");
++    if (mEID != iface.end())
++    {
++        auto sEID = std::visit(VariantToStringVisitor(), mEID->second);
++        uint8_t eid{};
++        auto [eptr, eec] = std::from_chars(sEID.data(),
++                                           sEID.data() + sEID.size(), eid);
++        if (eec != std::errc{})
++        {
++            throw std::invalid_argument("Bad EID value");
++        }
++        staticEid = eid;
++    }
++
+     try
+     {
+         std::string bus = busFromRootHubPath(rootHubPath);
+         std::string interface =
+             interfaceFromSysfs(bus, port, configuration, interfaceNum);
+-        return std::make_shared<USBMCTPDDevice>(connection, interface);
++        info("USBMCTPDDevice::from: port={USB_PORT} -> sysfs iface={SYSFS_IFACE} staticEid={STATIC_EID}",
++             "USB_PORT", port, "SYSFS_IFACE", interface,
++             "STATIC_EID", staticEid ? std::to_string(*staticEid) : "none");
++        return std::make_shared<USBMCTPDDevice>(connection, interface, staticEid);
+     }
+     catch (const MCTPException& ex)
+     {
+diff --git a/src/mctp/MCTPEndpoint.hpp b/src/mctp/MCTPEndpoint.hpp
+index 7e268ca6e..163126ae9 100644
+--- a/src/mctp/MCTPEndpoint.hpp
++++ b/src/mctp/MCTPEndpoint.hpp
+@@ -283,6 +283,16 @@ class MCTPDDevice :
+     void remove() override;
+     std::string describe() const override;
+     std::size_t id() const override;
++    const std::string& getInterface() const
++    {
++        return interface;
++    }
++
++  protected:
++    void setupWithStaticEid(
++        uint8_t eid,
++        std::function<void(const std::error_code& ec,
++                           const std::shared_ptr<MCTPEndpoint>& ep)>&& added);
+ 
+   private:
+     static void onEndpointInterfacesRemoved(
+@@ -369,12 +379,20 @@ class USBMCTPDDevice : public MCTPDDevice
+     USBMCTPDDevice() = delete;
+     USBMCTPDDevice(
+         const std::shared_ptr<sdbusplus::asio::connection>& connection,
+-        const std::string& interface) :
+-        MCTPDDevice(connection, interface, std::vector<uint8_t>{})
++        const std::string& interface,
++        std::optional<uint8_t> staticEid = std::nullopt) :
++        MCTPDDevice(connection, interface, std::vector<uint8_t>{}),
++        staticEid(staticEid)
+     {}
+     ~USBMCTPDDevice() override = default;
+ 
++    void setup(std::function<void(const std::error_code& ec,
++                                  const std::shared_ptr<MCTPEndpoint>& ep)>&&
++                   added) override;
++
+   private:
++    std::optional<uint8_t> staticEid;
++
+     static constexpr const char* configType = "MCTPUSBDevice";
+ 
+     static std::string busFromRootHubPath(
+diff --git a/src/mctp/MCTPReactor.cpp b/src/mctp/MCTPReactor.cpp
+index d4f591c8b..a53123e1d 100644
+--- a/src/mctp/MCTPReactor.cpp
++++ b/src/mctp/MCTPReactor.cpp
+@@ -201,6 +201,9 @@ void MCTPReactor::tick()
+ {
+     for (const auto& entry : devices)
+     {
++        debug("tick: device [ {MCTP_DEVICE} ] state={STATE}",
++              "MCTP_DEVICE", entry.second->describe(),
++              "STATE", states[entry.second->id()]);
+         switch (states[entry.second->id()])
+         {
+             case MCTPDeviceState::Unmanaged:
+@@ -269,6 +272,17 @@ void MCTPReactor::manageMCTPDevice(const std::string& path,
+                 return;
+             }
+ 
++            // If the device configuration hasn't changed (same id), skip
++            // re-assignment to avoid redundant AssignEndpointStatic calls
++            // when an unrelated interface triggers getConfiguration.
++            if (current->id() == device->id())
++            {
++                info(
++                    "Device at '{INVENTORY_PATH}' already assigned with same configuration, skipping re-assignment",
++                    "INVENTORY_PATH", path);
++                break;
++            }
++
+             // Unsynchronised termination so we can configure the new device.
+             // Paired with presence test when handling MCTPDeviceState::Removing
+             // in the subscribed endpoint removed handler
+@@ -294,6 +308,34 @@ void MCTPReactor::manageMCTPDevice(const std::string& path,
+     }
+ }
+ 
++void MCTPReactor::removeMCTPInterface(const std::string& ifname)
++{
++    // When a mctpd interface (e.g. mctpusb0) goes away, remove all devices
++    // using that interface from the repository.  This ensures that when the
++    // interface reappears on a different port and getConfiguration re-runs,
++    // manageMCTPDevice() can add the new device without hitting a stale
++    // path-to-device mapping conflict.
++
++    // Collect matching devices first to avoid modifying the map while
++    // iterating over it.
++    std::vector<std::shared_ptr<MCTPDevice>> toRemove;
++    for (const auto& entry : devices)
++    {
++        auto* mctpd = dynamic_cast<MCTPDDevice*>(entry.second.get());
++        if (mctpd && mctpd->getInterface() == ifname)
++            toRemove.push_back(entry.second);
++    }
++
++    for (const auto& dev : toRemove)
++    {
++        info("mctpd interface '{IFNAME}' removed, removing device "
++             "[ {MCTP_DEVICE} ] from repository",
++             "IFNAME", ifname, "MCTP_DEVICE", dev->describe());
++        devices.remove(dev);
++        states.erase(dev->id());
++    }
++}
++
+ void MCTPReactor::unmanageMCTPDevice(const std::string& path)
+ {
+     auto device = devices.deviceFor(path);
+diff --git a/src/mctp/MCTPReactor.hpp b/src/mctp/MCTPReactor.hpp
+index 5f07a7aa2..4979ef8d3 100644
+--- a/src/mctp/MCTPReactor.hpp
++++ b/src/mctp/MCTPReactor.hpp
+@@ -93,6 +93,7 @@ class MCTPReactor : public std::enable_shared_from_this<MCTPReactor>
+     void manageMCTPDevice(const std::string& path,
+                           const std::shared_ptr<MCTPDevice>& device);
+     void unmanageMCTPDevice(const std::string& path);
++    void removeMCTPInterface(const std::string& ifname);
+ 
+   private:
+     static std::optional<std::string> findSMBusInterface(int bus);
+diff --git a/src/mctp/MCTPReactorMain.cpp b/src/mctp/MCTPReactorMain.cpp
+index 06d9a0ab5..8f02e245a 100644
+--- a/src/mctp/MCTPReactorMain.cpp
++++ b/src/mctp/MCTPReactorMain.cpp
+@@ -249,6 +249,42 @@ int main()
+         static_cast<sdbusplus::bus_t&>(*systemBus), interfacesAddedMatchSpec,
+         std::bind_front(addInventory, systemBus, reactor));
+ 
++    // When a new mctpd interface appears (e.g. USB inserted after boot),
++    // re-run getConfiguration so USBMCTPDDevice::from() can succeed now
++    // that the sysfs path exists.
++    const std::string mctpdInterfaceAddedSpec =
++        rules::sender("au.com.codeconstruct.MCTP1") +
++        rules::interfacesAddedAtPath(
++            "/au/com/codeconstruct/mctp1/interfaces/");
++
++    auto mctpdInterfaceAddedMatch = sdbusplus::bus::match_t(
++        static_cast<sdbusplus::bus_t&>(*systemBus), mctpdInterfaceAddedSpec,
++        [reactor, systemBus](sdbusplus::message_t& /*msg*/) {
++            info("mctpd interface added, re-running getConfiguration");
++            auto gsc = std::make_shared<GetSensorConfiguration>(
++                systemBus,
++                std::bind_front(manageMCTPEntity, systemBus, reactor));
++            std::vector<std::string_view> types{"MCTPI2CTarget", "MCTPI3CTarget", "MCTPUSBDevice"};
++            gsc->getConfiguration(types);
++        });
++
++    // When a mctpd interface is removed (e.g. USB cable unplugged), stop
++    // retrying setup for devices on that interface so we don't flood mctpd
++    // with pointless AssignEndpointStatic calls.
++    const std::string mctpdInterfaceRemovedSpec =
++        rules::sender("au.com.codeconstruct.MCTP1") +
++        rules::interfacesRemovedAtPath(
++            "/au/com/codeconstruct/mctp1/interfaces/");
++
++    auto mctpdInterfaceRemovedMatch = sdbusplus::bus::match_t(
++        static_cast<sdbusplus::bus_t&>(*systemBus), mctpdInterfaceRemovedSpec,
++        [reactor](sdbusplus::message_t& msg) {
++            auto [objpath, interfaces] =
++                msg.unpack<sdbusplus::object_path, std::set<std::string>>();
++            std::string ifname = objpath.filename();
++            reactor->removeMCTPInterface(ifname);
++        });
++
+     systemBus->request_name("xyz.openbmc_project.MCTPReactor");
+ 
+     boost::asio::post(io, [reactor, systemBus]() {
+-- 
+2.34.1
+
