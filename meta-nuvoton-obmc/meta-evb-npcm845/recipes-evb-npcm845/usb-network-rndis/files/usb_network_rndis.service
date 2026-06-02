@@ -1,6 +1,5 @@
 [Unit]
 Description=enable usb network
-After=phosphor-ipmi-host.service
 
 [Service]
 Type=oneshot
