@@ -1,28 +1,28 @@
-From 57acc3674863538da4f3366bc8376c3a893ddb41 Mon Sep 17 00:00:00 2001
+From a81c294d2a71affbcb1e114070369c632606ceeb Mon Sep 17 00:00:00 2001
 From: Joseph Liu <kwliu@nuvoton.com>
-Date: Tue, 28 Mar 2023 11:56:33 +0800
+Date: Thu, 4 Jun 2026 15:20:04 +0800
 Subject: [PATCH] Add more PSU devices support
 
 Upstream-Status: Inappropriate [oe-specific]
 
 Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
 ---
- src/PSUSensorMain.cpp | 2 ++
+ src/psu/PSUSensorMain.cpp | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/src/PSUSensorMain.cpp b/src/PSUSensorMain.cpp
-index 07802cd4..5a1deef1 100644
---- a/src/PSUSensorMain.cpp
-+++ b/src/PSUSensorMain.cpp
-@@ -88,6 +88,8 @@ static const I2CDeviceTypeMap sensorTypes{
-     {"TPS546D24", I2CDeviceType{"tps546d24", true}},
+diff --git a/src/psu/PSUSensorMain.cpp b/src/psu/PSUSensorMain.cpp
+index 93df00ee8..706f5c056 100644
+--- a/src/psu/PSUSensorMain.cpp
++++ b/src/psu/PSUSensorMain.cpp
+@@ -157,6 +157,8 @@ static constexpr auto sensorTypes = std::to_array<
      {"XDPE11280", I2CDeviceType{"xdpe11280", true}},
      {"XDPE12284", I2CDeviceType{"xdpe12284", true}},
+     {"XDPE152C4", I2CDeviceType{"xdpe152c4", true}},
 +    {"TPS53659", I2CDeviceType{"tps53659", true}},
 +    {"TPS53679", I2CDeviceType{"tps53679", true}},
- };
+ });
  
- namespace fs = std::filesystem;
+ enum class DevTypes
 -- 
-2.34.1
+2.43.0
 

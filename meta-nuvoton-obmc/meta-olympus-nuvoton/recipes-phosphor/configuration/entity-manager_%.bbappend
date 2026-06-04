@@ -3,8 +3,6 @@ inherit obmc-phosphor-systemd
 
 SRC_URI:append = " file://F0B_BMC_MB.json"
 SRC_URI:append = " file://PSU_0.json"
-SRC_URI:append = " file://xyz.openbmc_project.EntityManager.service"
-SRC_URI:append = " file://xyz.openbmc_project.FruDevice.service"
 SRC_URI:append = " file://0001-Add-new-type-of-settable-interface-PowerSupply.patch"
 
 FILES:${PN}:append = " ${datadir}/entity-manager/F0B_BMC_MB.json"
