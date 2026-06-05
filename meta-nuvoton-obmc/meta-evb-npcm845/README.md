@@ -36,8 +36,7 @@ For more product questions, please contact us at:
     + [Build Output](#build-output)
   * [Flash Programming](#flash-programming)
     + [Method 1: IGPS](#method-1-igps-image-generation-and-programming-scripts)
-    + [Method 2: ISP](#method-2-isp-in-system-programming-via-ftdi)
-    + [Method 3: U-Boot TFTP](#method-3-u-boot-tftp)
+    + [Method 2: U-Boot TFTP](#method-3-u-boot-tftp)
   * [Next Steps](#next-steps)
   * [Troubleshooting](#troubleshooting)
   * [Boot from eMMC](#boot-from-emmc)
@@ -326,10 +325,10 @@ DEVICE_GEN = "A1"  # or "Z1" for Z1 devices
 
 #### Programming Steps
 
-**Step 1: Enter FUP Mode** (Z1 devices only; A1 devices should use ISP)
+**Step 1: Enter HZ Mode**
 
 1. Connect Mini-USB cable to **J_USB_TO_UART**
-2. Turn **ON** STRAP9 on the DIP switch
+2. Turn **ON** STRAP7 on the DIP switch
 3. Close your terminal application
 4. Press **PORST_N** button (Power-On-Reset)
 
@@ -345,36 +344,7 @@ For **secure boot**:
 $ python ./ProgramAll_Secure.py
 ```
 
-### Method 2: ISP (In-System Programming via FTDI)
-
-**Prerequisites:**
-- FTDI USB cable
-- `Arbel_EVB_FlashProg.exe` tool
-
-#### Programming Steps
-
-**Step 1: Enter Tri-State Mode**
-
-1. Connect Mini-USB cable to **J_USB_TO_UART**
-2. Configure straps:
-   - **STRAP7**: ON (BMC pins at Hi-Z)
-   - **STRAP5**: ON (Route BSP signals via Host SI2 pins)
-3. Close your terminal application
-4. Press **PORST_N** button (Power-On-Reset)
-
-**Step 2: Program Flash**
-
-**Program bootloader only:**
-```bash
-$ Arbel_EVB_FlashProg.exe -open-desc "NPCM8mnx_Evaluation_Board B" -verify-on -prog-file "image-u-boot" 0 0 -1 -reset
-```
-
-**Program complete firmware:**
-```bash
-$ Arbel_EVB_FlashProg.exe -open-desc "NPCM8mnx_Evaluation_Board B" -verify-on -prog-file "image-bmc" 0 0 -1 -reset
-```
-
-### Method 3: U-Boot TFTP
+### Method 2: U-Boot TFTP
 
 **Prerequisites:**
 - TFTP server on your network
@@ -622,8 +592,7 @@ The NPCM845 BMC serial console baudrate can be customized. This requires changes
 
 **Edit the BAUD_RATE Field:**
 
-1. Edit your custom `BootBlockAndHeader.xml` and enable `BAUD_RATE`
-2. Update `settings.json` in the `npcm8xx-bootloader` folder:
+1. Update `settings.json` in the `npcm8xx-bootloader` folder:
 
 ```json
 {
@@ -697,66 +666,29 @@ You can program MFSEL registers to configure a pin as GPIO.
 
 ### Linux Test
 
-- Edit nuvoton-common-npcm8xx.dtsi.
+- Update the platform DTS, for example `nuvoton-npcm845-evb.dts`
+- To define a default GPIO direction or level in Linux DTS, use `&pinctrl` only for pin mux or electrical settings when the pin must first be switched to GPIO mode.
+
+**Example: default GPIO state in platform DTS**
 ```
-    gpio0: gpio@f0010000 {
-        gpio-controller;
-        #gpio-cells = <2>;
-        reg = <0x0 0xB0>;
-        interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
-        gpio-ranges = <&pinctrl 0 0 32>;
-    };
-    gpio1: gpio@f0011000 {
-        gpio-controller;
-        #gpio-cells = <2>;
-        reg = <0x1000 0xB0>;
-        interrupts = <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>;
-        gpio-ranges = <&pinctrl 0 32 32>;
-    };
-    gpio2: gpio@f0012000 {
-        gpio-controller;
-        #gpio-cells = <2>;
-        reg = <0x2000 0xB0>;
-        interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
-        gpio-ranges = <&pinctrl 0 64 32>;
-    };
-    gpio3: gpio@f0013000 {
-        gpio-controller;
-        #gpio-cells = <2>;
-        reg = <0x3000 0xB0>;
-        interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>;
-        gpio-ranges = <&pinctrl 0 96 32>;
-    };
-    gpio4: gpio@f0014000 {
-        gpio-controller;
-        #gpio-cells = <2>;
-        reg = <0x4000 0xB0>;
-        interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
-        gpio-ranges = <&pinctrl 0 128 32>;
-    };
-    gpio5: gpio@f0015000 {
-        gpio-controller;
-        #gpio-cells = <2>;
-        reg = <0x5000 0xB0>;
-        interrupts = <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>;
-        gpio-ranges = <&pinctrl 0 160 32>;
-    };
-    gpio6: gpio@f0016000 {
-        gpio-controller;
-        #gpio-cells = <2>;
-        reg = <0x6000 0xB0>;
-        interrupts = <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>;
-        gpio-ranges = <&pinctrl 0 192 32>;
-    };
-    gpio7: gpio@f0017000 {
-        gpio-controller;
-        #gpio-cells = <2>;
-        reg = <0x7000 0xB0>;
-        interrupts = <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>;
-        gpio-ranges = <&pinctrl 0 224 32>;
-    };
+/* In the pin configuration dtsi, such as
+
+gpio0ol_pins: gpio0ol-pins {
+			pins = "GPIO00/IOX1_DI/SMB6C_SDA/SMB18_SDA";
+			bias-disable;
+			output-low;
+};
+
+/* In the platform DTS */
+&pinctrl {
+  pinctrl-names = "default";
+  pinctrl-0 = <
+      &gpio0ol
+  >;
+};
 ```
-- Enable Kernel config
+
+- Kernel config
 ```
 CONFIG_GPIOLIB=y
 CONFIG_GPIOLIB_FASTPATH_LIMIT=512
@@ -804,91 +736,9 @@ devmem 0xf0010004 32
 ```
 
 ### U-boot test
-- DTS
-```
-    gpio0: gpio0@f0010000 {
-        compatible = "nuvoton,npcm845-gpio";
-        reg = <0x0 0xf0010000 0x0 0x1000>;
-        #gpio-cells = <2>;
-        gpio-controller;
-        gpio-bank-name = "gpio0";
-        gpio-count = <32>;
-        gpio-port = <0>;
-    };
+- DTS configuration is sames as Linux DTS, for example `nuvoton-npcm845-evb.dts`, you need to define the pinmux for GPIO function, but there is no need to define the default GPIO state in DTS because we can operate GPIOs directly in U-Boot without relying on pinctrl driver to set the pinmux to GPIO mode.
 
-    gpio1: gpio1@f0011000 {
-        compatible = "nuvoton,npcm845-gpio";
-        reg = <0x0 0xf0011000 0x0 0x1000>;
-        #gpio-cells = <2>;
-        gpio-controller;
-        gpio-bank-name = "gpio1";
-        gpio-count = <32>;
-        gpio-port = <1>;
-    };
-
-    gpio2: gpio2@f0012000 {
-        compatible = "nuvoton,npcm845-gpio";
-        reg = <0x0 0xf0012000 0x0 0x1000>;
-        #gpio-cells = <2>;
-        gpio-controller;
-        gpio-bank-name = "gpio2";
-        gpio-count = <32>;
-        gpio-port = <2>;
-    };
-
-    gpio3: gpio3@f0013000 {
-        compatible = "nuvoton,npcm845-gpio";
-        reg = <0x0 0xf0013000 0x0 0x1000>;
-        #gpio-cells = <2>;
-        gpio-controller;
-        gpio-bank-name = "gpio3";
-        gpio-count = <32>;
-        gpio-port = <3>;
-    };
-
-    gpio4: gpio4@f0014000 {
-        compatible = "nuvoton,npcm845-gpio";
-        reg = <0x0 0xf0014000 0x0 0x1000>;
-        #gpio-cells = <2>;
-        gpio-controller;
-        gpio-bank-name = "gpio4";
-        gpio-count = <32>;
-        gpio-port = <4>;
-    };
-
-    gpio5: gpio5@f0015000 {
-        compatible = "nuvoton,npcm845-gpio";
-        reg = <0x0 0xf0015000 0x0 0x1000>;
-        #gpio-cells = <2>;
-        gpio-controller;
-        gpio-bank-name = "gpio5";
-        gpio-count = <32>;
-        gpio-port = <5>;
-    };
-
-    gpio6: gpio6@f0016000 {
-        compatible = "nuvoton,npcm845-gpio";
-        reg = <0x0 0xf0016000 0x0 0x1000>;
-        #gpio-cells = <2>;
-        gpio-controller;
-        gpio-bank-name = "gpio6";
-        gpio-count = <32>;
-        gpio-port = <6>;
-    };
-
-    gpio7: gpio7@f0017000 {
-        compatible = "nuvoton,npcm845-gpio";
-        reg = <0x0 0xf0017000 0x0 0x1000>;
-        #gpio-cells = <2>;
-        gpio-controller;
-        gpio-bank-name = "gpio7";
-        gpio-count = <32>;
-        gpio-port = <7>;
-    };
-
-```
-
-- Enable u-boot config
+-  u-boot config
 ```
 CONFIG_DM_GPIO=y
 CONFIG_CMD_GPIO=y
