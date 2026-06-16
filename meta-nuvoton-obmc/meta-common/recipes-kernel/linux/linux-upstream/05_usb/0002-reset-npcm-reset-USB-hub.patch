@@ -1,0 +1,40 @@
+From 56c79c64937cde67eab1ca560992d0071badfb4f Mon Sep 17 00:00:00 2001
+From: Tomer Maimon <tmaimon77@gmail.com>
+Date: Thu, 3 Jul 2025 11:35:50 +0300
+Subject: [PATCH] reset: npcm: reset USB hub
+
+Reset USB hub during reset probe.
+
+Signed-off-by: Tomer Maimon <tmaimon77@gmail.com>
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+---
+ drivers/reset/reset-npcm.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/reset/reset-npcm.c b/drivers/reset/reset-npcm.c
+index fac3dc89c4a4..9ad7c3587b9b 100644
+--- a/drivers/reset/reset-npcm.c
++++ b/drivers/reset/reset-npcm.c
+@@ -57,6 +57,7 @@
+ #define NPCM_IPSRST3_USBD7	BIT(5)
+ #define NPCM_IPSRST3_USBD8	BIT(6)
+ #define NPCM_IPSRST3_USBD9	BIT(7)
++#define NPCM_IPSRST3_USBHUB	BIT(8)
+ #define NPCM_IPSRST3_USBPHY1	BIT(24)
+ #define NPCM_IPSRST3_USBPHY2	BIT(25)
+ 
+@@ -286,7 +287,9 @@ static void npcm_usb_reset_npcm8xx(struct npcm_rc_data *rc)
+ 	if (!(mdlr & NPCM8XX_MDLR_USBD9))
+ 		ipsrst3_bits |= NPCM_IPSRST3_USBD9;
+ 
+-	/* assert reset USB PHY and USB devices */
++	ipsrst3_bits |= NPCM_IPSRST3_USBHUB;
++
++	/* assert reset USB PHY, USB HUB and USB devices */
+ 	iprst1 = readl(rc->base + NPCM_IPSRST1);
+ 	iprst2 = readl(rc->base + NPCM_IPSRST2);
+ 	iprst3 = readl(rc->base + NPCM_IPSRST3);
+-- 
+2.43.0
+

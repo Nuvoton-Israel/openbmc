@@ -1,0 +1,30 @@
+From 8f6b927f73760fffe5803682f69de6ae08cb67e9 Mon Sep 17 00:00:00 2001
+From: Tomer Maimon <tmaimon77@gmail.com>
+Date: Mon, 28 Apr 2025 21:26:01 +0300
+Subject: [PATCH] pinctrl: nuvoton: clear status and disable GPIO
+
+Signed-off-by: Tomer Maimon <tmaimon77@gmail.com>
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+---
+ drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c b/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
+index 7b469c8b7cbb..78b9652ec660 100644
+--- a/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
++++ b/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
+@@ -2399,6 +2399,10 @@ static int npcm8xx_gpio_fw(struct npcm8xx_pinctrl *pctrl)
+ 			return dev_err_probe(dev, ret, "gpio-ranges fail for GPIO bank %u\n", id);
+ 
+ 		ret = fwnode_irq_get(child, 0);
++		/* Clear and disable event before GPIO init */
++		iowrite32(0x0, pctrl->gpio_bank[id].base + NPCM8XX_GP_N_EVEN);
++		iowrite32(0xFFFFFFFF, pctrl->gpio_bank[id].base + NPCM8XX_GP_N_EVST);
++
+ 		if (ret < 0)
+ 			return dev_err_probe(dev, ret, "Failed to retrieve IRQ for bank %u\n", id);
+ 
+-- 
+2.43.0
+

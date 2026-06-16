@@ -1,0 +1,36 @@
+From 0943693d5dcd42a9f2d1db8f6c69864eeac8edf3 Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Fri, 3 Nov 2023 13:15:41 +0800
+Subject: [PATCH] reset: npcm8xx: add 50 us delay for usb phy clock stable
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Follow the USB initialize guidance of the datasheet
+- Enable USB PHY
+- wait for PHY clocks to stabilize for 50 μs or more.
+- set RS bit of USBPHYCTL
+
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+---
+ drivers/reset/reset-npcm.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/reset/reset-npcm.c b/drivers/reset/reset-npcm.c
+index e5b6127783a7..fac3dc89c4a4 100644
+--- a/drivers/reset/reset-npcm.c
++++ b/drivers/reset/reset-npcm.c
+@@ -317,6 +317,8 @@ static void npcm_usb_reset_npcm8xx(struct npcm_rc_data *rc)
+ 	iprst4 &= ~NPCM_IPSRST4_USBPHY3;
+ 	writel(iprst4, rc->base + NPCM_IPSRST4);
+ 
++	udelay(50);
++
+ 	/* set USB PHY RS bit */
+ 	regmap_update_bits(rc->gcr_regmap, NPCM_USB1PHYCTL_OFFSET,
+ 			   NPCM_USBXPHYCTL_RS, NPCM_USBXPHYCTL_RS);
+-- 
+2.43.0
+

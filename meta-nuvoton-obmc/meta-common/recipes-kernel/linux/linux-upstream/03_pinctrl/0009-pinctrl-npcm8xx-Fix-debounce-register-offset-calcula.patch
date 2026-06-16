@@ -1,0 +1,32 @@
+From 54db9f29b3f89da8905aef629b36c6de45f2f0ba Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Wed, 11 Feb 2026 14:36:06 +0800
+Subject: [PATCH] pinctrl: npcm8xx: Fix debounce register offset calculation
+
+Fix the DBNCS register offset calculation in debounce timing
+setting from (gpio / 4) to (gpio / 16) * 4, to correctly match
+the hardware design where every 16 GPIOs share one DBNCS register.
+
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+---
+ drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c b/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
+index 4d460e0d82ca..e5ba36923d2b 100644
+--- a/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
++++ b/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
+@@ -2139,7 +2139,7 @@ static const struct pinmux_ops npcm8xx_pinmux_ops = {
+ static int debounce_timing_setting(struct npcm8xx_gpio *bank, u32 gpio,
+ 				   u32 nanosecs)
+ {
+-	void __iomem *DBNCS_offset = bank->base + NPCM8XX_GP_N_DBNCS0 + (gpio / 4);
++	void __iomem *DBNCS_offset = bank->base + NPCM8XX_GP_N_DBNCS0 + (gpio / 16) * 4;
+ 	int gpio_debounce = (gpio % 16) * 2, debounce_select, i;
+ 	u32 dbncp_val, dbncp_val_mod;
+ 
+-- 
+2.43.0
+

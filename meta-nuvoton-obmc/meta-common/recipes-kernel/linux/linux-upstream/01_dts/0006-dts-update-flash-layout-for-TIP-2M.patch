@@ -1,0 +1,49 @@
+From 0561d5cf0bfb18519d4d0b5b420d77b82f78d596 Mon Sep 17 00:00:00 2001
+From: Brian Ma <chma0@nuvoton.com>
+Date: Thu, 9 May 2024 13:32:52 +0800
+Subject: [PATCH] dts: update flash layout for TIP 2M
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+---
+ .../boot/dts/nuvoton/nuvoton-npcm845-evb.dts     | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+index 1b6c128a219a..6ecfcee4c37e 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+@@ -254,23 +254,23 @@ bmc@0 {
+ 				};
+ 			u-boot@0 {
+ 				label = "u-boot";
+-				reg = <0x00000000 0x003C0000>;
++				reg = <0x00000000 0x007C0000>;
+ 				};
+-			u-boot-env@3c0000 {
++			u-boot-env@7c0000 {
+ 				label = "u-boot-env";
+-				reg = <0x003C0000 0x00040000>;
++				reg = <0x007C0000 0x00040000>;
+ 				};
+-			kernel@200000 {
++			kernel@800000 {
+ 				label = "kernel";
+-				reg = <0x00400000 0x00800000>;
++				reg = <0x00800000 0x00800000>;
+ 				};
+-			rofs@c00000 {
++			rofs@1000000 {
+ 				label = "rofs";
+-				reg = <0x00C00000 0x03000000>;
++				reg = <0x01000000 0x02C00000>;
+ 				};
+ 			rwfs@3c00000 {
+ 				label = "rwfs";
+-				reg = <0x3C00000 0x400000>;
++				reg = <0x03C00000 0x00400000>;
+ 				};
+ 		};
+ 	};
+-- 
+2.43.0
+

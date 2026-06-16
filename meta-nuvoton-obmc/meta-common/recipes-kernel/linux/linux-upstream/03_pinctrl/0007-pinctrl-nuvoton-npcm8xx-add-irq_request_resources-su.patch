@@ -1,0 +1,68 @@
+From 5aebcf1efc434fd2a8f153f60384d25c5eff333a Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Fri, 22 Aug 2025 11:56:02 +0800
+Subject: [PATCH] pinctrl: nuvoton: npcm8xx: add irq_request_resources support
+
+This patch adds support for irq_request_resources and irq_release_resources
+to the NPCM8XX GPIO driver. This allows the driver to properly manage
+interrupt resources when handling GPIO interrupts.
+
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+---
+ drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c | 24 ++++++++++++++++++-----
+ 1 file changed, 19 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c b/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
+index 39bf406450b1..3c4dc1c351d8 100644
+--- a/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
++++ b/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
+@@ -200,11 +200,6 @@ static int npcmgpio_gpio_request(struct gpio_chip *chip, unsigned int offset)
+ 	if (ret)
+ 		return ret;
+ 
+-	/* active-high, input, clear interrupt, enable interrupt */
+-	ret = npcmgpio_direction_input(chip, offset);
+-	if (ret)
+-		return ret;
+-
+ 	return bank->request(chip, offset);
+ }
+ 
+@@ -303,6 +298,23 @@ static unsigned int npcmgpio_irq_startup(struct irq_data *d)
+ 	return 0;
+ }
+ 
++static int npcmgpio_irq_request_resources(struct irq_data *d)
++{
++	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
++	unsigned int gpio = irqd_to_hwirq(d);
++
++	npcmgpio_direction_input(gc, gpio);
++
++	return gpiochip_lock_as_irq(gc, d->hwirq);
++}
++
++static void npcmgpio_irq_release_resources(struct irq_data *d)
++{
++	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
++
++	gpiochip_unlock_as_irq(gc, d->hwirq);
++}
++
+ static struct irq_chip npcmgpio_irqchip = {
+ 	.name = "NPCM8XX-GPIO-IRQ",
+ 	.irq_ack = npcmgpio_irq_ack,
+@@ -310,6 +322,8 @@ static struct irq_chip npcmgpio_irqchip = {
+ 	.irq_mask = npcmgpio_irq_mask,
+ 	.irq_set_type = npcmgpio_set_irq_type,
+ 	.irq_startup = npcmgpio_irq_startup,
++	.irq_request_resources	= npcmgpio_irq_request_resources,
++	.irq_release_resources = npcmgpio_irq_release_resources,
+ 	.flags =  IRQCHIP_MASK_ON_SUSPEND | IRQCHIP_IMMUTABLE,
+ 	GPIOCHIP_IRQ_RESOURCE_HELPERS,
+ };
+-- 
+2.43.0
+

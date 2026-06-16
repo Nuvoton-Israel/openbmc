@@ -1,0 +1,84 @@
+From 6270da96f9a43d1320ec36442028e5d7a0277e55 Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Tue, 14 Mar 2023 09:39:39 +0800
+Subject: [PATCH] dts: nuvoton: evb-npcm845: support openbmc partition
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ .../boot/dts/nuvoton/nuvoton-npcm845-evb.dts  | 51 ++++++-------------
+ 1 file changed, 16 insertions(+), 35 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+index aa25ad05ae03..1b6c128a219a 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+@@ -248,49 +248,30 @@ partitions@80000000 {
+ 			compatible = "fixed-partitions";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+-			bbuboot1@0 {
+-				label = "bb-uboot-1";
+-				reg = <0x0000000 0x80000>;
+-				read-only;
++			bmc@0 {
++				label = "bmc";
++				reg = <0x00000000 0x04000000>;
+ 				};
+-			bbuboot2@80000 {
+-				label = "bb-uboot-2";
+-				reg = <0x0080000 0x80000>;
+-				read-only;
++			u-boot@0 {
++				label = "u-boot";
++				reg = <0x00000000 0x003C0000>;
+ 				};
+-			envparam@100000 {
+-				label = "env-param";
+-				reg = <0x0100000 0x40000>;
+-				read-only;
+-				};
+-			spare@140000 {
+-				label = "spare";
+-				reg = <0x0140000 0xC0000>;
++			u-boot-env@3c0000 {
++				label = "u-boot-env";
++				reg = <0x003C0000 0x00040000>;
+ 				};
+ 			kernel@200000 {
+ 				label = "kernel";
+-				reg = <0x0200000 0x400000>;
+-				};
+-			rootfs@600000 {
+-				label = "rootfs";
+-				reg = <0x0600000 0x700000>;
++				reg = <0x00400000 0x00800000>;
+ 				};
+-			spare1@D00000 {
+-				label = "spare1";
+-				reg = <0x0D00000 0x200000>;
++			rofs@c00000 {
++				label = "rofs";
++				reg = <0x00C00000 0x03000000>;
+ 				};
+-			spare2@F00000 {
+-				label = "spare2";
+-				reg = <0x0F00000 0x200000>;
++			rwfs@3c00000 {
++				label = "rwfs";
++				reg = <0x3C00000 0x400000>;
+ 				};
+-			spare3@1100000 {
+-				label = "spare3";
+-				reg = <0x1100000 0x200000>;
+-				};
+-			spare4@1300000 {
+-				label = "spare4";
+-				reg = <0x1300000 0x0>;
+-			};
+ 		};
+ 	};
+ };
+-- 
+2.43.0
+

@@ -1,0 +1,48 @@
+From 5bf8cb60b62755e10d50b84c86d0875f2061b338 Mon Sep 17 00:00:00 2001
+From: Tomer Maimon <tmaimon77@gmail.com>
+Date: Mon, 23 Dec 2024 09:46:23 +0200
+Subject: [PATCH] watchdog: npcm: save reset status
+
+Since the reset status register (INTCR2) should be clear, the NPCM WD save
+the reset value in the scratchpad for other WD devices use.
+
+Signed-off-by: Tomer Maimon <tmaimon77@gmail.com>
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+---
+ drivers/watchdog/npcm_wdt.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/watchdog/npcm_wdt.c b/drivers/watchdog/npcm_wdt.c
+index 52f726b3c792..9a89abe3e276 100644
+--- a/drivers/watchdog/npcm_wdt.c
++++ b/drivers/watchdog/npcm_wdt.c
+@@ -18,6 +18,7 @@
+ /* NPCM7xx GCR module */
+ #define NPCM7XX_RESSR_OFFSET		0x6C
+ #define NPCM7XX_INTCR2_OFFSET		0x60
++#define NPCM8XX_SCRPAD10_OFFSET		0xE28
+ 
+ #define NPCM7XX_PORST			BIT(31)
+ #define NPCM7XX_CORST			BIT(30)
+@@ -235,9 +236,14 @@ static void npcm_get_reset_status(struct npcm_wdt *wdt, struct device *dev)
+ 	}
+ 
+ 	/* In Arbel, after reading the INTCR2 Clear reset status */
+-	if (of_device_is_compatible(dev->of_node, "nuvoton,npcm845-wdt"))
+-		regmap_write(gcr_regmap, NPCM7XX_INTCR2_OFFSET,
+-			     rstval & ~NPCM8XX_RST);
++	if (of_device_is_compatible(dev->of_node, "nuvoton,npcm845-wdt")) {
++		if (rstval & NPCM8XX_RST) {
++			regmap_write(gcr_regmap, NPCM7XX_INTCR2_OFFSET,
++				     rstval & ~NPCM8XX_RST);
++			regmap_write(gcr_regmap, NPCM8XX_SCRPAD10_OFFSET, rstval);
++		} else
++			regmap_read(gcr_regmap, NPCM8XX_SCRPAD10_OFFSET, &rstval);
++	}
+ 
+ 	if (rstval & wdt->card_reset)
+ 		wdt->wdd.bootstatus |= WDIOF_CARDRESET;
+-- 
+2.43.0
+

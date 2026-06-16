@@ -1,0 +1,28 @@
+From b79a5dfc9f815070235687b34a36e24e9e22bec5 Mon Sep 17 00:00:00 2001
+From: Tomer Maimon <tmaimon77@gmail.com>
+Date: Tue, 20 May 2025 17:55:35 +0300
+Subject: [PATCH] pinctrl: nuvoton: npcm8xx: modify GPIO7 pin naming
+
+Signed-off-by: Tomer Maimon <tmaimon77@gmail.com>
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+---
+ drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c b/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
+index 78b9652ec660..ce1b35caea5f 100644
+--- a/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
++++ b/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
+@@ -1564,7 +1564,7 @@ static const struct pinctrl_pin_desc npcm8xx_pins[] = {
+ 	PINCTRL_PIN(4,	"GPIO4/IOX2_DI/SMB1D_SDA"),
+ 	PINCTRL_PIN(5,	"GPIO5/IOX2_LD/SMB1D_SCL"),
+ 	PINCTRL_PIN(6,	"GPIO6/IOX2_CK/SMB2D_SDA"),
+-	PINCTRL_PIN(7,	"GPIO7/IOX2_D0/SMB2D_SCL"),
++	PINCTRL_PIN(7,	"GPIO7/IOX2_DO/SMB2D_SCL"),
+ 	PINCTRL_PIN(8,	"GPIO8/LKGPO1/TP_GPIO0"),
+ 	PINCTRL_PIN(9,	"GPIO9/LKGPO2/TP_GPIO1"),
+ 	PINCTRL_PIN(10, "GPIO10/IOXH_LD/SMB6D_SCL/SMB16_SCL"),
+-- 
+2.43.0
+

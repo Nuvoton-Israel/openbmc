@@ -1,0 +1,28 @@
+From 10961e5b7400ee57b4793f0f653edc7b7c41c66a Mon Sep 17 00:00:00 2001
+From: Ban Feng <kcfeng0@nuvoton.com>
+Date: Mon, 28 Jul 2025 11:01:42 +0800
+Subject: [PATCH] i2c: npcm: clear the FIFO in master ber case
+
+Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+---
+ drivers/i2c/busses/i2c-npcm7xx.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/i2c/busses/i2c-npcm7xx.c b/drivers/i2c/busses/i2c-npcm7xx.c
+index 57162bdf22b1..4b22492c4d7d 100644
+--- a/drivers/i2c/busses/i2c-npcm7xx.c
++++ b/drivers/i2c/busses/i2c-npcm7xx.c
+@@ -1777,6 +1777,8 @@ static void npcm_i2c_irq_handle_ber(struct npcm_i2c *bus)
+ 	if (npcm_i2c_is_master(bus)) {
+ 		npcm_i2c_master_abort(bus);
+ 	} else {
++		/* Clear the FIFO */
++		iowrite8(NPCM_I2CFIF_CTS_CLR_FIFO, bus->reg + NPCM_I2CFIF_CTS);
+ 		bus->ber_state = true;
+ 		npcm_i2c_clear_master_status(bus);
+ 
+-- 
+2.43.0
+

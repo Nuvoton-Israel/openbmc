@@ -1,0 +1,69 @@
+From ffbe8eba1821b694bf7007ba79ce31cf96522188 Mon Sep 17 00:00:00 2001
+From: Tomer Maimon <tmaimon77@gmail.com>
+Date: Wed, 9 Apr 2025 19:46:57 +0300
+Subject: [PATCH] pinctrl: nuvoton: npcm8xx: add rmii enable support
+
+Signed-off-by: Tomer Maimon <tmaimon77@gmail.com>
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+---
+ drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c b/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
+index c859dca4b973..70a2498c5bb4 100644
+--- a/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
++++ b/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
+@@ -26,6 +26,7 @@
+ #define NPCM8XX_GCR_SRCNT	0x068
+ #define NPCM8XX_GCR_FLOCKR1	0x074
+ #define NPCM8XX_GCR_DSCNT	0x078
++#define NPCM8XX_GCR_INTCR4	0x0C0
+ #define NPCM8XX_GCR_I2CSEGSEL	0x0e0
+ #define NPCM8XX_GCR_MFSEL1	0x260
+ #define NPCM8XX_GCR_MFSEL2	0x264
+@@ -390,7 +391,7 @@ static const int bu4_pins[] = { 54, 55 };
+ static const int bu5b_pins[] = { 100, 101 };
+ static const int bu5_pins[] = { 52, 53 };
+ static const int bu6_pins[] = { 50, 51 };
+-static const int rmii3_pins[] = { 110, 111, 209, 211, 210, 214, 215 };
++static const int rmii3_pins[] = { 110, 111, 209, 211, 210, 214, 215, 258 };
+ 
+ static const int jm1_pins[] = { 136, 137, 138, 139, 140 };
+ static const int jm2_pins[] = { 251 };
+@@ -524,10 +525,10 @@ static const int mmccd_pins[] = { 155 };
+ static const int mmcrst_pins[] = { 155 };
+ static const int mmc8_pins[] = { 148, 149, 150, 151 };
+ 
+-static const int r1_pins[] = { 178, 179, 180, 181, 182, 193, 201 };
++static const int r1_pins[] = { 178, 179, 180, 181, 182, 193, 201, 256 };
+ static const int r1err_pins[] = { 56 };
+ static const int r1md_pins[] = { 57, 58 };
+-static const int r2_pins[] = { 84, 85, 86, 87, 88, 89, 200 };
++static const int r2_pins[] = { 84, 85, 86, 87, 88, 89, 200, 257 };
+ static const int r2err_pins[] = { 90 };
+ static const int r2md_pins[] = { 91, 92 };
+ static const int sd1_pins[] = { 136, 137, 138, 139, 140, 141, 142, 143 };
+@@ -1549,6 +1550,9 @@ static const struct npcm8xx_pincfg pincfg[] = {
+ 	NPCM8XX_PINCFG(253,	none, NONE, 0,		none, NONE, 0,		none, NONE, 0,		none, NONE, 0,		none, NONE, 0,		GPI), /* SDHC1 power */
+ 	NPCM8XX_PINCFG(254,	none, NONE, 0,		none, NONE, 0,		none, NONE, 0,		none, NONE, 0,		none, NONE, 0,		GPI), /* SDHC2 power */
+ 	NPCM8XX_PINCFG(255,	none, NONE, 0,		none, NONE, 0,		none, NONE, 0,		none, NONE, 0,		none, NONE, 0,		GPI), /* DACOSEL */
++	NPCM8XX_PINCFG(256,	r1, INTCR4, 12,		none, NONE, 0,		none, NONE, 0,		none, NONE, 0,		none, NONE, 0,		0),
++	NPCM8XX_PINCFG(257,	r2, INTCR4, 13,		none, NONE, 0,		none, NONE, 0,		none, NONE, 0,		none, NONE, 0,		0),
++	NPCM8XX_PINCFG(258,	rmii3, INTCR4, 14,	none, NONE, 0,		none, NONE, 0,		none, NONE, 0,		none, NONE, 0,		0),
+ };
+ 
+ /* number, name, drv_data */
+@@ -1794,6 +1798,9 @@ static const struct pinctrl_pin_desc npcm8xx_pins[] = {
+ 	PINCTRL_PIN(247, "GPIO247/I3C3_SDA"),
+ 	PINCTRL_PIN(250, "GPIO250/RG2_REFCK/DVVSYNC"),
+ 	PINCTRL_PIN(251, "JM2/CP1_GPIO"),
++	PINCTRL_PIN(256, "RMII1 ENABLE"),
++	PINCTRL_PIN(257, "RMII2 ENABLE"),
++	PINCTRL_PIN(258, "RMII3 ENABLE"),
+ 	};
+ 
+ /* Enable mode in pin group */
+-- 
+2.43.0
+

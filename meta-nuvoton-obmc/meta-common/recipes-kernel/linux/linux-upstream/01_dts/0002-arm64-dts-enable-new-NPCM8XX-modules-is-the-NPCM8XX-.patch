@@ -1,0 +1,828 @@
+From 06e14ee5a6c5d486b58b003fd135ab939ea68f1f Mon Sep 17 00:00:00 2001
+From: Tomer Maimon <tmaimon77@gmail.com>
+Date: Thu, 6 Mar 2025 19:18:41 +0200
+Subject: [PATCH] arm64: dts: enable new NPCM8XX modules is the NPCM8XX EVB
+
+Signed-off-by: Tomer Maimon <tmaimon77@gmail.com>
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+---
+ .../boot/dts/nuvoton/nuvoton-npcm845-evb.dts  | 680 ++++++++++++++++++
+ .../nuvoton/nuvoton-npcm845-pincfg-evb.dtsi   |  89 +++
+ 2 files changed, 769 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-pincfg-evb.dtsi
+
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+index 5edf5d13342d..dc2402769825 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+@@ -3,6 +3,7 @@
+ 
+ /dts-v1/;
+ #include "nuvoton-npcm845.dtsi"
++#include "nuvoton-npcm845-pincfg-evb.dtsi"
+ 
+ / {
+ 	model = "Nuvoton npcm845 Development Board (Device Tree)";
+@@ -10,6 +11,52 @@ / {
+ 
+ 	aliases {
+ 		serial0 = &serial0;
++		ethernet0 = &gmac0;
++		ethernet1 = &gmac1;
++		ethernet2 = &gmac2;
++		ethernet3 = &gmac3;
++		mdio-gpio0 = &mdio0;
++		mdio-gpio1 = &mdio1;
++		udc0 = &udc0;
++		udc1 = &udc1;
++		udc2 = &udc2;
++		udc3 = &udc3;
++		udc4 = &udc4;
++		udc5 = &udc5;
++		udc6 = &udc6;
++		udc7 = &udc7;
++		fiu0 = &fiu0;
++		fiu1 = &fiu3;
++		fiu2 = &fiux;
++		fiu3 = &fiu1;
++		i2c0 = &i2c0;
++		i2c1 = &i2c1;
++		i2c2 = &i2c2;
++		i2c3 = &i2c3;
++		i2c4 = &i2c4;
++		i2c5 = &i2c5;
++		i2c6 = &i2c6;
++		i2c7 = &i2c7;
++		i2c8 = &i2c8;
++		i2c9 = &i2c9;
++		i2c10 = &i2c10;
++		i2c11 = &i2c11;
++		i2c12 = &i2c12;
++		i2c13 = &i2c13;
++		i2c14 = &i2c14;
++		i2c15 = &i2c15;
++		i2c16 = &i2c16;
++		i2c17 = &i2c17;
++		i2c18 = &i2c18;
++		i2c19 = &i2c19;
++		i2c20 = &i2c20;
++		i2c21 = &i2c21;
++		i2c22 = &i2c22;
++		i2c23 = &i2c23;
++		i2c24 = &i2c24;
++		i2c25 = &i2c25;
++		i2c26 = &i2c26;
++		spi1 = &spi_gpio;
+ 	};
+ 
+ 	chosen {
+@@ -21,17 +68,650 @@ memory@0 {
+ 		reg = <0x0 0x0 0x0 0x40000000>;
+ 	};
+ 
++	iio-hwmon {
++		compatible = "iio-hwmon";
++		io-channels = <&adc 0>, <&adc 1>, <&adc 2>, <&adc 3>,
++			<&adc 4>, <&adc 5>, <&adc 6>, <&adc 7>;
++	};
++
++	spi_gpio: spi-gpio {
++		compatible = "spi-gpio";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		sck-gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>;
++		mosi-gpios = <&gpio0 13 GPIO_ACTIVE_HIGH>;
++		miso-gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
++		num-chipselects = <1>;
++		cs-gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;
++
++		eeprom@0 {
++			compatible = "atmel,at25";
++			spi-max-frequency = <5000000>;
++			size = <0x10000>;
++			pagesize = <128>;
++			reg = <0>;
++			address-width = <16>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		heartbeat {
++			label = "heartbeat";
++			gpios = <&gpio3 2 GPIO_ACTIVE_HIGH>; /* gpio98 */
++		};
++		identify {
++			label = "identify";
++			gpios = <&gpio1 29 GPIO_ACTIVE_HIGH>; /* gpio61 */
++		};
++	};
++
+ 	refclk: refclk-25mhz {
+ 		compatible = "fixed-clock";
++		clock-output-names = "ref";
+ 		clock-frequency = <25000000>;
+ 		#clock-cells = <0>;
+ 	};
++
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		tip_reserved: tip@0x0 {
++			reg = <0x0 0x0 0x0 0x6200000>;
++		};
++
++		/*linux,cma {
++			compatible = "shared-dma-pool";
++			reusable;
++			size = <0x0 0x8000000>;
++			alloc-ranges = <0x0 0x20000000 0x0 0x8000000>;
++			linux,cma-default;
++		};*/
++	};
++
++
++	mdio0: mdio@0 {
++		compatible = "virtual,mdio-gpio";
++		gpios = <&gpio1 25 GPIO_ACTIVE_HIGH>,
++			<&gpio1 26 GPIO_ACTIVE_HIGH>; 
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		phy0: ethernet-phy@1 {
++		};
++	};
++
++	mdio1: mdio@1 {
++		compatible = "virtual,mdio-gpio";
++		gpios = <&gpio2 27 GPIO_ACTIVE_HIGH>, 
++			<&gpio2 28 GPIO_ACTIVE_HIGH>; 
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		phy1: ethernet-phy@1 {
++		};
++	};
++
++	tip_sram: sram@fffce000 {
++		compatible = "mmio-sram";
++		reg = <0 0xfffce000 0 0x1000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0 0xfffce000 0x1000>;
++		ch0_shm: ch_shm@0 {
++			reg = <0 0x1000>;
++		};
++	};
++
++	tip {
++		compatible = "nuvoton,cerberus";
++		mboxes = <&tip_mbox 0 16>; /*channel 0, 16th doorbell */
++		mbox-names = "cerberus";
++		shmem = <&ch0_shm>;
++		status = "okay";
++	};
++
++};
++
++&gmac0 {
++	phy-mode = "rgmii-id";
++	snps,eee-force-disable;
++	status = "okay";
++};
++
++&gmac1 {
++	phy-mode = "rgmii-id";
++	snps,eee-force-disable;
++	status = "okay";
++};
++
++&gmac2 {
++	phy-mode = "rmii";
++	pinctrl-names = "default";
++	pinctrl-0 = <&r1_pins
++			&r1oen_pins>;
++	phy-handle = <&phy0>;
++	status = "okay";
++};
++
++&gmac3 {
++	phy-mode = "rmii";
++	pinctrl-names = "default";
++	pinctrl-0 = <&r2_pins
++			&r2oen_pins>;
++	phy-handle = <&phy1>;
++	status = "okay";
++};
++
++&tmps {
++	status = "okay";
++};
++
++&sgpio2 {
++	status = "okay";
++	gpio-line-names =
++		"POWER_OUT","RESET_OUT","","","","","","NMI_OUT",
++		"g_led","","","","","","","",
++		"","","","","","","","",
++		"","","","","","","","",
++		"","","","","","","","",
++		"","","","","","","","",
++		"","","","","","","","",
++		"","","","","","","","",
++		"","","PS_PWROK","POST_COMPLETE","POWER_BUTTON","RESET_BUTTON","NMI_BUTTON","",
++		"","","","","","","","",
++		"","","","","","","","",
++		"","","","","","","","",
++		"","","","","","","","",
++		"","","","","","","","",
++		"","","","","","","","",
++		"","","","","","","","";
+ };
+ 
+ &serial0 {
+ 	status = "okay";
+ };
+ 
++&fiu0 {
++	status = "okay";
++	spi-nor@0 {
++		compatible = "jedec,spi-nor";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		spi-rx-bus-width = <1>;
++		reg = <0>;
++		spi-max-frequency = <5000000>;
++		partitions@80000000 {
++			compatible = "fixed-partitions";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			bbuboot1@0 {
++				label = "bb-uboot-1";
++				reg = <0x0000000 0x80000>;
++				read-only;
++				};
++			bbuboot2@80000 {
++				label = "bb-uboot-2";
++				reg = <0x0080000 0x80000>;
++				read-only;
++				};
++			envparam@100000 {
++				label = "env-param";
++				reg = <0x0100000 0x40000>;
++				read-only;
++				};
++			spare@140000 {
++				label = "spare";
++				reg = <0x0140000 0xC0000>;
++				};
++			kernel@200000 {
++				label = "kernel";
++				reg = <0x0200000 0x400000>;
++				};
++			rootfs@600000 {
++				label = "rootfs";
++				reg = <0x0600000 0x700000>;
++				};
++			spare1@D00000 {
++				label = "spare1";
++				reg = <0x0D00000 0x200000>;
++				};
++			spare2@F00000 {
++				label = "spare2";
++				reg = <0x0F00000 0x200000>;
++				};
++			spare3@1100000 {
++				label = "spare3";
++				reg = <0x1100000 0x200000>;
++				};
++			spare4@1300000 {
++				label = "spare4";
++				reg = <0x1300000 0x0>;
++			};
++		};
++	};
++};
++
++&fiu1 {
++	/*pinctrl-0 = <&spi1_pins>, <&spi1quad_pins>;*/
++	status = "okay";
++	spi-nor@0 {
++		compatible = "jedec,spi-nor";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		spi-rx-bus-width = <2>;
++		spi-tx-bus-width = <2>;
++		reg = <0>;
++		spi-max-frequency = <5000000>;
++		partitions@A0000000 {
++			compatible = "fixed-partitions";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			system1@0 {
++				label = "spi1-system1";
++				reg = <0x0 0x0>;
++			};
++		};
++	};
++};
++
++&fiu3 {
++	pinctrl-0 = <&spi3_pins>, <&spi3quad_pins>;
++	status = "okay";
++	spi-nor@0 {
++		compatible = "jedec,spi-nor";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		spi-rx-bus-width = <1>;
++		reg = <0>;
++		spi-max-frequency = <5000000>;
++		partitions@A0000000 {
++			compatible = "fixed-partitions";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			system1@0 {
++				label = "spi3-system1";
++				reg = <0x0 0x0>;
++			};
++		};
++	};
++};
++
++&fiux {
++	spix-mode;
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&ehci2 {
++	status = "okay";
++};
++
++&ohci1 {
++        status = "okay";
++};
++
++&sdhci {
++	status = "okay";
++};
++
++&pcie {
++	/* used for e1000e PCI -> AXI window opening */
++	dma-ranges = <0x02000000 0 0x00000000 0x0 0x00000000 0 0x40000000>;
++	npcm-pci-ep-rst = <&gpio3 24 1>;
++	status = "okay";
++};
++
++&pcimbox {
++	status = "okay";
++};
++
++&udc0 {
++	status = "okay";
++};
++
++&udc1 {
++	status = "okay";
++};
++
++&udc2 {
++	status = "okay";
++};
++
++&udc3 {
++	status = "okay";
++};
++
++&udc4 {
++	status = "okay";
++};
++
++&udc5 {
++	status = "okay";
++};
++
++&udc6 {
++	status = "okay";
++};
++
++&udc7 {
++	status = "okay";
++};
++
++&gcr {
++	udc9_mux: mux-controller {
++		compatible = "mmio-mux";
++		#mux-control-cells = <1>;
++		mux-reg-masks = <0x9C 0x3000>;
++		idle-states = <0x3000>;
++	};
++};
++
++&lpc_kcs {
++	kcs1: kcs1@0 {
++		status = "okay";
++	};
++
++	kcs2: kcs2@0 {
++		status = "okay";
++	};
++
++	kcs3: kcs3@0 {
++		status = "okay";
++	};
++};
++
++&lpc_host {
++	lpc_bpc: lpc_bpc@40 {
++		nuvoton,monitor-ports = <0x80>;
++		status = "okay";
++	};
++};
++
++&peci0 {
++	cmd-timeout-ms = <1000>;
++	npcm,pull-down = <0>;
++	npcm,host-neg-bit-rate = <15>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++	status = "okay";
++	intel-peci-dimmtemp@30 {
++		compatible = "intel,peci-client";
++		reg = <0x30>;
++		status = "okay";
++	};
++};
++
++&jtm1 {
++	status = "okay";
++};
++
++&rng {
++	status = "okay";
++};
++
++&adc {
++	#io-channel-cells = <1>;
++	status = "okay";
++};
++
+ &watchdog1 {
+ 	status = "okay";
+ };
++
++&pwm_fan {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pwm0_pins &pwm1_pins
++		&pwm2_pins &pwm3_pins
++		&pwm4_pins &pwm5_pins
++		&pwm6_pins &pwm7_pins
++		&fanin0_pins &fanin1_pins
++		&fanin2_pins &fanin3_pins
++		&fanin4_pins &fanin5_pins
++		&fanin6_pins &fanin7_pins>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++	fan@0 {
++		reg = <0x00>;
++		fan-tach-ch = /bits/ 8 <0x00 0x01>;
++		cooling-levels = <127 255>;
++	};
++	fan@1 {
++		reg = <0x01>;
++		fan-tach-ch = /bits/ 8 <0x02 0x03>;
++		cooling-levels = /bits/ 8 <127 255>;
++	};
++	fan@2 {
++		reg = <0x02>;
++		fan-tach-ch = /bits/ 8 <0x04 0x05>;
++		cooling-levels = /bits/ 8 <127 255>;
++	};
++	fan@3 {
++		reg = <0x03>;
++		fan-tach-ch = /bits/ 8 <0x06 0x07>;
++		cooling-levels = /bits/ 8 <127 255>;
++	};
++	fan@4 {
++		reg = <0x04>;
++		fan-tach-ch = /bits/ 8 <0x08 0x09>;
++		cooling-levels = /bits/ 8 <127 255>;
++	};
++	fan@5 {
++		reg = <0x05>;
++		fan-tach-ch = /bits/ 8 <0x0A 0x0B>;
++		cooling-levels = /bits/ 8 <127 255>;
++	};
++	fan@6 {
++		reg = <0x06>;
++		fan-tach-ch = /bits/ 8 <0x0C 0x0D>;
++		cooling-levels = /bits/ 8 <127 255>;
++	};
++	fan@7 {
++		reg = <0x07>;
++		fan-tach-ch = /bits/ 8 <0x0E 0x0F>;
++		cooling-levels = /bits/ 8 <127 255>;
++	};
++};
++
++&pspi {
++	cs-gpios = <&gpio0 20 GPIO_ACTIVE_LOW>;
++	status = "okay";
++	Flash@0 {
++		compatible = "jedec,spi-nor";
++		reg = <0x0>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		spi-max-frequency = <1000000>;
++		partition@0 {
++			label = "spi1_spare0";
++			reg = <0x0 0x0>;
++		};
++	};
++};
++
++&i2c0 {
++	status = "okay";
++
++};
++
++&i2c1 {
++	status = "okay";
++	#address-cells = <1>;
++	#size-cells = <0>;
++	eeprom@50 {
++		compatible = "atmel,24c256";
++		reg = <0x50>;
++	};
++};
++
++&i2c2 {
++	status = "okay";
++	#address-cells = <1>;
++	#size-cells = <0>;
++	ipmb@10 {
++		compatible = "ipmb-dev";
++		reg = <0x10>;
++		i2c-protocol;
++	};
++};
++
++&i2c3 {
++	status = "okay";
++	#address-cells = <1>;
++	#size-cells = <0>;
++	ipmb@11 {
++		compatible = "ipmb-dev";
++		reg = <0x11>;
++		i2c-protocol;
++	};
++};
++
++&i2c4 {
++	status = "okay";
++};
++
++&i2c5 {
++	status = "okay";
++};
++
++&i2c6 {
++	status = "okay";
++	#address-cells = <1>;
++	#size-cells = <0>;
++	tmp100@48 {
++		compatible = "tmp100";
++		reg = <0x48>;
++		status = "okay";
++	};
++};
++
++&i2c7 {
++	status = "okay";
++};
++
++&i2c8 {
++	status = "okay";
++};
++
++&i2c9 {
++	status = "okay";
++};
++
++&i2c10 {
++	status = "okay";
++};
++
++&i2c11 {
++	status = "okay";
++};
++
++&i2c12 {
++	status = "okay";
++};
++
++&i2c13 {
++	status = "okay";
++};
++
++&i2c14 {
++	status = "okay";
++};
++
++&i2c15 {
++	status = "okay";
++};
++
++&i2c16 {
++	status = "okay";
++};
++
++&i2c17 {
++	status = "okay";
++};
++
++&i2c18 {
++	status = "okay";
++};
++
++&i2c19 {
++	status = "okay";
++};
++
++&i2c20 {
++	status = "okay";
++};
++
++&i2c21 {
++	status = "okay";
++};
++
++&i2c22 {
++	status = "okay";
++};
++
++&i2c23 {
++	status = "okay";
++};
++
++&i2c24 {
++	status = "okay";
++};
++
++&i2c25 {
++	status = "okay";
++};
++
++&i2c26 {
++	status = "okay";
++};
++
++&i3c0 {
++	status = "okay";
++	i3c-scl-hz = <12500000>;
++	i2c-scl-hz = <400000>;
++};
++
++&i3c1 {
++	status = "okay";
++	i3c-scl-hz = <12500000>;
++	i2c-scl-hz = <400000>;
++};
++
++&mc {
++	status = "okay";
++};
++
++&pinctrl {
++	pinctrl-names = "default";
++	pinctrl-0 = <
++			&jtag2_pins
++			&lpc_pins
++			&spix_pins
++			&pin4_slew
++			&pin5_slew
++			&pin6_slew
++			&pin7_slew
++			&pin108_slew
++			&pin109_slew
++			&pin240_slew
++			&pin241_slew
++			&pin242_slew
++			&pin243_slew>;
++};
++
++&vcd {
++	status = "okay";
++};
++
++&ece {
++	status = "okay";
++};
++
++&tip_mbox {
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-pincfg-evb.dtsi b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-pincfg-evb.dtsi
+new file mode 100644
+index 000000000000..07892b782c78
+--- /dev/null
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-pincfg-evb.dtsi
+@@ -0,0 +1,89 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2018 Nuvoton Technology
++
++/ {
++	pinctrl: pinctrl@f0010000 {
++		pin4_slew: pin4_slew {
++			pins = "GPIO4/IOX2_DI/SMB1D_SDA";
++			slew-rate = <1>;
++		};
++		pin5_slew: pin5_slew {
++			pins = "GPIO5/IOX2_LD/SMB1D_SCL";
++			slew-rate = <1>;
++		};
++		pin6_slew: pin6_slew {
++			pins = "GPIO6/IOX2_CK/SMB2D_SDA";
++			slew-rate = <1>;
++		};
++		pin7_slew: pin7_slew {
++			pins = "GPIO7/IOX2_DO/SMB2D_SCL";
++			slew-rate = <1>;
++		};
++		pin33_slew: pin33-slew {
++			pins = "GPIO33/I3C4_SCL";
++			slew-rate = <1>;
++		};
++		pin34_slew: pin34-slew {
++			pins = "GPIO34/I3C4_SDA";
++			slew-rate = <1>;
++		};
++		pin106_slew: pin106-slew {
++			pins = "GPIO106/I3C5_SCL";
++			slew-rate = <1>;
++		};
++		pin107_slew: pin107-slew {
++			pins = "GPIO107/I3C5_SDA";
++			slew-rate = <1>;
++		};
++		pin108_slew: pin108-slew {
++			pins = "GPIO108/SG1_MDC";
++			slew-rate = <1>;
++		};
++		pin109_slew: pin109-slew {
++			pins = "GPIO109/SG1_MDIO";
++			slew-rate = <1>;
++		};
++		gpo187ol_pins: gpo187ol-pins {
++			pins = "GPO187/SPI3_nCS1_SMB14B_SDA";
++			bias-disable;
++			output-low;
++		};
++		gpio114ol_pins: gpio114ol-pins {
++			pins = "GPIO114/SMB0_SCL";
++			bias-disable;
++			output-low;
++		};
++		pin240_slew: pin240-slew {
++			pins = "GPIO240/I3C0_SCL";
++			slew-rate = <1>;
++		};
++		pin241_slew: pin241-slew {
++			pins = "GPIO241/I3C0_SDA";
++			slew-rate = <1>;
++		};
++		pin242_slew: pin242-slew {
++			pins = "GPIO242/I3C1_SCL";
++			slew-rate = <1>;
++		};
++		pin243_slew: pin243-slew {
++			pins = "GPIO243/I3C1_SDA";
++			slew-rate = <1>;
++		};
++		pin244_slew: pin244-slew {
++			pins = "GPIO244/I3C2_SCL";
++			slew-rate = <1>;
++		};
++		pin245_slew: pin245-slew {
++			pins = "GPIO245/I3C2_SDA";
++			slew-rate = <1>;
++		};
++		pin246_slew: pin246-slew {
++			pins = "GPIO246/I3C3_SCL";
++			slew-rate = <1>;
++		};
++		pin247_slew: pin247-slew {
++			pins = "GPIO247/I3C3_SDA";
++			slew-rate = <1>;
++		};
++	};
++};
+-- 
+2.43.0
+

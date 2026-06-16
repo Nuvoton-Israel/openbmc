@@ -1,0 +1,59 @@
+From 9b4965b07f4c0134ca08b13fdaf79cee11b29505 Mon Sep 17 00:00:00 2001
+From: Tomer Maimon <tmaimon77@gmail.com>
+Date: Tue, 17 Jun 2025 19:02:28 +0300
+Subject: [PATCH] pinctrl: nuvoton: npcm8xx: Fix lockdep error in
+ npcmgpio_irq_startup
+
+Nuvoton NPCM8XX pin controller GPIO driver triggered a lockdep error
+("BUG: Invalid wait context") when CONFIG_PROVE_LOCKING was enabled.
+
+The error occurred because npcmgpio_irq_startup called
+npcmgpio_direction_input, which invoked pinctrl_gpio_direction_input,
+leading to the acquisition of pinctrldev_list_mutex in an interrupt
+or atomic context (likely softirq) during IRQ setup. This is invalid,
+as mutexes can sleep and are not safe in such contexts.
+
+The fix moves the GPIO direction configuration from npcmgpio_irq_startup
+to npcmgpio_gpio_request, which is called  in a sleepable process context
+when the GPIO is requested, this ensures that pinctrl_gpio_direction_input
+is executed safely, avoiding the mutex-related lockdep error while maintaining
+the required GPIO input configuration for IRQs.
+
+Signed-off-by: Tomer Maimon <tmaimon77@gmail.com>
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+---
+ drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c b/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
+index ce1b35caea5f..39bf406450b1 100644
+--- a/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
++++ b/drivers/pinctrl/nuvoton/pinctrl-npcm8xx.c
+@@ -200,6 +200,11 @@ static int npcmgpio_gpio_request(struct gpio_chip *chip, unsigned int offset)
+ 	if (ret)
+ 		return ret;
+ 
++	/* active-high, input, clear interrupt, enable interrupt */
++	ret = npcmgpio_direction_input(chip, offset);
++	if (ret)
++		return ret;
++
+ 	return bank->request(chip, offset);
+ }
+ 
+@@ -292,11 +297,6 @@ static void npcmgpio_irq_unmask(struct irq_data *d)
+ 
+ static unsigned int npcmgpio_irq_startup(struct irq_data *d)
+ {
+-	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
+-	unsigned int gpio = irqd_to_hwirq(d);
+-
+-	/* active-high, input, clear interrupt, enable interrupt */
+-	npcmgpio_direction_input(gc, gpio);
+ 	npcmgpio_irq_ack(d);
+ 	npcmgpio_irq_unmask(d);
+ 
+-- 
+2.43.0
+
