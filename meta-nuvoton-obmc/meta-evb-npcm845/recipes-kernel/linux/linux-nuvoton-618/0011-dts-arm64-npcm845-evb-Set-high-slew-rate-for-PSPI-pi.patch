@@ -1,0 +1,51 @@
+From 3120e3b8dbe2f6d4b19317c30db92f69aadae1ff Mon Sep 17 00:00:00 2001
+From: Eason Yang <j2anfernee@gmail.com>
+Date: Mon, 29 Jun 2026 03:38:29 +0000
+Subject: [PATCH] dts: arm64: npcm845 evb: Set high slew rate for PSPI pins
+Upstream-Status: Pending
+
+---
+ arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts  |  3 +++
+ .../boot/dts/nuvoton/nuvoton-npcm845-pincfg-evb.dtsi | 12 ++++++++++++
+ 2 files changed, 15 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+index 173d4c657f80..da0ff45ba505 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+@@ -725,6 +725,9 @@ &pin4_slew
+ 			&pin5_slew
+ 			&pin6_slew
+ 			&pin7_slew
++			&pin17_slew
++			&pin18_slew
++			&pin19_slew
+ 			&pin108_slew
+ 			&pin109_slew>;
+ };
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-pincfg-evb.dtsi b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-pincfg-evb.dtsi
+index 66d549ba0227..2cdc35288a12 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-pincfg-evb.dtsi
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-pincfg-evb.dtsi
+@@ -7,6 +7,18 @@ pin0_slew: pin0_slew {
+ 			pins = "GPIO0/IOX1_DI/SMB6C_SDA/SMB18_SDA";
+ 			slew-rate = <1>;
+ 		};
++	pin17_slew: pin17_slew {
++		pins = "GPIO17/PSPI_DI/CP1_GPIO5";
++		slew-rate = <1>;
++	};
++	pin18_slew: pin18_slew {
++		pins = "GPIO18/PSPI_D0/SMB4B_SDA";
++		slew-rate = <1>;
++	};
++	pin19_slew: pin19_slew {
++		pins = "GPIO19/PSPI_CK/SMB4B_SCL";
++		slew-rate = <1>;
++	};
+ 		pin1_slew: pin1_slew {
+ 			pins = "GPIO1/IOX1_LD/SMB6C_SCL/SMB18_SCL";
+ 			slew-rate = <1>;
+-- 
+2.43.0
+
