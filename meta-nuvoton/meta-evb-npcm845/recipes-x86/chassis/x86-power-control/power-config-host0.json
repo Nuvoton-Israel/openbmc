@@ -48,5 +48,6 @@
           "Type" : "GPIO",
           "Polarity" : "ActiveLow"
       }
-    ]
+    ],
+    "timing_configs":{}
   }
