@@ -2,6 +2,7 @@
 Description=Enable USB TTY gadget and start getty on ttyGS0
 After=systemd-udevd.service
 Wants=serial-getty@ttyGS0.service
+ConditionPathExistsGlob=/sys/class/udc/*
 
 [Service]
 Type=oneshot

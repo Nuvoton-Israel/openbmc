@@ -1,6 +1,7 @@
 [Unit]
 Description=enable usb network
 After=systemd-udevd.service
+ConditionPathExistsGlob=/sys/class/udc/*
 
 [Service]
 Type=oneshot

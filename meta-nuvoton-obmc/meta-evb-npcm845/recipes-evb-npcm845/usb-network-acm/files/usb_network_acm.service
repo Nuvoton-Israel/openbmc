@@ -1,6 +1,7 @@
 [Unit]
 Description=Enable USB network (CDC ECM) with DHCP for RHEL host
 After=systemd-udevd.service
+ConditionPathExistsGlob=/sys/class/udc/*
 
 [Service]
 Type=oneshot
