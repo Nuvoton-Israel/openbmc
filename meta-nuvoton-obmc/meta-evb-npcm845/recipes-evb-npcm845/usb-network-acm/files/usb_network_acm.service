@@ -1,9 +1,11 @@
 [Unit]
 Description=Enable USB network (CDC ECM) with DHCP for RHEL host
+After=systemd-udevd.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+TimeoutStartSec=30
 ExecStart=/usr/sbin/usb_network_acm.sh
 
 [Install]

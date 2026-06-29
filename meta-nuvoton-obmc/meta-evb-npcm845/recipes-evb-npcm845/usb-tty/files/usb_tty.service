@@ -6,6 +6,7 @@ Wants=serial-getty@ttyGS0.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+TimeoutStartSec=30
 ExecStart=/bin/bash -c '/usr/sbin/usb_tty.sh'
 
 [Install]

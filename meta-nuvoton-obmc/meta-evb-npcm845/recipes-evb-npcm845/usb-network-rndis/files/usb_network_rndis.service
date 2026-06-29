@@ -1,8 +1,10 @@
 [Unit]
 Description=enable usb network
+After=systemd-udevd.service
 
 [Service]
 Type=oneshot
+TimeoutStartSec=30
 ExecStart=/bin/bash -c '/usr/sbin/usb_network_rndis.sh'
 
 [Install]

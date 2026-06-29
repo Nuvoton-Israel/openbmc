@@ -107,6 +107,19 @@ echo "${HOST_MAC}" > functions/ecm.usb0/host_addr
 ln -s "$(pwd)/functions/ecm.usb0" configs/c.1/
 
 # ── Bind to UDC ──────────────────────────────────────────────────────────────
+# Wait for the UDC device to appear before binding. Binding to a UDC that has
+# not yet been probed by the kernel can block or fail, which leaves this
+# oneshot service hanging and stalls multi-user.target intermittently.
+RETRY=0
+while [ ${RETRY} -lt 20 ]; do
+    [ -e "/sys/class/udc/${UDC_NAME}" ] && break
+    sleep 1
+    RETRY=$(( RETRY + 1 ))
+done
+if [ ! -e "/sys/class/udc/${UDC_NAME}" ]; then
+    echo "WARNING: UDC ${UDC_NAME} not present, skipping gadget bind" >&2
+    exit 0
+fi
 echo "${UDC_NAME}" > UDC
 
 echo "USB CDC ECM gadget started (UDC: ${UDC_NAME})"
