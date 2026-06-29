@@ -2625,7 +2625,7 @@ $ cd build
 # Launch QEMU
 $ ./qemu-system-aarch64 -machine npcm845-evb -nographic \
     -drive file=${IMG_DIR}/image-bmc,if=mtd,bus=0,unit=0,format=raw \
-    -device loader,force-raw=on,addr=0x2000000,file=${IMG_DIR}/bl31.bin \
+    -device loader,force-raw=on,addr=0x2000000,file=${IMG_DIR}/trusted-firmware-a/bl31.bin \
     -device loader,cpu-num=3,addr=0x2000000 \
     -device loader,cpu-num=2,addr=0x2000000 \
     -device loader,cpu-num=1,addr=0x2000000
@@ -2659,7 +2659,7 @@ $ cd build
 # Launch QEMU with eMMC support
 $ ./qemu-system-aarch64 -machine npcm845-evb -nographic \
     -drive file=${IMG_DIR}/image-u-boot,if=mtd,bus=0,unit=0,format=raw \
-    -device loader,force-raw=on,addr=0x2000000,file=${IMG_DIR}/bl31.bin \
+    -device loader,force-raw=on,addr=0x2000000,file=${IMG_DIR}/trusted-firmware-a/bl31.bin \
     -device loader,cpu-num=3,addr=0x2000000 \
     -device loader,cpu-num=2,addr=0x2000000 \
     -device loader,cpu-num=1,addr=0x2000000 \
