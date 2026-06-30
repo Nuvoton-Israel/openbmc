@@ -1,7 +1,7 @@
-From 61e5c1227ea54bff3d7c04c39dbd86c0986e9d7f Mon Sep 17 00:00:00 2001
+From c068d099c1e1928918d71f7b25af82cff8c8539a Mon Sep 17 00:00:00 2001
 From: Eason Yang <yhyang2@nuvoton.com>
 Date: Mon, 3 Jun 2024 09:55:12 +0800
-Subject: [PATCH 3/3] Modify power-supply-monitor@.service
+Subject: [PATCH] Modify power-supply-monitor@.service
 
 `psu-monitor` can't create powersupply until
 xyz.openbmc_project.Inventory.Manager.service is running.
@@ -14,7 +14,7 @@ Signed-off-by: Eason Yang <yhyang2@nuvoton.com>
  1 file changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/services/power-supply-monitor@.service b/services/power-supply-monitor@.service
-index 8f794d75..874b865c 100644
+index 8f794d7..874b865 100644
 --- a/services/power-supply-monitor@.service
 +++ b/services/power-supply-monitor@.service
 @@ -1,9 +1,9 @@
@@ -31,6 +31,3 @@ index 8f794d75..874b865c 100644
  ConditionPathExists=/etc/default/obmc/power-supply-monitor/power-supply-monitor-%i.conf
  
  [Service]
--- 
-2.34.1
-

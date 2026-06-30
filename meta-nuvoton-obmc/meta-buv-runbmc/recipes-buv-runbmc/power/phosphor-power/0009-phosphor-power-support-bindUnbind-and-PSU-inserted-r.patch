@@ -1,19 +1,18 @@
-From 8509d73e2b31ebb36b8253cdabd9392ca3f196a4 Mon Sep 17 00:00:00 2001
-From: Ban Feng <kcfeng0@nuvoton.com>
-Date: Wed, 15 Mar 2023 13:36:48 +0800
+From 4a4853619580b90a216c5c7acb54e00cb669fad6 Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Sat, 27 Jun 2026 12:23:39 +0800
 Subject: [PATCH] phosphor-power: support bindUnbind and PSU inserted/removed
- event log
 
 Upstream-Status: Inappropriate [oe-specific]
 
-Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
 ---
  power-supply/power_supply.cpp | 62 +++++++++++++++++++++++++++++++++++
  power-supply/power_supply.hpp | 19 +++++++++++
  2 files changed, 81 insertions(+)
 
 diff --git a/power-supply/power_supply.cpp b/power-supply/power_supply.cpp
-index 45246ca4..9309ba8c 100644
+index 0345f7c..d26de61 100644
 --- a/power-supply/power_supply.cpp
 +++ b/power-supply/power_supply.cpp
 @@ -29,6 +29,7 @@
@@ -24,7 +23,7 @@ index 45246ca4..9309ba8c 100644
  
  #if (NUVOTON_ENTITY == 1)
  #include <systemd/sd-journal.h>
-@@ -69,6 +70,7 @@ PowerSupply::PowerSupply(const std::string& name, size_t inst,
+@@ -72,6 +73,7 @@ PowerSupply::PowerSupply(const std::string& name, size_t inst,
      powerOnTimer(e, std::bind([this]() { this->powerOn = true; }))
  {
      getAccessType();
@@ -32,7 +31,7 @@ index 45246ca4..9309ba8c 100644
  
      using namespace sdbusplus::bus;
      using namespace phosphor::pmbus;
-@@ -124,6 +126,22 @@ void PowerSupply::getAccessType()
+@@ -130,6 +132,22 @@ void PowerSupply::getAccessType()
      inventoryPMBusAccessType = getPMBusAccessType(fruJson);
  }
  
@@ -55,7 +54,7 @@ index 45246ca4..9309ba8c 100644
  void PowerSupply::captureCmd(util::NamesValues& nv, const std::string& cmd,
                               phosphor::pmbus::Type type)
  {
-@@ -200,11 +218,31 @@ void PowerSupply::inventoryChanged(sdbusplus::message_t& msg)
+@@ -205,11 +223,31 @@ void PowerSupply::inventoryChanged(sdbusplus::message_t& msg)
      {
          if (std::get<bool>(valPropMap->second))
          {
@@ -119,13 +118,13 @@ index 45246ca4..9309ba8c 100644
  {
      readFail = 0;
 diff --git a/power-supply/power_supply.hpp b/power-supply/power_supply.hpp
-index f8e88a3c..fbccf2e1 100644
+index 5e8426e..10337e4 100644
 --- a/power-supply/power_supply.hpp
 +++ b/power-supply/power_supply.hpp
 @@ -19,6 +19,7 @@ namespace power
  namespace psu
  {
- namespace sdbusRule = sdbusplus::bus::match::rules;
+ namespace sdbusRule = sdbusplus::match_rules;
 +namespace fs = std::filesystem;
  
  constexpr auto FAULT_COUNT = 3;
@@ -169,6 +168,3 @@ index f8e88a3c..fbccf2e1 100644
      /**
       * @brief Callback for inventory property changes
       *
--- 
-2.34.1
-

@@ -1,19 +1,18 @@
-From eb5b4a22fa7a3bbb478048c514c304c02efa1382 Mon Sep 17 00:00:00 2001
+From 0843044a18eee11832fb3c26e18bacea6943a35e Mon Sep 17 00:00:00 2001
 From: Allen Kang <jhkang@nuvoton.com>
 Date: Tue, 21 Feb 2023 17:19:12 +0800
 Subject: [PATCH] Light up LED when fan fault
 
 Upstream-Status: Inappropriate [oe-specific]
-
 ---
  power-supply/power_supply.cpp | 9 +++++++++
  1 file changed, 9 insertions(+)
 
 diff --git a/power-supply/power_supply.cpp b/power-supply/power_supply.cpp
-index 2c346d47..06c9b363 100644
+index 5bebd05..630ab1a 100644
 --- a/power-supply/power_supply.cpp
 +++ b/power-supply/power_supply.cpp
-@@ -449,6 +449,7 @@ void PowerSupply::checkOutputOvervoltageFault(const uint16_t statusWord)
+@@ -454,6 +454,7 @@ void PowerSupply::checkOutputOvervoltageFault(const uint16_t statusWord)
  void PowerSupply::checkFanFault(const uint16_t statusWord)
  {
      using namespace phosphor::pmbus;
@@ -21,7 +20,7 @@ index 2c346d47..06c9b363 100644
  
      if (fanFault < FAULT_COUNT)
      {
-@@ -480,6 +481,14 @@ void PowerSupply::checkFanFault(const uint16_t statusWord)
+@@ -485,6 +486,14 @@ void PowerSupply::checkFanFault(const uint16_t statusWord)
                  metadata::RAW_STATUS(nv.get().c_str()),
                  metadata::CALLOUT_INVENTORY_PATH(inventoryPath.c_str()));
  
@@ -36,6 +35,3 @@ index 2c346d47..06c9b363 100644
              faultFound = true;
          }
      }
--- 
-2.34.1
-

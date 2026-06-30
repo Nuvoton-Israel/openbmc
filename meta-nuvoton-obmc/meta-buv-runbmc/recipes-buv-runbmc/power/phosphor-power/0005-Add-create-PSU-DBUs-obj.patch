@@ -1,8 +1,7 @@
-From 4ab9f4f85d3d37b968d70f5a12f3e5951632c955 Mon Sep 17 00:00:00 2001
+From 86231d297eac58427b7352985146438b608a2467 Mon Sep 17 00:00:00 2001
 From: Allen Kang <jhkang@nuvoton.com>
 Date: Tue, 14 Feb 2023 14:39:21 +0800
-Subject: [PATCH 5/5] Add create PSU DBUs obj
-
+Subject: [PATCH] Add create PSU DBUs obj
 
 Upstream-Status: Inappropriate [oe-specific]
 ---
@@ -12,10 +11,10 @@ Upstream-Status: Inappropriate [oe-specific]
  3 files changed, 81 insertions(+)
 
 diff --git a/power-supply/power_supply.cpp b/power-supply/power_supply.cpp
-index 1bbeb4fd..f74c6791 100644
+index 550462d..5bebd05 100644
 --- a/power-supply/power_supply.cpp
 +++ b/power-supply/power_supply.cpp
-@@ -86,6 +86,10 @@ PowerSupply::PowerSupply(const std::string& name, size_t inst,
+@@ -89,6 +89,10 @@ PowerSupply::PowerSupply(const std::string& name, size_t inst,
      presentMatch = std::make_unique<match_t>(
          bus, match::rules::propertiesChanged(inventoryPath, INVENTORY_IFACE),
          [this](auto& msg) { this->inventoryChanged(msg); });
@@ -26,7 +25,7 @@ index 1bbeb4fd..f74c6791 100644
      // Get initial presence state.
      updatePresence();
  
-@@ -606,6 +610,75 @@ void PowerSupply::resolveError(const std::string& callout,
+@@ -610,6 +614,75 @@ void PowerSupply::resolveError(const std::string& callout,
      }
  }
  
@@ -103,7 +102,7 @@ index 1bbeb4fd..f74c6791 100644
  {
      using namespace phosphor::pmbus;
 diff --git a/power-supply/power_supply.hpp b/power-supply/power_supply.hpp
-index c87df39c..3da9f7f6 100644
+index bcea68a..bdeffba 100644
 --- a/power-supply/power_supply.hpp
 +++ b/power-supply/power_supply.hpp
 @@ -381,6 +381,8 @@ class PowerSupply : public Device
@@ -116,26 +115,33 @@ index c87df39c..3da9f7f6 100644
       * @brief Adds properties to the inventory.
       *
 diff --git a/types.hpp b/types.hpp
-index b682d9bf..1f2cfe64 100644
+index c463958..d47a509 100644
 --- a/types.hpp
 +++ b/types.hpp
-@@ -23,3 +23,5 @@
+@@ -19,6 +19,8 @@ constexpr auto ENABLE_IFACE = "xyz.openbmc_project.Object.Enable";
+ constexpr auto POWER_SYSTEM_INPUTS_IFACE =
+     "xyz.openbmc_project.State.Decorator.PowerSystemInputs";
  constexpr auto ASSOC_DEF_IFACE = "xyz.openbmc_project.Association.Definitions";
 +constexpr auto DECOR_CACHEABLE_IFACE = "xyz.openbmc_project.Inventory.Decorator.Cacheable";
 +constexpr auto DECOR_REPLACEABLE_IFACE = "xyz.openbmc_project.Inventory.Decorator.Replaceable";
  constexpr auto CHASSIS_IFACE = "xyz.openbmc_project.Inventory.Item.Chassis";
  #ifdef IBM_VPD
-@@ -32,3 +34,4 @@
+ constexpr auto DINF_IFACE = "com.ibm.ipzvpd.DINF";
+@@ -29,6 +31,7 @@ constexpr auto ENDPOINTS_PROP = "endpoints";
+ constexpr auto MESSAGE_PROP = "Message";
+ constexpr auto RESOLVED_PROP = "Resolved";
  constexpr auto PRESENT_PROP = "Present";
 +constexpr auto PRETTYNAME_PROP = "PrettyName";
  constexpr auto FUNCTIONAL_PROP = "Functional";
  constexpr auto AVAILABLE_PROP = "Available";
-@@ -39,3 +42,6 @@
+ constexpr auto ENABLED_PROP = "Enabled";
+@@ -36,6 +39,9 @@ constexpr auto STATUS_PROP = "Status";
+ constexpr auto POWER_STATE_PROP = "state";
+ constexpr auto POWER_GOOD_PROP = "pgood";
  constexpr auto ASSOC_PROP = "Associations";
 +constexpr auto CACHED_PROP = "Cached";
 +constexpr auto FIELDREPLACEABLE_PROP = "FieldReplaceable";
 +
  
  constexpr auto INVENTORY_OBJ_PATH = "/xyz/openbmc_project/inventory";
--- 
-2.34.1
+ // TODO: Replace instances of POWER_OBJ_PATH with SYSTEM_POWER_PATH

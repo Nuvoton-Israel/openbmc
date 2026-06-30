@@ -1,4 +1,4 @@
-From 4a54e9e3db0bd411270d9f202a3e2817502f343f Mon Sep 17 00:00:00 2001
+From 4d1ff4c5d9bd8010857e5ca50936ca6ae95490b8 Mon Sep 17 00:00:00 2001
 From: Joseph Liu <kwliu@nuvoton.com>
 Date: Fri, 3 Feb 2023 09:26:40 +0800
 Subject: [PATCH] use interface /xyz/openbmc_project/
@@ -12,7 +12,7 @@ Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
  2 files changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/power-supply/average.hpp b/power-supply/average.hpp
-index 2a059123..34cccdd4 100644
+index 2a05912..34cccdd 100644
 --- a/power-supply/average.hpp
 +++ b/power-supply/average.hpp
 @@ -1,5 +1,5 @@
@@ -32,7 +32,7 @@ index 2a059123..34cccdd4 100644
  /**
   * @class Average
 diff --git a/power-supply/maximum.hpp b/power-supply/maximum.hpp
-index 599548ea..fa2a16f5 100644
+index 599548e..fa2a16f 100644
 --- a/power-supply/maximum.hpp
 +++ b/power-supply/maximum.hpp
 @@ -1,5 +1,5 @@
@@ -51,6 +51,3 @@ index 599548ea..fa2a16f5 100644
  
  /**
   * @class Maximum
--- 
-2.34.1
-

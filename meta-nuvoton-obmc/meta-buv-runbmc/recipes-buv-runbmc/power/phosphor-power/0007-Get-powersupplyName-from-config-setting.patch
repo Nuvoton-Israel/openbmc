@@ -1,7 +1,7 @@
-From 264ac99df2370b37d1ae439b4936397c35cac4ab Mon Sep 17 00:00:00 2001
+From 0861d6749d048dd367ce6a8a3f6fb0f4400f6767 Mon Sep 17 00:00:00 2001
 From: Allen Kang <jhkang@nuvoton.com>
 Date: Wed, 1 Mar 2023 15:49:03 +0800
-Subject: [PATCH 8/8] Get powersupplyName from config setting
+Subject: [PATCH] Get powersupplyName from config setting
 
 Upstream-Status: Inappropriate [oe-specific]
 
@@ -11,10 +11,10 @@ Signed-off-by: Allen Kang <jhkang@nuvoton.com>
  1 file changed, 5 insertions(+), 9 deletions(-)
 
 diff --git a/power-supply/power_supply.cpp b/power-supply/power_supply.cpp
-index 03f7bb3b..45246ca4 100644
+index 630ab1a..2713d99 100644
 --- a/power-supply/power_supply.cpp
 +++ b/power-supply/power_supply.cpp
-@@ -700,7 +700,6 @@ void PowerSupply::createInventoryObj()
+@@ -628,7 +628,6 @@ void PowerSupply::createInventoryObj()
      using namespace phosphor::pmbus;
      using namespace sdbusplus::message;
  
@@ -22,7 +22,7 @@ index 03f7bb3b..45246ca4 100644
      // Build the object map and send it to the inventory
      using Properties = std::map<std::string, std::variant<std::string, bool>>;
      using Interfaces = std::map<std::string, Properties>;
-@@ -709,11 +708,11 @@ void PowerSupply::createInventoryObj()
+@@ -637,11 +636,11 @@ void PowerSupply::createInventoryObj()
      Properties operProps;
      Properties fieldreplaceableProps;
      Properties cachedProps;
@@ -36,7 +36,7 @@ index 03f7bb3b..45246ca4 100644
  
      operProps.emplace(FUNCTIONAL_PROP, true);
      interfaces.emplace(OPERATIONAL_STATE_IFACE, std::move(operProps));
-@@ -724,11 +723,9 @@ void PowerSupply::createInventoryObj()
+@@ -652,11 +651,9 @@ void PowerSupply::createInventoryObj()
      fieldreplaceableProps.emplace(FIELDREPLACEABLE_PROP, true);
      interfaces.emplace(DECOR_REPLACEABLE_IFACE, std::move(fieldreplaceableProps));
  
@@ -51,7 +51,7 @@ index 03f7bb3b..45246ca4 100644
  
      presentProps.emplace(PRESENT_PROP, true);
      interfaces.emplace(PSU_INVENTORY_IFACE, std::move(presentProps));
-@@ -736,7 +733,6 @@ void PowerSupply::createInventoryObj()
+@@ -664,7 +661,6 @@ void PowerSupply::createInventoryObj()
      // For Notify(), just send the relative path of the inventory
      // object so remove the INVENTORY_OBJ_PATH prefix
      auto path = inventoryPath.substr(strlen(INVENTORY_OBJ_PATH));
@@ -59,6 +59,3 @@ index 03f7bb3b..45246ca4 100644
  
      object.emplace(path, std::move(interfaces));
  
--- 
-2.34.1
-

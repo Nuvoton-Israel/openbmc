@@ -47,7 +47,7 @@ index 125e89e7..4b34d660 100644
 +    static const std::string ipmiSELAddMessage =
 +        "IPMI SEL entry logged using IPMI Add SEL Entry command.";
 +
-+    sdbusplus::bus::bus bus{ipmid_get_sd_bus_connection()};
++    sdbusplus::bus_t bus{ipmid_get_sd_bus_connection()};
 +    std::vector<uint8_t> eventData = {eventData1, eventData2, eventData3};
 +
 +    if (recordType == dynamic_sensors::ipmi::sel::systemEvent)

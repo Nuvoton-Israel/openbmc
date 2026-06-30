@@ -13,80 +13,27 @@ Signed-off-by: Allen Kang <jhkang@nuvoton.com>
 
 Change-Id: I32430ab376c584ef7e4eec88cf604e00bfc6f415
 ---
- user_mgr.cpp | 14 ++++++++++++++
- user_mgr.hpp |  7 +++++++
- 2 files changed, 21 insertions(+)
+ user_mgr.cpp | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/user_mgr.cpp b/user_mgr.cpp
 index 4f49925..78b85b2 100644
 --- a/user_mgr.cpp
 +++ b/user_mgr.cpp
-@@ -93,6 +93,7 @@ using InternalFailure =
-     sdbusplus::xyz::openbmc_project::Common::Error::InternalFailure;
- using InvalidArgument =
-     sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument;
-+using NotAllowed = sdbusplus::xyz::openbmc_project::Common::Error::NotAllowed;
- using UserNameExists =
-     sdbusplus::xyz::openbmc_project::User::Common::Error::UserNameExists;
- using UserNameDoesNotExist =
-@@ -102,6 +103,7 @@ using UserNameGroupFail =
- using NoResource =
-     sdbusplus::xyz::openbmc_project::User::Common::Error::NoResource;
- using Argument = xyz::openbmc_project::Common::InvalidArgument;
-+using NotAllowedReason = xyz::openbmc_project::Common::NotAllowed;
- using GroupNameExists =
-     sdbusplus::xyz::openbmc_project::User::Common::Error::GroupNameExists;
- using GroupNameDoesNotExists =
-@@ -268,6 +270,15 @@ void UserMgr::throwForUserExists(const std::string& userName)
-     }
- }
- 
-+void UserMgr::throwForNotAllowRoot(const std::string& userName)
-+{
-+    if (userName == "root")
-+    {
-+        elog<NotAllowed>(
-+            NotAllowedReason::REASON("Operation is not allow for root"));
-+    }
-+}
-+
- void UserMgr::throwForUserNameConstraints(
-     const std::string& userName, const std::vector<std::string>& groupNames)
+@@ -971,11 +971,13 @@ void UserMgr::userEnable(const std::string& userName, bool enabled)
+ void UserMgr::userEnable(const std::string& userName, bool enabled)
  {
-@@ -476,6 +487,7 @@ void UserMgr::deleteUser(std::string userName)
- void UserMgr::deleteUser(std::string userName)
- {
-     throwForUserDoesNotExist(userName);
-+    throwForNotAllowRoot(userName);
-     deleteUserImpl(userName);
-     lg2::info("User '{USERNAME}' deleted successfully", "USERNAME", userName);
- }
-@@ -818,6 +830,8 @@ void UserMgr::userEnable(const std::string& userName, bool enabled)
      // All user management lock has to be based on /etc/shadow
      // TODO  phosphor-user-manager#10 phosphor::user::shadow::Lock lock{};
      throwForUserDoesNotExist(userName);
 +    if (!enabled)
-+        throwForNotAllowRoot(userName);
++        throwForUidZero(userName);
      try
      {
          executeUserModifyUserEnable(userName.c_str(), enabled);
-diff --git a/user_mgr.hpp b/user_mgr.hpp
-index d7b731c..6d3a32d 100644
---- a/user_mgr.hpp
-+++ b/user_mgr.hpp
-@@ -489,6 +489,13 @@ class UserMgr : public Ifaces
-      */
-     void throwForUserExists(const std::string& userName);
- 
-+    /** @brief avoid not allow operation for root
-+     *  method to check whether user is root, and throw if is.
-+     *
-+     *  @param[in] userName - name of the user
-+     */
-+    void throwForNotAllowRoot(const std::string& userName);
-+
-     /** @brief check user name constraints
-      *  method to check user name constraints and throw if failed.
-      *
+     }
+     catch (const InternalFailure& e)
+     {
 -- 
 2.34.1
+

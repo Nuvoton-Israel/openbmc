@@ -40,7 +40,7 @@ index 36cf0a48..ce05eb4c 100644
 +    try
 +    {
 +        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-+        //sdbusplus::bus::bus bus{ipmid_get_sd_bus_connection()};
++        //sdbusplus::bus_t bus{ipmid_get_sd_bus_connection()};
 +        auto bus = sdbusplus::bus::new_default();
 +        // Reset the failed units so we don't end up having systemd not properly restart if the command is spammed.
 +        auto reset = bus.new_method_call(SYSTEMD_SERVICE, SYSTEMD_OBJ_PATH, SYSTEMD_INTERFACE, "ResetFailed");

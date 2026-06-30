@@ -33,7 +33,7 @@ index 6cdd78f2..f3701d8d 100644
 +    {
 +        return;
 +    }
-+    sdbusplus::bus::bus bus{ipmid_get_sd_bus_connection()};
++    sdbusplus::bus_t bus{ipmid_get_sd_bus_connection()};
 +
 +    // read host version
 +    uint8_t str_len = data[1];

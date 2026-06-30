@@ -1,19 +1,18 @@
-From d12da7f7cb7f50b36247faf3a536015e592d06f2 Mon Sep 17 00:00:00 2001
+From da1a9953e6d28dc18dad1fb8beaeacfdb88d8bf1 Mon Sep 17 00:00:00 2001
 From: Allen Kang <jhkang@nuvoton.com>
 Date: Tue, 21 Feb 2023 17:14:15 +0800
 Subject: [PATCH] Fan fault test
 
 Upstream-Status: Inappropriate [oe-specific]
-
 ---
  power-supply/power_supply.cpp | 1 +
  1 file changed, 1 insertion(+)
 
 diff --git a/power-supply/power_supply.cpp b/power-supply/power_supply.cpp
-index b2d6c03f..f027203e 100644
+index c7a5bb6..550462d 100644
 --- a/power-supply/power_supply.cpp
 +++ b/power-supply/power_supply.cpp
-@@ -145,6 +145,7 @@ void PowerSupply::analyze()
+@@ -150,6 +150,7 @@ void PowerSupply::analyze()
              readFail = 0;
  
              checkInputFault(statusWord);
@@ -21,6 +20,3 @@ index b2d6c03f..f027203e 100644
  
              if (powerOn && (inputFault == 0) && !faultFound)
              {
--- 
-2.34.1
-

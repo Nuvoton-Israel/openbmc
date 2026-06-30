@@ -33,7 +33,7 @@ index 1e320615..d78188f4 100644
 +    {
 +        return;
 +    }
-+    sdbusplus::bus::bus bus{ipmid_get_sd_bus_connection()};
++    sdbusplus::bus_t bus{ipmid_get_sd_bus_connection()};
 +
 +    log<level::INFO>(("ipmid get BIOS version:" + version).c_str());
 +

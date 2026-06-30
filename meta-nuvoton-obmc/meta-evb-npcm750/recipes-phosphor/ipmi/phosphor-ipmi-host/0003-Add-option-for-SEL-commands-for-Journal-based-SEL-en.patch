@@ -99,7 +99,7 @@ index 00000000..7297467e
 +
 +inline static bool getSensorSubtree(SensorSubTree& subtree)
 +{
-+    sdbusplus::bus::bus dbus = sdbusplus::bus::new_default_system();
++    sdbusplus::bus_t dbus = sdbusplus::bus::new_default_system();
 +
 +    auto mapperCall =
 +        dbus.new_method_call("xyz.openbmc_project.ObjectMapper",
@@ -1210,7 +1210,7 @@ index 0b1a4e4d..a4dab20b 100644
 +    static const std::string ipmiSELAddMessage =
 +        "IPMI SEL entry logged using IPMI Add SEL Entry command.";
 +
-+    sdbusplus::bus::bus bus{ipmid_get_sd_bus_connection()};
++    sdbusplus::bus_t bus{ipmid_get_sd_bus_connection()};
 +
 +    if (recordType == ipmi::sel::systemEvent)
 +    {

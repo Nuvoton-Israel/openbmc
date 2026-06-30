@@ -1,22 +1,21 @@
-From 29fdb7f76fa5179a5e8bc10bac7df4b7cc7c96c4 Mon Sep 17 00:00:00 2001
-From: Allen Kang <jhkang@nuvoton.com>
-Date: Tue, 18 Apr 2023 11:23:55 +0800
+From 1db4eecbbc17fa908cc2e7cd01ceceb2ba8013a6 Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Sat, 27 Jun 2026 12:24:19 +0800
 Subject: [PATCH] phosphor-power: support PSU hot plug DBus property and
- removed/installed log.
 
 Upstream-Status: Inappropriate [oe-specific]
 
-Signed-off-by: Allen Kang <jhkang@nuvoton.com>
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
 ---
  elog-errors.hpp                               | 110 ++++++++++++++++++
  org/open_power/Witherspoon/Fault.errors.yaml  |   6 +
  .../Witherspoon/Fault.metadata.yaml           |  16 +++
- power-supply/power_supply.cpp                 |  21 +++-
+ power-supply/power_supply.cpp                 |  23 +++-
  types.hpp                                     |   1 +
- 5 files changed, 151 insertions(+), 3 deletions(-)
+ 5 files changed, 152 insertions(+), 4 deletions(-)
 
 diff --git a/elog-errors.hpp b/elog-errors.hpp
-index 90d7daa9..728b8391 100644
+index 90d7daa..728b839 100644
 --- a/elog-errors.hpp
 +++ b/elog-errors.hpp
 @@ -195,6 +195,14 @@ struct PowerSupplyInputFault;
@@ -144,7 +143,7 @@ index 90d7daa9..728b8391 100644
  namespace org::open_power::witherspoon::fault
  {
 diff --git a/org/open_power/Witherspoon/Fault.errors.yaml b/org/open_power/Witherspoon/Fault.errors.yaml
-index 02178eeb..1083ca1b 100644
+index 02178ee..1083ca1 100644
 --- a/org/open_power/Witherspoon/Fault.errors.yaml
 +++ b/org/open_power/Witherspoon/Fault.errors.yaml
 @@ -15,6 +15,12 @@
@@ -161,7 +160,7 @@ index 02178eeb..1083ca1b 100644
    description: The power supply has had an over temperature condition.
  
 diff --git a/org/open_power/Witherspoon/Fault.metadata.yaml b/org/open_power/Witherspoon/Fault.metadata.yaml
-index 4bdecf2b..321ae2bb 100644
+index 4bdecf2..321ae2b 100644
 --- a/org/open_power/Witherspoon/Fault.metadata.yaml
 +++ b/org/open_power/Witherspoon/Fault.metadata.yaml
 @@ -38,6 +38,22 @@
@@ -188,7 +187,7 @@ index 4bdecf2b..321ae2bb 100644
    level: ERR
    meta:
 diff --git a/power-supply/power_supply.cpp b/power-supply/power_supply.cpp
-index c2ba89fa..81c13d9b 100644
+index d26de61..376951b 100644
 --- a/power-supply/power_supply.cpp
 +++ b/power-supply/power_supply.cpp
 @@ -232,6 +232,13 @@ void PowerSupply::inventoryChanged(sdbusplus::message_t& msg)
@@ -219,8 +218,12 @@ index c2ba89fa..81c13d9b 100644
  #endif
              present = false;
              presentTimer.setEnabled(false);
-@@ -767,7 +781,7 @@ void PowerSupply::createInventoryObj()
-     using Object = std::map<object_path, Interfaces>;
+@@ -764,10 +778,10 @@ void PowerSupply::createInventoryObj()
+     // Build the object map and send it to the inventory
+     using Properties = std::map<std::string, std::variant<std::string, bool>>;
+     using Interfaces = std::map<std::string, Properties>;
+-    using Object = std::map<object_path, Interfaces>;
++    using Object = std::map<sdbusplus::object_path, Interfaces>;
      Properties assetProps;
      Properties operProps;
 -    Properties fieldreplaceableProps;
@@ -241,7 +244,7 @@ index c2ba89fa..81c13d9b 100644
      itemProps.emplace(PRESENT_PROP, true);
      itemProps.emplace(PRETTYNAME_PROP, std::move(powersupplyName));
 diff --git a/types.hpp b/types.hpp
-index 6cfdd9df..aeb16f77 100644
+index b9ccecb..7339f89 100644
 --- a/types.hpp
 +++ b/types.hpp
 @@ -46,6 +46,7 @@ constexpr auto ASSOC_PROP = "Associations";
@@ -252,6 +255,3 @@ index 6cfdd9df..aeb16f77 100644
  
  constexpr auto INVENTORY_OBJ_PATH = "/xyz/openbmc_project/inventory";
  // TODO: Replace instances of POWER_OBJ_PATH with SYSTEM_POWER_PATH
--- 
-2.43.0
-

@@ -1,11 +1,11 @@
-From e6b12cd5a04ff66ec8a76e18d44b080d41f8b2d0 Mon Sep 17 00:00:00 2001
-From: Eason Yang <j2anfernee@gmail.com>
-Date: Mon, 30 Jun 2025 17:07:52 +0800
+From 51f5df68e5f0d0509f99a3ac65988c3057ec2e7f Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Sat, 27 Jun 2026 12:20:59 +0800
 Subject: [PATCH] Support Entity-Manager for power supply monitoring
 
 Upstream-Status: Inappropriate [oe-specific]
-Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
-Signed-off-by: Eason Yang <j2anfernee@gmail.com>
+
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
 ---
  meson.build                               |   4 +-
  meson.options                             |   9 ++
@@ -19,7 +19,7 @@ Signed-off-by: Eason Yang <j2anfernee@gmail.com>
  create mode 100644 services/power-supply-monitor-em@.service
 
 diff --git a/meson.build b/meson.build
-index b7334edf..fb131b1e 100644
+index b7334ed..fb131b1 100644
 --- a/meson.build
 +++ b/meson.build
 @@ -114,6 +114,7 @@ servicedir = systemd.get_variable('systemd_system_unit_dir')
@@ -48,7 +48,7 @@ index b7334edf..fb131b1e 100644
  endif
  if get_option('supply-monitor-ng')
 diff --git a/meson.options b/meson.options
-index d45015be..263a3082 100644
+index d45015b..263a308 100644
 --- a/meson.options
 +++ b/meson.options
 @@ -39,6 +39,11 @@ option(
@@ -75,7 +75,7 @@ index d45015be..263a3082 100644
      'oe-sdk',
      type: 'feature',
 diff --git a/pmbus.cpp b/pmbus.cpp
-index 4ee0714a..d5a6b8d2 100644
+index 4ee0714..d5a6b8d 100644
 --- a/pmbus.cpp
 +++ b/pmbus.cpp
 @@ -401,6 +401,7 @@ void PMBus::findHwmonDir()
@@ -87,7 +87,7 @@ index 4ee0714a..d5a6b8d2 100644
  }
  
 diff --git a/power-supply/power_supply.cpp b/power-supply/power_supply.cpp
-index 6ceb2129..98065302 100644
+index 2713d99..0345f7c 100644
 --- a/power-supply/power_supply.cpp
 +++ b/power-supply/power_supply.cpp
 @@ -30,6 +30,12 @@
@@ -290,7 +290,7 @@ index 6ceb2129..98065302 100644
  void PowerSupply::createInventoryObj()
  {
      using namespace phosphor::pmbus;
-@@ -687,12 +758,47 @@ void PowerSupply::createInventoryObj()
+@@ -687,11 +758,46 @@ void PowerSupply::createInventoryObj()
          log<level::ERR>(e.what(), entry("PATH=%s", inventoryPath.c_str()));
      }
  }
@@ -299,7 +299,6 @@ index 6ceb2129..98065302 100644
  void PowerSupply::updateInventory()
  {
      using namespace phosphor::pmbus;
-     using namespace sdbusplus::message;
  
 +#if (NUVOTON_ENTITY == 1)
 +    std::string propName, fileName;
@@ -338,7 +337,7 @@ index 6ceb2129..98065302 100644
      // Build the object map and send it to the inventory
      using Properties = std::map<std::string, std::variant<std::string, bool>>;
      using Interfaces = std::map<std::string, Properties>;
-@@ -758,6 +864,7 @@ void PowerSupply::updateInventory()
+@@ -757,6 +863,7 @@ void PowerSupply::updateInventory()
          lg2::error("Exception in updateInventory: {ERROR}, PATH={PATH}",
                     "ERROR", e, "PATH", inventoryPath);
      }
@@ -347,7 +346,7 @@ index 6ceb2129..98065302 100644
  
  void PowerSupply::syncHistory()
 diff --git a/power-supply/power_supply.hpp b/power-supply/power_supply.hpp
-index 3da9f7f6..f8e88a3c 100644
+index bdeffba..5e8426e 100644
 --- a/power-supply/power_supply.hpp
 +++ b/power-supply/power_supply.hpp
 @@ -381,7 +381,9 @@ class PowerSupply : public Device
@@ -362,7 +361,7 @@ index 3da9f7f6..f8e88a3c 100644
       * @brief Adds properties to the inventory.
 diff --git a/services/power-supply-monitor-em@.service b/services/power-supply-monitor-em@.service
 new file mode 100644
-index 00000000..d0e95067
+index 0000000..d0e9506
 --- /dev/null
 +++ b/services/power-supply-monitor-em@.service
 @@ -0,0 +1,15 @@
@@ -382,7 +381,7 @@ index 00000000..d0e95067
 +[Install]
 +RequiredBy=multi-user.target
 diff --git a/types.hpp b/types.hpp
-index 4a18b85f..6cfdd9df 100644
+index d47a509..b9ccecb 100644
 --- a/types.hpp
 +++ b/types.hpp
 @@ -5,8 +5,12 @@
@@ -409,19 +408,19 @@ index 4a18b85f..6cfdd9df 100644
  constexpr auto SYSTEM_POWER_PATH = "/org/openbmc/control/power0";
  constexpr auto CHASSIS_POWER_PATH = "/org/openbmc/control/power{}";
 diff --git a/utility.cpp b/utility.cpp
-index 6cb98e84..f3806450 100644
+index 8533385..58fd96f 100644
 --- a/utility.cpp
 +++ b/utility.cpp
-@@ -19,6 +19,8 @@
- 
+@@ -20,6 +20,8 @@
  #include <fstream>
+ #include <unordered_set>
  
 +#include <xyz/openbmc_project/State/Chassis/server.hpp>
 +
  namespace phosphor
  {
  namespace power
-@@ -36,6 +38,9 @@ constexpr auto CHASSIS_ID_PROPERTY = "Position";
+@@ -37,6 +39,9 @@ constexpr auto POSITION_PROPERTY = "Position";
  
  using json = nlohmann::json;
  
@@ -449,6 +448,3 @@ index 6cb98e84..f3806450 100644
      }
      catch (const std::exception& e)
      {
--- 
-2.43.0
-
