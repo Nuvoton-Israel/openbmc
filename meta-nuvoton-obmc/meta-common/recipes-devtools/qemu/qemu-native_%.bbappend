@@ -1,11 +1,11 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 
 # Override source URI to Nuvoton's fork
-QBRANCH = "npcm-v10.2.0"
+QBRANCH = "npcm-v11.0.0"
 SRC_URI = "gitsm://github.com/Nuvoton-Israel/qemu.git;protocol=https;branch=${QBRANCH}"
-SRCREV = "48e6aea0574f1dcca3c7bc8fb5ea68a92728144a"
+SRCREV = "47bb2e94cbfd328cb56ca7323d7d9d8ead91e3ed"
 
-PV = "10.2.0+git${SRCPV}"
+PV = "11.0.0+git${SRCPV}"
 
 SRC_URI:append = " \
     file://0010-configure-lookup-meson-exutable-from-PATH.patch \
