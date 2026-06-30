@@ -674,7 +674,7 @@ The ``bitbake-setup settings`` sub-command helps modifying the settings of
 
 Settings must be set with a section and a value, for example::
 
-   bitbake-setup setting set default top-dir-name bitbake-builds
+   bitbake-setup settings set default top-dir-name bitbake-builds
 
 Will set the value of ``top-dir-name`` in the ``default`` section to
 "bitbake-builds".
@@ -1057,6 +1057,12 @@ They contain the following sections:
       snippet. This is what is prompted during the
       :ref:`ref-bbsetup-command-init` command execution.
 
+   -  ``notes`` (*optional*): additional information written to
+      ``build/conf/conf-notes.txt`` when ``bitbake-setup`` generates the build
+      configuration from ``bb-layers``. This can be a string, or a list of
+      strings which will be written one per line. For ``oe-template``
+      configurations, this file is provided by the template.
+
    -  ``configurations``: Configurations can recursively contain as many nested
       configurations as needed. This will create more choices when running the
       :ref:`ref-bbsetup-command-init` command.
@@ -1067,6 +1073,12 @@ They contain the following sections:
       between themselves in other parameters. ``bitbake-setup`` will assemble
       configuration choices by putting together information from a leaf
       configuration and all of its ancestors.
+
+      When the same keyword is present in a nested configuration and in one of
+      its ancestors, the values are merged with Python ``+`` semantics. For
+      example, lists are appended and strings are concatenated directly. String
+      values such as ``description`` should include any needed separators in
+      the configuration data.
 
    -  ``bb-env-passthrough-additions`` (*optional*): List of environment
       variables to include in :term:`BB_ENV_PASSTHROUGH_ADDITIONS`.

@@ -6,9 +6,10 @@ DEPENDS:append = " xxd-native"
 SRC_URI:append = "\
    file://fvp.cfg \
    file://fvp.env \
+   file://saveenv.cfg \
 "
 
 do_configure:append() {
-  install -m 644 ${UNPACKDIR}/fvp.env ${B}
+  install -m 644 ${UNPACKDIR}/fvp.env ${B}/source/board/armltd/vexpress64/fvp.env
 }
 

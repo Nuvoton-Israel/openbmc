@@ -28,6 +28,7 @@ The following prerequisites must be available on the host system:
 - GNU Tar 1.34 or greater.
 - GNU Compiler Collection 12.2 or greater.
 - GNU Make 4.3 or greater.
+- mtools 4.0 or greater.
 - tmux 3.3 or greater.
 
 Please follow the steps described in the Yocto mega manual:
@@ -210,13 +211,22 @@ Build
         mkdir ${WORKSPACE}
         cd ${WORKSPACE}
 
-#. Install kas version 4.4 with ``sudo`` rights.
+#. Create a Python virtual environment and activate it.
 
     .. code-block:: console
 
-        sudo pip3 install kas==4.4
+        python3 -m venv ${WORKSPACE}/venv_cs1k
+        source ${WORKSPACE}/venv_cs1k/bin/activate
 
-    Ensure the kas installation directory is visible on the ``$PATH`` environment variable.
+#. Install ``kas`` and ``wic`` inside the virtual environment.
+
+    .. code-block:: console
+
+        python3 -m pip install kas==5.1 "git+https://git.yoctoproject.org/wic@v0.3.0"
+
+    .. note::
+
+        Ensure the kas and wic installation directory is visible on the ``$PATH`` environment variable.
 
 #. Clone the `meta-arm` Yocto layer in the workspace ``${WORKSPACE}``.
 
@@ -243,8 +253,6 @@ Build
 
     .. warning::
 
-        **The External System Processor is not available on the Corstone-1000 with Cortex-A320 FVP.**
-
         Access to the External System Processor is disabled by default on **Corstone-1000 with Cortex-A35**.
 
         To build the Corstone-1000 image with External System Processor enabled, run:
@@ -252,18 +260,6 @@ Build
         .. code-block:: console
 
             kas build meta-arm/kas/corstone1000-${TARGET}.yml:meta-arm/ci/debug.yml:meta-arm/kas/corstone1000-extsys.yml
-
-    .. warning::
-
-        **The Ethos-U85 Neural Processing Unit (NPU) is only available on
-        the Corstone-1000 with Cortex-A320 FVP.**
-
-        To build the Corstone-1000 image with the Ethos-U85 NPU enabled, run:
-
-        .. code-block:: console
-
-            kas build meta-arm/kas/corstone1000-fvp.yml:meta-arm/ci/debug.yml:meta-arm/kas/corstone1000-a320.yml
-
 
 A clean build takes a significant amount of time given that all of the development machine utilities are also
 built along with the target images. Those development machine utilities include executables (Python,
@@ -279,6 +275,28 @@ The output binaries run in the Corstone-1000 platform are the following:
  - The Secure Enclave ROM firmware: ``${WORKSPACE}/build/tmp/deploy/images/corstone1000-${TARGET}/trusted-firmware-m/bl1.bin``
  - The External System Processor firmware: ``${WORKSPACE}/build/tmp/deploy/images/corstone1000-${TARGET}/es_flashfw.bin``
  - The internal firmware flash image: ``${WORKSPACE}/build/tmp/deploy/images/corstone1000-${TARGET}/corstone1000-flash-firmware-image-corstone1000-${TARGET}.wic``
+
+Build with SSH
+--------------
+
+The ``meta-arm/kas/corstone1000-${TARGET}.yml`` build produces an image for
+booting from flash.
+
+To build a bootable mass storage OS image with Dropbear SSH enabled, run:
+
+.. code-block:: console
+
+    kas build meta-arm/ci/corstone1000-${TARGET}.yml:meta-arm/kas/corstone1000-ssh.yml
+
+The mass storage OS image can be found at ``${WORKSPACE}/build/tmp/deploy/images/corstone1000-${TARGET}/core-image-minimal-corstone1000-${TARGET}.wic``
+
+.. note::
+
+    For the FVP, the generated ``core-image-minimal-corstone1000-fvp.fvpconf``
+    configures the mass storage OS image using ``board.msd_mmc.p_mmc_file``.
+
+    For the MPS3 platform, write the ``*.wic`` image directly to the mass storage device.
+
 
 .. _flashing-firmware-images:
 
@@ -425,6 +443,10 @@ MPS3
 
         sudo picocom -b 115200 /dev/ttyUSB3
 
+    .. note::
+
+        If the user is a member of the ``dialout`` group, ``sudo`` is not required for this step.
+
     .. important::
         Plug a connected Ethernet cable to the MPS3 or it will
         wait for a network connection for a considerable amount of time, printing the following
@@ -457,14 +479,9 @@ Corstone-1000 FVP software image.
 A Yocto recipe is provided to download the latest supported FVP version.
 
 The recipe is located at ``${WORKSPACE}/meta-arm/meta-arm/recipes-devtools/fvp/fvp-corstone1000.bb``.
-This recipe supports selecting different Corstone‑1000 FVP models via MACHINE_FEATURES:
 
-- ``cortexa320``      use the Cortex-A320 Host Processor with Ethos U85 enabled FVP build
-- (default)           use the Cortex-A35 Host Processor with Cortex-M3 External System FVP build
-
-The latest FVP version is ``11.23.25`` for Corstone-1000 with Cortex-A35 and ``11.30.27`` for
-Corstone-1000 with Cortex-A320, and each model is automatically downloaded and installed when using
-the ``runfvp`` command as detailed below.
+The latest FVP version is ``11.23.25`` and is automatically
+downloaded and installed when using the ``runfvp`` command as detailed below.
 
 .. note::
 
@@ -851,14 +868,15 @@ The results can be fetched from the `acs_results` folder in the ``BOOT`` partiti
 
 .. note::
 
-    Access the `acs_results` folder in FVP by running the following commands:
+    Access the `acs_results` folder in FVP by copying it from the same ACS image that was used to boot the FVP.
+    The following command copies the ``acs_results`` directory from the ACS image to
+    ``${WORKSPACE}/acs_results`` on the host development machine.
 
     .. code-block:: console
 
-        sudo mkdir /mnt/test
-        sudo mount -o rw,offset=1048576 \
-        ${WORKSPACE}/arm-systemready/IR/prebuilt_images/v23.09_2.1.0/ir-acs-live-image-generic-arm64.wic \
-        /mnt/test
+        cd ${WORKSPACE}
+        wic cp ${WORKSPACE}/arm-systemready/IR/prebuilt_images/v23.09_2.1.0/ir-acs-live-image-generic-arm64.wic:1/acs_results \
+          ${WORKSPACE}
 
 #####################################################
 
@@ -1061,76 +1079,48 @@ Transfer Capsules to Target
 The capsule delivery process described below is the direct method (usage of capsules from the ACS image)
 as opposed to the on-disk method (delivery of capsules using a file on a mass storage device).
 
-MPS3
-====
-
-#. Prepare a USB drive as explained in `this <mps3-instructions-for-acs-image_>`_ section.
-
-#. Copy the capsule file to the root directory of the ``BOOT`` partition in the USB drive.
-
-  .. code-block:: console
-
-    cp ${WORKSPACE}/build/tmp/deploy/images/corstone1000-mps3/corstone1000-mps3-v6.uefi.capsule /dev/sdc/BOOT/
-    cp ${WORKSPACE}/corstone1000-mps3-v5.uefi.capsule /dev/sdc/EFI/BOOT/
-    cp ${WORKSPACE}/corstone1000-mps3-partial-v7.uefi.capsule /dev/sdc/EFI/BOOT/
-    sync
-
 .. note::
 
-    ``/dev/sdc`` is the assumed path for the ACS Image USB drive.
-    Replace it with the actual device path as enumerated on your development machine.
+    The staging steps below are shared between ``mps3`` and ``fvp``.
 
+#. Download and extract the ACS image `as described for the MPS3 <mps3-instructions-for-acs-image_>`_.
+   The ACS image extraction location will be referred below as ``${ACS_IMAGE_PATH}``.
+
+#. Copy the ACS image to the workspace root directory and rename it to
+   ``ir-acs-live-image-generic-arm64-staged.wic``. The staged image will then be
+   populated with the capsule files.
+
+    ``${ACS_STAGED_IMAGE}`` refers to
+    ``${WORKSPACE}/ir-acs-live-image-generic-arm64-staged.wic``.
+
+    .. code-block:: console
+
+        cp ${ACS_IMAGE_PATH}/ir-acs-live-image-generic-arm64.wic \
+          ${ACS_STAGED_IMAGE}
+
+#. Copy the capsules to the staged ACS image:
+
+    .. code-block:: console
+
+        cd ${WORKSPACE}
+        wic cp ${WORKSPACE}/build/tmp/deploy/images/corstone1000-${TARGET}/corstone1000-${TARGET}-v6.uefi.capsule \
+          ${ACS_STAGED_IMAGE}:1/corstone1000-${TARGET}-v6.uefi.capsule
+        wic cp ${WORKSPACE}/corstone1000-${TARGET}-v5.uefi.capsule \
+          ${ACS_STAGED_IMAGE}:1/corstone1000-${TARGET}-v5.uefi.capsule
+        wic cp ${WORKSPACE}/corstone1000-${TARGET}-partial-v7.uefi.capsule \
+          ${ACS_STAGED_IMAGE}:1/corstone1000-${TARGET}-partial-v7.uefi.capsule
 
 .. important::
 
     The direct Capsule Update method requires that the capsule files not be placed in the ``EFI/UpdateCapsule`` directory,
     as doing so might inadvertently trigger the on-disk update method.
 
-FVP
+MPS3
 ===
 
-#. Download and extract the ACS image `as described for the MPS3 <mps3-instructions-for-acs-image_>`_.
-   The ACS image extraction location will be referred below as ``${ACS_IMAGE_PATH}``.
-
-    .. note::
-
-      Creating a USB drive with the ACS image is not required as the image will be mounted with the steps below.
-
-#. Find the first partition's offset of the ``ir-acs-live-image-generic-arm64.wic`` image using the ``fdisk`` tool.
-   The partition table can be listed using:
-
-    .. code-block:: console
-
-        fdisk -lu ${ACS_IMAGE_PATH}/ir-acs-live-image-generic-arm64.wic
-        Device                                                 Start     End Sectors  Size Type
-        ${ACS_IMAGE_PATH}/ir-acs-live-image-generic-arm64.wic1    2048  309247  307200  150M Microsoft basic data
-        ${ACS_IMAGE_PATH}/ir-acs-live-image-generic-arm64.wic2  309248 1343339 1034092  505M Linux filesystem
-
-
-    Given that the first partition starts at sector 2048 and each sector is 512 bytes in size,
-    the first partition is at offset 1048576 (2048 x 512).
-
-#. Mount the ``ir-acs-live-image-generic-arm64.wic`` image using the previously calculated offset:
-
-    .. code-block:: console
-
-        sudo mkdir /mnt/ir-acs-live-image-generic-arm64
-        sudo mount -o rw,offset=<first_partition_offset> ${ACS_IMAGE_PATH}/ir-acs-live-image-generic-arm64.wic  /mnt/ir-acs-live-image-generic-arm64
-
-#. Copy the capsules:
-
-    .. code-block:: console
-
-        sudo cp ${WORKSPACE}/build/tmp/deploy/images/corstone1000-fvp/corstone1000-fvp-v6.uefi.capsule /mnt/ir-acs-live-image-generic-arm64/
-        sudo cp ${WORKSPACE}/corstone1000-fvp-v5.uefi.capsule /mnt/ir-acs-live-image-generic-arm64/
-        sudo cp ${WORKSPACE}/corstone1000-fvp-partial-v7.uefi.capsule /mnt/ir-acs-live-image-generic-arm64/
-        sync
-
-#. Unmount the IR image:
-
-    .. code-block:: console
-
-        sudo umount /mnt/ir-acs-live-image-generic-arm64
+#. Write ``${ACS_STAGED_IMAGE}`` to the ACS USB drive by following the
+   `MPS3 ACS image steps <mps3-instructions-for-acs-image_>`_ and replacing
+   ``ir-acs-live-image-generic-arm64.wic`` with ``${ACS_STAGED_IMAGE}``.
 
 ************************
 Run Capsule Update Tests
@@ -1169,13 +1159,14 @@ Positive Full Capsule Update Test
 
       .. code-block:: console
 
+        cd ${WORKSPACE}
         kas shell meta-arm/kas/corstone1000-fvp.yml:meta-arm/ci/debug.yml \
         -c "../meta-arm/scripts/runfvp --terminals=tmux \
-        -- -C board.msd_mmc.p_mmc_file=${ACS_IMAGE_PATH}/ir-acs-live-image-generic-arm64.wic"
+        -- -C board.msd_mmc.p_mmc_file=${ACS_STAGED_IMAGE}"
 
       .. warning::
 
-          ``${ACS_IMAGE_PATH}`` must be an absolute path. Ensure there are no spaces before or after of ``=`` of the ``-C board.msd_mmc.p_mmc_file`` option.
+          ``${ACS_STAGED_IMAGE}`` must be an absolute path. Ensure there are no spaces before or after of ``=`` of the ``-C board.msd_mmc.p_mmc_file`` option.
 
 
 #. Wait until U-Boot loads EFI from the ACS image and interrupt the EFI shell by pressing the ``Escape`` key when the following prompt is displayed on the Host Processor terminal (``ttyUSB2`` for MPS3).
@@ -1196,7 +1187,7 @@ Positive Full Capsule Update Test
 
         .. code-block:: console
 
-            EFI/BOOT/app/CapsuleApp.efi EFI/BOOT/corstone1000-mps3-v6.uefi.capsule
+            EFI/BOOT/app/CapsuleApp.efi corstone1000-mps3-v6.uefi.capsule
 
     - FVP:
 
@@ -1340,7 +1331,7 @@ Rollback Protection Capsule Update Test
 
         .. code-block:: console
 
-            EFI/BOOT/app/CapsuleApp.efi EFI/BOOT/corstone1000-mps3-v5.uefi.capsule
+            EFI/BOOT/app/CapsuleApp.efi corstone1000-mps3-v5.uefi.capsule
 
     - FVP:
 
@@ -1656,6 +1647,10 @@ MPS3
 
         sudo picocom -b 115200 /dev/ttyUSB2
 
+    .. note::
+
+        If the user is a member of the ``dialout`` group, ``sudo`` is not required for this step.
+
 #. When the installation screen is displayed on ``ttyUSB2``, plug in the (still empty) system drive to the MPS3.
 #. Start the distribution installation process.
 
@@ -1865,7 +1860,7 @@ Generate Keys, Signed Image and Unsigned Image
 
     .. code-block:: console
 
-        ./${WORKSPACE}/iot-platform-assets/corstone1000/secureboot/create_keys_and_sign.sh \
+        ${WORKSPACE}/iot-platform-assets/corstone1000/secureboot/create_keys_and_sign.sh \
         -d ${TARGET} \
         -v ${CERTIFICATE_VALIDITY_DURATION_IN_DAYS}
 
@@ -1873,18 +1868,16 @@ Generate Keys, Signed Image and Unsigned Image
 
         The `efitools <https://github.com/vathpela/efitools/>`__  package is required to execute the script.
 
+        The ``mtools`` package is required on the host development machine to execute the script.
+
         ``${CERTIFICATE_VALIDITY_DURATION_IN_DAYS}`` is an integer that specifies the certificate's validity period in days.
 
     .. note::
 
         Consult the image signing script help message (``-h``) for more information about other optional arguments.
 
-        The script is interactive and contains commands that require ``sudo`` level permissions.
-
-
 The keys, signed kernel image, and unsigned kernel image will be copied to the exisiting ESP image.
 The modified ESP image can be found at ``${WORKSPACE}/build/tmp/deploy/images/corstone1000-${TARGET}/corstone1000-esp-image-corstone1000-${TARGET}.wic``.
-
 
 ****************************
 Run Unsigned Image Boot Test
@@ -2156,40 +2149,19 @@ Symmetric Multiprocessing
 
 .. warning::
 
-    Symmetric multiprocessing (SMP) mode is supported on Corstone-1000
-    with Cortex-A35 FVP and Corstone-1000 with Cortex-A320 FVP, but is disabled by default.
+    Symmetric multiprocessing (SMP) mode is supported on FVP but is disabled by default.
 
+#. Build the software stack with SMP mode enabled:
 
-#. Build the software stack with SMP mode enabled.
-
-   For Corstone-1000 with Cortex-A35 FVP:
-
-    .. code-block:: console
+   .. code-block:: console
 
         kas build meta-arm/kas/corstone1000-fvp.yml:meta-arm/ci/debug.yml:meta-arm/kas/corstone1000-multicore.yml
 
-   For Corstone-1000 with Cortex-A320 FVP:
-
-    .. code-block:: console
-
-        kas build meta-arm/kas/corstone1000-fvp.yml:meta-arm/ci/debug.yml:meta-arm/kas/corstone1000-a320.yml:\
-        meta-arm/kas/corstone1000-multicore.yml
-
 #. Run the Corstone-1000 FVP.
-
-   For Corstone-1000 with Cortex-A35 FVP:
 
     .. code-block:: console
 
         kas shell meta-arm/kas/corstone1000-fvp.yml:meta-arm/ci/debug.yml:meta-arm/kas/corstone1000-multicore.yml \
-        -c "../meta-arm/scripts/runfvp"
-
-   For Corstone-1000 with Cortex-A320 FVP:
-
-    .. code-block:: console
-
-        kas shell meta-arm/kas/corstone1000-fvp.yml:meta-arm/ci/debug.yml:meta-arm/kas/corstone1000-a320.yml:\
-        meta-arm/kas/corstone1000-multicore.yml \
         -c "../meta-arm/scripts/runfvp"
 
 #. Verify that the FVP is running the Host Processor with more than one CPU core:
@@ -2198,78 +2170,6 @@ Symmetric Multiprocessing
 
         nproc
         4                  # number of processing units
-
-Ethos-U85 NPU
--------------
-
-.. warning::
-
-    The Ethos-U85 NPU is only supported on Corstone-1000 with Cortex-A320 FVP.
-
-
-#. Clone the `iot-platform-assets` repository to your ``${WORKSPACE}``.
-
-    .. code-block:: console
-
-        cd ${WORKSPACE}
-        git clone https://git.gitlab.arm.com/arm-reference-solutions/iot-platform-assets.git \
-        -b CORSTONE1000-2025.12
-
-#. Copy the additional kas configuration file to:
-
-    .. code-block:: console
-
-        cp ${WORKSPACE}/iot-platform-assets/corstone1000/ethos-u85_test/ethos-u85-test.yml \
-        ${WORKSPACE}/meta-arm/kas/
-
-#. Copy the mesa package Git patch file to your copy of meta-arm.
-
-    .. code-block:: console
-
-        cp -f ${WORKSPACE}/iot-platform-assets/corstone1000/ethos-u85_test/0001-arm-bsp-mesa-Package-Teflon-test-runner-and-models.patch \
-        ${WORKSPACE}/meta-arm/
-
-#. Apply the Git patch to meta-arm.
-
-    .. code-block:: console
-
-        cd ${WORKSPACE}/meta-arm/
-        git apply 0001-arm-bsp-mesa-Package-Teflon-test-runner-and-models.patch
-        cd ${WORKSPACE}
-
-#. Re-Build the Corstone-1000 with Cortex-A320 FVP software stack as follows:
-
-    .. code-block:: console
-
-        kas build meta-arm/kas/corstone1000-fvp.yml:meta-arm/ci/debug.yml:meta-arm/kas/corstone1000-a320.yml:\
-        meta-arm/kas/ethos-u85-test.yml
-
-#. Run the Corstone-1000 with Cortex-320 FVP:
-
-    .. code-block:: console
-
-        kas shell meta-arm/kas/corstone1000-fvp.yml:meta-arm/ci/debug.yml:meta-arm/kas/corstone1000-a320.yml:\
-        meta-arm/kas/ethos-u85-test.yml \
-        -c "../meta-arm/scripts/runfvp"
-
-#. To verify you are running the Corstone-1000 with Cortex-A320, build and run the FVP and inspect the CPU model
-   reported in ``/proc/cpuinfo`` as shown below. Inside the FVP shell, confirm the core type:
-
-
-    .. code-block:: console
-
-        grep -E 'CPU part|model name' /proc/cpuinfo
-        # Expect: CPU part : 0xd8f  (which corresponds to Cortex-A320)
-
-#. Run the `test_teflon` test application inside the FVP shell as follows:
-
-    .. code-block:: console
-
-        export TEFLON_TEST_DELEGATE=/usr/lib/libteflon.so
-        export TEFLON_TEST_DATA=/usr/share/teflon/tests
-        test_teflon --gtest_filter='Models.*'
-
-   The test completes in approximately one minute.
 
 Secure Debug
 ------------

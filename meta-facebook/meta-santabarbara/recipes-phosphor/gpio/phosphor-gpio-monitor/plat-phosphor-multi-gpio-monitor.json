@@ -10,6 +10,7 @@
             ],
             "FALLING": [
                 "assert-power-good-drop.service",
+                "mctp_remove.service",
                 "power-rail-assert-log@FM_PWRGD_CPU0_PWROK.service"
             ]
         },
@@ -165,6 +166,50 @@
             ],
             "FALLING": [
                 "vr-fault-assert-log@FM_P3V3_NIC4_FAULT_N.service"
+            ]
+        },
+        "Continue": true
+    },
+    {
+        "Name": "I3C_MCIO_1B_ALERT_ISO_R_N",
+        "LineName": "I3C_MCIO_1B_ALERT_ISO_R_N",
+        "EventMon": "FALLING",
+        "Targets": {
+            "FALLING": [
+                "get-mmc-lastest-version@0.service"
+            ]
+        },
+        "Continue": true
+    },
+    {
+        "Name": "I3C_MCIO_2B_ALERT_ISO_R_N",
+        "LineName": "I3C_MCIO_2B_ALERT_ISO_R_N",
+        "EventMon": "FALLING",
+        "Targets": {
+            "FALLING": [
+                "get-mmc-lastest-version@2.service"
+            ]
+        },
+        "Continue": true
+    },
+    {
+        "Name": "I3C_MCIO_3B_ALERT_ISO_R_N",
+        "LineName": "I3C_MCIO_3B_ALERT_ISO_R_N",
+        "EventMon": "FALLING",
+        "Targets": {
+            "FALLING": [
+                "get-mmc-lastest-version@1.service"
+            ]
+        },
+        "Continue": true
+    },
+    {
+        "Name": "I3C_MCIO_4B_ALERT_ISO_R_N",
+        "LineName": "I3C_MCIO_4B_ALERT_ISO_R_N",
+        "EventMon": "FALLING",
+        "Targets": {
+            "FALLING": [
+                "get-mmc-lastest-version@3.service"
             ]
         },
         "Continue": true
@@ -333,8 +378,7 @@
             ],
             "FALLING": [
                 "assert-post-end.service",
-                "platform-host-ready.target",
-                "get-mmc-lastest-version.service"
+                "platform-host-ready.target"
             ]
         },
         "Continue": true
@@ -443,6 +487,46 @@
             ],
             "FALLING": [
                 "power-rail-deassert-log@PEX_SYS_ERR_FPGA.service"
+            ]
+        },
+        "Continue": true
+    },
+    {
+        "Name": "SYS_PWR_FAULT_ALERT",
+        "LineName": "SYS_PWR_FAULT_ALERT",
+        "EventMon": "BOTH",
+        "Targets": {
+            "RISING": [
+                "mb-pwr-fault-assert.service"
+            ],
+            "FALLING": [
+                "mb-pwr-fault-deassert.service"
+            ],
+            "INIT_HIGH": [
+                "mb-pwr-fault-assert.service"
+            ],
+            "INIT_LOW": [
+                "mb-pwr-fault-deassert.service"
+            ]
+        },
+        "Continue": true
+    },
+    {
+        "Name": "SWB_PWR_FAULT_N",
+        "LineName": "SWB_PWR_FAULT_N",
+        "EventMon": "BOTH",
+        "Targets": {
+            "RISING": [
+                "swb-pwr-fault-assert.service"
+            ],
+            "FALLING": [
+                "swb-pwr-fault-deassert.service"
+            ],
+            "INIT_HIGH": [
+                "swb-pwr-fault-assert.service"
+            ],
+            "INIT_LOW": [
+                "swb-pwr-fault-deassert.service"
             ]
         },
         "Continue": true

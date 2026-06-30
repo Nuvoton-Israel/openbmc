@@ -9,6 +9,7 @@ SRC_URI = "https://gstreamer.freedesktop.org/src/gst-plugins-bad/gst-plugins-bad
            file://0001-fix-maybe-uninitialized-warnings-when-compiling-with.patch \
            file://0002-avoid-including-sys-poll.h-directly.patch \
            file://0004-opencv-resolve-missing-opencv-data-dir-in-yocto-buil.patch \
+           file://0005-wayland-handle-padded-buffers-in-wl_shm-buffer-creat.patch \
            "
 SRC_URI[sha256sum] = "6467e3964828f4d7d08bfe1fbb4d76287a1c8fa76674e59e101a149c020fefd7"
 
@@ -21,11 +22,15 @@ DEPENDS += "gstreamer1.0-plugins-base"
 
 inherit gobject-introspection
 
+# Vulkan requires a windowing system
+PACKAGECONFIG_VULKAN = "${@bb.utils.contains_any('DISTRO_FEATURES', 'x11 wayland', 'vulkan', '', d)}"
+
 PACKAGECONFIG ??= " \
     ${GSTREAMER_ORC} \
+    ${@bb.utils.contains('DISTRO_FEATURES', 'vulkan', '${PACKAGECONFIG_VULKAN}', '', d)} \
     ${@bb.utils.contains('DISTRO_FEATURES', 'bluetooth', 'bluez', '', d)} \
-    ${@bb.utils.filter('DISTRO_FEATURES', 'directfb vulkan x11', d)} \
-    ${@bb.utils.contains('DISTRO_FEATURES', 'wayland', 'wayland', '', d)} \
+    ${@bb.utils.filter('DISTRO_FEATURES', 'directfb x11', d)} \
+    ${@bb.utils.filter('DISTRO_FEATURES', 'wayland', d)} \
     ${@bb.utils.contains('DISTRO_FEATURES', 'opengl', 'gl', '', d)} \
     bz2 closedcaption curl dash dtls hls openssl sbc smoothstreaming \
     sndfile ttml uvch264 webp analytics \

@@ -841,8 +841,9 @@ system and gives an overview of their function and contents.
       previous link.
 
    :term:`BBFILES_DYNAMIC`
-      Activates content when identified layers are present. You identify
-      the layers by the collections that the layers define.
+      Activates content when identified layers are present. This mechanism
+      is commonly referred to as "dynamic layers". You identify the layers
+      by the collections that the layers define.
 
       Use the :term:`BBFILES_DYNAMIC` variable to avoid ``.bbappend`` files
       whose corresponding ``.bb`` file is in a layer that attempts to
@@ -856,8 +857,8 @@ system and gives an overview of their function and contents.
       filename patterns::
 
          BBFILES_DYNAMIC += " \
-            clang-layer:${LAYERDIR}/bbappends/meta-clang/*/*/*.bbappend \
-            core:${LAYERDIR}/bbappends/openembedded-core/meta/*/*/*.bbappend \
+            clang-layer:${LAYERDIR}/dynamic-layers/meta-clang/*/*/*.bbappend \
+            core:${LAYERDIR}/dynamic-layers/openembedded-core/meta/*/*/*.bbappend \
             "
 
       This next example shows an error message that occurs because invalid
@@ -866,8 +867,8 @@ system and gives an overview of their function and contents.
       .. code-block:: none
 
          ERROR: BBFILES_DYNAMIC entries must be of the form <collection name>:<filename pattern>, not:
-             /work/my-layer/bbappends/meta-security-isafw/*/*/*.bbappend
-             /work/my-layer/bbappends/openembedded-core/meta/*/*/*.bbappend
+             /work/my-layer/dynamic-layers/meta-security-isafw/*/*/*.bbappend
+             /work/my-layer/dynamic-layers/openembedded-core/meta/*/*/*.bbappend
 
    :term:`BBINCLUDED`
       See :term:`bitbake:BBINCLUDED` in the BitBake manual.
@@ -1977,42 +1978,22 @@ system and gives an overview of their function and contents.
          variable only in certain contexts (e.g. when building for kernel
          and kernel module recipes).
 
-   :term:`CVE_CHECK_CREATE_MANIFEST`
-      Specifies whether to create a CVE manifest to place in the deploy
-      directory. The default is "1".
-
    :term:`CVE_CHECK_IGNORE`
       This variable is deprecated and should be replaced by :term:`CVE_STATUS`.
 
    :term:`CVE_CHECK_MANIFEST_JSON`
-      Specifies the path to the CVE manifest in JSON format. See
-      :term:`CVE_CHECK_CREATE_MANIFEST`.
-
-   :term:`CVE_CHECK_MANIFEST_JSON_SUFFIX`
-      Allows to modify the JSON manifest suffix. See
-      :term:`CVE_CHECK_MANIFEST_JSON`.
-
-   :term:`CVE_CHECK_REPORT_PATCHED`
-      Specifies whether or not the :ref:`ref-classes-cve-check`
-      class should report patched or ignored CVEs. The default is "1", but you
-      may wish to set it to "0" if you do not need patched or ignored CVEs in
-      the logs.
-
-   :term:`CVE_CHECK_SHOW_WARNINGS`
-      Specifies whether or not the :ref:`ref-classes-cve-check`
-      class should generate warning messages on the console when unpatched
-      CVEs are found. The default is "1", but you may wish to set it to "0" if
-      you are already examining/processing the logs after the build has
-      completed and thus do not need the warning messages.
+      When inheriting the :ref:`ref-classes-vex` class, this variable specifies
+      the path to the CVE manifest in JSON format.
 
    :term:`CVE_CHECK_SKIP_RECIPE`
-      The list of package names (:term:`PN`) for which
-      CVEs (Common Vulnerabilities and Exposures) are ignored.
+      When inheriting the :ref:`ref-classes-vex` class, the variable specifies
+      the list of package names (:term:`PN`) for which CVEs (Common
+      Vulnerabilities and Exposures) are ignored.
 
    :term:`CVE_CHECK_STATUSMAP`
       Mapping variable for all possible reasons of :term:`CVE_STATUS`:
       ``Patched``, ``Unpatched`` and ``Ignored``.
-      See :ref:`ref-classes-cve-check` or ``meta/conf/cve-check-map.conf`` for more details::
+      See :oecore_path:`meta/conf/cve-check-map.conf` for more details::
 
          CVE_CHECK_STATUSMAP[cpe-incorrect] = "Ignored"
 
@@ -2022,18 +2003,6 @@ system and gives an overview of their function and contents.
       justifications. Should be set as follows::
 
          CVE_CHECK_VEX_JUSTIFICATION[not-applicable-config] = "vulnerableCodeNotPresent"
-
-   :term:`CVE_DB_INCR_UPDATE_AGE_THRES`
-      Specifies the maximum age of the CVE database in seconds for an
-      incremental update (instead of a full-download). Use "0" to force a
-      full-download.
-
-   :term:`CVE_DB_UPDATE_INTERVAL`
-      Specifies the CVE database update interval in seconds, as used by
-      ``cve-update-db-native``. The default value is "86400" i.e. once a day
-      (24*60*60). If the value is set to "0" then the update will be forced
-      every time. Alternatively, a negative value e.g. "-1" will disable
-      updates entirely.
 
    :term:`CVE_PRODUCT`
       In a recipe, defines the name used to match the recipe name
@@ -2085,12 +2054,14 @@ system and gives an overview of their function and contents.
    :term:`CVE_VERSION`
       In a recipe, defines the version used to match the recipe version
       against the version in the `NIST CVE database <https://nvd.nist.gov/>`__
-      when usign :ref:`ref-classes-cve-check`.
+      when using the :ref:`ref-classes-vex` or :ref:`ref-classes-create-spdx`
+      class.
 
       The default is ${:term:`PV`} but if recipes use custom version numbers
       which do not map to upstream software component release versions and the versions
       used in the CVE database, then this variable can be used to set the
-      version number for :ref:`ref-classes-cve-check`. Example::
+      version number for :ref:`ref-classes-vex` or
+      :ref:`ref-classes-create-spdx`. Example::
 
           CVE_VERSION = "2.39"
 
@@ -4710,6 +4681,7 @@ system and gives an overview of their function and contents.
       - wic.gz
       - wic.lzma
       - wic.zst
+      - wicenv
 
       For more information about these types of images, see
       ``meta/classes-recipe/image_types*.bbclass`` in :term:`OpenEmbedded-Core
@@ -6331,6 +6303,9 @@ system and gives an overview of their function and contents.
       The default value for :term:`MIRRORS` is defined in the
       ``meta/classes-global/mirrors.bbclass`` file in the core metadata layer.
 
+      See the definition of this variable in the BitBake Manual for more
+      details: :term:`bitbake:MIRRORS`.
+
    :term:`MLPREFIX`
       Specifies a prefix has been added to :term:`PN` to create a
       special version of a recipe or package (i.e. a Multilib version). The
@@ -6547,33 +6522,6 @@ system and gives an overview of their function and contents.
       list with::
 
          NON_MULTILIB_RECIPES = "grub grub-efi make-mod-scripts ovmf u-boot"
-
-   :term:`NVD_DB_VERSION`
-      The :term:`NVD_DB_VERSION` variable allows choosing the CVE feed when
-      using the :ref:`ref-classes-cve-check` class. It can be one of:
-
-      -  ``FKIE`` (default): the `FKIE-CAD <https://github.com/fkie-cad/nvd-json-data-feeds>`__
-         feed reconstruction
-      -  ``NVD2``: the NVD feed with API version 2
-      -  ``NVD1``: the NVD JSON feed (deprecated)
-
-      In case of a malformed feed name, the ``NVD2`` feed is selected and an
-      error is printed.
-
-   :term:`NVDCVE_API_KEY`
-      The NVD API key used to retrieve data from the CVE database when
-      using :ref:`ref-classes-cve-check`.
-
-      By default, no API key is used, which results in larger delays between API
-      requests and limits the number of queries to the public rate limits posted
-      at the `NVD developer's page <https://nvd.nist.gov/developers/start-here>`__.
-
-      NVD API keys can be requested through the
-      `Request an API Key <https://nvd.nist.gov/developers/request-an-api-key>`__
-      page. You can set this variable to the NVD API key in your ``local.conf`` file.
-      Example::
-
-          NVDCVE_API_KEY = "fe753&7a2-1427-347d-23ff-b2e2b7ca5f3"
 
    :term:`OBJCOPY`
       The minimal command and arguments to run :manpage:`objcopy <objcopy(1)>`.
@@ -7812,6 +7760,9 @@ system and gives an overview of their function and contents.
       ``file://`` URLs to point to local directories or network shares as
       well.
 
+      See the definition of this variable in the BitBake Manual for more
+      details: :term:`bitbake:PREMIRRORS`.
+
    :term:`PRIORITY`
       Indicates the importance of a package.
 
@@ -8767,6 +8718,19 @@ system and gives an overview of their function and contents.
       -  ``both``: recipes are scanned in both their target and
          :ref:`ref-classes-native` context
 
+   :term:`SBOM_CVE_CHECK_SHOW_WARNINGS`
+      When inheriting the :ref:`ref-classes-sbom-cve-check` class, this
+      variable controls whether to show warnings when CVEs with the
+      ``Unpatched`` status are found. Example output:
+
+      .. code-block:: text
+
+         WARNING: core-image-minimal-1.0-r0 do_sbom_cve_check: glibc-2.43+git: Found unpatched CVEs: CVE-2010-4756
+
+      Set to "1" to show the warnings, "0" otherwise.
+
+      See :doc:`/security-manual/vulnerabilities` for more information.
+
    :term:`SDK_ARCH`
       The target architecture for the SDK. Typically, you do not directly
       set this variable. Instead, use :term:`SDKMACHINE`.
@@ -9422,7 +9386,7 @@ system and gives an overview of their function and contents.
       See also :term:`SPDX_INCLUDE_SOURCES`.
 
    :term:`SPDX_GIT_PURL_MAPPINGS`
-      A space separated list of ``domain:purl_type`` mappings to configure PURL
+      A space-separated list of ``domain:purl_type`` mappings to configure PURL
       (Package URLs) generation for Git source downloads.
 
       For example, adding ``gitlab.example.com:pkg:gitlab`` to this variable
@@ -9710,10 +9674,10 @@ system and gives an overview of their function and contents.
       is an empty string.
 
    :term:`SPDX_PACKAGE_URLS`
-      A space separated list of Package URLs ("PURLs") for the software package.
+      A space-separated list of Package URLs ("PURLs") for the software package.
       The first item in this list will be listed as the ``packageUrl`` property
       of the packages, and all PURLs (including the first one) will be listed as
-      external references. The default value is an auto generated ``pkg:yocto``
+      external references. The default value is an auto-generated ``pkg:yocto``
       PURL based on the recipe name, version, and layer name. Override this
       variable to replace the default, otherwise append or prepend to add
       additional PURLs.
@@ -11908,7 +11872,7 @@ system and gives an overview of their function and contents.
 
    :term:`UKI_DEVICETREE`
       When inheriting the :ref:`ref-classes-uki` class, the :term:`UKI_DEVICETREE`
-      variable holds the list of device tree blobs to include to the `Unified
+      variable holds the list of device tree blobs to include in the `Unified
       Kernel Image (UKI) <https://uapi-group.org/specifications/specs/unified_kernel_image/>`__.
 
    :term:`UKI_FILENAME`
