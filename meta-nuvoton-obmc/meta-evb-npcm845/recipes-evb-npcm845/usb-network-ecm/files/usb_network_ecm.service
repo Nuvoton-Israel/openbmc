@@ -7,7 +7,7 @@ ConditionPathExistsGlob=/sys/class/udc/*
 Type=oneshot
 RemainAfterExit=yes
 TimeoutStartSec=30
-ExecStart=/usr/sbin/usb_network_acm.sh
+ExecStart=/usr/sbin/usb_network_ecm.sh
 
 [Install]
 WantedBy=multi-user.target

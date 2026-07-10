@@ -1,5 +1,5 @@
 [Match]
-Name=acm0
+Name=ecm0
 MACAddress=02:00:11:22:33:44
 
 [Network]

@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# usb_network.sh
+# usb_network_ecm.sh
 # Configure USB gadget as CDC ECM network interface.
 #
 # Compatible with: Red Hat / RHEL / Fedora (uses cdc_ether driver, auto-detected)
@@ -18,11 +18,11 @@
 # SSH to BMC from RHEL host:
 #   ssh root@192.168.7.2
 
-GADGET_NAME="cdc_acm"
+GADGET_NAME="cdc_ecm"
 GADGET_DIR="/sys/kernel/config/usb_gadget/${GADGET_NAME}"
 BMC_IP="192.168.7.1"
 BMC_PREFIX="24"
-IFACE="acm0"
+IFACE="ecm0"
 
 # Fixed MAC addresses — required for stable NetworkManager profiles on RHEL
 # Host-side MAC must be unicast (LSB of first byte = 0)
@@ -99,7 +99,7 @@ echo 250                    > configs/c.1/MaxPower
 #
 # NOTE: The kernel names ECM interfaces usb0, usb1... regardless of the
 # function directory name.  Interface renaming to "${IFACE}" is handled
-# by the systemd .link file (10-bmc-usb-acm.link) matching by MAC address.
+# by the systemd .link file (10-bmc-usb-ecm.link) matching by MAC address.
 mkdir -p functions/ecm.usb0
 echo "${BMC_MAC}"  > functions/ecm.usb0/dev_addr
 echo "${HOST_MAC}" > functions/ecm.usb0/host_addr
@@ -157,7 +157,7 @@ if [ "${KERNEL_IFACE}" != "${IFACE}" ]; then
     echo "Renamed ${KERNEL_IFACE} -> ${IFACE}"
 fi
 
-# IP assignment is handled by systemd-networkd via 00-bmc-usb0-acm.network
+# IP assignment is handled by systemd-networkd via 00-bmc-usb0-ecm.network
 echo "Interface ${IFACE} ready — IP will be assigned by systemd-networkd"
 ) &
 

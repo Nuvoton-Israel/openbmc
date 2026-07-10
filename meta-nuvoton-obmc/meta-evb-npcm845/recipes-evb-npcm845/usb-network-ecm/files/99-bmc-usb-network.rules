@@ -2,13 +2,13 @@
 # Install on the RHEL/Linux HOST side (e.g. /etc/udev/rules.d/).
 #
 # Matches the BMC USB CDC ECM interface by the HOST-side MAC address
-# (host_addr written by usb_network.sh on the BMC).
+# (host_addr written by usb_network_ecm.sh on the BMC).
 #
 # BMC unit identity is strapped by GPIO12 / GPIO13 on the BMC board:
 #
 #   Unit   Host MAC (host_addr)   Interface Name  Host Static IP    BMC IP
 #   ----   ---------------------  --------------  ----------------  -----------
-#    A      02:00:55:66:77:88      bmc-usb-acm     192.168.7.2/24    192.168.7.1
+#    A      02:00:55:66:77:88      bmc-usb-ecm     192.168.7.2/24    192.168.7.1
 
 #
 # Each rule:
@@ -17,7 +17,7 @@
 
 # ── Unit A (GPIO12=0, GPIO13=0) ───────────────────────────────────────────────
 SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="02:00:55:66:77:88", \
-    NAME="bmc-usb-acm"
+    NAME="bmc-usb-ecm"
 
 SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="02:00:55:66:77:88", \
-    RUN+="/bin/sh -c 'sleep 1 && ip link set bmc-usb-acm up && ip addr add 192.168.7.2/24 dev bmc-usb-acm'"
+    RUN+="/bin/sh -c 'sleep 1 && ip link set bmc-usb-ecm up && ip addr add 192.168.7.2/24 dev bmc-usb-ecm'"
