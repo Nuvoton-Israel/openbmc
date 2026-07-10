@@ -1,0 +1,14 @@
+# Enslave the physical RGMII port (gmac0 -> eth0) as the bridge upstream.
+# NOTE (PoC): phosphor-networkd also generates a config for eth0. For this
+# bridge test, prevent phosphor-networkd from managing eth0 (e.g. remove/mask
+# its generated /etc/systemd/network/*eth0*.network) so this file wins.
+[Match]
+Name=eth0
+
+[Network]
+Bridge=br0
+LinkLocalAddressing=no
+IPv6AcceptRA=no
+
+[Link]
+RequiredForOnline=no

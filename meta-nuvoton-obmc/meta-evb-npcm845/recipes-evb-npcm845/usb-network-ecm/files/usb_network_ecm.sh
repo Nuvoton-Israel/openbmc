@@ -22,7 +22,7 @@ GADGET_NAME="cdc_ecm"
 GADGET_DIR="/sys/kernel/config/usb_gadget/${GADGET_NAME}"
 BMC_IP="192.168.7.1"
 BMC_PREFIX="24"
-IFACE="ecm0"
+IFACE="vport1"
 
 # Fixed MAC addresses — required for stable NetworkManager profiles on RHEL
 # Host-side MAC must be unicast (LSB of first byte = 0)

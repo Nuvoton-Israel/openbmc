@@ -1,0 +1,12 @@
+# br0 is a pure L2 switch — no IP here. The BMC OOB address lives on the
+# dedicated vport0 veth NIC (see 20-vport0.network).
+[Match]
+Name=br0
+
+[Network]
+LinkLocalAddressing=no
+IPv6AcceptRA=no
+ConfigureWithoutCarrier=yes
+
+[Link]
+RequiredForOnline=no

@@ -1,0 +1,17 @@
+# V-Port 0 (BMC OOB) as a dedicated, independently-named NIC.
+#
+# The bridge (br0) is a pure L2 switch with no IP of its own. To give the
+# BMC OOB its own network interface (rather than borrowing the bridge device),
+# we create a veth pair:
+#   vport0    -> the BMC-facing NIC that holds the OOB IP (192.168.x)
+#   vport0br  -> the peer, enslaved into br0 as a switch port
+#
+# 02:xx = locally administered, unicast (won't collide with real OUIs).
+[NetDev]
+Name=vport0
+Kind=veth
+MACAddress=02:00:00:aa:bb:00
+
+[Peer]
+Name=vport0br
+MACAddress=02:00:00:aa:bb:0b

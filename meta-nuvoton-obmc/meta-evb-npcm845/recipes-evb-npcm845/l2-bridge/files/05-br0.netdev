@@ -1,0 +1,24 @@
+# Software L2 switch (Linux bridge) for the NPCM845 EVB.
+#
+# Models the "Linux Implementation" slide:
+#   br0     = L2 switch (MAC learning), pure switch, no IP
+#   eth0 (gmac0, RGMII/RJ45) = physical upstream port
+#   vport0  = V-Port 0 (BMC OOB) — dedicated veth NIC, holds the OOB IP
+#   vport1  = V-Port 1 (Host Ethernet) — USB CDC ECM NIC
+[NetDev]
+Name=br0
+Kind=bridge
+# Fixed MAC keeps the switch identity stable even though it holds no IP.
+# 02:xx = locally administered, unicast.
+MACAddress=02:00:00:aa:bb:01
+
+[Bridge]
+# Disable STP and zero the forwarding delay. This is a loop-free L2 switch, so
+# STP is unnecessary. With STP on (or the default non-zero forward delay), a
+# port newly added to the bridge stays in listening/learning for ~15-30s and
+# does NOT forward. The USB host enumerates the moment the ECM gadget binds and
+# fires its first DHCP burst during that window, so those packets are dropped
+# and the host never gets a lease until the gadget is re-bound. Forwarding
+# immediately (ForwardDelaySec=0) removes that race.
+STP=no
+ForwardDelaySec=0

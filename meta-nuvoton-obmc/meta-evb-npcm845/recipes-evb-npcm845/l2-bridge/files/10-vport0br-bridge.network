@@ -1,0 +1,13 @@
+# Enslave the veth peer (vport0br) into the L2 switch (br0).
+# This is the switch-side end of the V-Port 0 veth pair; it carries no IP.
+[Match]
+Name=vport0br
+
+[Network]
+Bridge=br0
+LinkLocalAddressing=no
+IPv6AcceptRA=no
+ConfigureWithoutCarrier=yes
+
+[Link]
+RequiredForOnline=no

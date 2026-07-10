@@ -1,0 +1,15 @@
+# Enslave the USB CDC-ECM NIC (vport1) as V-Port 1 of the L2 switch.
+# This is the HOST Ethernet coming out of the USB NIC; it is a switch port
+# with no BMC-side IP. The Host connected via USB reaches the upstream (eth0)
+# through br0 at layer 2.
+[Match]
+Name=vport1
+
+[Network]
+Bridge=br0
+LinkLocalAddressing=no
+IPv6AcceptRA=no
+ConfigureWithoutCarrier=yes
+
+[Link]
+RequiredForOnline=no

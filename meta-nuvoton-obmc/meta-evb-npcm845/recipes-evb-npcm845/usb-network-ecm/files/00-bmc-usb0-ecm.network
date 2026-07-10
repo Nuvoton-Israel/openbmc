@@ -1,9 +1,12 @@
 [Match]
-Name=ecm0
+Name=vport1
 MACAddress=02:00:11:22:33:44
 
 [Network]
-Address=192.168.7.1/24
+# vport1 = V-Port 1: HOST Ethernet out of the USB CDC-ECM NIC. It is a switch
+# port of the L2 switch (br0) with no BMC-side IP. The Host connected via USB
+# obtains its own IP from the upstream DHCP server through br0.
+Bridge=br0
 LinkLocalAddressing=no
 IPv6AcceptRA=no
 ConfigureWithoutCarrier=yes

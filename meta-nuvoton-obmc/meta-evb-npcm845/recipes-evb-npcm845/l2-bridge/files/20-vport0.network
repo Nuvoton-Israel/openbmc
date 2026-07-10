@@ -1,0 +1,17 @@
+# V-Port 0 (BMC OOB) address — lives on the dedicated vport0 NIC.
+# The address comes exclusively from DHCP on the upstream RJ45 network via the
+# L2 switch. No static fallback is configured.
+[Match]
+Name=vport0
+
+[Network]
+DHCP=yes
+LinkLocalAddressing=no
+IPv6AcceptRA=no
+ConfigureWithoutCarrier=yes
+
+[DHCP]
+RouteMetric=100
+UseRoutes=yes
+UseGateway=yes
+UseDNS=yes
