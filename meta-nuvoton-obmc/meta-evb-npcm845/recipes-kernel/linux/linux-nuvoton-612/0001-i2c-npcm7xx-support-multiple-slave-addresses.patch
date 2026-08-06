@@ -1,0 +1,784 @@
+From 38f1332a2d8aecfd03429a48a780a4beb177076a Mon Sep 17 00:00:00 2001
+From: Jim Liu <JJLIU0@nuvoton.com>
+Date: Tue, 4 Aug 2026 10:25:56 +0800
+Subject: [PATCH] i2c: npcm7xx: support multiple slave addresses
+
+Replace the single slave client and shared slave transfer state with
+per-slot slave contexts so each own slave address keeps independent read/write buffers and indices.
+
+Track the currently matched slave with active_slot and route slave FIFO handling through the matched slot. 
+
+Re-decode the matched address on each slave match event so interleaved transactions are delivered to the correct slave backend.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Jim Liu <JJLIU0@nuvoton.com>
+---
+ drivers/i2c/busses/i2c-npcm7xx.c | 466 +++++++++++++++++++++++--------
+ 1 file changed, 345 insertions(+), 121 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-npcm7xx.c b/drivers/i2c/busses/i2c-npcm7xx.c
+index ee1473ffde1a..fdb9f2e4445a 100644
+--- a/drivers/i2c/busses/i2c-npcm7xx.c
++++ b/drivers/i2c/busses/i2c-npcm7xx.c
+@@ -546,6 +546,17 @@ static const struct npcm_i2c_data npxm8xx_i2c_data = {
+ 	.rxf_ctl_last_pec = BIT(7),
+ };
+ 
++#if IS_ENABLED(CONFIG_I2C_SLAVE)
++struct npcm_i2c_slave_ctx {
++	int rd_size;
++	int rd_ind;
++	int wr_size;
++	int wr_ind;
++	u8 rd_buf[MAX_I2C_HW_FIFO_SIZE];
++	u8 wr_buf[MAX_I2C_HW_FIFO_SIZE];
++};
++#endif
++
+ /* Status of one I2C module */
+ struct npcm_i2c {
+ 	struct i2c_adapter adap;
+@@ -579,13 +590,10 @@ struct npcm_i2c {
+ 	unsigned long bus_freq; /* in Hz */
+ #if IS_ENABLED(CONFIG_I2C_SLAVE)
+ 	u8 own_slave_addr;
+-	struct i2c_client *slave;
+-	int slv_rd_size;
+-	int slv_rd_ind;
+-	int slv_wr_size;
+-	int slv_wr_ind;
+-	u8 slv_rd_buf[MAX_I2C_HW_FIFO_SIZE];
+-	u8 slv_wr_buf[MAX_I2C_HW_FIFO_SIZE];
++	struct i2c_client *slaves[I2C_NUM_OWN_ADDR_SUPPORTED];
++	bool slave_enabled[I2C_NUM_OWN_ADDR_SUPPORTED];
++	int active_slot;
++	struct npcm_i2c_slave_ctx slv_ctxs[I2C_NUM_OWN_ADDR_SUPPORTED];
+ #endif
+ 	u64 ber_cnt;
+ 	u64 rec_succ_cnt;
+@@ -621,11 +629,35 @@ static void npcm_i2c_init_params(struct npcm_i2c *bus)
+ 	bus->PEC_use = false;
+ 	bus->PEC_mask = 0;
+ #if IS_ENABLED(CONFIG_I2C_SLAVE)
+-	if (bus->slave)
++	if (bus->active_slot >= 0 &&
++	    bus->active_slot < I2C_NUM_OWN_ADDR_SUPPORTED &&
++	    bus->slaves[bus->active_slot])
+ 		bus->master_or_slave = I2C_SLAVE;
+ #endif
+ }
+ 
++#if IS_ENABLED(CONFIG_I2C_SLAVE)
++static inline struct i2c_client *npcm_i2c_active_slave(struct npcm_i2c *bus)
++{
++	if (bus->active_slot < 0 ||
++	    bus->active_slot >= I2C_NUM_OWN_ADDR_SUPPORTED)
++		return NULL;
++
++	return bus->slaves[bus->active_slot];
++}
++
++/* Return the slave state for the currently active slot, or NULL if invalid. */
++static inline
++struct npcm_i2c_slave_ctx *npcm_i2c_active_state(struct npcm_i2c *bus)
++{
++	if (bus->active_slot < 0 ||
++	    bus->active_slot >= I2C_NUM_OWN_ADDR_SUPPORTED)
++		return NULL;
++
++	return &bus->slv_ctxs[bus->active_slot];
++}
++#endif
++
+ static inline void npcm_i2c_wr_byte(struct npcm_i2c *bus, u8 data)
+ {
+ 	iowrite8(data, bus->reg + NPCM_I2CSDA);
+@@ -864,6 +896,30 @@ static void npcm_i2c_slave_int_enable(struct npcm_i2c *bus, bool enable)
+ 	iowrite8(i2cctl1, bus->reg + NPCM_I2CCTL1);
+ }
+ 
++/*
++ * npcm_i2c_slave_refresh_int:
++ * With more than one own slave address registered, the slave-match interrupt
++ * (NMINTE) is a single global enable shared by all of them. Recompute it from
++ * the per-slave desired state so that disabling one slave (e.g. an SSIF
++ * backend that goes busy) keeps slave matching alive for the others. Otherwise
++ * a transaction addressed to a still-enabled slave would not raise a fresh
++ * NMATCH, its data would be handled against the stale active_slot and get
++ * misrouted to the wrong backend.
++ */
++static void npcm_i2c_slave_refresh_int(struct npcm_i2c *bus)
++{
++	int i;
++
++	for (i = 0; i < I2C_NUM_OWN_ADDR_SUPPORTED; i++) {
++		if (bus->slaves[i] && bus->slave_enabled[i]) {
++			npcm_i2c_slave_int_enable(bus, true);
++			return;
++		}
++	}
++
++	npcm_i2c_slave_int_enable(bus, false);
++}
++
+ static int npcm_i2c_slave_enable(struct npcm_i2c *bus, enum i2c_addr addr_type,
+ 				 u8 addr, bool enable)
+ {
+@@ -895,9 +951,17 @@ static int npcm_i2c_slave_enable(struct npcm_i2c *bus, enum i2c_addr addr_type,
+ 	if (addr_type >= I2C_ARP_ADDR)
+ 		return -EFAULT;
+ 
++	/*
++	 * Track the per-slave desired enable state so that the shared
++	 * slave-match interrupt is only torn down when no own slave address
++	 * remains enabled (see npcm_i2c_slave_refresh_int()).
++	 */
++	if (addr_type < I2C_NUM_OWN_ADDR_SUPPORTED)
++		bus->slave_enabled[addr_type] = enable;
++
+ 	/* Set and enable the address */
+ 	iowrite8(sa_reg, bus->reg + npcm_i2caddr[addr_type]);
+-	npcm_i2c_slave_int_enable(bus, enable);
++	npcm_i2c_slave_refresh_int(bus);
+ 
+ 	return 0;
+ }
+@@ -934,9 +998,14 @@ static void npcm_i2c_reset(struct npcm_i2c *bus)
+ 	iowrite8(NPCM_I2CFIF_CTS_CLR_FIFO, bus->reg + NPCM_I2CFIF_CTS);
+ 
+ #if IS_ENABLED(CONFIG_I2C_SLAVE)
+-	if (bus->slave) {
+-		addr = bus->slave->addr;
+-		npcm_i2c_slave_enable(bus, I2C_SLAVE_ADDR1, addr, true);
++	int i;
++
++	for (i = 0; i < I2C_NUM_OWN_ADDR_SUPPORTED; i++) {
++		if (!bus->slaves[i] || !bus->slave_enabled[i])
++			continue;
++
++		addr = bus->slaves[i]->addr;
++		npcm_i2c_slave_enable(bus, I2C_SLAVE_ADDR1 + i, addr, true);
+ 	}
+ #endif
+ 
+@@ -1006,7 +1075,7 @@ static void npcm_i2c_callback(struct npcm_i2c *bus,
+ 
+ 	bus->operation = I2C_NO_OPER;
+ #if IS_ENABLED(CONFIG_I2C_SLAVE)
+-	if (bus->slave)
++	if (npcm_i2c_active_slave(bus))
+ 		bus->master_or_slave = I2C_SLAVE;
+ #endif
+ 	if (do_complete)
+@@ -1143,6 +1212,15 @@ static int npcm_i2c_remove_slave_addr(struct npcm_i2c *bus, u8 slave_add)
+ 
+ static void npcm_i2c_write_fifo_slave(struct npcm_i2c *bus, u16 max_bytes)
+ {
++	int slot = bus->active_slot;
++	struct npcm_i2c_slave_ctx *slv_ctx;
++
++	/* Validate active_slot */
++	if (slot < 0 || slot >= I2C_NUM_OWN_ADDR_SUPPORTED)
++		return;
++
++	slv_ctx = &bus->slv_ctxs[slot];
++
+ 	/*
+ 	 * Fill the FIFO, while the FIFO is not full and there are more bytes
+ 	 * to write
+@@ -1151,90 +1229,118 @@ static void npcm_i2c_write_fifo_slave(struct npcm_i2c *bus, u16 max_bytes)
+ 	npcm_i2c_clear_tx_fifo(bus);
+ 	iowrite8(0, bus->reg + NPCM_I2CTXF_CTL);
+ 	while (max_bytes-- && bus->data->fifo_size != npcm_i2c_fifo_usage(bus)) {
+-		if (bus->slv_wr_size <= 0)
++		if (slv_ctx->wr_size <= 0)
+ 			break;
+-		bus->slv_wr_ind = bus->slv_wr_ind & (bus->data->fifo_size - 1);
+-		npcm_i2c_wr_byte(bus, bus->slv_wr_buf[bus->slv_wr_ind]);
+-		bus->slv_wr_ind++;
+-		bus->slv_wr_ind = bus->slv_wr_ind & (bus->data->fifo_size - 1);
+-		bus->slv_wr_size--;
++		slv_ctx->wr_ind = slv_ctx->wr_ind & (bus->data->fifo_size - 1);
++		npcm_i2c_wr_byte(bus, slv_ctx->wr_buf[slv_ctx->wr_ind]);
++		slv_ctx->wr_ind++;
++		slv_ctx->wr_ind = slv_ctx->wr_ind & (bus->data->fifo_size - 1);
++		slv_ctx->wr_size--;
+ 	}
+ }
+ 
+ static void npcm_i2c_read_fifo_slave(struct npcm_i2c *bus, u8 bytes_in_fifo)
+ {
++	int slot = bus->active_slot;
++	struct i2c_client *client = npcm_i2c_active_slave(bus);
++	struct npcm_i2c_slave_ctx *slv_ctx;
+ 	u8 data;
+ 
+-	if (!bus->slave)
++	if (!client || slot < 0 || slot >= I2C_NUM_OWN_ADDR_SUPPORTED)
+ 		return;
+ 
++	slv_ctx = &bus->slv_ctxs[slot];
++
+ 	while (bytes_in_fifo--) {
+ 		data = npcm_i2c_rd_byte(bus);
+ 
+-		bus->slv_rd_ind = bus->slv_rd_ind & (bus->data->fifo_size - 1);
+-		bus->slv_rd_buf[bus->slv_rd_ind] = data;
+-		bus->slv_rd_ind++;
++		slv_ctx->rd_ind = slv_ctx->rd_ind & (bus->data->fifo_size - 1);
++		slv_ctx->rd_buf[slv_ctx->rd_ind] = data;
++		slv_ctx->rd_ind++;
+ 
+ 		/* 1st byte is length in block protocol: */
+-		if (bus->slv_rd_ind == 1 && bus->read_block_use)
+-			bus->slv_rd_size = data + bus->PEC_use + 1;
++		if (slv_ctx->rd_ind == 1 && bus->read_block_use)
++			slv_ctx->rd_size = data + bus->PEC_use + 1;
+ 	}
+ }
+ 
+ static int npcm_i2c_slave_get_wr_buf(struct npcm_i2c *bus)
+ {
++	int slot = bus->active_slot;
++	struct i2c_client *client = npcm_i2c_active_slave(bus);
++	struct npcm_i2c_slave_ctx *slv_ctx;
+ 	int i;
+ 	u8 value;
+ 	int ind;
+-	int ret = bus->slv_wr_ind;
++	int ret;
++
++	if (!client || slot < 0 || slot >= I2C_NUM_OWN_ADDR_SUPPORTED)
++		return 0;
++
++	slv_ctx = &bus->slv_ctxs[slot];
++	ret = slv_ctx->wr_ind;
+ 
+ 	/* fill a cyclic buffer */
+ 	for (i = 0; i < bus->data->fifo_size; i++) {
+-		if (bus->slv_wr_size >= bus->data->fifo_size)
++		if (slv_ctx->wr_size >= bus->data->fifo_size)
+ 			break;
+ 		if (bus->state == I2C_SLAVE_MATCH) {
+-			i2c_slave_event(bus->slave, I2C_SLAVE_READ_REQUESTED, &value);
++			i2c_slave_event(client, I2C_SLAVE_READ_REQUESTED, &value);
+ 			bus->state = I2C_OPER_STARTED;
+ 		} else {
+-			i2c_slave_event(bus->slave, I2C_SLAVE_READ_PROCESSED, &value);
++			i2c_slave_event(client, I2C_SLAVE_READ_PROCESSED, &value);
+ 		}
+-		ind = (bus->slv_wr_ind + bus->slv_wr_size) & (bus->data->fifo_size - 1);
+-		bus->slv_wr_buf[ind] = value;
+-		bus->slv_wr_size++;
++		ind = (slv_ctx->wr_ind + slv_ctx->wr_size) & (bus->data->fifo_size - 1);
++		slv_ctx->wr_buf[ind] = value;
++		slv_ctx->wr_size++;
+ 	}
+ 	return bus->data->fifo_size - ret;
+ }
+ 
+ static void npcm_i2c_slave_send_rd_buf(struct npcm_i2c *bus)
+ {
++	int slot = bus->active_slot;
+ 	int i;
++	struct i2c_client *client = npcm_i2c_active_slave(bus);
++	struct npcm_i2c_slave_ctx *slv_ctx;
++
++	if (!client || slot < 0 || slot >= I2C_NUM_OWN_ADDR_SUPPORTED)
++		return;
++
++	slv_ctx = &bus->slv_ctxs[slot];
+ 
+-	for (i = 0; i < bus->slv_rd_ind; i++)
+-		i2c_slave_event(bus->slave, I2C_SLAVE_WRITE_RECEIVED,
+-				&bus->slv_rd_buf[i]);
++	for (i = 0; i < slv_ctx->rd_ind; i++)
++		i2c_slave_event(client, I2C_SLAVE_WRITE_RECEIVED,
++				&slv_ctx->rd_buf[i]);
+ 	/*
+ 	 * once we send bytes up, need to reset the counter of the wr buf
+ 	 * got data from master (new offset in device), ignore wr fifo:
+ 	 */
+-	if (bus->slv_rd_ind) {
+-		bus->slv_wr_size = 0;
+-		bus->slv_wr_ind = 0;
++	if (slv_ctx->rd_ind) {
++		slv_ctx->wr_size = 0;
++		slv_ctx->wr_ind = 0;
+ 	}
+ 
+-	bus->slv_rd_ind = 0;
+-	bus->slv_rd_size = bus->adap.quirks->max_read_len;
++	slv_ctx->rd_ind = 0;
++	slv_ctx->rd_size = bus->adap.quirks->max_read_len;
+ 
+ 	npcm_i2c_clear_fifo_int(bus);
+ 	npcm_i2c_clear_rx_fifo(bus);
+ }
+ 
+-static void npcm_i2c_slave_receive(struct npcm_i2c *bus, u16 nread,
+-				   u8 *read_data)
++static void npcm_i2c_slave_receive(struct npcm_i2c *bus, u16 nread)
+ {
++	int slot = bus->active_slot;
++	struct npcm_i2c_slave_ctx *slv_ctx;
++
+ 	bus->state = I2C_OPER_STARTED;
+ 	bus->operation = I2C_READ_OPER;
+-	bus->slv_rd_size = nread;
+-	bus->slv_rd_ind = 0;
++
++	if (slot >= 0 && slot < I2C_NUM_OWN_ADDR_SUPPORTED) {
++		slv_ctx = &bus->slv_ctxs[slot];
++		slv_ctx->rd_size = nread;
++		slv_ctx->rd_ind = 0;
++	}
+ 
+ 	iowrite8(0, bus->reg + NPCM_I2CTXF_CTL);
+ 	iowrite8(bus->data->fifo_size, bus->reg + NPCM_I2CRXF_CTL);
+@@ -1242,8 +1348,7 @@ static void npcm_i2c_slave_receive(struct npcm_i2c *bus, u16 nread,
+ 	npcm_i2c_clear_rx_fifo(bus);
+ }
+ 
+-static void npcm_i2c_slave_xmit(struct npcm_i2c *bus, u16 nwrite,
+-				u8 *write_data)
++static void npcm_i2c_slave_xmit(struct npcm_i2c *bus, u16 nwrite)
+ {
+ 	if (nwrite == 0)
+ 		return;
+@@ -1268,22 +1373,29 @@ static void npcm_i2c_slave_xmit(struct npcm_i2c *bus, u16 nwrite,
+  */
+ static void npcm_i2c_slave_wr_buf_sync(struct npcm_i2c *bus)
+ {
++	int slot = bus->active_slot;
++	struct npcm_i2c_slave_ctx *slv_ctx;
+ 	int left_in_fifo;
+ 
++	if (slot < 0 || slot >= I2C_NUM_OWN_ADDR_SUPPORTED)
++		return;
++
++	slv_ctx = &bus->slv_ctxs[slot];
++
+ 	left_in_fifo = bus->data->txf_sts_tx_bytes &
+ 			ioread8(bus->reg + NPCM_I2CTXF_STS);
+ 
+ 	/* fifo already full: */
+ 	if (left_in_fifo >= bus->data->fifo_size ||
+-	    bus->slv_wr_size >= bus->data->fifo_size)
++	    slv_ctx->wr_size >= bus->data->fifo_size)
+ 		return;
+ 
+ 	/* update the wr fifo index back to the untransmitted bytes: */
+-	bus->slv_wr_ind = bus->slv_wr_ind - left_in_fifo;
+-	bus->slv_wr_size = bus->slv_wr_size + left_in_fifo;
++	slv_ctx->wr_ind = slv_ctx->wr_ind - left_in_fifo;
++	slv_ctx->wr_size = slv_ctx->wr_size + left_in_fifo;
+ 
+-	if (bus->slv_wr_ind < 0)
+-		bus->slv_wr_ind += bus->data->fifo_size;
++	if (slv_ctx->wr_ind < 0)
++		slv_ctx->wr_ind += bus->data->fifo_size;
+ }
+ 
+ static void npcm_i2c_slave_rd_wr(struct npcm_i2c *bus)
+@@ -1294,8 +1406,7 @@ static void npcm_i2c_slave_rd_wr(struct npcm_i2c *bus)
+ 		 * transmit data. Write till the master will NACK
+ 		 */
+ 		bus->operation = I2C_WRITE_OPER;
+-		npcm_i2c_slave_xmit(bus, bus->adap.quirks->max_write_len,
+-				    bus->slv_wr_buf);
++		npcm_i2c_slave_xmit(bus, bus->adap.quirks->max_write_len);
+ 	} else {
+ 		/*
+ 		 * Slave got an address match with direction bit 0 so it should
+@@ -1307,8 +1418,7 @@ static void npcm_i2c_slave_rd_wr(struct npcm_i2c *bus)
+ 		npcm_i2c_read_fifo_slave(bus, npcm_i2c_fifo_usage(bus));
+ 		bus->stop_ind = I2C_SLAVE_RCV_IND;
+ 		npcm_i2c_slave_send_rd_buf(bus);
+-		npcm_i2c_slave_receive(bus, bus->adap.quirks->max_read_len,
+-				       bus->slv_rd_buf);
++		npcm_i2c_slave_receive(bus, bus->adap.quirks->max_read_len);
+ 	}
+ }
+ 
+@@ -1317,6 +1427,8 @@ static irqreturn_t npcm_i2c_int_slave_handler(struct npcm_i2c *bus)
+ 	u8 val;
+ 	irqreturn_t ret = IRQ_NONE;
+ 	u8 i2cst = ioread8(bus->reg + NPCM_I2CST);
++	int i;
++	struct i2c_client *client;
+ 
+ 	/* Slave: A NACK has occurred */
+ 	if (NPCM_I2CST_NEGACK & i2cst) {
+@@ -1371,6 +1483,8 @@ static irqreturn_t npcm_i2c_int_slave_handler(struct npcm_i2c *bus)
+ 	if (NPCM_I2CST_SLVSTP & i2cst) {
+ 		u8 bytes_in_fifo = npcm_i2c_fifo_usage(bus);
+ 
++		client = npcm_i2c_active_slave(bus);
++
+ 		bus->stop_ind = I2C_SLAVE_DONE_IND;
+ 
+ 		if (bus->operation == I2C_READ_OPER)
+@@ -1389,7 +1503,8 @@ static irqreturn_t npcm_i2c_int_slave_handler(struct npcm_i2c *bus)
+ 		 */
+ 		bus->operation = I2C_NO_OPER;
+ 		bus->own_slave_addr = 0xFF;
+-		i2c_slave_event(bus->slave, I2C_SLAVE_STOP, 0);
++		if (client)
++			i2c_slave_event(client, I2C_SLAVE_STOP, 0);
+ 		iowrite8(NPCM_I2CST_SLVSTP, bus->reg + NPCM_I2CST);
+ 		if (bus->fifo_use) {
+ 			npcm_i2c_clear_fifo_int(bus);
+@@ -1422,6 +1537,7 @@ static irqreturn_t npcm_i2c_int_slave_handler(struct npcm_i2c *bus)
+ 	/* A Slave Address Match has been identified */
+ 	if (NPCM_I2CST_NMATCH & i2cst) {
+ 		u8 info = 0;
++		int matched_slot = -1;
+ 
+ 		/* Address match automatically implies slave mode */
+ 		bus->master_or_slave = I2C_SLAVE;
+@@ -1430,50 +1546,77 @@ static irqreturn_t npcm_i2c_int_slave_handler(struct npcm_i2c *bus)
+ 		npcm_i2c_clear_tx_fifo(bus);
+ 		iowrite8(0, bus->reg + NPCM_I2CTXF_CTL);
+ 		iowrite8(bus->data->fifo_size, bus->reg + NPCM_I2CRXF_CTL);
+-		if (NPCM_I2CST_XMIT & i2cst) {
++		if (NPCM_I2CST_XMIT & i2cst)
+ 			bus->operation = I2C_WRITE_OPER;
+-		} else {
+-			i2c_slave_event(bus->slave, I2C_SLAVE_WRITE_REQUESTED,
+-					&info);
++		else
+ 			bus->operation = I2C_READ_OPER;
+-		}
+-		if (bus->own_slave_addr == 0xFF) {
+-			/* Check which type of address match */
+-			val = ioread8(bus->reg + NPCM_I2CCST);
+-			if (NPCM_I2CCST_MATCH & val) {
+-				u16 addr;
+-				enum i2c_addr eaddr;
+-				u8 i2ccst2;
+-				u8 i2ccst3;
+-
+-				i2ccst3 = ioread8(bus->reg + NPCM_I2CCST3);
+-				i2ccst2 = ioread8(bus->reg + NPCM_I2CCST2);
+-
+-				/*
+-				 * the i2c module can response to 10 own SA.
+-				 * check which one was addressed by the master.
+-				 * respond to the first one.
+-				 */
+-				addr = ((i2ccst3 & 0x07) << 7) |
+-					(i2ccst2 & 0x7F);
+-				info = ffs(addr);
+-				eaddr = (enum i2c_addr)info;
+-				addr = npcm_i2c_get_slave_addr(bus, eaddr);
+-				addr &= 0x7F;
+-				bus->own_slave_addr = addr;
+-				if (bus->PEC_mask & BIT(info))
+-					bus->PEC_use = true;
+-				else
+-					bus->PEC_use = false;
+-			} else {
+-				if (NPCM_I2CCST_GCMATCH & val)
+-					bus->own_slave_addr = 0;
+-				if (NPCM_I2CCST_ARPMATCH & val)
+-					bus->own_slave_addr = 0x61;
++
++		/*
++		 * Decode the matched address on *every* NMATCH (not only when
++		 * own_slave_addr == 0xFF). When more than one own slave address
++		 * is registered and traffic to the different addresses is
++		 * interleaved, the previous transaction's own_slave_addr may
++		 * not have been cleared yet; relying on it staying 0xFF would
++		 * mistake a fresh match of a *different* address for a
++		 * repeated-start of the previous slave and route the events to
++		 * the wrong backend. Re-decoding keeps active_slot correct.
++		 */
++		val = ioread8(bus->reg + NPCM_I2CCST);
++		if (NPCM_I2CCST_MATCH & val) {
++			u16 addr;
++			enum i2c_addr eaddr;
++			u8 i2ccst2;
++			u8 i2ccst3;
++			u8 prev_addr = bus->own_slave_addr;
++
++			i2ccst3 = ioread8(bus->reg + NPCM_I2CCST3);
++			i2ccst2 = ioread8(bus->reg + NPCM_I2CCST2);
++
++			/*
++			 * the i2c module can response to 10 own SA.
++			 * check which one was addressed by the master.
++			 * respond to the first one.
++			 */
++			addr = ((i2ccst3 & 0x07) << 7) |
++				(i2ccst2 & 0x7F);
++			info = ffs(addr);
++			eaddr = (enum i2c_addr)(info - 1);
++			addr = npcm_i2c_get_slave_addr(bus, eaddr);
++			addr &= 0x7F;
++			bus->own_slave_addr = addr;
++
++			for (i = 0; i < I2C_NUM_OWN_ADDR_SUPPORTED; i++) {
++				if (bus->slaves[i] && bus->slaves[i]->addr == addr) {
++					matched_slot = i;
++					break;
++				}
+ 			}
+-		} else {
++			bus->active_slot = matched_slot;
++
++			if (bus->PEC_mask & BIT(info))
++				bus->PEC_use = true;
++			else
++				bus->PEC_use = false;
++
++			/*
++			 * Only treat this as a repeated-start (write-then-read
++			 * of the *same* slave) when the matched address equals
++			 * the address of the still-open transaction. A match of
++			 * a different address is a brand new transaction for
++			 * another own slave and active_slot was switched above.
++			 */
++			if (prev_addr != 0xFF && prev_addr == addr &&
++			    ((bus->state == I2C_OPER_STARTED &&
++			      bus->operation == I2C_READ_OPER &&
++			      bus->stop_ind == I2C_SLAVE_XMIT_IND) ||
++			     bus->stop_ind == I2C_SLAVE_RCV_IND)) {
++				/* slave tx after slave rx w/o STOP */
++				bus->stop_ind = I2C_SLAVE_RESTART_IND;
++			}
++		} else if (bus->own_slave_addr != 0xFF) {
+ 			/*
+-			 *  Slave match can happen in two options:
++			 *  Repeated-start of the current slave where the HW no
++			 *  longer reports a fresh address match:
+ 			 *  1. Start, SA, read (slave read without further ado)
+ 			 *  2. Start, SA, read, data, restart, SA, read,  ...
+ 			 *     (slave read in fragmented mode)
+@@ -1487,8 +1630,17 @@ static irqreturn_t npcm_i2c_int_slave_handler(struct npcm_i2c *bus)
+ 				/* slave tx after slave rx w/o STOP */
+ 				bus->stop_ind = I2C_SLAVE_RESTART_IND;
+ 			}
++		} else {
++			if (NPCM_I2CCST_GCMATCH & val)
++				bus->own_slave_addr = 0;
++			if (NPCM_I2CCST_ARPMATCH & val)
++				bus->own_slave_addr = 0x61;
+ 		}
+ 
++		client = npcm_i2c_active_slave(bus);
++		if (bus->operation == I2C_READ_OPER && client)
++			i2c_slave_event(client, I2C_SLAVE_WRITE_REQUESTED, &info);
++
+ 		if (NPCM_I2CST_XMIT & i2cst)
+ 			bus->stop_ind = I2C_SLAVE_XMIT_IND;
+ 		else
+@@ -1534,26 +1686,45 @@ static int npcm_i2c_reg_slave(struct i2c_client *client)
+ {
+ 	unsigned long lock_flags;
+ 	struct npcm_i2c *bus = i2c_get_adapdata(client->adapter);
+-
+-	bus->slave = client;
++	int i, free_slot = -1;
+ 
+ 	if (client->flags & I2C_CLIENT_TEN)
+ 		return -EAFNOSUPPORT;
+ 
+ 	spin_lock_irqsave(&bus->lock, lock_flags);
+ 
++	/* Find a free slot in the slaves array */
++	for (i = 0; i < I2C_NUM_OWN_ADDR_SUPPORTED; i++) {
++		if (bus->slaves[i] == NULL) {
++			free_slot = i;
++			break;
++		}
++	}
++
++	if (free_slot < 0) {
++		spin_unlock_irqrestore(&bus->lock, lock_flags);
++		dev_err(bus->dev, "No free slave address slots available\n");
++		return -EBUSY;
++	}
++
++	/* Store client in the free slot and set as active slave (LIFO) */
++	bus->slaves[free_slot] = client;
++	bus->active_slot = free_slot;
++
+ 	npcm_i2c_init_params(bus);
+-	bus->slv_rd_size = 0;
+-	bus->slv_wr_size = 0;
+-	bus->slv_rd_ind = 0;
+-	bus->slv_wr_ind = 0;
++
++	/* Initialize slave state for this slot */
++	bus->slv_ctxs[free_slot].rd_size = 0;
++	bus->slv_ctxs[free_slot].wr_size = 0;
++	bus->slv_ctxs[free_slot].rd_ind = 0;
++	bus->slv_ctxs[free_slot].wr_ind = 0;
+ 	if (client->flags & I2C_CLIENT_PEC)
+ 		bus->PEC_use = true;
+ 
+-	dev_info(bus->dev, "i2c%d register slave SA=0x%x, PEC=%d\n", bus->num,
+-		 client->addr, bus->PEC_use);
++	dev_info(bus->dev, "i2c%d register slave SA=0x%x, PEC=%d (slot %d)\n", bus->num,
++		 client->addr, bus->PEC_use, free_slot);
+ 
+-	npcm_i2c_slave_enable(bus, I2C_SLAVE_ADDR1, client->addr, true);
++	npcm_i2c_slave_enable(bus, I2C_SLAVE_ADDR1 + free_slot, client->addr, true);
+ 	npcm_i2c_clear_fifo_int(bus);
+ 	npcm_i2c_clear_rx_fifo(bus);
+ 	npcm_i2c_clear_tx_fifo(bus);
+@@ -1567,15 +1738,44 @@ static int npcm_i2c_unreg_slave(struct i2c_client *client)
+ {
+ 	struct npcm_i2c *bus = client->adapter->algo_data;
+ 	unsigned long lock_flags;
++	int i, found = -1;
+ 
+ 	spin_lock_irqsave(&bus->lock, lock_flags);
+-	if (!bus->slave) {
++
++	/* Find the slave in the array and remove it */
++	for (i = 0; i < I2C_NUM_OWN_ADDR_SUPPORTED; i++) {
++		if (bus->slaves[i] == client) {
++			found = i;
++			bus->slaves[i] = NULL;
++			bus->slave_enabled[i] = false;
++			break;
++		}
++	}
++
++	if (found < 0) {
+ 		spin_unlock_irqrestore(&bus->lock, lock_flags);
+ 		return -EINVAL;
+ 	}
++
+ 	npcm_i2c_slave_int_enable(bus, false);
+ 	npcm_i2c_remove_slave_addr(bus, client->addr);
+-	bus->slave = NULL;
++
++	/* Switch to the next available slave (LIFO order) */
++	bus->active_slot = -1;
++	for (i = I2C_NUM_OWN_ADDR_SUPPORTED - 1; i >= 0; i--) {
++		if (bus->slaves[i] != NULL) {
++			bus->active_slot = i;
++			dev_info(bus->dev, "Switched to slave SA=0x%x (slot %d)\n",
++				 bus->slaves[bus->active_slot]->addr, i);
++			break;
++		}
++	}
++
++	if (bus->active_slot < 0)
++		dev_info(bus->dev, "All slaves unregistered\n");
++
++	npcm_i2c_slave_int_enable(bus, bus->active_slot >= 0);
++
+ 	spin_unlock_irqrestore(&bus->lock, lock_flags);
+ 	return 0;
+ }
+@@ -1966,10 +2166,15 @@ static int npcm_i2c_int_master_handler(struct npcm_i2c *bus)
+ 		       ioread8(bus->reg + NPCM_I2CCST3)))) {
+ 		npcm_i2c_irq_handle_eob(bus);
+ #if IS_ENABLED(CONFIG_I2C_SLAVE)
+-		/* reenable slave if it was enabled */
+-		if (bus->slave)
+-			iowrite8(bus->slave->addr | NPCM_I2CADDR_SAEN,
+-				 bus->reg + NPCM_I2CADDR1);
++		int i;
++
++		for (i = 0; i < I2C_NUM_OWN_ADDR_SUPPORTED; i++) {
++			if (!bus->slaves[i] || !bus->slave_enabled[i])
++				continue;
++
++			iowrite8((bus->slaves[i]->addr & 0x7F) | NPCM_I2CADDR_SAEN,
++				 bus->reg + npcm_i2caddr[i]);
++		}
+ #endif
+ 		return 0;
+ 	}
+@@ -2248,7 +2453,7 @@ static int __npcm_i2c_init(struct npcm_i2c *bus, struct platform_device *pdev)
+ 	bus->master_or_slave = I2C_SLAVE;
+ 	bus->int_time_stamp = 0;
+ #if IS_ENABLED(CONFIG_I2C_SLAVE)
+-	bus->slave = NULL;
++	bus->active_slot = -1;
+ #endif
+ 
+ 	ret = device_property_read_u32(&pdev->dev, "clock-frequency",
+@@ -2280,7 +2485,7 @@ static irqreturn_t npcm_i2c_bus_irq(int irq, void *dev_id)
+ 			return IRQ_HANDLED;
+ 	}
+ #if IS_ENABLED(CONFIG_I2C_SLAVE)
+-	if (bus->slave) {
++	if (npcm_i2c_active_slave(bus)) {
+ 		bus->master_or_slave = I2C_SLAVE;
+ 		if (npcm_i2c_int_slave_handler(bus))
+ 			return IRQ_HANDLED;
+@@ -2365,6 +2570,9 @@ static int npcm_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
+ 	bool read_PEC = false;
+ 	u8 bus_busy;
+ 	unsigned long timeout_usec;
++#if IS_ENABLED(CONFIG_I2C_SLAVE)
++	int i;
++#endif
+ 
+ 	if (bus->state == I2C_DISABLE) {
+ 		dev_err(bus->dev, "I2C%d module is disabled", bus->num);
+@@ -2419,9 +2627,15 @@ static int npcm_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
+ 		spin_lock_irqsave(&bus->lock, flags);
+ 		bus_busy = ioread8(bus->reg + NPCM_I2CCST) & NPCM_I2CCST_BB;
+ #if IS_ENABLED(CONFIG_I2C_SLAVE)
+-		if (!bus_busy && bus->slave)
+-			iowrite8((bus->slave->addr & 0x7F),
+-				 bus->reg + NPCM_I2CADDR1);
++		if (!bus_busy) {
++			for (i = 0; i < I2C_NUM_OWN_ADDR_SUPPORTED; i++) {
++				if (!bus->slaves[i])
++					continue;
++
++				iowrite8((bus->slaves[i]->addr & 0x7F),
++					 bus->reg + npcm_i2caddr[i]);
++			}
++		}
+ #endif
+ 		spin_unlock_irqrestore(&bus->lock, flags);
+ 
+@@ -2513,10 +2727,13 @@ static int npcm_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
+ 	npcm_i2c_eob_int(bus, false);
+ 
+ #if IS_ENABLED(CONFIG_I2C_SLAVE)
+-	/* reenable slave if it was enabled */
+-	if (bus->slave)
+-		iowrite8((bus->slave->addr & 0x7F) | NPCM_I2CADDR_SAEN,
+-			 bus->reg + NPCM_I2CADDR1);
++	for (i = 0; i < I2C_NUM_OWN_ADDR_SUPPORTED; i++) {
++		if (!bus->slaves[i] || !bus->slave_enabled[i])
++			continue;
++
++		iowrite8((bus->slaves[i]->addr & 0x7F) | NPCM_I2CADDR_SAEN,
++			 bus->reg + npcm_i2caddr[i]);
++	}
+ #else
+ 	npcm_i2c_int_enable(bus, false);
+ #endif
+@@ -2600,10 +2817,17 @@ void npcm_i2c_client_slave_enable(struct i2c_client *client, bool enable)
+ {
+ 	struct npcm_i2c *bus = i2c_get_adapdata(client->adapter);
+ 	unsigned long flags;
++	int i;
+ 
+ 	spin_lock_irqsave(&bus->lock, flags);
+ 
+-	npcm_i2c_slave_enable(bus, I2C_SLAVE_ADDR1, client->addr, enable);
++	for (i = 0; i < I2C_NUM_OWN_ADDR_SUPPORTED; i++) {
++		if (bus->slaves[i] == client) {
++			npcm_i2c_slave_enable(bus, I2C_SLAVE_ADDR1 + i,
++					      client->addr, enable);
++			break;
++		}
++	}
+ 
+ 	spin_unlock_irqrestore(&bus->lock, flags);
+ }
+-- 
+2.34.1
+

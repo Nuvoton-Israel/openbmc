@@ -46,3 +46,6 @@ SRC_URI:append = " file://0012-add-jtm-spi-driver.patch"
 # Enable voltage divider for ADC
 SRC_URI:append = " file://0014-dts-arm64-evb-npcm845-use-voltage-divider.patch"
 SRC_URI:append = " file://iio_rescale.cfg"
+
+# Enable multi slave for I2C
+#SRC_URI:append = " file://0001-i2c-npcm7xx-support-multiple-slave-addresses.patch"
