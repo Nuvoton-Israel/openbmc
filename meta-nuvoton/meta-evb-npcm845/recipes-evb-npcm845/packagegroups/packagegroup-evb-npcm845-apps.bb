@@ -62,4 +62,5 @@ RDEPENDS:${PN}-system = " \
         libnpcm-jtag \
         openocd \
         nuv-ocp-recovery \
+        phosphor-gpio-monitor-monitor \
         "

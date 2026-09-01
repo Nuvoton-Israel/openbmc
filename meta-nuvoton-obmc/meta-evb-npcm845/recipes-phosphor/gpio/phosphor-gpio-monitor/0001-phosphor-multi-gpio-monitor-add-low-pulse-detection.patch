@@ -1,0 +1,207 @@
+From 7fb9e355cda6f6403e391545ab204d7c2d9d8e9c Mon Sep 17 00:00:00 2001
+From: Tyrone Ting <kfting@nuvoton.com>
+Date: Tue, 1 Sep 2026 16:15:07 +0800
+Subject: [PATCH] phosphor-multi-gpio-monitor: add low-pulse detection and
+ clearer log label
+
+Add optional PulseTarget/PulseLowMinUs/PulseLowMaxUs config fields to
+phosphor-multi-gpio-monitor.  When set, the monitor measures the low
+pulse width between a falling edge and the following rising edge using
+the kernel event timestamps, and starts PulseTarget when the width is
+within [PulseLowMinUs, PulseLowMaxUs].  This is additive and does not
+change the existing per-edge Target/Targets handling.
+
+Requires EventMon "BOTH" and Continue true.
+
+Also make the log label unambiguous: use the config "Name" when present,
+otherwise "<chip>:<offset>" (e.g. gpiochip1:12) instead of a bare offset,
+so a chip-relative GpioNum is not mistaken for a global GPIO number.
+
+Upstream-Status: Inappropriate [oe-specific]
+Signed-off-by: Tyrone Ting <kfting@nuvoton.com>
+---
+ gpioMon.cpp     | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ gpioMon.hpp     | 29 +++++++++++++++++++++++++++--
+ gpioMonMain.cpp | 34 ++++++++++++++++++++++++++++++++--
+ 3 files changed, 103 insertions(+), 4 deletions(-)
+
+diff --git a/gpioMon.cpp b/gpioMon.cpp
+index deebebe..b7f67d1 100644
+--- a/gpioMon.cpp
++++ b/gpioMon.cpp
+@@ -99,6 +99,50 @@ void GpioMonitor::gpioEventHandler()
+         }
+     }
+ 
++    /* Low-pulse detection: measure the width between a falling edge and the
++     * following rising edge, and start pulseTarget when it falls within the
++     * configured window.  This is additive and does not affect the target
++     * handling above.  Requires EventMon "BOTH" and Continue true.
++     */
++    if (!pulseTarget.empty())
++    {
++        uint64_t nowNs =
++            static_cast<uint64_t>(gpioLineEvent.ts.tv_sec) * 1000000000ULL +
++            static_cast<uint64_t>(gpioLineEvent.ts.tv_nsec);
++
++        if (gpioLineEvent.event_type == GPIOD_LINE_EVENT_FALLING_EDGE)
++        {
++            lastFallingNs = nowNs;
++            havePendingFalling = true;
++        }
++        else if (havePendingFalling)
++        {
++            int64_t widthUs =
++                static_cast<int64_t>(nowNs - lastFallingNs) / 1000;
++            havePendingFalling = false;
++
++            if (widthUs >= pulseLowMinUs && widthUs <= pulseLowMaxUs)
++            {
++                lg2::info(
++                    "{GPIO} low pulse {WIDTH}us matched, starting {TARGET}",
++                    "GPIO", gpioLineMsg, "WIDTH", widthUs, "TARGET",
++                    pulseTarget);
++
++                auto bus = sdbusplus::bus::new_default();
++                auto method = bus.new_method_call(SYSTEMD_SERVICE, SYSTEMD_ROOT,
++                                                  SYSTEMD_INTERFACE,
++                                                  "StartUnit");
++                method.append(pulseTarget, "replace");
++                bus.call_noreply(method);
++            }
++            else
++            {
++                lg2::info("{GPIO} low pulse {WIDTH}us out of range", "GPIO",
++                          gpioLineMsg, "WIDTH", widthUs);
++            }
++        }
++    }
++
+     /* if not required to continue monitoring then return */
+     if (!continueAfterEvent)
+     {
+diff --git a/gpioMon.hpp b/gpioMon.hpp
+index 2d68891..6ace8e9 100644
+--- a/gpioMon.hpp
++++ b/gpioMon.hpp
+@@ -8,7 +8,9 @@
+ #include <boost/asio/io_context.hpp>
+ #include <boost/asio/posix/stream_descriptor.hpp>
+ 
++#include <cstdint>
+ #include <map>
++#include <string>
+ #include <vector>
+ 
+ namespace phosphor
+@@ -41,14 +43,22 @@ class GpioMonitor
+      *                           value change
+      *  @param[in] lineMsg     - GPIO line message to be used for log
+      *  @param[in] continueRun - Whether to continue after event occur
++     *  @param[in] pulseTarget - systemd unit to start when a low pulse
++     *                           (falling then rising) whose width is within
++     *                           [pulseLowMinUs, pulseLowMaxUs] is observed
++     *  @param[in] pulseLowMinUs - minimum accepted low pulse width (us)
++     *  @param[in] pulseLowMaxUs - maximum accepted low pulse width (us)
+      */
+     GpioMonitor(gpiod_line* line, gpiod_line_request_config& config,
+                 boost::asio::io_context& io, const std::string& target,
+                 const std::map<std::string, std::vector<std::string>>& targets,
+-                const std::string& lineMsg, bool continueRun) :
++                const std::string& lineMsg, bool continueRun,
++                const std::string& pulseTarget = "",
++                int64_t pulseLowMinUs = 0, int64_t pulseLowMaxUs = 0) :
+         gpioLine(line), gpioConfig(config), gpioEventDescriptor(io),
+         target(target), targets(targets), gpioLineMsg(lineMsg),
+-        continueAfterEvent(continueRun)
++        continueAfterEvent(continueRun), pulseTarget(pulseTarget),
++        pulseLowMinUs(pulseLowMinUs), pulseLowMaxUs(pulseLowMaxUs)
+     {
+         requestGPIOEvents();
+     };
+@@ -75,6 +85,21 @@ class GpioMonitor
+     /** @brief If the monitor should continue after event */
+     bool continueAfterEvent;
+ 
++    /** @brief Systemd unit to start on a matching low pulse (falling->rising) */
++    std::string pulseTarget;
++
++    /** @brief Minimum accepted low pulse width, in microseconds */
++    int64_t pulseLowMinUs;
++
++    /** @brief Maximum accepted low pulse width, in microseconds */
++    int64_t pulseLowMaxUs;
++
++    /** @brief Timestamp (ns) of the last falling edge seen */
++    uint64_t lastFallingNs = 0;
++
++    /** @brief Whether a falling edge is pending a following rising edge */
++    bool havePendingFalling = false;
++
+     /** @brief register handler for gpio event
+      *
+      *  @return  - 0 on success and -1 otherwise
+diff --git a/gpioMonMain.cpp b/gpioMonMain.cpp
+index e6ef782..2df4414 100644
+--- a/gpioMonMain.cpp
++++ b/gpioMonMain.cpp
+@@ -102,7 +102,10 @@ int main(int argc, char** argv)
+             std::string chipIdStr = obj["ChipId"];
+             int gpioNum = obj["GpioNum"];
+ 
+-            lineMsg += std::to_string(gpioNum);
++            /* Use "<chip>:<offset>" (e.g. gpiochip1:12) as the log label so a
++             * chip-relative offset is not mistaken for a global GPIO number.
++             */
++            lineMsg = chipIdStr + ":" + std::to_string(gpioNum);
+ 
+             /* Get the GPIO line */
+             line = gpiod_line_get(chipIdStr.c_str(), gpioNum);
+@@ -115,6 +118,15 @@ int main(int argc, char** argv)
+             line = gpiod_line_find(lineName.c_str());
+         }
+ 
++        /* Prefer a human-friendly Name for the log label, so a chip-relative
++         * GpioNum (e.g. 12 on gpiochip1, which is global GPIO44) is not
++         * mistaken for global GPIO12 in the logs.
++         */
++        if (obj.find("Name") != obj.end())
++        {
++            lineMsg = obj["Name"];
++        }
++
+         if (line == nullptr)
+         {
+             lg2::error("Failed to find the {GPIO}", "GPIO", lineMsg);
+@@ -159,9 +171,27 @@ int main(int argc, char** argv)
+             obj.at("Targets").get_to(targets);
+         }
+ 
++        /* Optional low-pulse (falling->rising) detection parameters. */
++        std::string pulseTarget;
++        int64_t pulseLowMinUs = 0;
++        int64_t pulseLowMaxUs = 0;
++        if (obj.find("PulseTarget") != obj.end())
++        {
++            pulseTarget = obj["PulseTarget"];
++        }
++        if (obj.find("PulseLowMinUs") != obj.end())
++        {
++            pulseLowMinUs = obj["PulseLowMinUs"];
++        }
++        if (obj.find("PulseLowMaxUs") != obj.end())
++        {
++            pulseLowMaxUs = obj["PulseLowMaxUs"];
++        }
++
+         /* Create a monitor object and let it do all the rest */
+         gpios.push_back(std::make_unique<phosphor::gpio::GpioMonitor>(
+-            line, config, io, target, targets, lineMsg, flag));
++            line, config, io, target, targets, lineMsg, flag, pulseTarget,
++            pulseLowMinUs, pulseLowMaxUs));
+     }
+     io.run();
+ 
+-- 
+2.34.1
+
