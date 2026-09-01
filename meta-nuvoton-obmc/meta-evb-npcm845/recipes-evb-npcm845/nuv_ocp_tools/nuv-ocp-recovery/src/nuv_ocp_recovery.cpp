@@ -50,6 +50,10 @@
 
 #define BIT(n)  (1 << (n))
 
+/* I3C sysfs device directory and BCR virtual-target bit (BCR[4]). */
+#define I3C_SYSFS_DEVICES "/sys/bus/i3c/devices/"
+#define I3C_BCR_VIRTUAL_TARGET BIT(4)
+
 #define PROT_CAP2_DEVICE_ID_SUPPORT BIT(0)
 #define PROT_CAP2_DEVICE_STATUS_SUPPORT BIT(4)
 #define PROT_CAP2_PUSH_C_IMAGE_SUPPORT BIT(7)
@@ -119,8 +123,11 @@ uint32_t cms_offset = 0x0;
 
 /**
  * Maximum block size for CMS write.
+ *
+ * Kept below the INDIRECT FIFO size (256 bytes) so each streamed chunk leaves
+ * headroom for the device to drain, reducing FIFO-full NACKs during streaming.
  */
-uint32_t cms_block_write = MAX_CMS_BLOCK_SIZE;
+uint32_t cms_block_write = 128;
 
 /**
  * Flag to ignore validation errors when processing commands.  Protocol and bus errors still
@@ -190,7 +197,7 @@ uint32_t write_delay = 1000;
 /**
  * Output verbosity.
  */
-int verbose = 0;
+int verbose = 2;
 
 /**
  * Dbus object path for device.
@@ -212,6 +219,19 @@ uint32_t recovery_mode_gpio_line_num = 0xFF;
 uint8_t recovery_mode_gpio_chip = 0xFF;
 uint32_t reset_gpio_line_num = 0xFF;
 uint8_t reset_gpio_chip = 0xFF;
+
+/**
+ * Path to the JSON recovery config (set via -j).  When provided, BusNumber and
+ * the three image paths are read from it, and the target I3C device is
+ * auto-discovered from the bus number using the BCR virtual-target bit.
+ */
+const char *config_name = NULL;
+
+/* Persistent storage backing the const char* image and device path globals. */
+static std::string cfg_fw_image;
+static std::string cfg_soc_manifest;
+static std::string cfg_mcu_rt;
+static std::string cfg_device_path;
 
 uint8_t buffer[MAX_RCRY_I3C_BLOCK_SIZE] = {0};
 
@@ -626,16 +646,23 @@ int i3c_block_write(uint8_t cmd, uint8_t *payload, uint16_t length)
 	xfers[0].data = (uintptr_t)buffer;
 
 	get_current_time (&start);
-	for (loop = 0; loop < 3; loop++) {
+	for (loop = 0; loop < 20; loop++) {
 		ret = ioctl(i3c, I3C_IOC_PRIV_XFER(1), xfers);
 
 		if (!ret) {
 			break;
 		}
 
-		if (use_write_delay) {
-			usleep (write_delay);
+		/*
+		 * A write can be NACKed when the device's INDIRECT FIFO is
+		 * momentarily full.  Wait before retrying so the consumer side
+		 * can drain, instead of hammering the bus with instant retries.
+		 */
+		if (verbose >= 1) {
+			fprintf(stderr, "i3c write retry %d (cmd %d): %s\n",
+					loop + 1, cmd, strerror(errno));
 		}
+		usleep(use_write_delay ? write_delay : 5000);
 	}
 	get_current_time (&end);
 
@@ -989,6 +1016,71 @@ int send_indirect_fifo_ctrl(uint8_t cms, uint32_t img_size)
 	return i3c_block_write(INDIRECT_FIFO_CTRL, data, sizeof(data));
 }
 
+/* INDIRECT_FIFO_STATUS byte-0 flags. */
+#define IFS_EMPTY  (1U << 0)
+#define IFS_FULL   (1U << 1)
+
+/*
+ * Block until the device's INDIRECT FIFO has room for at least need_words
+ * 4-byte words, using INDIRECT_FIFO_STATUS for flow control.
+ *
+ * INDIRECT_FIFO_STATUS layout (DWORD based):
+ *   data[0]      : flags (bit0 = Empty, bit1 = Full)
+ *   data[4..7]   : Write Index (DWORDs written by host)
+ *   data[8..11]  : Read Index  (DWORDs consumed by device)
+ *   data[12..15] : FIFO Size   (DWORDs)
+ *
+ * The Empty flag is used as a safe fallback: when the FIFO reports empty the
+ * whole FIFO is free, so progress is guaranteed even if the index offsets need
+ * adjusting for a given device.  Run with verbose >= 2 to dump the raw fields
+ * and confirm the Write/Read Index offsets on the target.
+ */
+static int wait_indirect_fifo_room(uint32_t need_words)
+{
+	uint8_t data[20];
+	uint32_t size, wr, rd, used, avail;
+	int tries;
+
+	for (tries = 0; tries < 2000; tries++) {          /* up to ~2s at 1ms poll */
+		memset(buffer, 0, sizeof(buffer));
+		if (!i3c_block_read(INDIRECT_FIFO_STATUS, data, sizeof(data), sizeof(data))) {
+			fprintf(stderr, "wait_indirect_fifo_room: INDIRECT_FIFO_STATUS read failed\n");
+			return -1;
+		}
+
+		size = *(uint32_t *)&data[12];
+		wr   = *(uint32_t *)&data[4];
+		rd   = *(uint32_t *)&data[8];
+
+		/*
+		 * wr/rd are ring pointers (0..size); when they are equal the FIFO
+		 * is either empty or full, disambiguated by the flags.  Trust the
+		 * flags first, and only fall back to the pointer delta otherwise.
+		 */
+		if (data[0] & IFS_FULL)
+			avail = 0;                             /* full => no room, wait */
+		else if (data[0] & IFS_EMPTY)
+			avail = size;                          /* empty => whole FIFO free */
+		else {
+			used = (wr >= rd) ? (wr - rd) : (size - (rd - wr));
+			avail = (used <= size) ? (size - used) : 0;
+		}
+
+		if (verbose >= 2)
+			fprintf(stderr,
+				"FIFO status: flags=0x%02x wr=%u rd=%u size=%u free=%u need=%u\n",
+				data[0], wr, rd, size, avail, need_words);
+
+		if (avail >= need_words)
+			return 0;
+
+		usleep(1000);                                  /* 1ms; let device drain */
+	}
+
+	fprintf(stderr, "timeout waiting for FIFO room (need %u words)\n", need_words);
+	return -1;
+}
+
 int command_load_image(int index, const char *file, bool check_size)
 {
 	struct stat stat;
@@ -998,7 +1090,10 @@ int command_load_image(int index, const char *file, bool check_size)
 	uint8_t data[MAX_CMS_BLOCK_SIZE] = {0};
 	uint8_t reg_value[MAX_CMS_READ_BLOCK_SIZE] = {0};
 	uint16_t capabilities, reg16;
-	int bytes, ret;
+	int bytes, ret = 0;
+	uint32_t total_bytes = 0;
+
+	fprintf(stderr, "Loading image index %d: %s\n", index, file);
 
 	fd = open(file, O_RDONLY);
 	if (fd < 0) {
@@ -1010,6 +1105,13 @@ int command_load_image(int index, const char *file, bool check_size)
 		fprintf(stderr, "Failed to check size of input file %s: %s\n", file,
 				strerror (errno));
 
+		close (fd);
+		return -1;
+	}
+
+	if (stat.st_size == 0) {
+		fprintf(stderr, "Input file %s is empty; a valid recovery image is required.\n",
+				file);
 		close (fd);
 		return -1;
 	}
@@ -1048,12 +1150,23 @@ int command_load_image(int index, const char *file, bool check_size)
 		fprintf(stderr, "recovery protocol capabilites are not available\n");
 		close (fd);
 		return -1;
-	} else if (capabilities != (PROT_CAP2_DEVICE_ID_SUPPORT |
+	} else if ((capabilities & (PROT_CAP2_DEVICE_ID_SUPPORT |
+				PROT_CAP2_DEVICE_STATUS_SUPPORT |
+				PROT_CAP2_PUSH_C_IMAGE_SUPPORT |
+				PROT_CAP2_FLASHLESS_BOOT_VALUE |
+				PROT_CAP2_FIFO_CMS_SUPPORT)) !=
+				(PROT_CAP2_DEVICE_ID_SUPPORT |
 				PROT_CAP2_DEVICE_STATUS_SUPPORT |
 				PROT_CAP2_PUSH_C_IMAGE_SUPPORT |
 				PROT_CAP2_FLASHLESS_BOOT_VALUE |
 				PROT_CAP2_FIFO_CMS_SUPPORT)) {
-		fprintf(stderr, "recovery protocol capabilites expected 0x%x\n",
+		/*
+		 * Only require the mandatory recovery bits to be present; the device
+		 * may advertise additional capabilities, so match the 0x1891 mask
+		 * instead of requiring an exact 0x1891 value.
+		 */
+		fprintf(stderr, "recovery protocol capabilites 0x%x missing required bits 0x%x\n",
+				capabilities,
 				(PROT_CAP2_DEVICE_ID_SUPPORT |
                                 PROT_CAP2_DEVICE_STATUS_SUPPORT |
                                 PROT_CAP2_PUSH_C_IMAGE_SUPPORT |
@@ -1083,7 +1196,14 @@ int command_load_image(int index, const char *file, bool check_size)
 			return -1;
 		}
 
-		fprintf(stderr, "CMS %d CMS=%u\n", cms_id, max_length);
+		fprintf(stderr, "CMS %d CMS size=%u\n", cms_id, max_length);
+		/*
+		 * For Flashless/Streaming Boot the image is streamed through the
+		 * INDIRECT FIFO window in chunks, so the total image size may
+		 * legitimately exceed the FIFO size reported here.  Skip the
+		 * "image larger than FIFO" rejection.
+		 */
+#if 0
 		if ((uint32_t) ((stat.st_size + 3) / 4) > max_length) {
 			fprintf(stderr, "CMS %d is not large enough for the image:  CMS=%u, file=%u\n",
 					cms_id, max_length, (uint32_t) ((stat.st_size + 3) / 4));
@@ -1092,6 +1212,7 @@ int command_load_image(int index, const char *file, bool check_size)
 				return -1;
 			}
 		}
+#endif
 		WAIT
 	}
 
@@ -1119,7 +1240,7 @@ int command_load_image(int index, const char *file, bool check_size)
 	memset(reg_value, 0, sizeof(reg_value));
 
 	if (read_recovery_status(false, reg_value)) {
-		fprintf(stderr, "read_device_status() failed\n");
+		fprintf(stderr, "read_recovery_status() failed\n");
 		close (fd);
 		return -1;
 	}
@@ -1135,12 +1256,17 @@ int command_load_image(int index, const char *file, bool check_size)
 	do {
 		bytes = read (fd, data, cms_block_write);
 		if (bytes > 0) {
+			if (wait_indirect_fifo_room((bytes + 3) / 4)) {
+				fprintf(stderr, "indirect fifo room not available for %d bytes\n", bytes);
+				ret = -1;
+				break;
+			}
 			ret = i3c_block_write(INDIRECT_FIFO_DATA, data, bytes);
 			if (ret) {
 				fprintf(stderr, "write file data fail\n");
 				break;
 			}
-			WAIT
+			total_bytes += (uint32_t)bytes;
 		}
 	} while (bytes > 0);
 
@@ -1154,6 +1280,21 @@ int command_load_image(int index, const char *file, bool check_size)
 	if (ret) {
 		close (fd);
 		return -1;
+	}
+
+	/*
+	 * Diagnostics: the device only reports the image as available (and moves to
+	 * RECOVERY_PENDING) once the bytes streamed into INDIRECT_FIFO_DATA reach
+	 * INDIRECT_FIFO_CTRL image size (dwords * 4).  Log what we streamed vs the
+	 * size we programmed.  (No extra bus reads here: the device is busy right
+	 * after streaming and NACKs reads, which would perturb timing.)
+	 */
+	{
+		uint32_t img_words = (uint32_t)((stat.st_size + 3) / 4);
+
+		fprintf(stderr,
+			"image streamed: %u bytes (file=%ld, fifo_ctrl size=%u words = %u bytes)\n",
+			total_bytes, (long)stat.st_size, img_words, img_words * 4);
 	}
 
 
@@ -1179,17 +1320,49 @@ int command_load_image(int index, const char *file, bool check_size)
 int command_activate_image(void)
 {
 	uint8_t reg_value[MAX_CMS_READ_BLOCK_SIZE] = {0};
+	int tries;
 
-	if (read_device_status(false, reg_value)) {
-		fprintf(stderr, "read_device_status() failed\n");
+	/*
+	 * Once the whole image has been ingested from the INDIRECT FIFO, the device
+	 * advances DEVICE_STATUS to RECOVERY_PENDING (0x4) and then waits for the
+	 * host to write RECOVERY_CTRL 'Activate Recovery Image'.  This matches both
+	 * Caliptra Core's wait_for_activation() (drivers/src/dma.rs) and the MCU ROM
+	 * recovery agent (rom/src/recovery.rs), which gate activation on the
+	 * RECOVERY_PENDING hand-off.  Poll DEVICE_STATUS until it appears; a device
+	 * that stays at READY_TO_ACCEPT_RECOVERY_IMAGE (0x3) means it is still
+	 * draining the FIFO (i.e. the image was not fully received) rather than
+	 * ready to activate.  Poll quietly (raw block read) to avoid dumping the
+	 * full DEVICE_STATUS block on every iteration.
+	 */
+	for (tries = 0; tries < 300; tries++) {          /* up to ~30s at 100ms */
+		memset(buffer, 0, sizeof(buffer));
+		if (!i3c_block_read(DEVICE_STATUS, reg_value, 7, MAX_CMS_READ_BLOCK_SIZE)) {
+			fprintf(stderr, "read_device_status() failed\n");
+			return -1;
+		}
+
+		if (reg_value[0] == RECOVERY_PENDING)
+			break;
+
+		if (reg_value[0] == DEVICE_ERROR ||
+		    reg_value[0] == BOOT_FAILURE ||
+		    reg_value[0] == FATAL_ERROR) {
+			fprintf(stderr, "device_status error 0x%02x\n", reg_value[0]);
+			read_recovery_status(false, reg_value);
+			return -1;
+		}
+
+		usleep(100 * 1000);
+	}
+
+	if (reg_value[0] != RECOVERY_PENDING) {
+		fprintf(stderr, "device_status not RECOVERY_PENDING 0x%02x (timeout)\n",
+				reg_value[0]);
+		/* Show where the device actually is to help diagnose. */
+		read_recovery_status(false, reg_value);
 		return -1;
 	}
 	WAIT
-
-	if (reg_value[0] != RECOVERY_PENDING) {
-		fprintf(stderr, "device_status not RECOVERY_PENDING 0x%02x\n", reg_value[0]);
-		return -1;
-	}
 
 	if (send_recovery_ctrl(cms_id, false)) {
 		fprintf(stderr, "%s send_recovery_ctrl false fail\r\n", __func__);
@@ -1276,7 +1449,9 @@ void print_help(void)
 	printf ("  -b       :  Show raw response bytes in addition to parsed data.\n");
 	printf ("  -c <num> :  The CMS to use for the operation.  Defaults to 0.\n");
 #endif
-	printf ("  -d /dev/${i3c_path} :  The I3C device path.  This is required.\n");
+	printf ("  -d /dev/${i3c_path} :  The I3C device path.  Required unless -j is used.\n");
+	printf ("  -j <config>         :  JSON config with BusNumber and image paths.  When set,\n");
+	printf ("                         the I3C device is auto-discovered from the bus number.\n");
 #if 0
 	printf ("  -e       :  Force a PEC error on a raw write command.\n");
 	printf ("  -f       :  Ignore failed error checks during operation validation.\n");
@@ -1297,7 +1472,9 @@ void print_help(void)
 	printf ("  -h       :  Displays the help menu.\n");
 	printf ("\n");
 	printf ("COMMANDS\n");
-	printf ("  recover <file>    : Load a binary image into the device and activate it.\n");
+	printf ("  recover <fw_image> <soc_manifest> <mcu_rt> :\n");
+	printf ("                      Load the FW image, SoC manifest, and MCU runtime images\n");
+	printf ("                      into the device and activate each one.\n");
 #if 0
 	printf ("  load_img <file>   : Write a binary file to device memory.\n");
 	printf ("  verify_img <file> : Read CMS data and compare it to a specified file.\n");
@@ -1342,6 +1519,109 @@ void print_help(void)
 }
 
 /**
+ * Load recovery parameters from a JSON config file.
+ *
+ * Reads the target I3C bus number and the three recovery image paths, storing
+ * them in the globals consumed by command_recover().
+ *
+ * @param path Path to the JSON config file.
+ *
+ * @return 0 on success or -1 on failure.
+ */
+static int load_recovery_config(const char *path)
+{
+	std::ifstream in(path);
+	if (!in.is_open()) {
+		fprintf(stderr, "cannot open config %s\n", path);
+		return -1;
+	}
+
+	nlohmann::json cfg;
+	try {
+		in >> cfg;
+	} catch (const std::exception &e) {
+		fprintf(stderr, "failed to parse config %s: %s\n", path, e.what());
+		return -1;
+	}
+
+	if (!cfg.contains("BusNumber") || !cfg.contains("FwImage") ||
+	    !cfg.contains("SocManifest") || !cfg.contains("McuRuntime")) {
+		fprintf(stderr, "config %s missing required field(s) "
+			"(BusNumber, FwImage, SocManifest, McuRuntime)\n", path);
+		return -1;
+	}
+
+	device_bus = cfg["BusNumber"].get<int>();
+	cfg_fw_image = cfg["FwImage"].get<std::string>();
+	cfg_soc_manifest = cfg["SocManifest"].get<std::string>();
+	cfg_mcu_rt = cfg["McuRuntime"].get<std::string>();
+
+	file_name = cfg_fw_image.c_str();
+	soc_man_file_name = cfg_soc_manifest.c_str();
+	mcu_rt_file_name = cfg_mcu_rt.c_str();
+
+	return 0;
+}
+
+/**
+ * Locate the I3C virtual target device for a given bus number.
+ *
+ * Scans /sys/bus/i3c/devices/ for a target named "<bus>-<provisional_id>" and
+ * checks its BCR: only a device with the virtual-target bit (BCR[4]) set is a
+ * valid recovery target.  The matching character device path is returned.
+ *
+ * @param bus_number I3C bus number from the config.
+ * @param dev_path   Output: "/dev/i3c-<bus>-<provisional_id>" on success.
+ *
+ * @return 0 on success or -1 if no matching virtual device is found.
+ */
+static int find_i3c_virtual_device(int bus_number, std::string &dev_path)
+{
+	namespace fs = std::filesystem;
+	std::error_code ec;
+	std::string prefix = std::to_string(bus_number) + "-";
+
+	fs::directory_iterator dir(I3C_SYSFS_DEVICES, ec);
+	if (ec) {
+		fprintf(stderr, "cannot scan %s: %s\n", I3C_SYSFS_DEVICES,
+			ec.message().c_str());
+		return -1;
+	}
+
+	for (const auto &entry : dir) {
+		std::string name = entry.path().filename().string();
+
+		/* I3C targets are named "<bus>-<provisional_id>", e.g. "2-fffe005a10a5". */
+		if (name.rfind(prefix, 0) != 0) {
+			continue;
+		}
+
+		std::ifstream bcr_in(entry.path() / "bcr");
+		if (!bcr_in.is_open()) {
+			continue;
+		}
+
+		std::string bcr_str;
+		std::getline(bcr_in, bcr_str);
+		if (bcr_str.empty()) {
+			continue;
+		}
+
+		/* sysfs prints bcr as hex (e.g. "0x33"); base 16 handles the optional 0x. */
+		unsigned long bcr = strtoul(bcr_str.c_str(), NULL, 16);
+		if (bcr & I3C_BCR_VIRTUAL_TARGET) {
+			dev_path = std::string("/dev/i3c-") + name;
+			fprintf(stderr, "found i3c virtual device %s (bcr 0x%02lx)\n",
+				dev_path.c_str(), bcr);
+			return 0;
+		}
+	}
+
+	fprintf(stderr, "no i3c virtual device found for bus %d\n", bus_number);
+	return -1;
+}
+
+/**
  * Entry point for the OCP recovery test application.
  *
  * @param argc Number of arguments provided to the application.
@@ -1351,7 +1631,7 @@ void print_help(void)
  */
 int main (int argc, char *argv[])
 {
-	const char *opts = "d:h";
+	const char *opts = "d:j:h";
 	char sys_path[256];
 	char value[32];
 	char tmp[128];
@@ -1363,19 +1643,35 @@ int main (int argc, char *argv[])
 			case 'd':
 				device_name = optarg;
 				break;
+			case 'j':
+				config_name = optarg;
+				break;
 			case 'h':
 				print_help();
 				return 0;
 		}
 	}
 
-	if (optind >= argc) {
-		fprintf(stderr, "nuv_ocp_recovery arguments too few\n");
-		print_usage();
-		return 1;
-	}
+	if (config_name != NULL) {
+		if (load_recovery_config(config_name) != 0) {
+			return 1;
+		}
 
-	command = argv[optind++];
+		if (find_i3c_virtual_device(device_bus, cfg_device_path) != 0) {
+			return 1;
+		}
+
+		device_name = cfg_device_path.data();
+		command = "recover";
+	} else {
+		if (optind >= argc) {
+			fprintf(stderr, "nuv_ocp_recovery arguments too few\n");
+			print_usage();
+			return 1;
+		}
+
+		command = argv[optind++];
+	}
 
 	if (device_name != NULL) {
 
@@ -1409,10 +1705,21 @@ int main (int argc, char *argv[])
 			}
 
 			if (fgets(value, sizeof(value), fpipe) != NULL) {
-				addr = atoi(value);
+				/*
+				 * sysfs exports dynamic_address as bare hex
+				 * digits without a 0x prefix ("0a\n"), so parse
+				 * with base 16.  atoi() or strtol() base 0/10
+				 * would stop at the first hex letter and return
+				 * 0, producing a wrong PEC and a NACKed transfer.
+				 */
+				addr = (uint8_t)strtol(value, NULL, 16);
 			}
 
 			pclose(fpipe);
+
+			if (verbose >= 1) {
+				fprintf(stderr, "i3c addr 0x%02x\n", addr);
+			}
 		} else {
 			fprintf(stderr, " i3c device path is faulty\n");
 			return 1;
@@ -1430,9 +1737,11 @@ int main (int argc, char *argv[])
 		return 1;
 	}
 
-	if (strcmp ("recover", command) == 0) {
+	if (strcmp ("recover", command) == 0 && config_name == NULL) {
 		if ((optind + 2) >= argc) {
 			fprintf (stderr, "files must be provided for this command.\n");
+			fprintf (stderr, "Usage: nuv_ocp_recovery -d /dev/${i3c_path} recover "
+					"<fw_image> <soc_manifest> <mcu_rt>\n");
 			close(i3c);
 			return 1;
 		}

@@ -1,0 +1,6 @@
+[Unit]
+Description=Nuvoton OCP Recovery (triggered by GPIO low-pulse)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/nuv_ocp_recovery -j /usr/share/nuv-ocp-recovery/recovery-config.json

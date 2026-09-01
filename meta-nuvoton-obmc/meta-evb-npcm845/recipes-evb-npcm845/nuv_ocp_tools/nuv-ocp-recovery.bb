@@ -19,8 +19,15 @@ SRC_URI = "file://src/nuv_ocp_recovery.cpp \
            file://Makefile.am \
            file://configure.ac \
            file://COPYING.MIT \
+           file://recovery-config.json \
+           file://nuv-ocp-recovery.service \
           "
+
+SYSTEMD_SERVICE:${PN} = "nuv-ocp-recovery.service"
+SYSTEMD_AUTO_ENABLE = "disable"
 
 do_install() {
     install -Dm755 ${WORKDIR}/build/src/nuv_ocp_recovery ${D}/${sbindir}/nuv_ocp_recovery
+    install -Dm644 ${S}/recovery-config.json ${D}${datadir}/nuv-ocp-recovery/recovery-config.json
+    install -Dm644 ${S}/nuv-ocp-recovery.service ${D}${systemd_system_unitdir}/nuv-ocp-recovery.service
 }
