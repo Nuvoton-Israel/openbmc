@@ -1,0 +1,139 @@
+From bd0f114f1a94f0882b8e89cbb54076b6fb59e618 Mon Sep 17 00:00:00 2001
+From: Tyrone Ting <kfting@nuvoton.com>
+Date: Tue, 1 Sep 2026 14:59:52 +0800
+Subject: [PATCH] arm64: npcm845-evb: i3c tuning and debug changes
+
+Bundle the remaining EVB i3c-related changes:
+
+- dts: tune i3c4 OD/PP SCL periods, add gdma tx/rx and mark i3c4 as an
+  mctp-controller.
+- clk: clk-npcm8xx: hard-code the I3C MCLK divider (~6.25 MHz).
+- i3c: master: dynamic_address sysfs read also issues a GETSTATUS CCC and
+  logs the device status for debugging.
+- i3c: svc-i3c-master: bail out of DAA with -ENOSPC when the max device
+  count is reached.
+
+Upstream-Status: Inappropriate [oe-specific]
+Signed-off-by: Tyrone Ting <kfting@nuvoton.com>
+---
+ .../boot/dts/nuvoton/nuvoton-npcm845-evb.dts  | 11 ++++++++-
+ drivers/clk/clk-npcm8xx.c                     | 10 ++++++++
+ drivers/i3c/master.c                          | 24 +++++++++++++++++++
+ drivers/i3c/master/svc-i3c-master.c           |  6 +++++
+ 4 files changed, 50 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+index 801c908..bd72186 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+@@ -584,12 +584,21 @@
+ 	 *
+ 	 * Current setting: PP at slowest possible 1.013MHz
+ 	 */
++        /*
+ 	i3c-od-scl-hi-period-ns = <1344>;   // 4× PP high (336ns) → 50% duty
+ 	i3c-od-scl-lo-period-ns = <1344>;   // 4× PP high (336ns) → 50% duty, ~372KHz
+ 	i3c-pp-scl-hi-period-ns = <336>;    // PP high, ppbaud=15 (max)
+-	i3c-pp-scl-lo-period-ns = <504>;    // PP low, pplow=15 (max) → slowest PP: 1.013MHz
++	i3c-pp-scl-lo-period-ns = <651>;    // PP low, pplow=15 (max) → slowest PP: 1.013MHz
++	*/
++	i3c-od-scl-hi-period-ns = <1920>;
++	i3c-od-scl-lo-period-ns = <1920>;
++	i3c-pp-scl-hi-period-ns = <960>;
++	i3c-pp-scl-lo-period-ns = <960>;
+ 	i3c-scl-hz = <1000000>;
+ 	i2c-scl-hz = <400000>;
++	dmas = <&gdma0 0>, <&gdma0 1>;
++	dma-names = "tx", "rx";
++	mctp-controller;
+ };
+ 
+ &mc {
+diff --git a/drivers/clk/clk-npcm8xx.c b/drivers/clk/clk-npcm8xx.c
+index 2138c01..e8ee447 100644
+--- a/drivers/clk/clk-npcm8xx.c
++++ b/drivers/clk/clk-npcm8xx.c
+@@ -290,6 +290,7 @@ static int npcm8xx_clk_probe(struct auxiliary_device *adev,
+ 	struct device *dev = &adev->dev;
+ 	struct clk_hw *hw;
+ 	unsigned int i;
++	u32 reg;
+ 
+ 	npcm8xx_clk_data = devm_kzalloc(dev, struct_size(npcm8xx_clk_data, hws,
+ 							 NPCM8XX_NUM_CLOCKS),
+@@ -299,6 +300,15 @@ static int npcm8xx_clk_probe(struct auxiliary_device *adev,
+ 
+ 	clk_base = rdev->base;
+ 
++	/* Hard code 25MHz I3C MCLK frequency */
++	dev_info(dev, "Set 6.25 MHz I3C mclk\n");
++	reg = readl(clk_base + 0x4) & ~BIT(27);
++	reg |= BIT(28);
++	writel(reg, clk_base + 0x4);
++	reg = readl(clk_base + 0x7c) & ~0xF000;
++	reg |= 0x3000;
++	writel(reg, clk_base + 0x7c);
++
+ 	npcm8xx_clk_data->num = NPCM8XX_NUM_CLOCKS;
+ 
+ 	for (i = 0; i < NPCM8XX_NUM_CLOCKS; i++)
+diff --git a/drivers/i3c/master.c b/drivers/i3c/master.c
+index 685d767..4d3ce09 100644
+--- a/drivers/i3c/master.c
++++ b/drivers/i3c/master.c
+@@ -188,11 +188,35 @@ static ssize_t dynamic_address_show(struct device *dev,
+ {
+ 	struct i3c_bus *bus = dev_to_i3cbus(dev);
+ 	struct i3c_dev_desc *desc;
++	struct i3c_device_info info;
+ 	ssize_t ret;
++	int sts_ret;
++	u16 status;
+ 
+ 	i3c_bus_normaluse_lock(bus);
+ 	desc = dev_to_i3cdesc(dev);
+ 	ret = sprintf(buf, "%02x\n", desc->info.dyn_addr);
++
++	/*
++	 * In addition to reporting the cached dynamic address, actively issue a
++	 * GETSTATUS CCC to the device and dump the result to the kernel log.
++	 * The bus normaluse lock is already held here, so call the _locked
++	 * variant directly.
++	 */
++	info = desc->info;
++	sts_ret = i3c_dev_getstatus_locked(desc, &info);
++	if (sts_ret) {
++		printk(KERN_INFO "i3c %s: GETSTATUS CCC failed (dyn_addr=0x%02x, ret=%d)\n",
++		       dev_name(dev), desc->info.dyn_addr, sts_ret);
++	} else {
++		status = (u16)info.status;
++		printk(KERN_INFO "i3c %s: GETSTATUS dyn_addr=0x%02x status=0x%04x pending_int=%u protocol_err=%u activity_mode=%u\n",
++		       dev_name(dev), desc->info.dyn_addr, status,
++		       (unsigned int)I3C_CCC_STATUS_PENDING_INT(status),
++		       (unsigned int)(!!(status & I3C_CCC_STATUS_PROTOCOL_ERROR)),
++		       (unsigned int)I3C_CCC_STATUS_ACTIVITY_MODE(status));
++	}
++
+ 	i3c_bus_normaluse_unlock(bus);
+ 
+ 	return ret;
+diff --git a/drivers/i3c/master/svc-i3c-master.c b/drivers/i3c/master/svc-i3c-master.c
+index e763d15..5f15824 100644
+--- a/drivers/i3c/master/svc-i3c-master.c
++++ b/drivers/i3c/master/svc-i3c-master.c
+@@ -1070,6 +1070,12 @@ static int svc_i3c_master_do_daa_locked(struct svc_i3c_master *master,
+ 		if (ret)
+ 			break;
+ 
++		if (dev_nb == SVC_I3C_MAX_DEVS) {
++			dev_info(master->dev, "Reach max devs\n");
++			ret = -ENOSPC;
++			break;
++		}
++
+ 		if (SVC_I3C_MSTATUS_RXPEND(reg)) {
+ 			u8 data[6];
+ 
+-- 
+2.34.1
+

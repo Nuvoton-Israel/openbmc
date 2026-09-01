@@ -63,3 +63,5 @@ SRC_URI:append = " file://0014-dts-remove-i2c5-8-11-and-24-26.patch"
 # Repurpose JTAG2 pin as GPIO44 input (OCP recovery low-pulse trigger)
 SRC_URI:append = " file://0015-arm64-dts-nuvoton-npcm845-evb-repurpose-jtag2-as-gpio44.patch"
 
+# EVB i3c tuning and debug changes (dts i3c4, clk mclk, master/svc drivers)
+SRC_URI:append = " file://0016-arm64-npcm845-evb-i3c-tuning-and-debug-changes.patch"
