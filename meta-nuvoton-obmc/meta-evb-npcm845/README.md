@@ -62,6 +62,7 @@ For more product questions, please contact us at:
   * [JTAG Master](#jtag-master)
   * [SMBus](#smbus)
   * [ESPI](#espi)
+    + [ESPI Master](#espi-master)
   * [VWGPIO](#vwgpio)
   * [SIOX](#siox)
   * [SPIX](#spix)
@@ -1260,6 +1261,469 @@ I2c probe 0x48
 ## ESPI
 
 The EVB has the J_eSPI header to support ESPI transactions.
+
+### ESPI Master
+
+This section describes the **eSPI Master** test utility implemented in U-Boot using GPIO software bit-banging.
+This utility allows the BMC to act as an eSPI Master (Controller) during the U-Boot stage and verify whether the connected eSPI Slave (Target, such as an EC or another BMC) correctly responds to the protocol behavior of the four eSPI channels.
+
+#### 1. Hardware Requirements and Wiring
+
+This utility uses **GPIO5 (GPIO160–191, register base `0xF0015000`)** to emulate eSPI signals. The implementation also drives `eSPI_nRST` from **GPIO2 (GPIO95, bit 31)**.
+
+| Signal | GPIO | Port bit | Direction (Master Side) | Description |
+|------|------|----------|------------------|------|
+| `eSPI_nCS`   | GPIO161 | BIT(1) | Output | Chip Select, active low |
+| `eSPI_CLK`   | GPIO163 | BIT(3) | Output | Serial Clock |
+| `eSPI_IO0`   | GPIO164 | BIT(4) | Single: Output / Dual and Quad: Output (Request), Input (Response) | Data line |
+| `eSPI_IO1`   | GPIO165 | BIT(5) | Single: Input + Alert / Dual and Quad: Output (Request), Input (Response) | Slave → Master data + in-band ALERT in Single mode / Data line for Dual and Quad mode |
+| `eSPI_IO2`   | GPIO166 | BIT(6) | Quad: Output (Request), Input (Response) | Additional data line for Quad |
+| `eSPI_IO3`   | GPIO167 | BIT(7) | Quad: Output (Request), Input (Response) | Additional data line for Quad |
+| `eSPI_ALERT` | GPIO168 | BIT(8) | Input | Dedicated ALERT# pin (Out‑of‑Band alert) |
+| `eSPI_nRST`  | GPIO95  | BIT(31, GPIO2) | Output | eSPI Reset, active low |
+
+##### Important Wiring and GPIO Rules
+
+- **`eSPI_CLK` and all `eSPI_IO` lines must reside on the same GPIO port.** The code performs atomic writes to the port (single `writel()`), so mixing ports will break timing and sampling.
+- The implementation supports **Single / Dual / Quad I/O modes** and negotiates capability with the Slave. Use `espi setiomode <0|1|2>` (or `espi autotest <mode>`) to request Single(0)/Dual(1)/Quad(2). 
+- `IO1` may serve as an in-band ALERT line only in **Single** I/O mode. In Dual/Quad modes IO1 is a data line and the GPIO edge event will not reliably fire for alerts; in that case the implementation falls back to polling `GET_STATUS`.
+- `use_alert_pin` (controlled by `espi alertmode <0|1>`) selects the dedicated `ALERT#` input (`GPIO168`, `eSPI_ALERT`) when available. When `use_alert_pin` is set, the driver configures the GPIO event/IEM for the ALERT# pin — run `espi setiomode` to write the Alert bit into the Slave's General Capabilities register.
+
+---
+
+#### 2. Initialization and Automated Testing
+
+##### 2.1 `espi init`
+
+```
+=> espi init
+espi: init gpios
+espi reset
+```
+
+Actions: switch the pinmux → configure GPIO output enable / GPIO input enable / GPIO event detection → pull `eSPI_nRST` low for 100 µs and then release it.
+
+After execution, the Slave enters a state waiting for Master negotiation, but **no channel is enabled yet**.
+
+##### 2.2 `espi start`
+
+After `init`, the following negotiation sequence is completed automatically:
+
+1. `setconfig 0x20 0x00000001` — Enable VW channel
+2. `putvw 3 0x33` — Deassert `PLTRST#` and `SUS_STAT#`
+3. `setconfig 0x10 0x00001113` — Enable Peripheral channel
+4. `setconfig 0x30 0x00000111` — Enable OOB channel
+5. `setconfig 0x40 0x00031925` — Enable Flash channel (TAF mode)
+6. Configure the Slave through Super I/O (index port `0x4E` / data port `0x4F`):
+   - **SP1 (LDN 0x03)**: I/O base `0x3F8`, IRQ 3
+   - **KCS1 (LDN 0x11)**: Data port `0xCA2`, Cmd/Status port `0xCA3`
+   - **SHM (LDN 0x0F)**: I/O base `0x700`, Shared Access Window 1 base `0x10000000`, Shared Access Window 2 base `0x10001000`
+   - **ESHM (LDN 0x1D)**: Shared Access Window 3 base `0x10002000`, Shared Access Window 4 base `0x10003000`
+
+##### 2.3 `espi kcstest`
+
+Execute a single KCS transaction (IPMI Get Device ID) and print the 18-byte response in hex. This is used to verify that the KCS state machine is functioning correctly.
+
+##### 2.4 `espi autotest`
+
+Full regression test covering:
+
+| Test Item | Pass Condition |
+|--------|----------|
+| `peripheral: put_iord_short + put_iowr_short` | Configure KCS and SHM via Super I/O, then verify readback LDN Enable value is `0x01` |
+| `peripheral: put_memrd32_short + put_memwr32_short` | After writing to `0x10000000`, read back `0x1A2B3C4D` from `0x10000004` |
+| `vw: IRQ` | Receive VW index 0 = `0x81` (IRQ1 assert) → read KCS data to clear OBF → index 0 becomes `0x01` |
+| `vw: get_vwire + put_vwire` | After asserting `HOST_RST_WARN#`, receive the corresponding change at VW index 6 bit3 (`HOST_RST_ACK`) |
+| `oob: get_oob + put_oob` | Receive a 4-byte request from the Slave and return 5-byte temperature data |
+| `flash: TAFS` | CRC8 differs before and after Erase, and the CRC8 read back after Write matches; RPMC OP1/OP2 are also tested |
+| `flash: CAFS` | After switching to CAF mode (`setconfig 0x40 0x00031125`), service the Slave's read/write/erase requests |
+
+> **Prerequisites**: `autotest` assumes that the Slave is running the corresponding test firmware and can actively:
+> - Place the magic value `0x1A2B3C4D` at SHM `0x10000004`
+> - Trigger a KCS IRQ
+> - Initiate an OOB temperature request
+> - Initiate flash requests in CAF mode
+
+The TAF flash test uses the following memory regions. Make sure they are not in use before running the test:
+
+| Address | Purpose |
+|------|------|
+| `0x10000000` | Temporary buffer for flash reads (64 bytes) |
+| `0x10010000` | Source data for flash writes (64 bytes) |
+| flash offset `0x10000` | Test sector (**will be erased!**) |
+
+---
+
+#### 3. Configuration
+
+##### `espi getconfig <addr>`
+
+```
+=> espi getconfig 20
+get_config(20)=0x0000000f
+```
+
+##### `espi setconfig <addr> <data>`
+
+```
+=> espi setconfig 20 00000001
+set_config(20)=0x00000001
+```
+
+##### Common Configuration Addresses
+
+| Addr | Name | Description |
+|------|------|------|
+| `0x04` | Device Identification | Version information |
+| `0x08` | General Capabilities and Configuration | I/O mode select, Alert Mode, **Wait State** |
+| `0x10` | Channel 0 — Peripheral | Recommended value `0x00001113` |
+| `0x20` | Channel 1 — Virtual Wire | Recommended value `0x00000001` |
+| `0x30` | Channel 2 — OOB | Recommended value `0x00000111` |
+| `0x40` | Channel 3 — Flash | TAF: `0x00031925` / CAF: `0x00031125` (determined by bit 11) |
+
+> **Important**: When writing to address `0x08`, this utility automatically parses the number of Wait States from `data[15:12]` and updates the internal `wait_state` variable (if 0, it is treated as 16). This affects the retry tolerance for subsequent `RESP_WAIT` responses.
+
+---
+
+#### 4. Virtual Wire Channel
+
+##### `espi getvw`
+
+```
+=> espi getvw
+get_vwire: index(6)=0x88
+```
+
+One index/data pair is read at a time. If the Slave has multiple entries pending, repeat the command.
+
+##### `espi putvw <index> <data>`
+
+`<data>` follows the eSPI standard: **bits[7:4] = Valid bit mask, bits[3:0] = data value**.
+
+```
+=> espi putvw 3 33
+put_vwire: index(3)=0x33
+```
+
+##### Common VW Index Reference
+
+| Index | Direction | bit0 | bit1 | bit2 | bit3 |
+|-------|------|------|------|------|------|
+| `0x00` | S→M | [6:0] = IRQ number, bit7 = IRQ level | | | |
+| `0x02` | M→S | `SLP_S3#` | `SLP_S4#` | `SLP_S5#` | — |
+| `0x03` | M→S | `SUS_STAT#` | `PLTRST#` | `OOB_RST_WARN` | — |
+| `0x04` | S→M | `OOB_RST_ACK` | — | `WAKE#` | `PME#` |
+| `0x05` | S→M | `SLAVE_BOOT_LOAD_DONE` | `ERROR_FATAL` | `ERROR_NONFATAL` | `SLAVE_BOOT_LOAD_STATUS` |
+| `0x06` | S→M | `SCI#` | `SMI#` | `RCIN#` | `HOST_RST_ACK` |
+| `0x07` | M→S | `HOST_RST_WARN` | `SMIOUT#` | `NMIOUT#` | — |
+
+##### Common Operation Examples
+
+```
+=> espi putvw 3 22      # Deassert PLTRST#
+=> espi putvw 3 33      # Deassert PLTRST# and SUS_STAT#
+=> espi putvw 7 11      # Assert HOST_RST_WARN#
+=> espi getvw           # You should see index(6) bit3 = HOST_RST_ACK
+=> espi putvw 7 10      # Deassert HOST_RST_WARN#
+```
+
+---
+
+#### 5. Peripheral Channel
+
+##### 5.1 I/O Access
+
+```
+espi iowr <addr> <data> <len>     # len = 1, 2, 4
+espi iord <addr> <len>            # len = 1, 2, 4
+```
+
+`iord` directly prints the read result.
+
+##### 5.2 Enable KCS Channel
+
+The Slave's Super I/O uses an index/data port pair (default `0x4E`/`0x4F`):
+
+```
+=> espi iowr 4e 07 1     # Select Logical Device Number Register
+=> espi iowr 4f 11 1     # Select KCS1 module
+=> espi iowr 4e 60 1     # Select I/O Base Address Descriptor 0
+=> espi iowr 4f 0c 1     
+=> espi iowr 4e 61 1     
+=> espi iowr 4f a2 1     # Set Data register base address 0xca2
+=> espi iowr 4e 62 1     # Select I/O Base Address Descriptor 1
+=> espi iowr 4f 0c 1     
+=> espi iowr 4e 63 1
+=> espi iowr 4f a3 1     # Set Status/Command register base address 0xca3
+=> espi iowr 4e 30 1
+=> espi iowr 4f 01 1     # Enable KCS1 module
+```
+
+You can then use `ipmitool` commands to send commands to the Slave.
+
+##### 5.3 Shared Memory Access
+
+1. Enable shared memory and set the shared memory base address:
+
+```
+=> espi iowr 4e 07 1     # Select Logical Device Number Register
+=> espi iowr 4f 0f 1     # Select SHM module
+=> espi iowr 4e 30 1
+=> espi iowr 4f 00 1     # Disable SHM module
+=> espi iowr 4e 60 1     # Select I/O Base Address Descriptor 0
+=> espi iowr 4f 07 1     
+=> espi iowr 4e 61 1     
+=> espi iowr 4f 00 1     # Set SHM I/O base address 0x700
+=> espi iowr 4e 70 1     # Select Interrupt Number register
+=> espi iowr 4f 0f 1
+# Set SHAW1BA_0~3 registers    
+=> espi iowr 4e f4 1     
+=> espi iowr 4f 00 1     
+=> espi iowr 4e f5 1
+=> espi iowr 4f 00 1
+=> espi iowr 4e f6 1
+=> espi iowr 4f 00 1
+=> espi iowr 4e f7 1
+=> espi iowr 4f 10 1     # Set shared memory base address 0x10000000
+=> espi iowr 4e 30 1
+=> espi iowr 4f 01 1     # Enable SHM module
+```
+
+2. Use the `espi memwr32` or `espi memrd32` command to access shared memory:
+
+```
+espi memwr32 <addr> <data> <len>   # len = 1, 2, 4
+espi memrd32 <addr> <len>          # len = 1, 2, 4
+```
+
+```
+=> espi memwr32 10000000 caabca8b 4
+MEM wr32: addr[0x10000000]=caabca8b
+=> espi memrd32 10000004 4
+MEM rd32: addr[0x10000004]=1a2b3c4d
+```
+
+**`memwr32` waits for ALERT afterward**; if the Slave does not respond with an alert, a `wait_alert timeout` will occur.
+
+**DEFER Handling**: If `memrd32` receives `RESP_DEFER` (`0x01`), the utility automatically prints `MEM rd32 DEFER`, then waits for ALERT → polls `PC_AVAIL` (Status bit 4) → issues `GET_PC` to retrieve the deferred completion packet. This is normal behavior and does not indicate an error.
+
+> The target address for memory access must fall within the SHM window opened by the Slave (`espi start` defaults to `0x10000000`), otherwise the Slave may return `RESP_FATAL_ERROR` or fail to respond.
+
+##### 5.4 Enable Host UART (SP1)
+
+```
+=> espi iowr 4e 07 1     # Select Logical Device Number Register
+=> espi iowr 4f 03 1     # Select SP1 module
+=> espi iowr 4e 30 1
+=> espi iowr 4f 00 1     # Disable SP1 module
+=> espi iowr 4e 60 1     # Select I/O Base Address Descriptor 0
+=> espi iowr 4f 03 1     
+=> espi iowr 4e 61 1     
+=> espi iowr 4f f8 1     # Set SP1 I/O base address 0x3f8
+=> espi iowr 4e 70 1     # Select Interrupt Number register
+=> espi iowr 4f 03 1     
+=> espi iowr 4e 30 1
+=> espi iowr 4f 01 1     # Enable SP1 module
+# Select bank1, divisor=1, baud=f_input/(16*divisor)
+=> espi iowr 3fb 80 1    # Select bank1
+=> espi iowr 3f8 01 1     # Legacy Baud Generator Divisor register (Low Byte)
+=> espi iowr 3f9 00 1     # Legacy Baud Generator Divisor register (High Byte)
+# Select bank0, LCR=3(8 bit/1 stop/no parity)
+=> espi iowr 3fb 03 1    # Select bank0, LCR=3
+=> espi iowr 3fc 00 1    # Modem/Mode Control register
+=> espi iowr 3f9 03 1    # Interrupt Enable register
+=> espi iowr 3fa 06 1    # FIFO Control register
+```
+
+Next, you can test the host UART using `espi_uart` command.
+
+---
+
+#### 6. Flash Channel (TAF / CAF / RPMC)
+
+##### 6.1 Mode Selection
+
+| Mode | Description | Configuration |
+|------|------|--------|
+| **TAF** (Target Attached Flash) | Flash is attached to the Slave, and the **Master initiates** accesses | `espi setconfig 40 00031925` |
+| **CAF** (Controller Attached Flash) | Flash is attached to the Master, and the **Slave initiates** accesses; the Master services the requests | `espi setconfig 40 00031125` |
+
+The difference lies in bit 11. After switching modes, polling for Channel Ready is also required.
+
+##### 6.2 TAF — Master-Initiated Access
+
+```
+espi flash_read  <flash_offset> <len> <mem_addr> <tag>
+espi flash_write <flash_offset> <len> <mem_addr> <tag>
+espi flash_erase <flash_offset> <tag>
+```
+
+- `<len>` is specified in bytes and is automatically split internally into **64-byte (`FLASH_R_LENGTH`)** packets
+- `<mem_addr>` is the local BMC DRAM address (destination for reads / source for writes)
+- `<tag>` is the eSPI Tag (0–15), which can be used to test multiple outstanding transactions or access isolation
+- The erase granularity of `flash_erase` is determined by the Slave and is typically a **4 KB sector**
+
+```
+=> espi flash_read 10000 40 10000000 0
+Load address: 0x10000000
+Loading: #
+done
+
+=> md.b 10000000 40
+```
+
+```
+=> espi flash_erase 10000 0
+Erase address: 0x10000
+done
+
+=> espi flash_write 10000 40 10010000 0
+Save mem address 0x10010000 to flash address 0x10000
+Saving..
+#
+done
+```
+
+**Internal Flow** (for each 64-byte chunk):
+`PUT_FLASH_NP` → wait for ALERT → poll `FLASH_C_AVAIL` (Status bit 12) → `GET_FLASH_C` to retrieve the completion packet.
+Before sending, `FLASH_NP_FREE` (Status bit 9) is polled to ensure that the Slave queue has space.
+
+##### 6.3 RPMC (Replay Protected Monotonic Counter)
+
+```
+espi flash_rpmc_op1 <flash_dev> <len> <mem_addr> <tag>
+espi flash_rpmc_op2 <flash_dev> <len> <mem_addr> <tag>
+```
+
+- `<flash_dev>`: Target flash device number 0–3 (encoded into cycle type bits[6:5])
+- **OP1**: Retrieve `<len>` bytes of RPMC command packet from `<mem_addr>` and send it to flash (Master → Flash)
+- **OP2**: Read back `<len>` bytes of result from flash and store it at `<mem_addr>` (Flash → Master)
+
+```
+=> espi flash_rpmc_op1 0 40 10000000 0
+Get mem address 0x10000000 to flash device 0x0
+done
+
+=> espi flash_rpmc_op2 0 40 10000000 0
+Read flash device 0x0 to 0x10000000
+done
+```
+
+##### 6.4 CAF — Service Slave Requests
+
+```
+espi caf_flash <cycle_type> <len>
+```
+
+| `<cycle_type>` | Meaning |
+|----------------|------|
+| `0` | Flash Read |
+| `1` | Flash Write |
+| `2` | Flash Erase |
+
+```
+=> espi setconfig 40 00031125
+=> espi caf_flash 0 40
+done
+```
+
+Flow: poll `FLASH_NP_AVAIL` (Status bit 13) → `GET_FLASH_NP` to retrieve the Slave request → `PUT_FLASH_C` to return the completion packet.
+
+> **The current implementation is for loopback validation**: read responses contain an incrementing sequence (`0x00, 0x01, 0x02...`) rather than actual flash contents; write/erase only return successful completions and do not actually modify the Master-side flash. For real flash service, connect an actual SPI flash driver in `espi_put_flash_c()`.
+
+---
+
+#### 7. OOB Channel
+
+```
+espi oobtest <request_len>
+```
+
+`<request_len>` is the **expected length of the Slave request** (bytes).
+
+```
+=> espi oobtest 4
+done
+```
+
+Flow: poll `OOB_AVAIL` (Status bit 7) → `GET_OOB` receives the Slave's SMBus tunnel request → `PUT_OOB` sends the response.
+
+**The current response content is a fixed "PCH Get Temperature" example** (5 bytes):
+
+---
+
+#### 8. `ipmitool` Commands (KCS over eSPI)
+
+**You must run `espi start` before using these commands** (KCS LDN configuration must be completed).
+
+```
+ipmitool bmc info
+ipmitool sdr [<record_id>]
+```
+
+##### `ipmitool bmc info`
+
+Send IPMI `Get Device ID` (NetFn/LUN `0x18`, Cmd `0x01`):
+
+```
+=> ipmitool bmc info
+Device ID               : 32
+Device Revision         : 1
+Firmware Revision       : 3.15
+IPMI Version            : 2.0
+Manufacturer ID         : 0x000c8b
+Product ID              : 0x0000
+```
+
+##### `ipmitool sdr [<record_id>]`
+
+Read the specified SDR record and display the temperature sensor reading. `<record_id>` is in hexadecimal; **if omitted, it defaults to `8`** (EVB_Temp).
+
+```
+=> ipmitool sdr
+EVB_Temp: 42 degree C
+
+=> ipmitool sdr 0a
+CPU_Temp: 55 degree C
+```
+
+> **Limitation**: Only handles items with **Record Type = 0x01 (Full Sensor Record)** and **Sensor Type = 0x01 (Temperature)**; other types are silently skipped (no output). The reading is a raw value without applying the M/B/exponent linear conversion formula from the SDR.
+
+> **Note**: Executing `ipmitool bmc` without a subcommand will access `argv[2]` (which may be NULL); please make sure to enter `ipmitool bmc info` completely.
+
+---
+
+#### 9. `espi_uart` Command (Host UART Demo)
+
+Send data to the Slave's 16550 UART (I/O base `0x3F8`) through the Peripheral channel to verify the Host UART path. **You must run `espi start` before use.**
+
+```
+espi_uart auto
+espi_uart manual <mem_addr> <len>
+```
+
+##### `espi_uart auto`
+
+Send the built-in company introduction string, with a 100 µs interval between characters.
+
+```
+=> espi_uart auto
+```
+
+The complete text output should be visible on the serial console connected to the Slave.
+
+##### `espi_uart manual <mem_addr> <len>`
+
+Retrieve `<len>` bytes one by one from BMC memory `<mem_addr>` and transmit them, polling **THRE (bit 5)** of the LSR (`0x3FD`) after each character to confirm that the FIFO is empty. This mode is more reliable than `auto`.
+
+```
+=> mw.b 20000000 48 1     # 'H'
+=> mw.b 20000001 49 1     # 'I'
+=> espi_uart manual 20000000 2
+```
+
+- Supports **Ctrl+C interruption**
+- If THRE does not become set within 1000 polls, `uart write timeout` is printed and the operation stops
 
 ### U-boot test
 1. Wiring
