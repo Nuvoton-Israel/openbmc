@@ -1,0 +1,133 @@
+From e414ebfdff47a979d1c7e0a84fcf357afcaa6f20 Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Fri, 4 Sep 2026 10:51:12 +0800
+Subject: [PATCH] mctpd: reply to Set Endpoint ID before querying peer
+ properties
+
+Previously, add_peer_from_addr()/setup_added_peer() (which queries the
+new peer's properties) ran before reply_message() sent the Set
+Endpoint ID response. Since the requester waits synchronously for that
+response before servicing our queries, this could stall or fail.
+
+Split setup_added_peer() into setup_peer_route() (route setup only)
+and the property query/publish steps. In
+handle_control_set_endpoint_id(), set up the peer's route, send the
+Set Endpoint ID reply, and only then query properties and publish the
+peer, removing it again if that fails.
+
+Upstream-Status: Inappropriate [oe-specific]
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ src/mctpd.c | 56 +++++++++++++++++++++++++++++++++++++++--------------
+ 1 file changed, 41 insertions(+), 15 deletions(-)
+
+diff --git a/src/mctpd.c b/src/mctpd.c
+index a7036ad..a264916 100644
+--- a/src/mctpd.c
++++ b/src/mctpd.c
+@@ -300,6 +300,7 @@ static int add_peer_from_addr(struct ctx *ctx,
+ static int remove_peer(struct peer *peer);
+ static int remove_bridged_peers(struct peer *bridge);
+ static int query_peer_properties(struct peer *peer);
++static void setup_peer_route(struct peer *peer);
+ static int setup_added_peer(struct peer *peer);
+ static void add_peer_route(struct peer *peer);
+ static int publish_peer(struct peer *peer);
+@@ -770,7 +771,7 @@ static int handle_control_set_endpoint_id(struct ctx *ctx, int sd,
+ 	struct link *link_data;
+ 	struct peer *peer;
+ 	size_t resp_len;
+-	int rc;
++	int rc, peer_rc;
+ 
+ 	if (buf_size < sizeof(*req)) {
+ 		bug_warn("short Set Endpoint ID message");
+@@ -834,14 +835,6 @@ static int handle_control_set_endpoint_id(struct ctx *ctx, int sd,
+ 			resp->completion_code = MCTP_CTRL_CC_ERROR_NOT_READY;
+ 		}
+ 
+-		rc = add_peer_from_addr(ctx, addr, &peer);
+-		if (rc == 0) {
+-			rc = setup_added_peer(peer);
+-		}
+-		if (rc < 0) {
+-			warnx("ERR: cannot add bus owner to object lists");
+-		}
+-
+ 		if (link_data->discovered != DISCOVERY_UNSUPPORTED) {
+ 			link_data->discovered = DISCOVERY_DISCOVERED;
+ 		}
+@@ -851,7 +844,31 @@ static int handle_control_set_endpoint_id(struct ctx *ctx, int sd,
+ 		resp->eid_set = req->eid;
+ 		resp->eid_pool_size = 0;
+ 		fprintf(stderr, "Accepted set eid %d\n", req->eid);
+-		return reply_message(ctx, sd, resp, resp_len, addr);
++
++		// Add local routing for the requester before replying:
++		// reply_message() addresses by EID and needs a route.
++		peer_rc = add_peer_from_addr(ctx, addr, &peer);
++		if (peer_rc == 0) {
++			setup_peer_route(peer);
++		}
++
++		// Reply before querying the requester's properties below: it is
++		// synchronously waiting on this response and won't service our
++		// queries until it gets it.
++		rc = reply_message(ctx, sd, resp, resp_len, addr);
++
++		if (peer_rc == 0) {
++			peer_rc = query_peer_properties(peer);
++			if (peer_rc == 0)
++				peer_rc = publish_peer(peer);
++			if (peer_rc < 0)
++				remove_peer(peer);
++		}
++		if (peer_rc < 0) {
++			warnx("ERR: cannot add bus owner to object lists");
++		}
++
++		return rc;
+ 
+ 	case MCTP_SET_EID_DISCOVERED:
+ 		if (link_data->discovered == DISCOVERY_UNSUPPORTED) {
+@@ -3135,16 +3152,16 @@ static int peer_route_update(struct peer *peer, uint16_t type)
+ 	return -EPROTO;
+ }
+ 
+-/* Called when a new peer is discovered. Queries properties and publishes.
+- * The peer's route has already been set up */
+-static int setup_added_peer(struct peer *peer)
++/* Adds local routing for a newly discovered peer, without querying its
++ * properties. Must be called (directly or via setup_added_peer()) before the
++ * peer can be reached over EID-based addressing, e.g. by reply_message(). */
++static void setup_peer_route(struct peer *peer)
+ {
+ 	struct net *n = lookup_net(peer->ctx, peer->net);
+-	int rc;
+ 
+ 	if (!n) {
+ 		bug_warn("%s Bad net %u", __func__, peer->net);
+-		return -EPROTO;
++		return;
+ 	}
+ 	// Set minimum MTU by default for compatibility. Clients can increase
+ 	// this with .SetMTU as needed
+@@ -3154,6 +3171,15 @@ static int setup_added_peer(struct peer *peer)
+ 	// bridged endpoints will use the bridge's pool range route.
+ 	if (!is_eid_in_bridge_pool(n, peer->ctx, peer->eid))
+ 		add_peer_route(peer);
++}
++
++/* Called when a new peer is discovered. Queries properties and publishes.
++ * The peer's route has already been set up */
++static int setup_added_peer(struct peer *peer)
++{
++	int rc;
++
++	setup_peer_route(peer);
+ 
+ 	rc = query_peer_properties(peer);
+ 	if (rc < 0)
+-- 
+2.34.1
+
