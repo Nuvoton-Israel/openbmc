@@ -1,0 +1,59 @@
+From daa820644a646a481aeebac7c0372873ec91fdb2 Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Fri, 4 Sep 2026 08:20:30 +0800
+Subject: [PATCH] usb: disable hub remote wakeup
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ drivers/reset/reset-npcm.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/drivers/reset/reset-npcm.c b/drivers/reset/reset-npcm.c
+index 26fb358752fe..51d3dcbac5a5 100644
+--- a/drivers/reset/reset-npcm.c
++++ b/drivers/reset/reset-npcm.c
+@@ -68,6 +68,9 @@
+ #define NPCM_RC_RESETS_PER_REG	32
+ #define NPCM_MASK_RESETS	GENMASK(4, 0)
+ 
++#define NPCM_INTCR3		0x9c
++#define NPCM_INTCR3_UHUB_RWUD	BIT(5)
++
+ enum {
+ 	BMC_NPCM7XX = 0,
+ 	BMC_NPCM8XX,
+@@ -267,6 +270,10 @@ static void npcm_usb_reset_npcm8xx(struct npcm_rc_data *rc)
+ 	u32 ipsrst3_bits = 0;
+ 	u32 ipsrst4_bits = NPCM_IPSRST4_USB_HOST2 | NPCM_IPSRST4_USBPHY3;
+ 
++	/* Disable hub remote wakeup */
++	regmap_update_bits(rc->gcr_regmap, NPCM_INTCR3,
++			   NPCM_INTCR3_UHUB_RWUD, NPCM_INTCR3_UHUB_RWUD);
++
+ 	/* checking which USB device is enabled */
+ 	regmap_read(rc->gcr_regmap, NPCM_MDLR_OFFSET, &mdlr);
+ 	if (!(mdlr & NPCM8XX_MDLR_USBD0_3)) {
+@@ -314,6 +321,8 @@ static void npcm_usb_reset_npcm8xx(struct npcm_rc_data *rc)
+ 	regmap_update_bits(rc->gcr_regmap, NPCM_USB3PHYCTL_OFFSET,
+ 			   NPCM_USBXPHYCTL_RS, 0);
+ 
++	mdelay(10);
++
+ 	/* deassert reset USB PHY */
+ 	iprst3 &= ~(NPCM_IPSRST3_USBPHY1 | NPCM_IPSRST3_USBPHY2);
+ 	writel(iprst3, rc->base + NPCM_IPSRST3);
+@@ -330,6 +339,10 @@ static void npcm_usb_reset_npcm8xx(struct npcm_rc_data *rc)
+ 	regmap_update_bits(rc->gcr_regmap, NPCM_USB3PHYCTL_OFFSET,
+ 			   NPCM_USBXPHYCTL_RS, NPCM_USBXPHYCTL_RS);
+ 
++	/* deassert reset USB HUB */
++	iprst3 &= ~NPCM_IPSRST3_USBHUB;
++	writel(iprst3, rc->base + NPCM_IPSRST3);
++
+ 	/* deassert reset USB devices*/
+ 	iprst1 &= ~ipsrst1_bits;
+ 	iprst2 &= ~ipsrst2_bits;
+-- 
+2.34.1
+

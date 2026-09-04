@@ -46,3 +46,7 @@ SRC_URI:append = " file://0012-add-jtm-spi-driver.patch"
 # Enable voltage divider for ADC
 SRC_URI:append = " file://0014-dts-arm64-evb-npcm845-use-voltage-divider.patch"
 SRC_URI:append = " file://iio_rescale.cfg"
+
+# Dsiable USB hub remote wakeup
+SRC_URI:append = " file://0015-usb-disable-hub-remote-wakeup.patch"
+
