@@ -147,6 +147,14 @@ bool pec = true;
 bool force_pec_error = false;
 
 /**
+ * Suppress the per-retry "i3c read transfer failed" message.  The device
+ * legitimately NACKs reads for a few seconds while it is busy processing a
+ * streamed image, so callers that poll across that window set this to avoid
+ * flooding the log with expected transient failures.
+ */
+bool quiet_i3c_retry = false;
+
+/**
  * Flag indicating a read or write operation.
  */
 bool is_read = true;
@@ -553,7 +561,9 @@ uint8_t i3c_block_read(uint8_t cmd, uint8_t *payload, uint16_t min_length, uint1
 		sleep(1);
 		ret = ioctl(i3c, I3C_IOC_PRIV_XFER(2), xfers);
 		if (ret) {
-			fprintf(stderr, "i3c read transfer failed 2nd time %s\n", strerror(errno));
+			if (!quiet_i3c_retry) {
+				fprintf(stderr, "i3c read transfer failed 2nd time %s\n", strerror(errno));
+			}
 		} else {
 			break;
 		}
@@ -800,24 +810,66 @@ uint16_t get_device_capabilities(void)
 
 /**
  * Check the device for any protocol errors.
+ *
+ * Right after streaming an image the device is busy processing it: reads can
+ * NACK for a few seconds, and it may report a *transient* Protocol Error (e.g.
+ * 0x01 "Unsupported Command") that clears once it settles.  A single read that
+ * happens to land in that window would wrongly fail the whole load.  Poll a few
+ * times and treat the status as good as soon as we read a clean value; only
+ * report an error if it *persists* across every retry (a real error, e.g. a CRC
+ * failure, stays set).
+ *
+ * @param quiet_busy_nack When true, suppress the per-retry i3c read-failure
+ * warning during this poll because the caller expects the device to NACK while
+ * it is busy (e.g. right after streaming an image).  Defaults to false so that
+ * unexpected NACKs in any other context are still reported.
  */
-int8_t check_protocol_error(void)
+int8_t check_protocol_error(bool quiet_busy_nack = false)
 {
 	uint8_t data[MAX_CMS_READ_BLOCK_SIZE];
+	uint8_t perr = 0;
+	bool got_status = false;
+	bool prev_quiet = quiet_i3c_retry;
+	int8_t rc = -1;
+	int tries;
 
-	memset(buffer, 0, sizeof(buffer));
-	if(!i3c_block_read (DEVICE_STATUS, data, 7, sizeof(data))) {
+	/*
+	 * Only silence the per-retry read-failure message when the caller knows
+	 * the device is in its expected post-stream busy window (it NACKs reads
+	 * for a few seconds).  In any other context a NACK is unexpected, so the
+	 * warning should still be printed.
+	 */
+	if (quiet_busy_nack)
+		quiet_i3c_retry = true;
+
+	for (tries = 0; tries < 8; tries++) {
+		memset(buffer, 0, sizeof(buffer));
+		if (i3c_block_read (DEVICE_STATUS, data, 7, sizeof(data))) {
+			got_status = true;
+			perr = data[1];
+			if (perr == 0) {
+				rc = 0;		/* clean status -> no protocol error */
+				break;
+			}
+		}
+		/* busy read (NACK) or a transient error -> wait and re-check */
+		usleep (200 * 1000);
+	}
+
+	quiet_i3c_retry = prev_quiet;
+
+	if (rc == 0)
+		return 0;
+
+	if (!got_status) {
 		fprintf(stderr, "%s i3c_block_read fail\n", __func__);
 		return -1;
 	}
 
-	if (data[1] != 0) {
-		printf ("Protocol Error: 0x%02x%s%s\n", data[1], (data[1] <= 0xf) ? " -> " : "",
-		(data[1] <= 0xf) ? PROTOCOL_ERROR_STR[data[1]] : "");
-		return -1;
-	}
-
-	return 0;
+	fprintf(stderr, "%s: protocol error persisted across retries\n", __func__);
+	printf ("Protocol Error: 0x%02x%s%s\n", perr, (perr <= 0xf) ? " -> " : "",
+	(perr <= 0xf) ? PROTOCOL_ERROR_STR[perr] : "");
+	return -1;
 }
 
 /**
@@ -1298,14 +1350,11 @@ int command_load_image(int index, const char *file, bool check_size)
 	}
 
 
-	if (check_protocol_error()) {
+	if (check_protocol_error(true)) {
 		fprintf(stderr, "%s check_protocol_error fail\n", __func__);
 		close (fd);
 		return -1;
 	}
-	WAIT
-
-	check_indirect_fifo_status(-1, false);
 	WAIT
 
 	close (fd);
