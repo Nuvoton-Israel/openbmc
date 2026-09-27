@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <memory>
 #include <stdlib.h>
+#include <limits.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -21,6 +22,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <vector>
 #include <nlohmann/json.hpp>
 #include <sdbusplus/bus.hpp>
 
@@ -57,6 +59,14 @@
 #define I3C_SYSFS_DEVICES "/sys/bus/i3c/devices/"
 #define I3C_BCR_VIRTUAL_TARGET BIT(4)
 #define I3C_BCR_IBI_REQUEST_CAPABLE BIT(1)
+
+/*
+ * How long to keep re-running discovery while waiting for the recovery target,
+ * and how often.  When the service is started by the GPIO pulse the NPCM500
+ * may still be booting, so its I3C targets are not necessarily on the bus yet.
+ */
+#define TARGET_WAIT_TIMEOUT_S 10
+#define TARGET_DISCOVER_INTERVAL_S 1
 
 #define PROT_CAP2_DEVICE_ID_SUPPORT BIT(0)
 #define PROT_CAP2_DEVICE_STATUS_SUPPORT BIT(4)
@@ -1665,6 +1675,107 @@ static int trigger_i3c_discovery(int bus_number)
 }
 
 /**
+ * Detach every I3C target currently registered on the given bus.
+ *
+ * For each "<bus>-<pid>" entry under /sys/bus/i3c/devices/ this is equivalent
+ * to "echo 0x<pid> > /sys/bus/i3c/devices/i3c-<bus>/detach".  The kernel
+ * detach handler parses the PID with kstrtoull(buf, 0, ...), so the "0x"
+ * prefix is required: the sysfs name carries the PID as bare hex ("%llx"),
+ * which base 0 would reject as an invalid decimal number.
+ *
+ * Detach issues RSTDAA and unregisters the device, so its /dev char node goes
+ * away and the target may get a different dynamic address at the next
+ * discovery.
+ *
+ * @param bus_number I3C bus number.
+ *
+ * @return 0 on success (including a bus with no targets) or -1 on failure.
+ */
+static int detach_i3c_bus_devices(int bus_number)
+{
+	namespace fs = std::filesystem;
+	std::error_code ec;
+	std::string prefix = std::to_string(bus_number) + "-";
+	std::string detach_path = std::string(I3C_SYSFS_DEVICES) + "i3c-" +
+		std::to_string(bus_number) + "/detach";
+	std::vector<std::string> pids;
+
+	fs::directory_iterator dir(I3C_SYSFS_DEVICES, ec);
+	if (ec) {
+		fprintf(stderr, "cannot scan %s: %s\n", I3C_SYSFS_DEVICES,
+			ec.message().c_str());
+		return -1;
+	}
+
+	/*
+	 * Collect the PIDs first: every detach removes an entry from the
+	 * directory, and it is not specified whether a directory iterator sees
+	 * entries removed while it is iterating.
+	 */
+	for (const auto &entry : dir) {
+		std::string name = entry.path().filename().string();
+
+		/* I3C targets are named "<bus>-<provisional_id>", e.g. "2-fffe005a10a5". */
+		if (name.rfind(prefix, 0) != 0) {
+			continue;
+		}
+
+		std::string pid = name.substr(prefix.size());
+		if (pid.empty() ||
+		    pid.find_first_not_of("0123456789abcdefABCDEF") != std::string::npos) {
+			fprintf(stderr, "i3c device %s: unexpected name, not detaching\n",
+				name.c_str());
+			continue;
+		}
+
+		pids.push_back(pid);
+	}
+
+	/*
+	 * Write with open()/write() rather than std::ofstream: the kernel
+	 * reports the result of the detach as the errno of write(), and ENXIO
+	 * has to be told apart from real failures below.
+	 */
+	for (const auto &pid : pids) {
+		std::string value = "0x" + pid + "\n";
+		int fd = open(detach_path.c_str(), O_WRONLY);
+		if (fd < 0) {
+			fprintf(stderr, "cannot open %s to detach %s%s: %s\n",
+				detach_path.c_str(), prefix.c_str(), pid.c_str(),
+				strerror(errno));
+			return -1;
+		}
+
+		ssize_t written = write(fd, value.data(), value.size());
+		int write_errno = errno;
+		close(fd);
+
+		if (written < 0) {
+			/*
+			 * ENXIO: the target is no longer on the bus, e.g.
+			 * someone else detached it after we scanned the
+			 * directory.  It is already detached, which is what
+			 * we want.
+			 */
+			if (write_errno == ENXIO) {
+				fprintf(stderr, "i3c device %s%s already detached\n",
+					prefix.c_str(), pid.c_str());
+				continue;
+			}
+
+			fprintf(stderr, "failed to detach i3c device %s%s via %s: %s\n",
+				prefix.c_str(), pid.c_str(), detach_path.c_str(),
+				strerror(write_errno));
+			return -1;
+		}
+
+		fprintf(stderr, "detached i3c device %s%s\n", prefix.c_str(), pid.c_str());
+	}
+
+	return 0;
+}
+
+/**
  * Read PROT_CAP from an I3C target with a single transfer.
  *
  * Used to confirm that the recovery target candidate supports streaming boot;
@@ -1767,16 +1878,24 @@ static uint16_t probe_prot_cap(const std::string &cdev, uint8_t dyn_addr)
  * candidate is asked for PROT_CAP and taken if it supports streaming
  * (flashless) boot.  The matching character device path is returned.
  *
- * @param bus_number I3C bus number from the config.
- * @param dev_path   Output: "/dev/i3c-<bus>-<provisional_id>" on success.
+ * @param bus_number      I3C bus number.
+ * @param only_name       Sysfs name ("<bus>-<provisional_id>") of the one
+ *                        target to consider, or empty to consider every
+ *                        target on the bus.
+ * @param dev_path        Output: "/dev/i3c-<bus>-<provisional_id>" on success.
+ * @param targets_present Output: true if the bus has any enumerated target at
+ *                        all, whether or not it qualifies.
  *
  * @return 0 on success or -1 if no matching virtual device is found.
  */
-static int find_i3c_virtual_device(int bus_number, std::string &dev_path)
+static int find_i3c_virtual_device(int bus_number, const std::string &only_name,
+				   std::string &dev_path, bool &targets_present)
 {
 	namespace fs = std::filesystem;
 	std::error_code ec;
 	std::string prefix = std::to_string(bus_number) + "-";
+
+	targets_present = false;
 
 	fs::directory_iterator dir(I3C_SYSFS_DEVICES, ec);
 	if (ec) {
@@ -1790,6 +1909,12 @@ static int find_i3c_virtual_device(int bus_number, std::string &dev_path)
 
 		/* I3C targets are named "<bus>-<provisional_id>", e.g. "2-fffe005a10a5". */
 		if (name.rfind(prefix, 0) != 0) {
+			continue;
+		}
+
+		targets_present = true;
+
+		if (!only_name.empty() && name != only_name) {
 			continue;
 		}
 
@@ -1878,8 +2003,74 @@ static int find_i3c_virtual_device(int bus_number, std::string &dev_path)
 		}
 	}
 
-	fprintf(stderr, "no i3c recovery device with streaming boot support found for bus %d\n",
-		bus_number);
+	/*
+	 * Tell "nothing on the bus" apart from "targets that do not qualify":
+	 * the first means the NPCM500 has not been enumerated (yet).
+	 */
+	if (!targets_present) {
+		fprintf(stderr, "no i3c targets enumerated on bus %d\n", bus_number);
+	} else {
+		fprintf(stderr, "no i3c recovery device with streaming boot support found for bus %d\n",
+			bus_number);
+	}
+	return -1;
+}
+
+/**
+ * Get the recovery target on a bus ready for the recovery transfer.
+ *
+ * 1. If the bus already has enumerated targets, ask them for PROT_CAP and use
+ *    the one that supports streaming boot.  Nothing is detached or
+ *    re-discovered in that case.
+ * 2. If targets are enumerated but none of them qualifies, they are treated
+ *    as stale (e.g. the NPCM500 was reset and lost its dynamic address while
+ *    the kernel still holds the old one) and all of them are detached, once.
+ * 3. Trigger discovery and look again, repeating both until the timeout: the
+ *    NPCM500 may not be on the bus yet, and right after it joins it may not
+ *    serve PROT_CAP yet.  The targets are not detached again inside this
+ *    loop, since that would remove a target that has just joined.
+ *
+ * @param bus_number I3C bus number.
+ * @param only_name  Sysfs name ("<bus>-<provisional_id>") of the one target to
+ *                   accept, or empty to accept any target on the bus.
+ * @param dev_path   Output: "/dev/i3c-<bus>-<provisional_id>" on success.
+ *
+ * @return 0 on success or -1 on failure.
+ */
+static int acquire_recovery_device(int bus_number, const std::string &only_name,
+				   std::string &dev_path)
+{
+	bool targets_present = false;
+	int elapsed;
+
+	if (find_i3c_virtual_device(bus_number, only_name, dev_path, targets_present) == 0) {
+		return 0;
+	}
+
+	if (targets_present) {
+		fprintf(stderr, "no usable recovery target among the i3c targets on bus %d, "
+			"detaching them\n", bus_number);
+		if (detach_i3c_bus_devices(bus_number) != 0) {
+			return -1;
+		}
+	}
+
+	for (elapsed = 0; elapsed < TARGET_WAIT_TIMEOUT_S;
+	     elapsed += TARGET_DISCOVER_INTERVAL_S) {
+		if (trigger_i3c_discovery(bus_number) != 0) {
+			return -1;
+		}
+
+		if (find_i3c_virtual_device(bus_number, only_name, dev_path,
+					    targets_present) == 0) {
+			return 0;
+		}
+
+		sleep(TARGET_DISCOVER_INTERVAL_S);
+	}
+
+	fprintf(stderr, "no i3c recovery device on bus %d after %d s of discovery\n",
+		bus_number, TARGET_WAIT_TIMEOUT_S);
 	return -1;
 }
 
@@ -1919,33 +2110,13 @@ int main (int argc, char *argv[])
 			return 1;
 		}
 
-		if (find_i3c_virtual_device(device_bus, cfg_device_path) != 0) {
-			/*
-			 * No usable virtual target yet: trigger I3C discovery on
-			 * the bus (echo 1 > /sys/bus/i3c/devices/i3c-<bus>/discover)
-			 * to re-run DAA, then poll for the target to be fully
-			 * enumerated.  The sysfs entry and its /dev char node can
-			 * lag the discover write (udev creates the node), so wait
-			 * 0.5s between scans and retry a few times before giving up.
-			 */
-			int found = -1;
-			int retry;
-
-			if (trigger_i3c_discovery(device_bus) != 0) {
-				return 1;
-			}
-
-			for (retry = 0; retry < 10; retry++) {
-				usleep(500 * 1000);
-				found = find_i3c_virtual_device(device_bus, cfg_device_path);
-				if (found == 0) {
-					break;
-				}
-			}
-
-			if (found != 0) {
-				return 1;
-			}
+		/*
+		 * Find the recovery target on the config's bus before any i3c
+		 * transfer; the bus is detached and re-discovered only when
+		 * needed (see acquire_recovery_device()).
+		 */
+		if (acquire_recovery_device(device_bus, "", cfg_device_path) != 0) {
+			return 1;
 		}
 
 		device_name = cfg_device_path.data();
@@ -1979,32 +2150,34 @@ int main (int argc, char *argv[])
 			}
 
 			/*
-			 * The target may not be enumerated yet: when it has not
-			 * joined the bus, both its /dev char node and its sysfs
-			 * dynamic_address are absent (open() and the cat below
-			 * would then fail).  tmp is "<bus>-<pid>", so derive the
-			 * bus number, trigger discovery on it
-			 * (echo 1 > /sys/bus/i3c/devices/i3c-<bus>/discover) and
-			 * poll for the char device to appear before continuing.
-			 * This also covers the manual -d path, which does not run
-			 * the -j auto-discovery logic.
+			 * Manual -d path: before any i3c transfer, make sure the
+			 * given target is on the bus and answers PROT_CAP, the
+			 * same way the -j path does for the config's bus.  tmp is
+			 * "<bus>-<pid>", so the bus number is its leading digits.
+			 * A detach and rediscovery may change the target's
+			 * dynamic address, so this must run before
+			 * dynamic_address is read below.
+			 *
+			 * The -j path has already done this for the device it
+			 * found, so it is skipped there.
 			 */
-			if (access(device_name, F_OK) != 0) {
-				int bus = atoi(tmp);
-				int retry;
+			if (config_name == NULL) {
+				char *bus_end;
+				long bus = strtol(tmp, &bus_end, 10);
+				std::string found_path;
 
-				fprintf(stderr, "%s not present, triggering discovery on bus %d\n",
-						device_name, bus);
+				/*
+				 * Refuse to guess the bus: a wrong bus number would
+				 * detach the targets of an unrelated bus.
+				 */
+				if (bus_end == tmp || *bus_end != '-' || bus < 0 || bus > INT_MAX) {
+					fprintf(stderr, "cannot derive i3c bus number from %s\n",
+							device_name);
+					return 1;
+				}
 
-				if (trigger_i3c_discovery(bus) == 0) {
-					for (retry = 0; retry < 10; retry++) {
-						usleep(500 * 1000);
-						if (access(device_name, F_OK) == 0) {
-							fprintf(stderr, "%s appeared after discovery\n",
-									device_name);
-							break;
-						}
-					}
+				if (acquire_recovery_device((int)bus, tmp, found_path) != 0) {
+					return 1;
 				}
 			}
 
