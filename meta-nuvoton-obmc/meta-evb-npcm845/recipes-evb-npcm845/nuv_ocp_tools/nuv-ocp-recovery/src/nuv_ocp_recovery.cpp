@@ -1366,7 +1366,7 @@ int command_load_image(int index, const char *file, bool check_size)
  * Execute the 'activate_img' command that instructs the device to activate a previously loaded
  * recovery image.
  */
-int command_activate_image(void)
+int command_activate_image(bool wait_recovery_pending)
 {
 	uint8_t reg_value[MAX_CMS_READ_BLOCK_SIZE] = {0};
 	int tries;
@@ -1382,36 +1382,42 @@ int command_activate_image(void)
 	 * draining the FIFO (i.e. the image was not fully received) rather than
 	 * ready to activate.  Poll quietly (raw block read) to avoid dumping the
 	 * full DEVICE_STATUS block on every iteration.
+	 *
+	 * When wait_recovery_pending is false the caller wants to activate the
+	 * image immediately after streaming, so the RECOVERY_PENDING poll is
+	 * skipped and RECOVERY_CTRL is sent right away.
 	 */
-	for (tries = 0; tries < 300; tries++) {          /* up to ~30s at 100ms */
-		memset(buffer, 0, sizeof(buffer));
-		if (!i3c_block_read(DEVICE_STATUS, reg_value, 7, MAX_CMS_READ_BLOCK_SIZE)) {
-			fprintf(stderr, "read_device_status() failed\n");
-			return -1;
+	if (wait_recovery_pending) {
+		for (tries = 0; tries < 300; tries++) {          /* up to ~30s at 100ms */
+			memset(buffer, 0, sizeof(buffer));
+			if (!i3c_block_read(DEVICE_STATUS, reg_value, 7, MAX_CMS_READ_BLOCK_SIZE)) {
+				fprintf(stderr, "read_device_status() failed\n");
+				return -1;
+			}
+
+			if (reg_value[0] == RECOVERY_PENDING)
+				break;
+
+			if (reg_value[0] == DEVICE_ERROR ||
+			    reg_value[0] == BOOT_FAILURE ||
+			    reg_value[0] == FATAL_ERROR) {
+				fprintf(stderr, "device_status error 0x%02x\n", reg_value[0]);
+				read_recovery_status(false, reg_value);
+				return -1;
+			}
+
+			usleep(100 * 1000);
 		}
 
-		if (reg_value[0] == RECOVERY_PENDING)
-			break;
-
-		if (reg_value[0] == DEVICE_ERROR ||
-		    reg_value[0] == BOOT_FAILURE ||
-		    reg_value[0] == FATAL_ERROR) {
-			fprintf(stderr, "device_status error 0x%02x\n", reg_value[0]);
+		if (reg_value[0] != RECOVERY_PENDING) {
+			fprintf(stderr, "device_status not RECOVERY_PENDING 0x%02x (timeout)\n",
+					reg_value[0]);
+			/* Show where the device actually is to help diagnose. */
 			read_recovery_status(false, reg_value);
 			return -1;
 		}
-
-		usleep(100 * 1000);
+		WAIT
 	}
-
-	if (reg_value[0] != RECOVERY_PENDING) {
-		fprintf(stderr, "device_status not RECOVERY_PENDING 0x%02x (timeout)\n",
-				reg_value[0]);
-		/* Show where the device actually is to help diagnose. */
-		read_recovery_status(false, reg_value);
-		return -1;
-	}
-	WAIT
 
 	if (send_recovery_ctrl(cms_id, false)) {
 		fprintf(stderr, "%s send_recovery_ctrl false fail\r\n", __func__);
@@ -1460,7 +1466,7 @@ int command_recover(void)
 			return -1;
 		}
 
-		if(command_activate_image()) {
+		if(command_activate_image(true)) {
 			fprintf(stderr, "%s command_activate_image fail\r\n", __func__);
 			return -1;
 		}
