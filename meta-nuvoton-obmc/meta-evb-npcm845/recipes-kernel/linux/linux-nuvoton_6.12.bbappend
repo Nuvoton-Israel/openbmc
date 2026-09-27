@@ -65,3 +65,6 @@ SRC_URI:append = " file://0015-arm64-dts-nuvoton-npcm845-evb-repurpose-jtag2-as-
 
 # EVB i3c tuning and debug changes (dts i3c4, clk mclk, master/svc drivers)
 SRC_URI:append = " file://0016-arm64-npcm845-evb-i3c-tuning-and-debug-changes.patch"
+
+# i3c: master: add 'detach' sysfs interface (used by nuv-ocp-recovery)
+SRC_URI:append = " file://0017-i3c-master-Add-sysfs-interface-to-detach-I3C-device.patch"
