@@ -465,7 +465,7 @@ static void get_current_time (struct timespec *current)
 
 	status = clock_gettime (CLOCK_MONOTONIC, current);
 	if (status != 0) {
-		printf ("Failed to get the current time: %s\n", strerror (errno));
+		fprintf (stderr, "Failed to get the current time: %s\n", strerror (errno));
 		exit (1);
 	}
 }
@@ -613,7 +613,7 @@ uint8_t i3c_block_read(uint8_t cmd, uint8_t *payload, uint16_t min_length, uint1
 	}
 #endif
 	if (crc != buffer[length + 2]) {
-		printf ("PEC failed: CRC=0x%x, Rx=%x\n", crc, buffer[length + 2]);
+		fprintf (stderr, "PEC failed: CRC=0x%x, Rx=%x\n", crc, buffer[length + 2]);
 		return 0;
 	}
 
@@ -867,7 +867,7 @@ int8_t check_protocol_error(bool quiet_busy_nack = false)
 	}
 
 	fprintf(stderr, "%s: protocol error persisted across retries\n", __func__);
-	printf ("Protocol Error: 0x%02x%s%s\n", perr, (perr <= 0xf) ? " -> " : "",
+	fprintf (stderr, "Protocol Error: 0x%02x%s%s\n", perr, (perr <= 0xf) ? " -> " : "",
 	(perr <= 0xf) ? PROTOCOL_ERROR_STR[perr] : "");
 	return -1;
 }
