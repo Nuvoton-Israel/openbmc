@@ -591,7 +591,11 @@ uint8_t i3c_block_read(uint8_t cmd, uint8_t *payload, uint16_t min_length, uint1
 	}
 	get_current_time (&end);
 
-	if (verbose >= 1) {
+	/*
+	 * Printed for every read, including each FIFO poll while streaming an
+	 * image; at a lower level this floods the journal past its rate limit.
+	 */
+	if (verbose >= 3) {
 		fprintf(stderr, "Read Cmd (%d us): %d\n", get_time_duration (&start, &end), cmd);
 #if 0
 		if (verbose >= 2) {
@@ -697,7 +701,8 @@ int i3c_block_write(uint8_t cmd, uint8_t *payload, uint16_t length)
 	}
 	get_current_time (&end);
 
-	if (verbose >= 1) {
+	/* Printed for every write, including each image chunk; see i3c_block_read(). */
+	if (verbose >= 3) {
 		fprintf(stderr, "Write Cmd (%d us): %d, Length: %d\n",
 				get_time_duration(&start, &end), cmd, length);
 
@@ -1105,7 +1110,7 @@ int send_indirect_fifo_ctrl(uint8_t cms, uint32_t img_size)
  *
  * The Empty flag is used as a safe fallback: when the FIFO reports empty the
  * whole FIFO is free, so progress is guaranteed even if the index offsets need
- * adjusting for a given device.  Run with verbose >= 2 to dump the raw fields
+ * adjusting for a given device.  Run with verbose >= 3 to dump the raw fields
  * and confirm the Write/Read Index offsets on the target.
  */
 static int wait_indirect_fifo_room(uint32_t need_words)
@@ -1139,7 +1144,8 @@ static int wait_indirect_fifo_room(uint32_t need_words)
 			avail = (used <= size) ? (size - used) : 0;
 		}
 
-		if (verbose >= 2)
+		/* Printed on every poll while streaming; see i3c_block_read(). */
+		if (verbose >= 3)
 			fprintf(stderr,
 				"FIFO status: flags=0x%02x wr=%u rd=%u size=%u free=%u need=%u\n",
 				data[0], wr, rd, size, avail, need_words);
