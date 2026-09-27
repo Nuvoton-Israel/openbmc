@@ -1619,6 +1619,41 @@ static int load_recovery_config(const char *path)
 }
 
 /**
+ * Trigger I3C target discovery on the given bus.
+ *
+ * Equivalent to "echo 1 > /sys/bus/i3c/devices/i3c-<bus>/discover", this asks
+ * the controller to (re)enumerate its targets so a virtual recovery target that
+ * was not present at the first scan can appear.
+ *
+ * @param bus_number I3C bus number from the config.
+ *
+ * @return 0 on success or -1 if the discover node cannot be written.
+ */
+static int trigger_i3c_discovery(int bus_number)
+{
+	std::string path = std::string(I3C_SYSFS_DEVICES) + "i3c-" +
+		std::to_string(bus_number) + "/discover";
+
+	std::ofstream out(path);
+	if (!out.is_open()) {
+		fprintf(stderr, "cannot open %s to trigger discovery: %s\n",
+			path.c_str(), strerror(errno));
+		return -1;
+	}
+
+	out << "1\n";
+	out.flush();
+	if (out.fail()) {
+		fprintf(stderr, "failed to write discover node %s\n", path.c_str());
+		return -1;
+	}
+
+	fprintf(stderr, "triggered i3c discovery on bus %d (%s)\n",
+		bus_number, path.c_str());
+	return 0;
+}
+
+/**
  * Locate the I3C virtual target device for a given bus number.
  *
  * Scans /sys/bus/i3c/devices/ for a target named "<bus>-<provisional_id>" and
@@ -1665,9 +1700,41 @@ static int find_i3c_virtual_device(int bus_number, std::string &dev_path)
 		/* sysfs prints bcr as hex (e.g. "0x33"); base 16 handles the optional 0x. */
 		unsigned long bcr = strtoul(bcr_str.c_str(), NULL, 16);
 		if (bcr & I3C_BCR_VIRTUAL_TARGET) {
-			dev_path = std::string("/dev/i3c-") + name;
-			fprintf(stderr, "found i3c virtual device %s (bcr 0x%02lx)\n",
-				dev_path.c_str(), bcr);
+			std::string cdev = std::string("/dev/i3c-") + name;
+
+			/*
+			 * The bcr match only proves the sysfs entry exists; a
+			 * stale/half-attached target can advertise the virtual
+			 * bit while lacking a dynamic address and an i3cdev
+			 * character node (open()/dynamic_address then fail).
+			 * Require the device to be fully usable before accepting
+			 * it, otherwise skip it so the caller re-triggers
+			 * discovery to re-enumerate the target.
+			 */
+			std::ifstream da_in(entry.path() / "dynamic_address");
+			std::string da_str;
+			if (da_in.is_open()) {
+				std::getline(da_in, da_str);
+			}
+
+			if (da_str.empty()) {
+				fprintf(stderr,
+					"i3c device %s: bcr 0x%02lx but no dynamic_address, skipping\n",
+					name.c_str(), bcr);
+				continue;
+			}
+
+			if (access(cdev.c_str(), F_OK) != 0) {
+				fprintf(stderr,
+					"i3c device %s: char node %s not ready, skipping\n",
+					name.c_str(), cdev.c_str());
+				continue;
+			}
+
+			dev_path = cdev;
+			fprintf(stderr,
+				"found i3c virtual device %s (bcr 0x%02lx, dynamic_address 0x%s)\n",
+				dev_path.c_str(), bcr, da_str.c_str());
 			return 0;
 		}
 	}
@@ -1713,7 +1780,32 @@ int main (int argc, char *argv[])
 		}
 
 		if (find_i3c_virtual_device(device_bus, cfg_device_path) != 0) {
-			return 1;
+			/*
+			 * No usable virtual target yet: trigger I3C discovery on
+			 * the bus (echo 1 > /sys/bus/i3c/devices/i3c-<bus>/discover)
+			 * to re-run DAA, then poll for the target to be fully
+			 * enumerated.  The sysfs entry and its /dev char node can
+			 * lag the discover write (udev creates the node), so wait
+			 * 0.5s between scans and retry a few times before giving up.
+			 */
+			int found = -1;
+			int retry;
+
+			if (trigger_i3c_discovery(device_bus) != 0) {
+				return 1;
+			}
+
+			for (retry = 0; retry < 10; retry++) {
+				usleep(500 * 1000);
+				found = find_i3c_virtual_device(device_bus, cfg_device_path);
+				if (found == 0) {
+					break;
+				}
+			}
+
+			if (found != 0) {
+				return 1;
+			}
 		}
 
 		device_name = cfg_device_path.data();
@@ -1744,6 +1836,36 @@ int main (int argc, char *argv[])
 
 			if (verbose >= 1) {
 				fprintf(stderr, "tmp string:%s\n", tmp);
+			}
+
+			/*
+			 * The target may not be enumerated yet: when it has not
+			 * joined the bus, both its /dev char node and its sysfs
+			 * dynamic_address are absent (open() and the cat below
+			 * would then fail).  tmp is "<bus>-<pid>", so derive the
+			 * bus number, trigger discovery on it
+			 * (echo 1 > /sys/bus/i3c/devices/i3c-<bus>/discover) and
+			 * poll for the char device to appear before continuing.
+			 * This also covers the manual -d path, which does not run
+			 * the -j auto-discovery logic.
+			 */
+			if (access(device_name, F_OK) != 0) {
+				int bus = atoi(tmp);
+				int retry;
+
+				fprintf(stderr, "%s not present, triggering discovery on bus %d\n",
+						device_name, bus);
+
+				if (trigger_i3c_discovery(bus) == 0) {
+					for (retry = 0; retry < 10; retry++) {
+						usleep(500 * 1000);
+						if (access(device_name, F_OK) == 0) {
+							fprintf(stderr, "%s appeared after discovery\n",
+									device_name);
+							break;
+						}
+					}
+				}
 			}
 
 			snprintf(sys_path, sizeof(sys_path), 
