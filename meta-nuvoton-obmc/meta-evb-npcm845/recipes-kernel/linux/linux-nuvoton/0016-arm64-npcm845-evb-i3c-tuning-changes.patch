@@ -1,15 +1,13 @@
 From bd0f114f1a94f0882b8e89cbb54076b6fb59e618 Mon Sep 17 00:00:00 2001
 From: Tyrone Ting <kfting@nuvoton.com>
 Date: Tue, 1 Sep 2026 14:59:52 +0800
-Subject: [PATCH] arm64: npcm845-evb: i3c tuning and debug changes
+Subject: [PATCH] arm64: npcm845-evb: i3c tuning changes
 
 Bundle the remaining EVB i3c-related changes:
 
 - dts: tune i3c4 OD/PP SCL periods, add gdma tx/rx and mark i3c4 as an
   mctp-controller.
 - clk: clk-npcm8xx: hard-code the I3C MCLK divider (~6.25 MHz).
-- i3c: master: dynamic_address sysfs read also issues a GETSTATUS CCC and
-  logs the device status for debugging.
 - i3c: svc-i3c-master: bail out of DAA with -ENOSPC when the max device
   count is reached.
 
@@ -18,9 +16,8 @@ Signed-off-by: Tyrone Ting <kfting@nuvoton.com>
 ---
  .../boot/dts/nuvoton/nuvoton-npcm845-evb.dts  | 11 ++++++++-
  drivers/clk/clk-npcm8xx.c                     | 10 ++++++++
- drivers/i3c/master.c                          | 24 +++++++++++++++++++
  drivers/i3c/master/svc-i3c-master.c           |  6 +++++
- 4 files changed, 50 insertions(+), 1 deletion(-)
+ 3 files changed, 26 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
 index 801c908..bd72186 100644
@@ -77,46 +74,6 @@ index 2138c01..e8ee447 100644
  	npcm8xx_clk_data->num = NPCM8XX_NUM_CLOCKS;
  
  	for (i = 0; i < NPCM8XX_NUM_CLOCKS; i++)
-diff --git a/drivers/i3c/master.c b/drivers/i3c/master.c
-index 685d767..4d3ce09 100644
---- a/drivers/i3c/master.c
-+++ b/drivers/i3c/master.c
-@@ -188,11 +188,35 @@ static ssize_t dynamic_address_show(struct device *dev,
- {
- 	struct i3c_bus *bus = dev_to_i3cbus(dev);
- 	struct i3c_dev_desc *desc;
-+	struct i3c_device_info info;
- 	ssize_t ret;
-+	int sts_ret;
-+	u16 status;
- 
- 	i3c_bus_normaluse_lock(bus);
- 	desc = dev_to_i3cdesc(dev);
- 	ret = sprintf(buf, "%02x\n", desc->info.dyn_addr);
-+
-+	/*
-+	 * In addition to reporting the cached dynamic address, actively issue a
-+	 * GETSTATUS CCC to the device and dump the result to the kernel log.
-+	 * The bus normaluse lock is already held here, so call the _locked
-+	 * variant directly.
-+	 */
-+	info = desc->info;
-+	sts_ret = i3c_dev_getstatus_locked(desc, &info);
-+	if (sts_ret) {
-+		printk(KERN_INFO "i3c %s: GETSTATUS CCC failed (dyn_addr=0x%02x, ret=%d)\n",
-+		       dev_name(dev), desc->info.dyn_addr, sts_ret);
-+	} else {
-+		status = (u16)info.status;
-+		printk(KERN_INFO "i3c %s: GETSTATUS dyn_addr=0x%02x status=0x%04x pending_int=%u protocol_err=%u activity_mode=%u\n",
-+		       dev_name(dev), desc->info.dyn_addr, status,
-+		       (unsigned int)I3C_CCC_STATUS_PENDING_INT(status),
-+		       (unsigned int)(!!(status & I3C_CCC_STATUS_PROTOCOL_ERROR)),
-+		       (unsigned int)I3C_CCC_STATUS_ACTIVITY_MODE(status));
-+	}
-+
- 	i3c_bus_normaluse_unlock(bus);
- 
- 	return ret;
 diff --git a/drivers/i3c/master/svc-i3c-master.c b/drivers/i3c/master/svc-i3c-master.c
 index e763d15..5f15824 100644
 --- a/drivers/i3c/master/svc-i3c-master.c
