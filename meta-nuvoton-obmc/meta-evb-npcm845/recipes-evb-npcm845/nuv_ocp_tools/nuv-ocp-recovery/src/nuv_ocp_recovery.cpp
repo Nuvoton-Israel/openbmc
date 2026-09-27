@@ -50,15 +50,26 @@
 
 #define BIT(n)  (1 << (n))
 
-/* I3C sysfs device directory and BCR virtual-target bit (BCR[4]). */
+/*
+ * I3C sysfs device directory, BCR virtual-target bit (BCR[4]) and BCR
+ * IBI-request-capable bit (BCR[1]).
+ */
 #define I3C_SYSFS_DEVICES "/sys/bus/i3c/devices/"
 #define I3C_BCR_VIRTUAL_TARGET BIT(4)
+#define I3C_BCR_IBI_REQUEST_CAPABLE BIT(1)
 
 #define PROT_CAP2_DEVICE_ID_SUPPORT BIT(0)
 #define PROT_CAP2_DEVICE_STATUS_SUPPORT BIT(4)
 #define PROT_CAP2_PUSH_C_IMAGE_SUPPORT BIT(7)
 #define PROT_CAP2_FLASHLESS_BOOT_VALUE BIT(11)
 #define PROT_CAP2_FIFO_CMS_SUPPORT BIT(12)
+
+/*
+ * PROT_CAP response payload length per the OCP recovery spec: magic (8) +
+ * version (2) + capabilities (2) + CMS count (1) + max response time (1) +
+ * heartbeat period (1).
+ */
+#define PROT_CAP_RESPONSE_LENGTH 15
 
 #define NEED_WAIT true
 #define WAIT_TIME 1000*1000
@@ -1654,11 +1665,107 @@ static int trigger_i3c_discovery(int bus_number)
 }
 
 /**
- * Locate the I3C virtual target device for a given bus number.
+ * Read PROT_CAP from an I3C target with a single transfer.
  *
- * Scans /sys/bus/i3c/devices/ for a target named "<bus>-<provisional_id>" and
- * checks its BCR: only a device with the virtual-target bit (BCR[4]) set is a
- * valid recovery target.  The matching character device path is returned.
+ * Used to confirm that the recovery target candidate supports streaming boot;
+ * it is never called for Caliptra's main target (see
+ * find_i3c_virtual_device()).  It does not go through
+ * get_device_capabilities()/i3c_block_read() for two reasons:
+ *
+ * - i3c_block_read() retries a failed transfer up to six times with a 1s
+ *   sleep in between.  A failed probe is already covered by the caller
+ *   rescanning the bus, so the retries would only stall that loop.
+ * - i3c_block_read() works on the global i3c fd and addr, which belong to the
+ *   device selected for recovery; probing uses its own fd and address.
+ *
+ * @param cdev     i3cdev character node of the target.
+ * @param dyn_addr Dynamic address of the target, used for the PEC.
+ *
+ * @return The PROT_CAP capabilities (payload bytes 10-11), or 0 if the target
+ * did not return a valid PROT_CAP response.
+ */
+static uint16_t probe_prot_cap(const std::string &cdev, uint8_t dyn_addr)
+{
+	struct i3c_ioc_priv_xfer xfers[2];
+	uint8_t w_data[2];
+	/* length (2) + payload + PEC (1) */
+	uint8_t r_data[2 + PROT_CAP_RESPONSE_LENGTH + 1] = {0};
+	uint8_t cmd = PROT_CAP;
+	uint16_t rx_length;
+	uint8_t crc;
+	int fd, ret, xfer_errno;
+
+	fd = open(cdev.c_str(), O_RDWR);
+	if (fd < 0) {
+		fprintf(stderr, "PROT_CAP probe: cannot open %s: %s\n", cdev.c_str(),
+			strerror(errno));
+		return 0;
+	}
+
+	/* Write the command code and its PEC, then read the response. */
+	crc = checksum_init_smbus_crc8(dyn_addr << 1);
+	crc = checksum_update_smbus_crc8(crc, &cmd, 1);
+	w_data[0] = cmd;
+	w_data[1] = crc;
+
+	memset(xfers, 0, sizeof(xfers));
+	xfers[0].rnw = 0;
+	xfers[0].len = sizeof(w_data);
+	xfers[0].data = (uintptr_t)w_data;
+	xfers[1].rnw = 1;
+	xfers[1].len = sizeof(r_data);
+	xfers[1].data = (uintptr_t)r_data;
+
+	ret = ioctl(fd, I3C_IOC_PRIV_XFER(2), xfers);
+	xfer_errno = errno;
+	close(fd);
+
+	if (ret) {
+		fprintf(stderr, "PROT_CAP probe: no response from %s: %s\n", cdev.c_str(),
+			strerror(xfer_errno));
+		return 0;
+	}
+
+	/*
+	 * PROT_CAP has a fixed length.  Any other length also means the PEC is
+	 * not where it is expected in r_data, so the response cannot be
+	 * verified.
+	 */
+	rx_length = (uint16_t)r_data[0] | ((uint16_t)r_data[1] << 8);
+	if (rx_length != PROT_CAP_RESPONSE_LENGTH) {
+		fprintf(stderr, "PROT_CAP probe: %s returned length %u, expected %u\n",
+			cdev.c_str(), (unsigned int)rx_length,
+			(unsigned int)PROT_CAP_RESPONSE_LENGTH);
+		return 0;
+	}
+
+	crc = checksum_init_smbus_crc8((dyn_addr << 1) | 1);
+	crc = checksum_update_smbus_crc8(crc, r_data, 2 + PROT_CAP_RESPONSE_LENGTH);
+	if (crc != r_data[2 + PROT_CAP_RESPONSE_LENGTH]) {
+		fprintf(stderr, "PROT_CAP probe: %s PEC failed: CRC=0x%02x, Rx=0x%02x\n",
+			cdev.c_str(), crc, r_data[2 + PROT_CAP_RESPONSE_LENGTH]);
+		return 0;
+	}
+
+	if (memcmp(&r_data[2], "OCP RECV", 8) != 0) {
+		fprintf(stderr, "PROT_CAP probe: %s has no OCP recovery magic\n",
+			cdev.c_str());
+		return 0;
+	}
+
+	return (uint16_t)r_data[2 + 10] | ((uint16_t)r_data[2 + 11] << 8);
+}
+
+/**
+ * Locate the I3C recovery target device for a given bus number.
+ *
+ * Scans /sys/bus/i3c/devices/ for a target named "<bus>-<provisional_id>" with
+ * the virtual-target bit (BCR[4]) set.  Caliptra puts two such targets on the
+ * bus: the recovery (virtual) target with BCR 0x30 and the main target with
+ * BCR 0x36, which only carries MCTP.  The main target is told apart by its
+ * IBI-request-capable bit (BCR[1]) and is never sent anything; the remaining
+ * candidate is asked for PROT_CAP and taken if it supports streaming
+ * (flashless) boot.  The matching character device path is returned.
  *
  * @param bus_number I3C bus number from the config.
  * @param dev_path   Output: "/dev/i3c-<bus>-<provisional_id>" on success.
@@ -1699,6 +1806,22 @@ static int find_i3c_virtual_device(int bus_number, std::string &dev_path)
 
 		/* sysfs prints bcr as hex (e.g. "0x33"); base 16 handles the optional 0x. */
 		unsigned long bcr = strtoul(bcr_str.c_str(), NULL, 16);
+
+		/*
+		 * Never send a private transfer to Caliptra's main target: it
+		 * sets BCR[4] too, but unlike the recovery target it is IBI
+		 * capable (BCR[1]).  On the NPCM500, a single private write
+		 * addressed to the main target during recovery was observed to
+		 * corrupt the image size the ROM reads from INDIRECT_FIFO_CTRL
+		 * of the recovery target, failing the whole recovery.
+		 */
+		if ((bcr & I3C_BCR_VIRTUAL_TARGET) && (bcr & I3C_BCR_IBI_REQUEST_CAPABLE)) {
+			fprintf(stderr,
+				"i3c device %s: bcr 0x%02lx is the IBI-capable main target, not probing\n",
+				name.c_str(), bcr);
+			continue;
+		}
+
 		if (bcr & I3C_BCR_VIRTUAL_TARGET) {
 			std::string cdev = std::string("/dev/i3c-") + name;
 
@@ -1731,15 +1854,32 @@ static int find_i3c_virtual_device(int bus_number, std::string &dev_path)
 				continue;
 			}
 
+			/*
+			 * Confirm that the candidate really is a recovery
+			 * target with streaming boot support.  sysfs exports
+			 * dynamic_address as bare hex digits ("0a"), hence
+			 * base 16.
+			 */
+			uint8_t dyn_addr = (uint8_t)strtoul(da_str.c_str(), NULL, 16);
+			uint16_t caps = probe_prot_cap(cdev, dyn_addr);
+
+			if (!(caps & PROT_CAP2_FLASHLESS_BOOT_VALUE)) {
+				fprintf(stderr,
+					"i3c device %s: PROT_CAP 0x%04x has no streaming boot support, skipping\n",
+					name.c_str(), caps);
+				continue;
+			}
+
 			dev_path = cdev;
 			fprintf(stderr,
-				"found i3c virtual device %s (bcr 0x%02lx, dynamic_address 0x%s)\n",
-				dev_path.c_str(), bcr, da_str.c_str());
+				"found i3c recovery device %s (bcr 0x%02lx, dynamic_address 0x%s, PROT_CAP 0x%04x)\n",
+				dev_path.c_str(), bcr, da_str.c_str(), caps);
 			return 0;
 		}
 	}
 
-	fprintf(stderr, "no i3c virtual device found for bus %d\n", bus_number);
+	fprintf(stderr, "no i3c recovery device with streaming boot support found for bus %d\n",
+		bus_number);
 	return -1;
 }
 
