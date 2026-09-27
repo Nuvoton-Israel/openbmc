@@ -2244,11 +2244,20 @@ int main (int argc, char *argv[])
 		fprintf(stderr, "mcu rt file name %s\n", mcu_rt_file_name);
 	}
 
+	/*
+	 * Report a failed recovery through the exit code, so that systemd
+	 * marks the service as failed instead of finished.
+	 */
+	int rc = 0;
+
 	if (strcmp("recover", command) == 0) {
-		command_recover();
+		if (command_recover() != 0) {
+			fprintf(stderr, "recovery failed\n");
+			rc = 1;
+		}
 	}
 
 	close(i3c);
 
-	return 0;
+	return rc;
 }
