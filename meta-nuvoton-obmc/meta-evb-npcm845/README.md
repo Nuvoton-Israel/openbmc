@@ -203,6 +203,63 @@ TIP_IMAGE = "False"
 
 **Important:** Ensure your BMC hardware supports the configuration you choose.
 
+#### TIP Firmware Source (Disabled by Default)
+
+By default the build uses the **pre-built, Nuvoton pre-signed** TIP firmware.
+This is what you want on an EVB or any production part, because the chip has
+Nuvoton keys fused into OTP and only accepts firmware signed with them.
+
+```python
+TIP_FW_SOURCE = "False"   # default, use the pre-signed binary
+```
+
+**To build the TIP firmware from source instead**, set this in `local.conf`, or
+above the `require` line in your machine conf:
+
+```python
+TIP_FW_SOURCE = "True"
+```
+
+**Important:**
+
+- Put the line **above** the `require` at the top of the machine conf.
+  `npcm8xx.inc` is pulled in by that `require` and already sets a `?=` default,
+  so a line placed after it has no effect. You can also just set it in
+  `local.conf`, which always wins.
+- With `"True"` the image is signed locally with the **public default keys**
+  that ship inside the IGPS repository. A board with Nuvoton keys in OTP will
+  reject it and drop into recovery. Only use this on a part whose OTP holds a
+  key you can sign with, or on a part with secure boot disabled.
+
+#### Custom Signing Keys (Optional)
+
+Signing keys are supplied through `IGPS_KEYS` in
+[`npcm8xx-bootloader_04.04.04.bb`](https://github.com/Nuvoton-Israel/openbmc/blob/npcm-master/meta-nuvoton/recipes-bsp/images/npcm8xx-bootloader_04.04.04.bb).
+It is empty by default, which means the public default keys from the IGPS
+repository are used:
+
+```python
+IGPS_KEYS = ""
+```
+
+To use your own, put the key files in the bootloader recipe's files directory
+and list them:
+
+```python
+IGPS_KEYS = "otp_ecc_key_1.der otp_ecc_key_1_pub.der otp_ecc_key_1_pub.bin"
+```
+
+**Important:**
+
+- This only has an effect when `TIP_FW_SOURCE = "True"`. With `"False"` the
+  signed TIP firmware is copied in as-is, and changing the keys will make the
+  board fail to boot.
+- Each ECC key needs all three files: `.der`, `_pub.der` and `_pub.bin`. If
+  `_pub.der` is missing, IGPS silently regenerates the key.
+- Keys you do not override keep using the public defaults, without any warning.
+- Your public key must also be fused into the chip's OTP. Contact Nuvoton for
+  the OTP programming tools.
+
 #### Memory ECC (Optional)
 
 To enable Error Correction Code (ECC) for memory:
