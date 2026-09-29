@@ -617,8 +617,16 @@ uint8_t i3c_block_read(uint8_t cmd, uint8_t *payload, uint16_t min_length, uint1
 	fprintf(stderr, "rx_length %d\r\n", rx_length);
 #endif
 
+	/*
+	 * rx_length comes from the device and is not covered by PEC until after the
+	 * copy below.  Reject anything longer than requested: the payload buffer is
+	 * only sized for 'length' bytes, and a longer response was truncated by the
+	 * transfer, so its PEC byte was never received anyway.
+	 */
 	if (length < rx_length) {
-		fprintf(stderr, "WARNING: Incomplete block read (%d < %d)\n", length, rx_length);
+		fprintf(stderr, "Invalid response length for command %d.  Rx %d bytes, requested at most %d.\n",
+				cmd, rx_length, length);
+		return 0;
 	}
 	else if (min_length > rx_length) {
 		fprintf (stderr, "Invalid response length for command %d.  Rx %d bytes.\n", cmd, rx_length);
@@ -2261,6 +2269,10 @@ int main (int argc, char *argv[])
 			fprintf(stderr, "recovery failed\n");
 			rc = 1;
 		}
+	} else {
+		fprintf(stderr, "unknown command: %s\n", command);
+		print_usage();
+		rc = 1;
 	}
 
 	close(i3c);
