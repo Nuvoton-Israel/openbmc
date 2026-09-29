@@ -53,4 +53,16 @@ TIP_IMAGE ?= "True"
 
 SA_TIP_IMAGE ?= "False"
 
+# Build the TIP FW from source (npcm8xx-tip-fw-source) instead of consuming
+# the pre-built, Nuvoton pre-signed combo0 image (npcm8xx-tip-fw). A self
+# built TIP FW is signed by IGPS with a locally generated openssl key set,
+# so it only boots on parts whose OTP is not fused with production keys.
+TIP_FW_SOURCE ?= "False"
+
+# The TIP FW build enables -Wall -Wextra -Werror and -Wl,--fatal-warnings, so
+# it only compiles with the toolchain Nuvoton validates against, which
+# npcm8xx-tip/README.md documents as "9-2019-q4-major". Newer releases reject
+# the sources over diagnostics that did not exist back then.
+PREFERRED_VERSION_gcc-arm-none-eabi-native ?= "9-2019-q4-major"
+
 UBOOT_MKIMAGE:npcm8xx = "uboot-mkimage-npcm8xx"

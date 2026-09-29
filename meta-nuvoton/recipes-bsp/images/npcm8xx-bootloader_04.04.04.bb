@@ -54,8 +54,15 @@ do_configure() {
     fi
 }
 
+# TIP_FW_SOURCE = "True"  -> build the TIP FW from source, IGPS signs the
+#                            resulting raw L0/L1 images with the openssl key
+#                            set it generates itself.
+# TIP_FW_SOURCE = "False" -> use the pre-built, Nuvoton pre-signed combo0
+#                            from npcm8xx-tip-fw, do not sign it again.
+TIP_FW_PROVIDER = "${@'npcm8xx-tip-fw-source' if d.getVar('TIP_FW_SOURCE') == 'True' else 'npcm8xx-tip-fw'}"
+
 do_compile[depends] += " \
-    npcm8xx-tip-fw:do_deploy npcm8xx-bootblock:do_deploy \
+    ${TIP_FW_PROVIDER}:do_deploy npcm8xx-bootblock:do_deploy \
     trusted-firmware-a:do_deploy optee-os:do_deploy \
     u-boot-nuvoton:do_deploy"
 do_compile() {
@@ -66,14 +73,21 @@ do_compile() {
         trusted-firmware-a/bl31.bin \
         tee.bin \
         u-boot.bin
+    if [ "${TIP_FW_SOURCE}" = "True" ];then
+      # override the raw TIP images shipped by IGPS with our own build
+      cp -v -t ${IGPS_SCRIPT_BASE}/inputs \
+          arbel_tip_fw_L0.bin \
+          arbel_tip_fw_L1.bin
+    fi
     cd ${IGPS_SCRIPT_BASE}
     install -d output_binaries/tmp
     install -d inputs/key_input
-    if [ "${TIP_IMAGE}" = "True" ] || [ "${SA_TIP_IMAGE}" = "True" ];then
+    if [ "${TIP_FW_SOURCE}" != "True" ] && \
+       { [ "${TIP_IMAGE}" = "True" ] || [ "${SA_TIP_IMAGE}" = "True" ]; };then
       # Do not sign combo0 image again
       python3 ${S}/py_scripts/GenerateAll.py openssl ${DEPLOY_DIR_IMAGE}
     else
-      # for No TIP, we can run IGPS script directly
+      # for No TIP or a self built TIP, we can run IGPS script directly
       python3 ${S}/py_scripts/GenerateAll.py openssl
     fi
 }
