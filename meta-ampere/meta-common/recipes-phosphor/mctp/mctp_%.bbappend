@@ -1,5 +1,7 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
+inherit systemd
+
 RDEPENDS:${PN} += "bash"
 
 SRC_URI:append = " \

@@ -22,6 +22,7 @@ from collections import OrderedDict, defaultdict
 
 import io
 import bb.event
+import bb.fetch
 import bb.cooker
 import bb.remotedata
 import bb.parse
@@ -228,7 +229,7 @@ class CommandsSync:
         Set the value of variable in configuration
         """
         varname = params[0]
-        value = str(params[1])
+        value = params[1]
         setattr(command.cooker.configuration, varname, value)
 
     def enableDataTracking(self, command, params):
@@ -257,7 +258,7 @@ class CommandsSync:
         except IndexError:
             mc = ''
         return command.cooker.matchFile(fMatch, mc)
-    matchFile.needconfig = False
+    matchFile.needconfig = True
 
     def getUIHandlerNum(self, command, params):
         return bb.event.get_uihandler()
@@ -622,9 +623,13 @@ class CommandsAsync:
             internal = params[2]
         else:
             internal = False
+        if len(params) > 3:
+            taskonly = params[3]
+        else:
+            taskonly = False
 
         if internal:
-            command.cooker.buildFileInternal(bfile, task, fireevents=False, quietlog=True)
+            command.cooker.buildFileInternal(bfile, task, fireevents=False, quietlog=True, taskonly=taskonly)
         else:
             command.cooker.buildFile(bfile, task)
     buildFile.needcache = False

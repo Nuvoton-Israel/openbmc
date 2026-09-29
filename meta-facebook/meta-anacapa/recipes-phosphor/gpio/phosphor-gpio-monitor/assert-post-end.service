@@ -1,8 +1,0 @@
-[Unit]
-Description=Assert Post Complete Status
-
-[Service]
-Type=oneshot
-ExecStart=/usr/libexec/phosphor-gpio-monitor/assert-post-end
-
-SyslogIdentifier=assert-post-end

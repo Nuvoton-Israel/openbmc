@@ -4,8 +4,27 @@
 source /usr/libexec/fb-common-functions
 
 # Disable SSC
-i2ctransfer -fy 17 w2@0x09 0xfd 0x03
-i2ctransfer -fy 17 w2@0x09 0x07 0x00
+SSC_BUS=17
+SSC_ADDR=0x09
+
+# Set page 0 to read vendor id
+if ! i2ctransfer -fy "$SSC_BUS" w2@"$SSC_ADDR" 0xfd 0x00 2>/dev/null; then
+    echo "SSC device not found, skip disabling SSC" >&2
+else
+    read -r SSC_VENDOR_ID0 SSC_VENDOR_ID1 <<< "$(i2ctransfer -fy "$SSC_BUS" w1@"$SSC_ADDR" 0x00 r2)"
+
+    if [ "$SSC_VENDOR_ID0" = "0x33" ] && [ "$SSC_VENDOR_ID1" = "0x10" ]; then
+        # Renesas
+        i2ctransfer -fy "$SSC_BUS" w2@"$SSC_ADDR" 0xfd 0x03
+        i2ctransfer -fy "$SSC_BUS" w2@"$SSC_ADDR" 0x07 0x00
+    elif [ "$SSC_VENDOR_ID0" = "0x8b" ] && [ "$SSC_VENDOR_ID1" = "0x03" ]; then
+        # TI
+        i2ctransfer -fy "$SSC_BUS" w2@"$SSC_ADDR" 0xfd 0x00
+        i2ctransfer -fy "$SSC_BUS" w2@"$SSC_ADDR" 0x3c 0x20
+    else
+        echo "unknown SSC vendor id ($SSC_VENDOR_ID0/$SSC_VENDOR_ID1), skip disabling SSC" >&2
+    fi
+fi
 
 # Create /dev/mem
 if [ ! -c /dev/mem ]; then

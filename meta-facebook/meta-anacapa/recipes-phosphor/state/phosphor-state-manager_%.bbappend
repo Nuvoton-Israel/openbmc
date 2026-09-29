@@ -2,6 +2,8 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 
 PACKAGECONFIG:remove = "only-run-apr-on-power-loss"
+
+PACKAGECONFIG:append = " check-fwupdate-before-do-transition"
 PACKAGECONFIG:append = " host-gpio"
 
 # Chassis Config
@@ -75,6 +77,8 @@ SYSTEMD_SERVICE:${PN}-chassis:remove = "obmc-power-start@.service"
 SYSTEMD_SERVICE:${PN}-chassis:remove = "obmc-power-stop@.service"
 
 SRC_URI:append = " \
+    file://chassis-power-state-init \
+    file://chassis-power-state-init.conf \
     file://chassis-powercycle \
     file://chassis-powercycle@.service \
     file://chassis-poweroff \
@@ -103,6 +107,7 @@ do_install:append() {
     install -m 0644 ${UNPACKDIR}/*.service ${D}${systemd_system_unitdir}/
 
     install -d ${D}${libexecdir}/${PN}
+    install -m 0755 ${UNPACKDIR}/chassis-power-state-init ${D}${libexecdir}/${PN}/
     install -m 0755 ${UNPACKDIR}/chassis-poweroff ${D}${libexecdir}/${PN}/
     install -m 0755 ${UNPACKDIR}/chassis-poweron ${D}${libexecdir}/${PN}/
     install -m 0755 ${UNPACKDIR}/chassis-powercycle ${D}${libexecdir}/${PN}/
@@ -114,4 +119,5 @@ do_install:append() {
     install -m 0755 ${UNPACKDIR}/phosphor-state-manager-init ${D}${libexecdir}/${PN}/
 }
 SYSTEMD_OVERRIDE:${PN}-discover += "discover-sys-init.conf:phosphor-discover-system-state@0.service.d/discover-sys-init.conf"
+SYSTEMD_OVERRIDE:${PN}-host += "chassis-power-state-init.conf:xyz.openbmc_project.State.Host@0.service.d/chassis-power-state-init.conf"
 SYSTEMD_OVERRIDE:${PN}-systemd-target-monitor += "phosphor-state-manager-init.conf:phosphor-systemd-target-monitor.service.d/phosphor-state-manager-init.conf"

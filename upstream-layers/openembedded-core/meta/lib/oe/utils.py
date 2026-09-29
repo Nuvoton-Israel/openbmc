@@ -433,10 +433,12 @@ def get_host_gcc_version(d, taskcontextonly=False):
         # datastore PATH does not contain session PATH as set by environment-setup-...
         # this breaks the install-buildtools use-case
         # env["PATH"] = d.getVar("PATH")
-        output = subprocess.check_output("gcc --version", \
-                    shell=True, env=env, stderr=subprocess.STDOUT).decode("utf-8")
+        output = subprocess.check_output(["gcc", "--version"], \
+                    env=env, stderr=subprocess.STDOUT).decode("utf-8")
     except subprocess.CalledProcessError as e:
         bb.fatal("Error running gcc --version: %s" % (e.output.decode("utf-8")))
+    except OSError as e:
+        bb.fatal("Error running gcc --version: %s" % e)
 
     match = re.match(r".* (\d+\.\d+)\.\d+.*", output.split('\n')[0])
     if not match:
@@ -513,9 +515,6 @@ def touch(filename):
 # Used by allarch recipes and other cases where arch independence is needed
 #
 def make_arch_independent(d):
-    # No need for virtual/libc or a cross compiler
-    d.setVar("INHIBIT_DEFAULT_DEPS","1")
-
     # Set these to a common set of values, we shouldn't be using them other that for WORKDIR directory
     # naming anyway
     d.setVar("baselib", "lib")

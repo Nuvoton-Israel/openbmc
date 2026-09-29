@@ -102,17 +102,25 @@ DISTRO_FEATURES_OBMC = " \
         obmc-phosphor-system-mgmt \
         "
 
+# BMC-appropriate override of OE-core's DISTRO_FEATURES_DEFAULTS (weak ?=
+# in default-distrovars.inc, which also seeds bluetooth/wifi/x11/etc into
+# DISTRO_FEATURES). Already seeded automatically by OE-core — do not
+# append below or it will duplicate entries.
 DISTRO_FEATURES_DEFAULTS = " \
-        avahi \
         ipv4 \
         ipv6 \
-        pam \
-        security \
         seccomp \
         "
 
+# Phosphor-specific features not present in OE-core defaults.
+DISTRO_FEATURES_PHOSPHOR_DEFAULTS = " \
+        avahi \
+        pam \
+        security \
+        "
+
 DISTRO_FEATURES += " \
-        ${DISTRO_FEATURES_DEFAULTS} \
+        ${DISTRO_FEATURES_PHOSPHOR_DEFAULTS} \
         ${DISTRO_FEATURES_OBMC} \
         "
 

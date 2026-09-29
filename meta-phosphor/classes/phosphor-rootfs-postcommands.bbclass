@@ -3,7 +3,15 @@
 #
 update_root_user_groups () {
     if [ -e ${IMAGE_ROOTFS}/etc/group ]; then
-        sed -i '/^\(ipmi\|web\|redfish\|priv-admin\):/ { /:root\(,\|$\)/! s/$/,root/; s/:,/:/ }' ${IMAGE_ROOTFS}/etc/group
+        # Build the group pattern conditionally. ipmi is excluded when
+        # phosphor-no-ipmi-rmcp is in DISTRO_FEATURES because that distro
+        # feature intentionally removes the IPMI stack from the image.
+        local groups="web\|redfish\|priv-admin"
+        if ! echo "${DISTRO_FEATURES}" | grep -qw "phosphor-no-ipmi-rmcp"; then
+            groups="ipmi\|${groups}"
+        fi
+        sed -i "/^\(${groups}\):/ { /:root\(,\|\$\)/! s/\$/,root/; s/:,/:/ }" \
+            ${IMAGE_ROOTFS}/etc/group
     fi
 }
 # Add root user to the needed groups

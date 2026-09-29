@@ -13,12 +13,17 @@ SRC_URI:append = " \
   file://gbmc-psu-hardreset-pre.target \
   file://gbmc-psu-hardreset-time.service \
   file://gbmc-psu-hardreset.target \
+  file://hwclock-save.service \
   file://gbmc-enqueue-powercycle.sh \
   file://40-gbmc-forward.conf \
   file://40-gbmc-sysctl.conf \
   file://40-gbmc-time.conf \
+  file://40-gbmc-networkd.conf \
   file://10-gbmc.conf \
   file://10-reboot-timeout.conf \
+  file://10-poweroff-timeout.conf \
+  file://10-halt-timeout.conf \
+  file://10-kexec-timeout.conf \
   file://delayed-reboot.service \
   "
 
@@ -26,11 +31,15 @@ FILES:${PN}:append = " \
   ${systemd_unitdir}/coredump.conf.d/40-gbmc-coredump.conf \
   ${systemd_unitdir}/resolved.conf.d/40-gbmc-nomdns.conf \
   ${systemd_unitdir}/timesyncd.conf.d/40-gbmc-time.conf \
+  ${systemd_unitdir}/networkd.conf.d/40-gbmc-networkd.conf \
   ${libdir}/sysctl.d/40-gbmc-sysctl.conf \
   ${libdir}/sysctl.d/40-gbmc-forward.conf \
   ${systemd_system_unitdir}/sysinit.target.wants/systemd-time-wait-sync.service \
   ${systemd_system_unitdir}/systemd-time-wait-sync.service.d/10-gbmc.conf \
   ${systemd_system_unitdir}/reboot.target.d/10-reboot-timeout.conf \
+  ${systemd_system_unitdir}/poweroff.target.d/10-poweroff-timeout.conf \
+  ${systemd_system_unitdir}/halt.target.d/10-halt-timeout.conf \
+  ${systemd_system_unitdir}/kexec.target.d/10-kexec-timeout.conf \
   ${systemd_system_unitdir}/delayed-reboot.service \
   "
 
@@ -44,6 +53,7 @@ SYSTEMD_SERVICE:${PN}:append = " \
   gbmc-psu-hardreset-pre.target \
   gbmc-psu-hardreset-time.service \
   gbmc-psu-hardreset.target \
+  hwclock-save.service \
   "
 
 RDEPENDS:${PN}:append = " bash"
@@ -63,6 +73,7 @@ do_install() {
   install -m 0644 ${UNPACKDIR}/gbmc-psu-hardreset-pre.target ${D}${systemd_system_unitdir}/
   install -m 0644 ${UNPACKDIR}/gbmc-psu-hardreset-time.service ${D}${systemd_system_unitdir}/
   install -m 0644 ${UNPACKDIR}/gbmc-psu-hardreset.target ${D}${systemd_system_unitdir}/
+  install -m 0644 ${UNPACKDIR}/hwclock-save.service ${D}${systemd_system_unitdir}/
   # mask systemd-pstore.service to avoid copying logs to SPI
   mkdir -p ${D}${sysconfdir}/systemd/system
   ln -sv /dev/null ${D}${sysconfdir}/systemd/system/systemd-pstore.service
@@ -89,6 +100,9 @@ do_install() {
   install -d -m 0755 ${D}${systemd_unitdir}/timesyncd.conf.d/
   install -D -m0644 ${UNPACKDIR}/40-gbmc-time.conf ${D}${systemd_unitdir}/timesyncd.conf.d/
 
+  install -d -m 0755 ${D}${systemd_unitdir}/networkd.conf.d/
+  install -D -m0644 ${UNPACKDIR}/40-gbmc-networkd.conf ${D}${systemd_unitdir}/networkd.conf.d/
+
   mkdir -p ${D}${systemd_system_unitdir}/sysinit.target.wants/
   ln -sv ${systemd_system_unitdir}/systemd-time-wait-sync.service ${D}${systemd_system_unitdir}/sysinit.target.wants/
   mkdir -p ${D}${systemd_system_unitdir}/systemd-time-wait-sync.service.d/
@@ -96,6 +110,15 @@ do_install() {
 
   install -d -m 0755 ${D}${systemd_system_unitdir}/reboot.target.d/
   install -D -m0644 ${UNPACKDIR}/10-reboot-timeout.conf ${D}${systemd_system_unitdir}/reboot.target.d/
+
+  install -d -m 0755 ${D}${systemd_system_unitdir}/poweroff.target.d/
+  install -D -m0644 ${UNPACKDIR}/10-poweroff-timeout.conf ${D}${systemd_system_unitdir}/poweroff.target.d/
+
+  install -d -m 0755 ${D}${systemd_system_unitdir}/halt.target.d/
+  install -D -m0644 ${UNPACKDIR}/10-halt-timeout.conf ${D}${systemd_system_unitdir}/halt.target.d/
+
+  install -d -m 0755 ${D}${systemd_system_unitdir}/kexec.target.d/
+  install -D -m0644 ${UNPACKDIR}/10-kexec-timeout.conf ${D}${systemd_system_unitdir}/kexec.target.d/
 
   # Install new delayed-reboot.service
   install -m 0644 ${UNPACKDIR}/delayed-reboot.service ${D}${systemd_system_unitdir}/delayed-reboot.service

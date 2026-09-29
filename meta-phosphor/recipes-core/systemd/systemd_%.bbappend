@@ -27,15 +27,25 @@ FILES:${PN}-catalog-extralocales = "\
 
 SRC_URI:append = " \
   file://40-hardware-watchdog.conf \
+  file://10-run-always.conf \
   "
 
 FILES:${PN}:append = " \
   ${systemd_unitdir}/system.conf.d/40-hardware-watchdog.conf \
+  ${systemd_system_unitdir}/systemd-sysusers.service.d/10-run-always.conf \
   "
 
 do_install:append() {
     install -d -m 0755 ${D}${systemd_unitdir}/system.conf.d/
     install -m 0644 ${UNPACKDIR}/40-hardware-watchdog.conf ${D}${systemd_unitdir}/system.conf.d/
+
+    # systemd-sysusers is gated on ConditionNeedsUpdate=/etc, which compares
+    # against the mtime of /usr. Reproducible builds pin that mtime, so once
+    # /etc/.updated exists in a persistent /etc the condition is never met
+    # again and sysusers.d fragments shipped by later updates never run.
+    # Clear the unit's trigger conditions; sysusers is idempotent.
+    install -d -m 0755 ${D}${systemd_system_unitdir}/systemd-sysusers.service.d/
+    install -m 0644 ${UNPACKDIR}/10-run-always.conf ${D}${systemd_system_unitdir}/systemd-sysusers.service.d/
 
     # A number of udev devices would unlikely be present on a BMC and have large
     # helper executables associated with them.  Delete both the helpers and the

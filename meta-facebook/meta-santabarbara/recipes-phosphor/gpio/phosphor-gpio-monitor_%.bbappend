@@ -27,18 +27,18 @@ SERVICE_LIST = "assert-module-power-good@.service \
                 swb-pwr-fault-deassert.service \
                 mb-pwr-fault-assert.service \
                 mb-pwr-fault-deassert.service \
+                setup-nic-endpoint-slot@.service \
+                remove-nic-endpoint-slot@.service \
                 "
 
 SERVICE_FILE_FMT = "file://{0}"
 
 SRC_URI += " \
-    file://assert-post-end \
     file://assert-module-power-good \
     file://assert-power-good-drop \
     file://assert-reset-button \
     file://assert-rmc-main-power-enable \
     file://deassert-module-power-good \
-    file://deassert-post-end \
     file://deassert-power-good-drop \
     file://deassert-reset-button \
     file://deassert-rmc-main-power-enable \
@@ -52,6 +52,9 @@ SRC_URI += " \
     file://swb-pwr-fault-handler \
     file://mb-pwr-fault-handler \
     file://phosphor-multi-gpio-monitor.conf \
+    file://configure-nic-mctp-endpoint \
+    file://setup-nic-endpoint-slot@.service \
+    file://remove-nic-endpoint-slot@.service \
     ${@compose_list(d, 'SERVICE_FILE_FMT', 'SERVICE_LIST')} \
     "
 
@@ -75,12 +78,10 @@ do_install:append() {
 
     install -d ${D}${libexecdir}/${PN}
     install -m 0755 ${UNPACKDIR}/assert-module-power-good ${D}${libexecdir}/${PN}/
-    install -m 0755 ${UNPACKDIR}/assert-post-end ${D}${libexecdir}/${PN}/
     install -m 0755 ${UNPACKDIR}/assert-power-good-drop ${D}${libexecdir}/${PN}/
     install -m 0755 ${UNPACKDIR}/assert-reset-button ${D}${libexecdir}/${PN}/
     install -m 0755 ${UNPACKDIR}/assert-rmc-main-power-enable ${D}${libexecdir}/${PN}/
     install -m 0755 ${UNPACKDIR}/deassert-module-power-good ${D}${libexecdir}/${PN}/
-    install -m 0755 ${UNPACKDIR}/deassert-post-end ${D}${libexecdir}/${PN}/
     install -m 0755 ${UNPACKDIR}/deassert-power-good-drop ${D}${libexecdir}/${PN}/
     install -m 0755 ${UNPACKDIR}/deassert-reset-button ${D}${libexecdir}/${PN}/
     install -m 0755 ${UNPACKDIR}/deassert-rmc-main-power-enable ${D}${libexecdir}/${PN}/
@@ -96,4 +97,7 @@ do_install:append() {
     install -d ${D}${systemd_system_unitdir}/phosphor-multi-gpio-monitor.service.d
     install -m 0644 ${UNPACKDIR}/phosphor-multi-gpio-monitor.conf \
         ${D}${systemd_system_unitdir}/phosphor-multi-gpio-monitor.service.d/phosphor-multi-gpio-monitor.conf
+
+    install -d ${D}${bindir}
+    install -m 0755 ${UNPACKDIR}/configure-nic-mctp-endpoint ${D}${bindir}/
 }

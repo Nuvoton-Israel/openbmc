@@ -13,7 +13,6 @@ SRC_URI += "file://assert-post-end \
             file://auto-poweroff@.service \
             file://auto-poweron \
             file://auto-poweron@.service \
-            file://deassert-post-end \
             file://deassert-post-end.service \
             file://deassert-power-good \
             file://deassert-power-good.service \
@@ -110,7 +109,6 @@ do_install:append() {
     install -m 0755 ${UNPACKDIR}/deassert-reset-button ${D}${libexecdir}/${PN}/
 
     install -m 0755 ${UNPACKDIR}/assert-post-end ${D}${libexecdir}/${PN}/
-    install -m 0755 ${UNPACKDIR}/deassert-post-end ${D}${libexecdir}/${PN}/
 
     install -m 0755 ${UNPACKDIR}/assert-power-good ${D}${libexecdir}/${PN}/
     install -m 0755 ${UNPACKDIR}/deassert-power-good ${D}${libexecdir}/${PN}/

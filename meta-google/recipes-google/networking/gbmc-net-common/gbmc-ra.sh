@@ -30,6 +30,15 @@ old_mac=invalid
 old_pfx=invalid
 old_fqdn=invalid
 
+# Install router and gateway configuration for an RA router.
+# Writes networkd drop-ins ([Neighbor] and [Route] definitions) under
+# /run/systemd/network/ for the RA interface, updates the runtime neighbor
+# table and kernel routes (both interface-specific and default metric routes),
+# and records the last seen RA router info.
+# Arguments:
+#   $1: Router IPv6 address
+#   $2: Router MAC address
+#   $3: Flag indicating if this is a newly discovered router (1) or cached (0)
 add_rtr() {
   local rtr="$1"
   local mac="$2"
@@ -51,8 +60,12 @@ add_rtr() {
     if (( new == 1 )); then
       printf '[Route]\nGateway=%s\nGatewayOnLink=true\nMetric=%d\n' \
         "$rtr" "$ROUTE_METRIC" >"$file.d"/10-gateway-dyn.conf
-      mkdir -p /var/google/last-ra
-      printf '%s\n%s\n' "$rtr" "$mac" >"/var/google/last-ra/$RA_IF"
+      mkdir -p /run/last-ra
+      printf '%s\n%s\n' "$rtr" "$mac" >"/run/last-ra/$RA_IF"
+      if [ -z "${GBMC_AVOID_RWFS-}" ]; then
+        mkdir -p /var/google/last-ra
+        printf '%s\n%s\n' "$rtr" "$mac" >"/var/google/last-ra/$RA_IF"
+      fi
     fi
   done
 
@@ -71,8 +84,13 @@ add_rtr() {
 }
 
 # Read the old info from persistent storage in case ToR is updating
-rafile="/var/google/last-ra/$RA_IF"
-if [ -e "$rafile" ]; then
+rafile=
+if [ -e "/run/last-ra/$RA_IF" ]; then
+  rafile="/run/last-ra/$RA_IF"
+elif [ -e "/var/google/last-ra/$RA_IF" ]; then
+  rafile="/var/google/last-ra/$RA_IF"
+fi
+if [ -n "$rafile" ]; then
   exec {rafd}<"$rafile"
   read -r -u "$rafd" rtr
   read -r -u "$rafd" mac
@@ -81,6 +99,13 @@ if [ -e "$rafile" ]; then
   add_rtr "$rtr" "$mac" 0
 fi
 
+# Process router reachability and prefix information received via RA.
+# Ignores routers assigned to local BMC addresses, verifies prefix matching
+# against the expected subnet, and manages interface routes and networkd drop-ins.
+# Arguments:
+#   $1: Router IPv6 address
+#   $2: Router MAC address
+#   $3: Operation ('add' or 'remove', defaults to 'add')
 default_update_rtr() {
   local rtr="$1"
   local mac="$2"
@@ -93,9 +118,10 @@ default_update_rtr() {
 
 
   if [[ ${op} = "add" ]]; then
-    add_rtr "$rtr" "$mac" 1
     echo "Set router $rtr on $RA_IF" >&2
+    add_rtr "$rtr" "$mac" 1
   elif [[ ${op} = "remove" ]]; then
+    echo "Del router $rtr on $RA_IF" >&2
     # Override any existing gateway information within files
     # Make sure we cover `00-*` and `-*` files
     for file in /run/systemd/network/{00,}-bmc-$RA_IF.network.d/10-gateway-dyn.conf; do
@@ -105,11 +131,12 @@ default_update_rtr() {
     # Fall back to reload if remove failed
     ip -6 route del default via "$rtr" onlink dev "$RA_IF" metric "$ROUTE_METRIC" || \
       gbmc_net_networkd_reload "$RA_IF" || true
-
-    echo "Del router $rtr on $RA_IF" >&2
   fi
 }
 
+# Update the BMC's hostname based on the DNS search list domain from RA.
+# Arguments:
+#   $1: Fully qualified domain name (FQDN)
 default_update_fqdn() {
   local fqdn="$1"
   [ -z "$fqdn" ] && return

@@ -1,5 +1,7 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
+inherit systemd
+
 SRC_URI:append = " \
     file://mctp_init.service \
     file://mctp_init.sh \

@@ -13,6 +13,7 @@ include phosphor-state-manager-systemd-links.inc
 STATE_MGR_PACKAGES = " \
     ${PN}-host \
     ${PN}-chassis \
+    ${PN}-chassis-availability \
     ${PN}-bmc \
     ${PN}-hypervisor \
     ${PN}-discover \
@@ -135,8 +136,15 @@ SYSTEMD_SERVICE:${PN}-chassis += "phosphor-reset-chassis-on@.service"
 SYSTEMD_SERVICE:${PN}-chassis += "phosphor-reset-chassis-running@.service"
 SYSTEMD_SERVICE:${PN}-chassis += "phosphor-set-chassis-transition-to-on@.service"
 SYSTEMD_SERVICE:${PN}-chassis += "phosphor-set-chassis-transition-to-off@.service"
+SYSTEMD_SERVICE:${PN}-chassis += "phosphor-wait-poweron-blocks.service"
 SYSTEMD_SERVICE:${PN}-chassis += "${@bb.utils.contains('PACKAGECONFIG', 'multi-chassis-smp', 'phosphor-chassis-wait-for-smp-poweron.service', '', d)}"
 FILES:${PN}-chassis += "${@bb.utils.contains('PACKAGECONFIG', 'multi-chassis-smp', '${libexecdir}/phosphor-state-manager/phosphor-chassis-wait-for-smp-poweron', '', d)}"
+
+SYSTEMD_SERVICE:${PN}-chassis-availability += "phosphor-chassis-availability.service"
+FILES:${PN}-chassis-availability += "${libexecdir}/phosphor-state-manager/phosphor-chassis-availability-monitor"
+FILES:${PN}-chassis-availability += "${datadir}/phosphor-state-manager/chassis-availability/phosphor-chassis-availability-default.json"
+FILES:${PN}-chassis-availability += "${systemd_system_unitdir}/phosphor-chassis-availability.service"
+FILES:${PN}-chassis-availability += "${systemd_system_unitdir}/multi-user.target.wants/phosphor-chassis-availability.service"
 
 SYSTEMD_SERVICE:${PN}-chassis-poweron-log += "phosphor-create-chassis-poweron-log@.service"
 
@@ -298,5 +306,5 @@ SYSTEMD_LINK:${PN}-obmc-targets += "${@compose_list_zip(d, 'RESET_FMT_CTRL', 'OB
 SYSTEMD_LINK[vardeps] += "OBMC_CHASSIS_INSTANCES OBMC_HOST_INSTANCES"
 
 SRC_URI = "git://github.com/openbmc/phosphor-state-manager;branch=master;protocol=https"
-SRCREV = "cb8d100b2f740ac8b2b382586786a8148fbc43fc"
+SRCREV = "f68829cd572508585f5e2bbd5ee9fa1d8de2edd5"
 

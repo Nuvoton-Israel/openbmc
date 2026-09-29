@@ -2,6 +2,175 @@
 # shellcheck source=meta-facebook/recipes-fb/obmc_functions/files/fb-common-functions
 source /usr/libexec/fb-common-functions
 
+GPIO_HIGH=1
+
+check_aspeed_usb()
+{
+    # Check onboard USB hub is detected or not to identify whether we need to
+    # re-bind aspeed usb driver
+    local usb_hub_link="/sys/bus/usb/devices/1-1"
+
+    if [ ! -L "$usb_hub_link" ]; then
+        echo "$usb_hub_link not found, re-binding aspeed usb driver..."
+        echo 1e6a3000.usb > /sys/bus/platform/drivers/ehci-platform/unbind
+        echo 1e6a3000.usb > /sys/bus/platform/drivers/ehci-platform/bind
+        sleep 3
+    fi
+}
+
+identify_hsc_type()
+{
+    # identify hsc source by get MFR_ID
+    local retry=0
+    local max_retries=10
+    local mfr_id_val=""
+    local hsc_type=""
+
+    while [ "$retry" -lt "$max_retries" ]; do
+        if mfr_id_val=$(i2cget -y -f 9 0x10 0x99 s 2>/dev/null); then
+            if [ "${mfr_id_val}" == "0x54 0x49 0x00" ]; then
+                hsc_type="ti"
+            elif [ "${mfr_id_val}" == "0x53 0x50 0x4d" ]; then
+                hsc_type="mps"
+            elif [ "${mfr_id_val}" == "0x49 0x46 0x00" ]; then
+                hsc_type="ifx"
+            fi
+        elif mfr_id_val=$(i2cget -y -f 9 0x11 0x99 s 2>/dev/null); then
+            if [ "${mfr_id_val}" == "0x54 0x49 0x00" ]; then
+                hsc_type="ti-dvt"
+            fi
+        fi
+
+        if [ -n "${hsc_type}" ]; then
+            echo "${hsc_type}" > "/tmp/hsc_type"
+            echo "${hsc_type}"
+            return 0
+        fi
+
+        ((retry++))
+        sleep 1
+    done
+
+    echo "Cannot identify hsc type" >&2
+    return 1
+}
+
+config_ti_hsc()
+{
+    local hsc_type="$1"
+    local addrs=()
+    local dev_setup_offset="0xd9"
+    local dev_setup_val=(0x14 0x04 0x04 0x14)
+    local res=0
+    local i
+
+    echo "Configure TI HSC"
+
+    if [ "${hsc_type}" == "ti-dvt" ]; then
+        addrs=(0x11 0x13 0x15 0x17)
+    else
+        addrs=(0x10 0x12 0x14 0x16)
+    fi
+
+    # Config HSC current range via DEVICE_SETUP register
+    for i in "${!addrs[@]}"; do
+        if ! i2cset -y -f 9 "${addrs[$i]}" "${dev_setup_offset}" "${dev_setup_val[$i]}" b; then
+            echo "Failed to set HSC$((i + 1)) current range" >&2
+            res=1
+        fi
+    done
+
+    return "${res}"
+}
+
+config_mps_hsc()
+{
+    local addrs=(0x10 0x12 0x14 0x16)
+    local iin_tunes_offset="0x38"
+    local iin_tunes_val_lsb=(0x3c 0xef 0xf2 0x79)
+    local iin_tunes_val_msb=(0x00 0xf0 0xe8 0x00)
+    local res=0
+    local i
+
+    echo "Configure MPS HSC"
+
+    # Config HSC IIN_TUNE register
+    for i in "${!addrs[@]}"; do
+        if ! i2ctransfer -y -f 9 "w3@${addrs[$i]}" "${iin_tunes_offset}" "${iin_tunes_val_lsb[$i]}" "${iin_tunes_val_msb[$i]}"; then
+            echo "Failed to set HSC$((i + 1)) IIN_TUNE" >&2
+            res=1
+        fi
+    done
+
+    return "${res}"
+}
+
+config_ifx_hsc()
+{
+    echo "Configure IFX HSC"
+    return 0
+}
+
+config_hsc()
+{
+    local hsc_type=""
+    local retry=0
+    local max_retries=3
+
+    if ! hsc_type=$(identify_hsc_type); then
+        echo "Failed to identify HSC type, assume TI"
+        hsc_type="ti"
+    fi
+
+    echo "HSC type identified as: ${hsc_type}"
+
+    while [ "${retry}" -lt "${max_retries}" ]; do
+        case "${hsc_type}" in
+            "ti-dvt"|"ti")
+                if config_ti_hsc "${hsc_type}"; then
+                    return 0
+                fi
+                ;;
+            "mps")
+                if config_mps_hsc; then
+                    return 0
+                fi
+                ;;
+            "ifx")
+                if config_ifx_hsc; then
+                    return 0
+                fi
+                ;;
+        esac
+
+        ((retry++))
+        if [ "${retry}" -lt "${max_retries}" ]; then
+            echo "Retrying HSC configuration (${retry}/${max_retries})..."
+            sleep 1
+        fi
+    done
+
+    echo "HSC configuration failed after ${max_retries} attempts" >&2
+    return 1
+}
+
+bind_HPM_gpio_expanders()
+{
+    bind_i2c_device pca953x 70-0050 3
+    bind_i2c_device pca953x 70-0051 3
+    bind_i2c_device pca953x 70-0052 3
+    bind_i2c_device pca953x 70-0053 3
+    bind_i2c_device pca953x 70-0054 3
+
+    bind_i2c_device pca953x 71-0050 3
+    bind_i2c_device pca953x 71-0051 3
+    bind_i2c_device pca953x 71-0052 3
+    bind_i2c_device pca953x 71-0053 3
+    bind_i2c_device pca953x 71-0054 3
+}
+
+check_aspeed_usb
+
 # Enable standby power and bind i2c components
 echo "Attempting to enable standby power..."
 if /usr/libexec/plat-svc/standby-power-enable; then
@@ -9,5 +178,17 @@ if /usr/libexec/plat-svc/standby-power-enable; then
 else
     echo "Error: Standby power enable failed."
 fi
+
+# configure hsc
+if ! config_hsc; then
+    echo "Error: HSC configuration failed."
+fi
+
+# The host boot drive reset pin does not require BMC control during host power on/off.
+# Drive the pin HIGH by default (deassert reset).
+set_gpio "BMC_SSD0_RST_L-O" "$GPIO_HIGH"
+
+# Bind HPM IOEXP
+bind_HPM_gpio_expanders
 
 exit 0

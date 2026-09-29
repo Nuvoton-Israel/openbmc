@@ -14,6 +14,9 @@
 
 [ -n "${gbmc_ncsi_clear_ip-}" ] && return
 
+# shellcheck source=meta-google/recipes-google/networking/gbmc-net-common/gbmc-net-lib.sh
+source /usr/share/gbmc-net-lib.sh || exit
+
 gbmc_ncsi_clear_ip_hook() {
   local ip="${1-}"
 
@@ -24,7 +27,7 @@ gbmc_ncsi_clear_ip_hook() {
   [ ! -e /etc/systemd/network/00-bmc-@NCSI_IF@.network ] && return
 
   echo "Removing Persistent NCSI IPs" >&2
-  rm /etc/systemd/network/00-bmc-@NCSI_IF@.network || return
+  gbmc_net_mask_or_rm /etc/systemd/network/00-bmc-@NCSI_IF@.network || return
   gbmc_net_networkd_reload || return
 }
 

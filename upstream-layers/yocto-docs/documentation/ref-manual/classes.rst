@@ -270,7 +270,7 @@ The :ref:`ref-classes-buildhistory` class records a history of build output meta
 which can be used to detect possible regressions as well as used for
 analysis of the build output. For more information on using Build
 History, see the
-":ref:`dev-manual/build-quality:maintaining build output quality`"
+":ref:`dev-manual/build-quality:maintaining build output quality with \`\`buildhistory\`\``"
 section in the Yocto Project Development Tasks Manual.
 
 .. _ref-classes-buildstats:
@@ -560,7 +560,7 @@ as well as in ``tmp/deploy/spdx``.
 
 The exact behaviour of this class, and the amount of output can be controlled
 by the :term:`SPDX_PRETTY`, :term:`SPDX_INCLUDE_SOURCES` and other variables
-starting with with ``SPDX_``.
+starting with ``SPDX_``.
 
 See the description of these variables and the
 ":ref:`dev-manual/sbom:creating a software bill of materials`"
@@ -2053,11 +2053,8 @@ consider some further things about using RPM:
    perform on-device upgrades.
 
 You can find additional information on the effects of the package class
-at these two Yocto Project mailing list links:
-
--  :yocto_lists:`/pipermail/poky/2011-May/006362.html`
-
--  :yocto_lists:`/pipermail/poky/2011-May/006363.html`
+at this Yocto Project mailing list link:
+:yocto_lists:`/g/poky/topic/61292484#msg6286`
 
 .. _ref-classes-package_deb:
 
@@ -2129,6 +2126,18 @@ For information on how to use this class, see the
 section in the Yocto Project Development Tasks Manual.
 
 Previously, this class was called the ``task`` class.
+
+.. note::
+
+   If you're defining a packagegroup and need to set::
+
+      PACKAGE_ARCH = "${MACHINE_ARCH}"
+
+   for the packagegroup, you need to do that *before* the
+   ``inherit packagegroup`` line in the recipe file.
+   Setting it afterward can break BitBake parsing, result in
+   an "allarch" architecture mismatch error, or allow
+   architecture-independent defaults to override your intent.
 
 .. _ref-classes-patch:
 
@@ -2248,6 +2257,15 @@ environment for cross compilation.
 
 This class is internal to the :ref:`ref-classes-python-setuptools3_rust` class
 and is not meant to be used directly in recipes.
+
+.. _ref-classes-python_uv_build:
+
+``python_uv_build``
+===================
+
+The :ref:`ref-classes-python_uv_build` class can be inherited in Python recipes
+that are built with ``uv_build`` and which are `PEP-517
+<https://www.python.org/dev/peps/pep-0517/>`__ compliant.
 
 .. _ref-classes-python-setuptools3_rust:
 
@@ -2614,6 +2632,13 @@ which can also be set in your ``local.conf`` file. Here is an example::
 
    RM_WORK_EXCLUDE += "busybox glibc"
 
+Finally, if you are using this class for a recipe but want to prevent
+:term:`BitBake` from deleting specific folders or files in that recipe's
+:term:`WORKDIR` (other than ``temp``), you can preserve those folders or
+files with the :term:`RM_WORK_EXCLUDE_ITEMS` variable as follows::
+
+   RM_WORK_EXCLUDE_ITEMS += "items_to_keep"
+
 .. _ref-classes-rootfs*:
 
 ``rootfs*``
@@ -2819,7 +2844,7 @@ Python version 3.x extensions that use build systems based on ``setuptools``
 ``pyproject.toml`` format). Unlike :ref:`ref-classes-setuptools3`,
 this uses the traditional ``setup.py`` ``build`` and ``install`` commands and
 not wheels. This use of ``setuptools`` like this is
-`deprecated <https://github.com/pypa/setuptools/blob/main/CHANGES.rst#v5830>`__
+`deprecated <https://github.com/pypa/setuptools/blob/14cc4452199818e60cf01cd9cea96e90761abce7/NEWS.rst#v5830>`__
 but still relatively common.
 
 .. _ref-classes-setuptools3-base:
@@ -3075,7 +3100,7 @@ the :term:`SYSTEMD_BOOT_CFG`,
 :term:`SYSTEMD_BOOT_TIMEOUT` variables.
 
 You can also see the `Systemd-boot
-documentation <https://www.freedesktop.org/wiki/Software/systemd/systemd-boot/>`__
+documentation <https://systemd.io/BOOT/>`__
 for more information.
 
 .. _ref-classes-terminal:
@@ -3515,8 +3540,7 @@ by rootfs image recipes. The build configuration should also use an
 on target hardware. Using ``systemd`` as init is recommended. Image builds
 should create an ESP partition for UEFI firmware and copy ``systemd-boot`` and
 UKI files there. Sample configuration for Wic images is provided in
-:oe_git:`scripts/lib/wic/canned-wks/efi-uki-bootdisk.wks.in
-</openembedded-core/tree/scripts/lib/wic/canned-wks/efi-uki-bootdisk.wks.in>`.
+:oecore_path:`meta/files/wic/efi-uki-bootdisk.wks.in`
 UKIs are generated using ``systemd`` reference implementation `ukify
 <https://www.freedesktop.org/software/systemd/man/latest/ukify.html>`__.
 This class uses a number of variables but tries to find sensible defaults for
@@ -3654,6 +3678,30 @@ before a package is removed and started when the package is installed.
 Three variables control this class: :term:`INITSCRIPT_PACKAGES`,
 :term:`INITSCRIPT_NAME` and :term:`INITSCRIPT_PARAMS`. See the variable links
 for details.
+
+.. _ref-classes-upstream-stable-release-point:
+
+``upstream-stable-release-point``
+=================================
+
+The :ref:`ref-classes-upstream-stable-release-point` class automatically
+generates the :term:`UPSTREAM_STABLE_RELEASE_REGEX` variable for recipes
+whose version uses a dot-separated scheme. This enables stable point release
+upgrades — version upgrades constrained to the same stable series (e.g.
+``1.4.2`` to ``1.4.3`` but not to ``1.5.0``).
+
+The class uses the :term:`STABLE_VERSION_PARTS` variable (defaults to ``"2"``)
+to determine how many leading dot-separated parts of :term:`PV` constitute the
+stable prefix. For example:
+
+-  With ``PV = "1.4.2"`` and ``STABLE_VERSION_PARTS = "2"`` (default), the
+   generated regex is ``^1\.4(\.\d+)*$``.
+-  With ``PV = "259.5"`` and ``STABLE_VERSION_PARTS = "1"`` (e.g. systemd), the
+   generated regex is ``^259(\.\d+)*$``.
+
+For recipes whose stable version part is not dot-separated (e.g. openssh uses
+``10.2p1``), set :term:`UPSTREAM_STABLE_RELEASE_REGEX` directly instead of
+inheriting this class.
 
 .. _ref-classes-useradd:
 

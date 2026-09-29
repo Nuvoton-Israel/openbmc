@@ -1,3 +1,8 @@
 owners:
 - joel@jms.id.au
 - andrew@codeconstruct.com.au
+
+matchers:
+- partial_regex: recipes-bsp/u-boot
+  owners:
+  - tan@siewert.io

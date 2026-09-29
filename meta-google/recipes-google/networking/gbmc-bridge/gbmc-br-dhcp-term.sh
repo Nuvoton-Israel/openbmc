@@ -15,12 +15,16 @@
 
 # shellcheck source=meta-google/recipes-google/networking/network-sh/lib.sh
 source /usr/share/network/lib.sh || exit
+# shellcheck source=meta-google/recipes-google/networking/gbmc-bridge/gbmc-br-lib.sh
+source /usr/share/gbmc-br-lib.sh || exit
+
+NETBOOT_STATUS_START["netboot"]=$SECONDS
 
 # Wait until a well known service is network available
 echo 'Waiting for network reachability' >&2
 while true; do
   before=$SECONDS
-  if ip="$(cat /var/google/gbmc-br-ip 2>/dev/null)"; then
+  if ip="$(gbmc_br_get_ip)" && [ -n "$ip" ]; then
     echo "Trying reachability from $ip" >&2
     for i in {0..5}; do
       ping -I "$ip" -c 1 -W 1 2001:4860:4860::8888 >/dev/null 2>&1 && break 3
@@ -34,8 +38,10 @@ while true; do
   fi
 done
 
-# We need to guarantee we wait at least 10 minutes from reachable in
-# case networking just came up
+# The 10 minute wait is intentional because gBMC uses DHCP to trigger a
+# reinstall process. DHCP servers only respond when a reinstall is queued,
+# not during normal system operation and bootup. We must wait at least 10 minutes
+# from reachability to allow any scheduled reinstall jobs to arrive.
 wait_min=10
 echo "Network is reachable, waiting $wait_min min" >&2
 sleep $((60 * wait_min))
@@ -73,7 +79,7 @@ while true; do
   activestr="$(echo "$json" | jq -r '.data[0].ActiveState.data')"
 
   # The process is already stopped, we are done
-  [[ "$activestr" == 'inactive' ]] && exit
+  [[ "$activestr" == 'inactive' ]] && break
 
   # If the process is running, give it at least 10 minutes from when it started
   cur_s="$(cut -d' ' -f1 /proc/uptime)"
@@ -91,4 +97,7 @@ while true; do
 done
 
 echo "Stopping DHCP processing" >&2
-systemctl stop --no-block gbmc-br-dhcp@'*'
+systemctl stop gbmc-br-dhcp@'*'
+if [[ ! -e /run/netboot_done ]]; then
+  update_netboot_status "netboot" "DHCP is not running" "FAIL"
+fi

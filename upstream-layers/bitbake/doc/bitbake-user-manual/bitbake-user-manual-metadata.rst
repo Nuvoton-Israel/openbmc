@@ -172,6 +172,26 @@ assignment, ``BAR`` expands to the literal string "${FOO}" as long as
 
    BAR = "${FOO}"
 
+Immediate variable expansion (:=)
+---------------------------------
+
+The ":=" operator results in a variable's contents being expanded
+immediately, rather than when the variable is actually used::
+
+   T = "123"
+   A := "test ${T}"
+   T = "456"
+   B := "${T} ${C}"
+   C = "cval"
+   C := "${C}append"
+
+In this example, ``A`` contains "test 123", even though the final value
+of :term:`T` is "456". The variable :term:`B` will end up containing "456
+cvalappend". This is because references to undefined variables are
+preserved as is during (immediate)expansion. This is in contrast to GNU
+Make, where undefined variables expand to nothing. The variable ``C``
+contains "cvalappend" since ``${C}`` immediately expands to "cval".
+
 Setting a default value (?=)
 ----------------------------
 
@@ -234,26 +254,6 @@ any active weak default value has been substituted::
 After parsing we will have::
 
    W = "xy"
-
-Immediate variable expansion (:=)
----------------------------------
-
-The ":=" operator results in a variable's contents being expanded
-immediately, rather than when the variable is actually used::
-
-   T = "123"
-   A := "test ${T}"
-   T = "456"
-   B := "${T} ${C}"
-   C = "cval"
-   C := "${C}append"
-
-In this example, ``A`` contains "test 123", even though the final value
-of :term:`T` is "456". The variable :term:`B` will end up containing "456
-cvalappend". This is because references to undefined variables are
-preserved as is during (immediate)expansion. This is in contrast to GNU
-Make, where undefined variables expand to nothing. The variable ``C``
-contains "cvalappend" since ``${C}`` immediately expands to "cval".
 
 .. _appending-and-prepending:
 
@@ -608,7 +608,7 @@ variable.
 
       DEPENDS = "glibc ncurses"
       OVERRIDES = "machine:local"
-      DEPENDS:append:machine = "libmad"
+      DEPENDS:append:machine = " libmad"
 
    In this example, :term:`DEPENDS` becomes "glibc ncurses libmad".
 
@@ -617,8 +617,8 @@ variable.
    ``KERNEL_FEATURES`` variable based on the architecture::
 
       KERNEL_FEATURES:append = " ${KERNEL_EXTRA_FEATURES}"
-      KERNEL_FEATURES:append:qemux86=" cfg/sound.scc cfg/paravirt_kvm.scc"
-      KERNEL_FEATURES:append:qemux86-64=" cfg/sound.scc cfg/paravirt_kvm.scc"
+      KERNEL_FEATURES:append:qemux86 = " cfg/sound.scc cfg/paravirt_kvm.scc"
+      KERNEL_FEATURES:append:qemux86-64 = " cfg/sound.scc cfg/paravirt_kvm.scc"
 
 -  *Setting a Variable for a Single Task:* BitBake supports setting a
    variable just for the duration of a single task. Here is an example::
@@ -1902,8 +1902,9 @@ and the content of the :term:`FILE` variable::
        print("The name of the Event is %s" % getName(e))
        print("The file we run for is %s" % d.getVar('FILE'))
    }
-   myclass_eventhandler[eventmask] = "bb.event.BuildStarted
-   bb.event.BuildCompleted"
+   myclass_eventhandler[eventmask] = "bb.event.BuildStarted \
+                                      bb.event.BuildCompleted \
+                                      "
 
 In the previous example, an eventmask has been
 set so that the handler only sees the "BuildStarted" and

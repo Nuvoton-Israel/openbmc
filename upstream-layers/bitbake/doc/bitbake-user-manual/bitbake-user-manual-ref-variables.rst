@@ -143,7 +143,7 @@ overview of their function and contents.
       .. note::
 
          For more details on how to make the BitBake server persistent, see the
-         :term:`BB_SERVER_TIMEOUT` variable.
+         ``BB_SERVER_TIMEOUT`` variable.
 
    :term:`BB_CURRENTTASK`
       Contains the name of the currently running task. The name does not
@@ -1557,6 +1557,20 @@ overview of their function and contents.
 
          PREFERRED_PROVIDER_xxx = "yyy"
          PREFERRED_PROVIDER_aaa = "bbb"
+
+   :term:`PREFERRED_RPROVIDER`
+      Determines which *recipe* should be given preference when
+      multiple packages declare runtime-providing (:term:`RPROVIDES`)
+      the same item. Some examples::
+
+         PREFERRED_RPROVIDER_initd-functions ?= "initscripts"
+         PREFERRED_RPROVIDER_virtual-libegl-icd ?= "mesa"
+
+      The former will select as the package built by the `initscripts`
+      recipe declaring to be runtime-provider for `initd-functions`,
+      which is in this case `initscripts-functions`::
+
+          .../initscripts_1.0.bb:RPROVIDES:${PN}-functions = "initd-functions"
 
    :term:`PREFERRED_VERSION`
       If there are multiple versions of a recipe available, this variable

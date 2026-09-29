@@ -6,12 +6,12 @@
         "Targets": {
             "RISING": [
                 "deassert-power-good-drop.service",
-                "power-rail-deassert-log@FM_PWRGD_CPU0_PWROK.service"
+                "power-rail-deassert-log@Santabarbara_MB-FM_PWRGD_CPU0_PWROK.service"
             ],
             "FALLING": [
                 "assert-power-good-drop.service",
                 "mctp_remove.service",
-                "power-rail-assert-log@FM_PWRGD_CPU0_PWROK.service"
+                "power-rail-assert-log@Santabarbara_MB-FM_PWRGD_CPU0_PWROK.service"
             ]
         },
         "Continue": true
@@ -22,10 +22,10 @@
         "EventMon": "BOTH",
         "Targets": {
             "RISING": [
-                "power-rail-deassert-log@FM_RST_CPU0_RESETL_N.service"
+                "power-rail-deassert-log@Santabarbara_MB-FM_RST_CPU0_RESETL_N.service"
             ],
             "FALLING": [
-                "power-rail-assert-log@FM_RST_CPU0_RESETL_N.service"
+                "power-rail-assert-log@Santabarbara_MB-FM_RST_CPU0_RESETL_N.service"
             ]
         },
         "Continue": true
@@ -36,10 +36,10 @@
         "EventMon": "BOTH",
         "Targets": {
             "RISING": [
-                "thermal-deassert-log@FM_CPU0_THERMTRIP_N.service"
+                "thermal-deassert-log@thermtrip-cpu0-FM_CPU0_THERMTRIP_N.service"
             ],
             "FALLING": [
-                "thermal-assert-log@FM_CPU0_THERMTRIP_N.service"
+                "thermal-assert-log@thermtrip-cpu0-FM_CPU0_THERMTRIP_N.service"
             ]
         },
         "Continue": true
@@ -50,10 +50,10 @@
         "EventMon": "BOTH",
         "Targets": {
             "RISING": [
-                "thermal-deassert-log@FM_CPU0_PROCHOT_N.service"
+                "thermal-deassert-log@prochot-cpu0-FM_CPU0_PROCHOT_N.service"
             ],
             "FALLING": [
-                "thermal-assert-log@FM_CPU0_PROCHOT_N.service"
+                "thermal-assert-log@prochot-cpu0-FM_CPU0_PROCHOT_N.service"
             ]
         },
         "Continue": true
@@ -64,10 +64,10 @@
         "EventMon": "BOTH",
         "Targets": {
             "RISING": [
-                "vr-fault-deassert-log@FM_PVDDCR_CPU0_P0_OCP_N.service"
+                "vr-fault-deassert-log@Santabarbara_MB-FM_PVDDCR_CPU0_P0_OCP_N.service"
             ],
             "FALLING": [
-                "vr-fault-assert-log@FM_PVDDCR_CPU0_P0_OCP_N.service"
+                "vr-fault-assert-log@Santabarbara_MB-FM_PVDDCR_CPU0_P0_OCP_N.service"
             ]
         },
         "Continue": true
@@ -78,10 +78,10 @@
         "EventMon": "BOTH",
         "Targets": {
             "RISING": [
-                "vr-fault-deassert-log@FM_PVDDCR_CPU1_P0_OCP_N.service"
+                "vr-fault-deassert-log@Santabarbara_MB-FM_PVDDCR_CPU1_P0_OCP_N.service"
             ],
             "FALLING": [
-                "vr-fault-assert-log@FM_PVDDCR_CPU1_P0_OCP_N.service"
+                "vr-fault-assert-log@Santabarbara_MB-FM_PVDDCR_CPU1_P0_OCP_N.service"
             ]
         },
         "Continue": true
@@ -92,10 +92,10 @@
         "EventMon": "BOTH",
         "Targets": {
             "RISING": [
-                "vr-fault-deassert-log@FM_PVDDCR_SOC_P0_OCP_N.service"
+                "vr-fault-deassert-log@Santabarbara_MB-FM_PVDDCR_SOC_P0_OCP_N.service"
             ],
             "FALLING": [
-                "vr-fault-assert-log@FM_PVDDCR_SOC_P0_OCP_N.service"
+                "vr-fault-assert-log@Santabarbara_MB-FM_PVDDCR_SOC_P0_OCP_N.service"
             ]
         },
         "Continue": true
@@ -106,10 +106,10 @@
         "EventMon": "BOTH",
         "Targets": {
             "RISING": [
-                "vr-fault-deassert-log@FM_P3V3_NIC_400G_FAULT_R_N.service"
+                "vr-fault-deassert-log@Santabarbara_MB-FM_P3V3_NIC_400G_FAULT_R_N.service"
             ],
             "FALLING": [
-                "vr-fault-assert-log@FM_P3V3_NIC_400G_FAULT_R_N.service"
+                "vr-fault-assert-log@Santabarbara_MB-FM_P3V3_NIC_400G_FAULT_R_N.service"
             ]
         },
         "Continue": true
@@ -120,10 +120,10 @@
         "EventMon": "BOTH",
         "Targets": {
             "RISING": [
-                "vr-fault-deassert-log@FM_P3V3_NIC1_FAULT_N.service"
+                "vr-fault-deassert-log@Santabarbara_MB-FM_P3V3_NIC1_FAULT_N.service"
             ],
             "FALLING": [
-                "vr-fault-assert-log@FM_P3V3_NIC1_FAULT_N.service"
+                "vr-fault-assert-log@Santabarbara_MB-FM_P3V3_NIC1_FAULT_N.service"
             ]
         },
         "Continue": true
@@ -134,10 +134,10 @@
         "EventMon": "BOTH",
         "Targets": {
             "RISING": [
-                "vr-fault-deassert-log@FM_P3V3_NIC2_FAULT_N.service"
+                "vr-fault-deassert-log@Santabarbara_MB-FM_P3V3_NIC2_FAULT_N.service"
             ],
             "FALLING": [
-                "vr-fault-assert-log@FM_P3V3_NIC2_FAULT_N.service"
+                "vr-fault-assert-log@Santabarbara_MB-FM_P3V3_NIC2_FAULT_N.service"
             ]
         },
         "Continue": true
@@ -148,10 +148,10 @@
         "EventMon": "BOTH",
         "Targets": {
             "RISING": [
-                "vr-fault-deassert-log@FM_P3V3_NIC3_FAULT_N.service"
+                "vr-fault-deassert-log@Santabarbara_MB-FM_P3V3_NIC3_FAULT_N.service"
             ],
             "FALLING": [
-                "vr-fault-assert-log@FM_P3V3_NIC3_FAULT_N.service"
+                "vr-fault-assert-log@Santabarbara_MB-FM_P3V3_NIC3_FAULT_N.service"
             ]
         },
         "Continue": true
@@ -162,10 +162,10 @@
         "EventMon": "BOTH",
         "Targets": {
             "RISING": [
-                "vr-fault-deassert-log@FM_P3V3_NIC4_FAULT_N.service"
+                "vr-fault-deassert-log@Santabarbara_MB-FM_P3V3_NIC4_FAULT_N.service"
             ],
             "FALLING": [
-                "vr-fault-assert-log@FM_P3V3_NIC4_FAULT_N.service"
+                "vr-fault-assert-log@Santabarbara_MB-FM_P3V3_NIC4_FAULT_N.service"
             ]
         },
         "Continue": true
@@ -220,10 +220,10 @@
         "EventMon": "BOTH",
         "Targets": {
             "RISING": [
-                "vr-fault-deassert-log@FM_P3V3_E1S_0_FAULT_R_N.service"
+                "vr-fault-deassert-log@Santabarbara_MB-FM_P3V3_E1S_0_FAULT_R_N.service"
             ],
             "FALLING": [
-                "vr-fault-assert-log@FM_P3V3_E1S_0_FAULT_R_N.service"
+                "vr-fault-assert-log@Santabarbara_MB-FM_P3V3_E1S_0_FAULT_R_N.service"
             ]
         },
         "Continue": true
@@ -234,10 +234,10 @@
         "EventMon": "BOTH",
         "Targets": {
             "RISING": [
-                "vr-fault-deassert-log@FM_P3V3_E1S_1_FAULT_R_N.service"
+                "vr-fault-deassert-log@Santabarbara_MB-FM_P3V3_E1S_1_FAULT_R_N.service"
             ],
             "FALLING": [
-                "vr-fault-assert-log@FM_P3V3_E1S_1_FAULT_R_N.service"
+                "vr-fault-assert-log@Santabarbara_MB-FM_P3V3_E1S_1_FAULT_R_N.service"
             ]
         },
         "Continue": true
@@ -248,10 +248,10 @@
         "EventMon": "BOTH",
         "Targets": {
             "RISING": [
-                "vr-fault-deassert-log@FM_P3V3_E1S_2_FAULT_R_N.service"
+                "vr-fault-deassert-log@Santabarbara_MB-FM_P3V3_E1S_2_FAULT_R_N.service"
             ],
             "FALLING": [
-                "vr-fault-assert-log@FM_P3V3_E1S_2_FAULT_R_N.service"
+                "vr-fault-assert-log@Santabarbara_MB-FM_P3V3_E1S_2_FAULT_R_N.service"
             ]
         },
         "Continue": true
@@ -262,10 +262,10 @@
         "EventMon": "BOTH",
         "Targets": {
             "RISING": [
-                "vr-fault-deassert-log@FM_P3V3_E1S_3_FAULT_R_N.service"
+                "vr-fault-deassert-log@Santabarbara_MB-FM_P3V3_E1S_3_FAULT_R_N.service"
             ],
             "FALLING": [
-                "vr-fault-assert-log@FM_P3V3_E1S_3_FAULT_R_N.service"
+                "vr-fault-assert-log@Santabarbara_MB-FM_P3V3_E1S_3_FAULT_R_N.service"
             ]
         },
         "Continue": true
@@ -276,10 +276,10 @@
         "EventMon": "BOTH",
         "Targets": {
             "RISING": [
-                "vr-fault-deassert-log@FM_P3V3_E1S_4_FAULT_R_N.service"
+                "vr-fault-deassert-log@Santabarbara_MB-FM_P3V3_E1S_4_FAULT_R_N.service"
             ],
             "FALLING": [
-                "vr-fault-assert-log@FM_P3V3_E1S_4_FAULT_R_N.service"
+                "vr-fault-assert-log@Santabarbara_MB-FM_P3V3_E1S_4_FAULT_R_N.service"
             ]
         },
         "Continue": true
@@ -290,10 +290,10 @@
         "EventMon": "BOTH",
         "Targets": {
             "RISING": [
-                "vr-fault-deassert-log@E1S_0_P12V_ADC_R_ALERT.service"
+                "vr-fault-deassert-log@Santabarbara_MB-E1S_0_P12V_ADC_R_ALERT.service"
             ],
             "FALLING": [
-                "vr-fault-assert-log@E1S_0_P12V_ADC_R_ALERT.service"
+                "vr-fault-assert-log@Santabarbara_MB-E1S_0_P12V_ADC_R_ALERT.service"
             ]
         },
         "Continue": true
@@ -304,10 +304,10 @@
         "EventMon": "BOTH",
         "Targets": {
             "RISING": [
-                "vr-fault-deassert-log@FM_P12V_E1S_1_FAULT_R_N.service"
+                "vr-fault-deassert-log@Santabarbara_MB-FM_P12V_E1S_1_FAULT_R_N.service"
             ],
             "FALLING": [
-                "vr-fault-assert-log@FM_P12V_E1S_1_FAULT_R_N.service"
+                "vr-fault-assert-log@Santabarbara_MB-FM_P12V_E1S_1_FAULT_R_N.service"
             ]
         },
         "Continue": true
@@ -318,10 +318,10 @@
         "EventMon": "BOTH",
         "Targets": {
             "RISING": [
-                "vr-fault-deassert-log@FM_P12V_E1S_2_FAULT_R_N.service"
+                "vr-fault-deassert-log@Santabarbara_MB-FM_P12V_E1S_2_FAULT_R_N.service"
             ],
             "FALLING": [
-                "vr-fault-assert-log@FM_P12V_E1S_2_FAULT_R_N.service"
+                "vr-fault-assert-log@Santabarbara_MB-FM_P12V_E1S_2_FAULT_R_N.service"
             ]
         },
         "Continue": true
@@ -332,10 +332,10 @@
         "EventMon": "BOTH",
         "Targets": {
             "RISING": [
-                "vr-fault-deassert-log@FM_P12V_E1S_3_FAULT_R_N.service"
+                "vr-fault-deassert-log@Santabarbara_MB-FM_P12V_E1S_3_FAULT_R_N.service"
             ],
             "FALLING": [
-                "vr-fault-assert-log@FM_P12V_E1S_3_FAULT_R_N.service"
+                "vr-fault-assert-log@Santabarbara_MB-FM_P12V_E1S_3_FAULT_R_N.service"
             ]
         },
         "Continue": true
@@ -346,10 +346,10 @@
         "EventMon": "BOTH",
         "Targets": {
             "RISING": [
-                "vr-fault-deassert-log@FM_P12V_E1S_4_FAULT_R_N.service"
+                "vr-fault-deassert-log@Santabarbara_MB-FM_P12V_E1S_4_FAULT_R_N.service"
             ],
             "FALLING": [
-                "vr-fault-assert-log@FM_P12V_E1S_4_FAULT_R_N.service"
+                "vr-fault-assert-log@Santabarbara_MB-FM_P12V_E1S_4_FAULT_R_N.service"
             ]
         },
         "Continue": true
@@ -483,10 +483,10 @@
         "EventMon": "BOTH",
         "Targets": {
             "RISING": [
-                "power-rail-assert-log@PEX_SYS_ERR_FPGA.service"
+                "power-rail-assert-log@Santabarbara_MB-PEX_SYS_ERR_FPGA.service"
             ],
             "FALLING": [
-                "power-rail-deassert-log@PEX_SYS_ERR_FPGA.service"
+                "power-rail-deassert-log@Santabarbara_MB-PEX_SYS_ERR_FPGA.service"
             ]
         },
         "Continue": true
@@ -527,6 +527,76 @@
             ],
             "INIT_LOW": [
                 "swb-pwr-fault-deassert.service"
+            ]
+        },
+        "Continue": true
+    },
+    {
+        "Name": "PRSNT_NIC0_N",
+        "LineName": "PRSNT_NIC0_N",
+        "EventMon": "BOTH",
+        "Targets": {
+            "RISING": [
+                "remove-nic-endpoint-slot@0.service"
+            ],
+            "FALLING": [
+                "setup-nic-endpoint-slot@0.service"
+            ]
+        },
+        "Continue": true
+    },
+    {
+        "Name": "PRSNT_NIC1_N",
+        "LineName": "PRSNT_NIC1_N",
+        "EventMon": "BOTH",
+        "Targets": {
+            "RISING": [
+                "remove-nic-endpoint-slot@1.service"
+            ],
+            "FALLING": [
+                "setup-nic-endpoint-slot@1.service"
+            ]
+        },
+        "Continue": true
+    },
+    {
+        "Name": "PRSNT_NIC2_N",
+        "LineName": "PRSNT_NIC2_N",
+        "EventMon": "BOTH",
+        "Targets": {
+            "RISING": [
+                "remove-nic-endpoint-slot@2.service"
+            ],
+            "FALLING": [
+                "setup-nic-endpoint-slot@2.service"
+            ]
+        },
+        "Continue": true
+    },
+    {
+        "Name": "PRSNT_NIC3_N",
+        "LineName": "PRSNT_NIC3_N",
+        "EventMon": "BOTH",
+        "Targets": {
+            "RISING": [
+                "remove-nic-endpoint-slot@3.service"
+            ],
+            "FALLING": [
+                "setup-nic-endpoint-slot@3.service"
+            ]
+        },
+        "Continue": true
+    },
+    {
+        "Name": "PRSNT_NIC4_N",
+        "LineName": "PRSNT_NIC4_N",
+        "EventMon": "BOTH",
+        "Targets": {
+            "RISING": [
+                "remove-nic-endpoint-slot@4.service"
+            ],
+            "FALLING": [
+                "setup-nic-endpoint-slot@4.service"
             ]
         },
         "Continue": true

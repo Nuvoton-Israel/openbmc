@@ -21,8 +21,6 @@ GBMC_BR_DHCP_HOOKS=()
 
 # A dict of outstanding items that should prevent DHCP completion
 declare -A GBMC_BR_DHCP_OUTSTANDING=()
-# A dict of netboot status to retain start of each state
-declare -A NETBOOT_STATUS_START=()
 
 # SC can't find this path during repotest
 # shellcheck disable=SC1091
@@ -30,37 +28,13 @@ source /usr/share/network/lib.sh || exit
 # SC can't find this path during repotest
 # shellcheck disable=SC1091
 source /usr/share/gbmc-br-lib.sh || exit
+# SC can't find this path during repotest
+# shellcheck disable=SC1091
+source /usr/share/gbmc-br-dhcp-lib.sh || exit
 
 # Load configurations from a known location in the filesystem to populate
 # hooks that are executed after each event.
 gbmc_br_source_dir /usr/share/gbmc-br-dhcp || exit
-update_netboot_status() {
-  local state="$1"
-  local message="$2"
-  local code="$3"
-  local retries="${4-}"
-  local time
-
-  if [[ "$code" == "START" ]]; then
-    NETBOOT_STATUS_START["$state"]=$SECONDS
-    time=0
-  elif [[ -v NETBOOT_STATUS_START["$state"] ]]; then
-    time=$((SECONDS - NETBOOT_STATUS_START["$state"]))
-  else
-    # easy indicator to flag error, no state should ever report before START is defined.
-    time=-1
-  fi
-  local json_output="{\"Message\":\"$message\",\"State\":\"$state\",\"Code\":\"$code\",\"Time\":\"$time\""
-
-  if [[ -n "$retries" ]]; then
-    json_output+=",\"retries\":\"$retries\""
-  fi
-
-  json_output+="}"
-
-  systemd-cat -t "gbmc-netboot" <<<"$json_output"
-  update-dhcp-status 'ONGOING' "$json_output"
-}
 
 if [ "$1" = bound ]; then
   # We don't want to allow 2 simultaneous sessions. Check for a pidfile
@@ -69,15 +43,24 @@ if [ "$1" = bound ]; then
   # If we can't acquire the lock we already have a successful DHCP process in the works
   flock -xn $PID_FD || exit 0
 
-  # Write out the current PID and cleanup when complete
-  trap 'rm -f $PID_FILE' EXIT
+  gbmc_br_exit() {
+    local ret=$?
+    if (( ret != 0 )); then
+      rm -f "$PID_FILE"
+      # Report against the umbrella state: the last state we touched may have
+      # already reported SUCCESS, and netboot is only closed out on success.
+      if [[ "${NETBOOT_STATUS_CODE-}" != "FAIL" ]]; then
+        update_netboot_status "netboot" "DHCP failed with exit code $ret" "FAIL"
+      fi
+    else
+      touch /run/netboot_done
+      # Don't let other DHCP processes start by hogging the pidfile indefinitely
+      # on successful termination.
+      sleep infinity
+    fi
+  }
+  trap 'gbmc_br_exit' EXIT
   echo "$$" >&$PID_FD
-
-  # Don't let other DHCP processes start by hogging the pidfile indefinitely
-  # on successful termination.
-  # This intentionally comes after the pidfile hook to replace it, since we
-  # won't need to remove the pidfile if we never terminate.
-  trap '(( $? == 0 )) && sleep infinity' EXIT
 
   update_netboot_status "netboot" "BMC netboot started" "START"
   # Variable is from the environment via udhcpc6
@@ -139,7 +122,10 @@ if [ "$1" = bound ]; then
     fi
 
     update_netboot_status "dhcp_ip" "Attempt to set ips to ${ipv6s[*]}" "START"
-    gbmc_br_set_ip "${ipv6s[@]}" || exit
+    if ! GBMC_AVOID_RWFS=1 gbmc_br_set_ip "${ipv6s[@]}"; then
+      update_netboot_status "dhcp_ip" "Failed to set ips to ${ipv6s[*]}" "FAIL"
+      exit 1
+    fi
     update_netboot_status "dhcp_ip" "Successfully set ips to ${ipv6s[*]}" "SUCCESS"
     update_netboot_status "dhcp" "DHCP complete" "SUCCESS"
   else
@@ -147,12 +133,20 @@ if [ "$1" = bound ]; then
     update_netboot_status "dhcp" "skip ip/fqdn settings" "SUCCESS"
   fi
 
-  gbmc_br_run_hooks GBMC_BR_DHCP_HOOKS || exit
+  if ! gbmc_br_run_hooks GBMC_BR_DHCP_HOOKS; then
+    update_netboot_status "netboot" "DHCP hooks failed" "FAIL"
+    exit 1
+  fi
 
   # If any of our hooks had expectations we should fail here
   if [ "${#GBMC_BR_DHCP_OUTSTANDING[@]}" -gt 0 ]; then
     update_netboot_status "netboot" "Outstanding DHCP hooks ${!GBMC_BR_DHCP_OUTSTANDING[*]}" "FAIL"
     exit 1
+  fi
+
+  # Persist primary IP to RWFS now that netboot hooks and purge have completed
+  if gbmc_rwfs_purge_done && [[ -n "${ipv6s[0]-}" ]]; then
+    gbmc_net_unmask_and_write /var/google/gbmc-br-ip "${ipv6s[0]}" || true
   fi
 
   # Ensure that the installer knows we have completed processing DHCP by

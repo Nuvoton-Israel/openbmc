@@ -3,67 +3,74 @@
 # shellcheck source=meta-facebook/meta-yosemite5/recipes-phosphor/state/phosphor-state-manager/power-cmd
 source /usr/libexec/phosphor-state-manager/power-cmd
 
-# 1. Change to page 3, for r/w regsiter 0x300 ~ 0x3FF
-i2ctransfer -y 13 w2@0x09 0xfd 0x03
+#Change to page 0
+i2ctransfer -y 13 w2@0x09 0xfd 0x00
 
-# 2. Disable SSC
-i2ctransfer -y 13 w2@0x09 0x07 0x00
+read -r b1 b2 <<< "$(i2ctransfer -y 13 w1@0x09 0x00 r2 2>/dev/null)"
+vendor=$(printf "0x%02X%02X" "$((b1))" "$((b2))")
 
-# 3. Setting SSC amplitude + step（-0.25%）
-i2ctransfer -y 13 w5@0x09 0x04 0xFC 0x2D 0x28 0x80
-i2ctransfer -y 13 w5@0x09 0x04 0xB5 0x16 0x28 0x80
+#RC21008
+if [ "$vendor" == "0x3310" ]; then
+    echo "RC21008 detected."
+    # 1. Change to page 3, for r/w regsiter 0x300 ~ 0x3FF
+    i2ctransfer -y 13 w2@0x09 0xfd 0x03
 
-# 4. enable SSC
-i2ctransfer -y 13 w2@0x09 0x07 0x80
+    # 2. Disable SSC
+    i2ctransfer -y 13 w2@0x09 0x07 0x00
 
-# 5. Check SSC Enable/Disable status
-ret=$(i2ctransfer -y 13 w1@0x09 0x07 r1 2>/dev/null | tr -d ' ')
-if [ "$ret" != "0x80" ]; then
-    echo "Wrong SSC status read: $ret"
+    # 3. Setting SSC amplitude + step（-0.25%）
+    i2ctransfer -y 13 w5@0x09 0x04 0xFC 0x2D 0x28 0x80
+    i2ctransfer -y 13 w5@0x09 0x04 0xB5 0x16 0x28 0x80
+
+    # 4. enable SSC
+    i2ctransfer -y 13 w2@0x09 0x07 0x80
+
+    # 5. Check SSC Enable/Disable status
+    ret=$(i2ctransfer -y 13 w1@0x09 0x07 r1 2>/dev/null | tr -d ' ')
+    if [ "$ret" != "0x80" ]; then
+        echo "Wrong SSC status read: $ret"
+    fi
+
+#SPMU390A
+elif [ "$vendor" == "0x8B03" ]; then
+    echo "SPMU390A detected."
+    #FOD0 SSC = -0.25% Down-spread and enable
+    i2ctransfer -y 13 w2@0x09 0x3c 0x24
+
+    ret=$(i2ctransfer -y 13 w1@0x09 0x3c r1 2>/dev/null | tr -d ' ')
+    if [ "$ret" != "0x24" ]; then
+        echo "Wrong SSC status read: $ret"
+    fi
+else
+    echo "Invalid Clk Gen vendor, No SSC is configured."
 fi
+
 echo "SSC deassertion is triggered by power-good drop, \
     set SSC to -0.25% for better signal integrity"
 
-currentstate=$(busctl get-property \
-    xyz.openbmc_project.State.Host0 \
-    /xyz/openbmc_project/state/host0 \
-    xyz.openbmc_project.State.Host \
-    CurrentHostState | awk '{print $2}' | tr -d '"')
-if [ "$currentstate" == "xyz.openbmc_project.State.Host.HostState.TransitioningToRunning" ]; then
+REQ_ON="${HOST_STATE_INTF}.Transition.On"
+STATE_TRANS_RUNNING="${HOST_STATE_INTF}.HostState.TransitioningToRunning"
+STATE_TRANS_OFF="${HOST_STATE_INTF}.HostState.TransitioningToOff"
+STATE_RUNNING="${HOST_STATE_INTF}.HostState.Running"
+STATE_OFF="${HOST_STATE_INTF}.HostState.Off"
+
+currentstate=$(get_host_prop CurrentHostState)
+if [ "$currentstate" = "$STATE_TRANS_RUNNING" ]; then
     exit 0
 fi
 
-if is_service_busy host-poweron@0.service; then
-    exit 0
-fi
+is_power_transition_active && exit 0
 
-if is_service_busy host-powerreset@0.service; then
-    exit 0
-fi
-
-# Sync power status to "On" for abnormal power-on scenarios.
-if [ "$(power_status)" == "on" ]; then
-    transition=$(busctl get-property \
-        xyz.openbmc_project.State.Host0 \
-        /xyz/openbmc_project/state/host0 \
-        xyz.openbmc_project.State.Host \
-        RequestedHostTransition | awk '{print $2}' | tr -d '"')
-    if [ "$transition" != "xyz.openbmc_project.State.Host.Transition.On" ]; then
-        busctl set-property xyz.openbmc_project.State.Host0 \
-            /xyz/openbmc_project/state/host0 \
-            xyz.openbmc_project.State.Host \
-            RequestedHostTransition s \
-            xyz.openbmc_project.State.Host.Transition.On
-    elif [ "$currentstate" == "xyz.openbmc_project.State.Host.HostState.TransitioningToOff" ]; then
-        busctl set-property xyz.openbmc_project.State.Host0 \
-            /xyz/openbmc_project/state/host0 \
-            xyz.openbmc_project.State.Host \
-            CurrentHostState s xyz.openbmc_project.State.Host.HostState.Off
+if [ "$(power_status)" = "on" ]; then
+    transition=$(get_host_prop RequestedHostTransition)
+    if [ "$transition" != "$REQ_ON" ]; then
+        set_host_prop RequestedHostTransition "$REQ_ON"
+    elif [ "$currentstate" = "$STATE_TRANS_OFF" ]; then
+        set_host_prop CurrentHostState "$STATE_OFF"
         sleep 0.1
-        busctl set-property xyz.openbmc_project.State.Host0 \
-            /xyz/openbmc_project/state/host0 \
-            xyz.openbmc_project.State.Host \
-            CurrentHostState s xyz.openbmc_project.State.Host.HostState.Running
+        set_host_prop CurrentHostState "$STATE_RUNNING"
+    elif [ "$currentstate" = "$STATE_OFF" ]; then
+        set_host_prop CurrentHostState "$STATE_RUNNING"
     fi
 fi
 

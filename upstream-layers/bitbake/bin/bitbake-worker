@@ -11,7 +11,7 @@ import warnings
 warnings.simplefilter("default")
 warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*use.of.fork.*may.lead.to.deadlocks.in.the.child.*")
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(sys.argv[0])), 'lib'))
-from bb import fetch2
+from bb import fetch
 import logging
 import bb
 import select
@@ -24,6 +24,12 @@ import shlex
 import subprocess
 import fcntl
 from threading import Thread
+
+__version__ = "2.19.1"
+ 
+if __name__ == "__main__":
+    if __version__ != bb.__version__:
+        sys.exit("Bitbake core library version and program version mismatch!")
 
 Lock = bb.multiprocessing.Lock
 
@@ -288,8 +294,10 @@ def fork_off_task(cfg, data, databuilder, workerdata, extraconfigdata, runtask):
                     else:
                         logger.debug("Skipping disable network for %s since %s is not a local uid." % (taskname, uid))
 
-                # exported_vars() returns a generator which *cannot* be passed to os.environ.update() 
-                # successfully. We also need to unset anything from the environment which shouldn't be there 
+                # exported_vars() expands each value, so it must be called before
+                # empty_environment() below: an expansion that shells out needs the
+                # environment bitbake was started with. We also need to unset
+                # anything from the environment which shouldn't be there
                 exports = bb.data.exported_vars(the_data)
 
                 bb.utils.empty_environment()

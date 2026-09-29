@@ -12,20 +12,17 @@ LIC_FILES_CHKSUM = "file://OvmfPkg/License.txt;md5=06357ddc23f46577c2aeaeaf7b776
 PACKAGECONFIG ??= "${@bb.utils.contains_any('MACHINE_FEATURES', 'tpm tpm2', 'tpm', '', d)}"
 PACKAGECONFIG[debug] = ",,,"
 PACKAGECONFIG[secureboot] = ",,,"
-PACKAGECONFIG[tpm] = "-D TPM_ENABLE=TRUE,-D TPM_ENABLE=FALSE,,"
+PACKAGECONFIG[tpm] = "-D TPM2_ENABLE=TRUE,-D TPM2_ENABLE=FALSE,,"
 
 SRC_URI = "gitsm://github.com/tianocore/edk2.git;branch=master;protocol=https;tag=${PV} \
            file://0001-ovmf-update-path-to-native-BaseTools.patch \
            file://0002-BaseTools-makefile-adjust-to-build-in-under-bitbake.patch \
            file://0003-debug-prefix-map.patch \
            file://0004-reproducible.patch \
-           file://0005-UefiCpuPkg-CpuExceptionHandlerLib-fix-push-instructi.patch \
-           file://0001-BaseTools-StringFuncs-fix-gcc-16-warning.patch \
-           file://0002-BaseTools-EfiRom-fix-compiler-warning.patch \
            "
 
-PV = "edk2-stable202511"
-SRCREV = "46548b1adac82211d8d11da12dd914f41e7aa775"
+PV = "edk2-stable202605"
+SRCREV = "b03a21a63e3bd001f52c527e5a57feddb53a690b"
 UPSTREAM_CHECK_GITTAGREGEX = "(?P<pver>edk2-stable.*)"
 
 CVE_PRODUCT = "edk2"

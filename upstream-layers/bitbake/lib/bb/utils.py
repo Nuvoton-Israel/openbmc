@@ -529,6 +529,9 @@ def lockfile(name, shared=False, retry=True, block=False):
 
     Returns the locked file descriptor in case of success, ``None`` otherwise.
     """
+    if not name:
+        return None
+
     basename = os.path.basename(name)
     if len(basename) > 255:
         root, ext = os.path.splitext(basename)
@@ -584,6 +587,14 @@ def lockfile(name, shared=False, retry=True, block=False):
         if not retry:
             return None
 
+# We have to drop the existing lock to avoid deadlocks
+def lockfile_to_exclusive(lf):
+    if not lf:
+        return
+    name = lf.name
+    unlockfile(lf)
+    return lockfile(name)
+
 def unlockfile(lf):
     """
     Unlock a file locked using ``bb.utils.lockfile()``.
@@ -594,6 +605,9 @@ def unlockfile(lf):
 
     No return value.
     """
+    if not lf:
+        return
+
     try:
         # If we had a shared lock, we need to promote to exclusive before
         # removing the lockfile. Attempt this, ignore failures.
@@ -944,8 +958,20 @@ def mkdirhier(directory):
     try:
         os.makedirs(directory)
     except OSError as e:
-        if e.errno != errno.EEXIST or not os.path.isdir(directory):
+        if e.errno != errno.EEXIST:
             raise e
+        if os.path.isdir(directory):
+            return
+        # We can end up here if there is a race between two mkdirs on an NFS mount,
+        # which happens more often with sstate that you'd think. The server returns
+        # EEXIST but the local attribute cache is out of date. It can be refreshed with
+        # an opendir call, so try that (via listdir) and check the directory again
+        # before we really fail.
+        os.listdir(os.path.dirname(directory))
+        if os.path.isdir(directory):
+            return
+        bb.warn("mkdir: %s is not a directory?")
+        raise e
 
 def movefile(src, dest, newmtime = None, sstat = None):
     """Moves a file from ``src`` to ``dest``, preserving all permissions and
@@ -2055,7 +2081,7 @@ def disable_network(uid=None, gid=None):
         f.write("%s %s 1" % (gid, gid))
 
 def export_proxies(d):
-    from bb.fetch2 import get_fetcher_environment
+    from bb.fetch import get_fetcher_environment
     """ export common proxies variables from datastore to environment """
     newenv = get_fetcher_environment(d)
     for v in newenv:

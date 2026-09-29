@@ -15,6 +15,10 @@ SRC_URI = "git://github.com/NetworkConfiguration/dhcpcd;protocol=https;branch=ma
            file://dhcpcd.service \
            file://dhcpcd@.service \
            file://0001-dhcpcd.8-Fix-conflict-error-when-enable-multilib.patch \
+           file://CVE-2026-56113.patch \
+           file://CVE-2026-56114.patch \
+           file://CVE-2026-56116.patch \
+           file://CVE-2026-56117.patch \
            "
 
 SRCREV = "243ad84ac67a87d631ff7eb83b2eed2727acebb5"
@@ -24,10 +28,11 @@ inherit pkgconfig autotools-brokensep systemd useradd
 
 SYSTEMD_SERVICE:${PN} = "dhcpcd.service"
 
-PACKAGECONFIG ?= "udev ${@bb.utils.filter('DISTRO_FEATURES', 'ipv6', d)}"
+PACKAGECONFIG ?= "udev ${@bb.utils.filter('DISTRO_FEATURES', 'ipv6 seccomp', d)}"
 
 PACKAGECONFIG[udev] = "--with-udev,--without-udev,udev,udev"
 PACKAGECONFIG[ipv6] = "--enable-ipv6,--disable-ipv6"
+PACKAGECONFIG[seccomp] = "--enable-seccomp,--disable-seccomp"
 # ntp conflicts with chrony
 PACKAGECONFIG[ntp] = "--with-hook=ntp, , ,ntp"
 PACKAGECONFIG[chrony] = "--with-hook=ntp, , ,chrony"

@@ -1,5 +1,5 @@
 #
-# BitBake Tests for the Fetcher (fetch2/)
+# BitBake Tests for the Fetcher (fetch/)
 #
 # Copyright (C) 2012 Richard Purdie
 #
@@ -18,9 +18,10 @@ import collections
 import os
 import signal
 import subprocess
+import json
 import tarfile
 import threading
-from bb.fetch2 import URI
+from bb.fetch import URI
 import bb
 import bb.utils
 from bb.tests.support.httpserver import HTTPService
@@ -519,28 +520,28 @@ class MirrorUriTest(FetcherTest):
         for k, v in self.replaceuris.items():
             ud = bb.fetch.FetchData(k[0], self.d)
             ud.setup_localpath(self.d)
-            mirrors = bb.fetch2.mirror_from_string("%s %s" % (k[1], k[2]))
-            newuris, uds = bb.fetch2.build_mirroruris(ud, mirrors, self.d)
+            mirrors = bb.fetch.mirror_from_string("%s %s" % (k[1], k[2]))
+            newuris, uds = bb.fetch.build_mirroruris(ud, mirrors, self.d)
             self.assertEqual([v] if v else [], newuris)
 
     def test_urilist1(self):
         fetcher = bb.fetch.FetchData("http://downloads.yoctoproject.org/releases/bitbake/bitbake-1.0.tar.gz", self.d)
-        mirrors = bb.fetch2.mirror_from_string(self.mirrorvar)
-        uris, uds = bb.fetch2.build_mirroruris(fetcher, mirrors, self.d)
+        mirrors = bb.fetch.mirror_from_string(self.mirrorvar)
+        uris, uds = bb.fetch.build_mirroruris(fetcher, mirrors, self.d)
         self.assertEqual(uris, ['file:///somepath/downloads/bitbake-1.0.tar.gz', 'file:///someotherpath/downloads/bitbake-1.0.tar.gz'])
 
     def test_urilist2(self):
         # Catch https:// -> files:// bug
         fetcher = bb.fetch.FetchData("https://downloads.yoctoproject.org/releases/bitbake/bitbake-1.0.tar.gz", self.d)
-        mirrors = bb.fetch2.mirror_from_string(self.mirrorvar)
-        uris, uds = bb.fetch2.build_mirroruris(fetcher, mirrors, self.d)
+        mirrors = bb.fetch.mirror_from_string(self.mirrorvar)
+        uris, uds = bb.fetch.build_mirroruris(fetcher, mirrors, self.d)
         self.assertEqual(uris, ['file:///someotherpath/downloads/bitbake-1.0.tar.gz'])
 
     def test_urilistsvn(self):
         # Catch svn:// -> svn:// bug
         fetcher = bb.fetch.FetchData("svn://svn.server1.com/isource/svnroot/reponame/tags/tagname;module=path_in_tagnamefolder;protocol=https;rev=2", self.d)
-        mirrors = bb.fetch2.mirror_from_string(self.mirrorvar)
-        uris, uds = bb.fetch2.build_mirroruris(fetcher, mirrors, self.d)
+        mirrors = bb.fetch.mirror_from_string(self.mirrorvar)
+        uris, uds = bb.fetch.build_mirroruris(fetcher, mirrors, self.d)
         self.assertEqual(uris, ['svn://svn.server2.com/isource/svnroot/reponame/tags/tagname;module=path_in_tagnamefolder;protocol=https;rev=2'])
 
     def test_mirror_of_mirror(self):
@@ -548,8 +549,8 @@ class MirrorUriTest(FetcherTest):
         mirrorvar = self.mirrorvar + " http://.*/.* http://otherdownloads.yoctoproject.org/downloads/"
         mirrorvar = mirrorvar + " http://otherdownloads.yoctoproject.org/.* http://downloads2.yoctoproject.org/downloads/"
         fetcher = bb.fetch.FetchData("http://downloads.yoctoproject.org/releases/bitbake/bitbake-1.0.tar.gz", self.d)
-        mirrors = bb.fetch2.mirror_from_string(mirrorvar)
-        uris, uds = bb.fetch2.build_mirroruris(fetcher, mirrors, self.d)
+        mirrors = bb.fetch.mirror_from_string(mirrorvar)
+        uris, uds = bb.fetch.build_mirroruris(fetcher, mirrors, self.d)
         self.assertEqual(uris, ['file:///somepath/downloads/bitbake-1.0.tar.gz',
                                 'file:///someotherpath/downloads/bitbake-1.0.tar.gz',
                                 'http://otherdownloads.yoctoproject.org/downloads/bitbake-1.0.tar.gz',
@@ -560,8 +561,8 @@ class MirrorUriTest(FetcherTest):
 
     def test_recursive(self):
         fetcher = bb.fetch.FetchData("https://downloads.yoctoproject.org/releases/bitbake/bitbake-1.0.tar.gz", self.d)
-        mirrors = bb.fetch2.mirror_from_string(self.recmirrorvar)
-        uris, uds = bb.fetch2.build_mirroruris(fetcher, mirrors, self.d)
+        mirrors = bb.fetch.mirror_from_string(self.recmirrorvar)
+        uris, uds = bb.fetch.build_mirroruris(fetcher, mirrors, self.d)
         self.assertEqual(uris, ['http://aaaa/A/A/A/bitbake/bitbake-1.0.tar.gz',
                                 'https://bbbb/B/B/B/bitbake/bitbake-1.0.tar.gz',
                                 'http://aaaa/A/A/A/B/B/bitbake/bitbake-1.0.tar.gz'])
@@ -572,8 +573,8 @@ class GitDownloadDirectoryNamingTest(FetcherTest):
         super(GitDownloadDirectoryNamingTest, self).setUp()
         self.recipe_url = "git://git.openembedded.org/bitbake;branch=master;protocol=https"
         self.recipe_dir = "git.openembedded.org.bitbake"
-        self.mirror_url = "git://github.com/openembedded/bitbake.git;protocol=https;branch=master"
-        self.mirror_dir = "github.com.openembedded.bitbake.git"
+        self.mirror_url = "git://git.openembedded.org/bitbake-contrib.git;protocol=https;branch=master"
+        self.mirror_dir = "git.openembedded.org.bitbake-contrib.git"
 
         self.d.setVar('SRCREV', '82ea737a0b42a8b53e11c9cde141e9e9c0bd8c40')
 
@@ -620,8 +621,8 @@ class TarballNamingTest(FetcherTest):
         super(TarballNamingTest, self).setUp()
         self.recipe_url = "git://git.openembedded.org/bitbake;branch=master;protocol=https"
         self.recipe_tarball = "git2_git.openembedded.org.bitbake.tar.gz"
-        self.mirror_url = "git://github.com/openembedded/bitbake.git;protocol=https;branch=master"
-        self.mirror_tarball = "git2_github.com.openembedded.bitbake.git.tar.gz"
+        self.mirror_url = "git://git.openembedded.org/bitbake-contrib.git;protocol=https;branch=master"
+        self.mirror_tarball = "git2_git.openembedded.org.bitbake-contrib.git.tar.gz"
 
         self.d.setVar('BB_GENERATE_MIRROR_TARBALLS', '1')
         self.d.setVar('SRCREV', '82ea737a0b42a8b53e11c9cde141e9e9c0bd8c40')
@@ -654,8 +655,8 @@ class GitShallowTarballNamingTest(FetcherTest):
         super(GitShallowTarballNamingTest, self).setUp()
         self.recipe_url = "git://git.openembedded.org/bitbake;branch=master;protocol=https"
         self.recipe_tarball = "gitshallow_git.openembedded.org.bitbake_82ea737-1_master.tar.gz"
-        self.mirror_url = "git://github.com/openembedded/bitbake.git;protocol=https;branch=master"
-        self.mirror_tarball = "gitshallow_github.com.openembedded.bitbake.git_82ea737-1_master.tar.gz"
+        self.mirror_url = "git://git.openembedded.org/bitbake-contrib.git;protocol=https;branch=master"
+        self.mirror_tarball = "gitshallow_git.openembedded.org.bitbake-contrib.git_82ea737-1_master.tar.gz"
 
         self.d.setVar('BB_GIT_SHALLOW', '1')
         self.d.setVar('BB_GENERATE_SHALLOW_TARBALLS', '1')
@@ -797,7 +798,7 @@ class FetcherLocalTest(FetcherTest):
         self.assertEqual(tree, [r'backslash\x2dsystemd-unit.device'])
 
     def test_local_wildcard(self):
-        with self.assertRaises(bb.fetch2.ParameterError):
+        with self.assertRaises(bb.fetch.ParameterError):
             tree = self.fetchUnpack(['file://a', 'file://dir/*'])
 
     def test_local_dir(self):
@@ -826,7 +827,7 @@ class FetcherLocalTest(FetcherTest):
         tree = self.fetchUnpack(['file://a;subdir=%s' % os.path.join(self.unpackdir, 'bar')])
 
         # Unpacking to an absolute path outside of the root should fail
-        with self.assertRaises(bb.fetch2.UnpackError):
+        with self.assertRaises(bb.fetch.UnpackError):
             self.fetchUnpack(['file://a;subdir=/bin/sh'])
 
     def test_local_striplevel(self):
@@ -853,20 +854,20 @@ class FetcherLocalTest(FetcherTest):
 
     def test_local_deb_rejects_unknown_data_member_suffix(self):
         package = self.make_ar_package("archive.deb", data_member="data.tar.foo")
-        with self.assertRaises(bb.fetch2.UnpackError) as context:
+        with self.assertRaises(bb.fetch.UnpackError) as context:
             self.fetchUnpack(['file://%s' % package])
 
         self.assertIn("does not contain supported data.tar* file", str(context.exception))
 
     def test_local_deb_rejects_unsafe_data_member(self):
         package = self.make_ar_package("archive.deb", data_member="data.tar.xz;id")
-        with self.assertRaises(bb.fetch2.UnpackError) as context:
+        with self.assertRaises(bb.fetch.UnpackError) as context:
             self.fetchUnpack(['file://%s' % package])
 
         self.assertIn("does not contain supported data.tar* file", str(context.exception))
 
     def assertInvalidStriplevel(self, value):
-        with self.assertRaises(bb.fetch2.UnpackError) as context:
+        with self.assertRaises(bb.fetch.UnpackError) as context:
             self.fetchUnpack(['file://archive.tar;subdir=bar;striplevel=%s' % value])
         self.assertIn("Invalid striplevel parameter", str(context.exception))
 
@@ -930,7 +931,7 @@ class FetcherNoNetworkTest(FetcherTest):
         self.assertFalse(os.path.exists(os.path.join(self.dldir, "test-file.tar.gz")))
         self.assertFalse(os.path.exists(os.path.join(self.dldir, "test-file.tar.gz.done")))
         fetcher = bb.fetch.Fetch(["http://invalid.yoctoproject.org/test-file.tar.gz"], self.d)
-        with self.assertRaises(bb.fetch2.NetworkAccess):
+        with self.assertRaises(bb.fetch.NetworkAccess):
             fetcher.download()
 
     def test_valid_missing_donestamp(self):
@@ -960,7 +961,7 @@ class FetcherNoNetworkTest(FetcherTest):
         self.assertTrue(os.path.exists(os.path.join(self.dldir, "test-file.tar.gz")))
         self.assertFalse(os.path.exists(os.path.join(self.dldir, "test-file.tar.gz.done")))
         fetcher = bb.fetch.Fetch(["http://invalid.yoctoproject.org/test-file.tar.gz"], self.d)
-        with self.assertRaises(bb.fetch2.NetworkAccess):
+        with self.assertRaises(bb.fetch.NetworkAccess):
             fetcher.download()
         # the existing file should not exist or should have be moved to "bad-checksum"
         self.assertFalse(os.path.exists(os.path.join(self.dldir, "test-file.tar.gz")))
@@ -971,7 +972,7 @@ class FetcherNoNetworkTest(FetcherTest):
         # ssh fetch does not support checksums
         fetcher = bb.fetch.Fetch(["ssh://invalid@invalid.yoctoproject.org/test-file.tar.gz"], self.d)
         # attempts to download with missing donestamp
-        with self.assertRaises(bb.fetch2.NetworkAccess):
+        with self.assertRaises(bb.fetch.NetworkAccess):
             fetcher.download()
 
     def test_nochecksums_missing_donestamp(self):
@@ -984,7 +985,7 @@ class FetcherNoNetworkTest(FetcherTest):
         # ssh fetch does not support checksums
         fetcher = bb.fetch.Fetch(["ssh://invalid@invalid.yoctoproject.org/test-file.tar.gz"], self.d)
         # attempts to download with missing donestamp
-        with self.assertRaises(bb.fetch2.NetworkAccess):
+        with self.assertRaises(bb.fetch.NetworkAccess):
             fetcher.download()
 
     def test_nochecksums_has_donestamp(self):
@@ -1013,7 +1014,7 @@ class FetcherNoNetworkTest(FetcherTest):
         self.assertTrue(os.path.exists(os.path.join(self.dldir, "test-file.tar.gz.done")))
         # ssh fetch does not support checksums
         fetcher = bb.fetch.Fetch(["ssh://invalid@invalid.yoctoproject.org/test-file.tar.gz"], self.d)
-        with self.assertRaises(bb.fetch2.NetworkAccess):
+        with self.assertRaises(bb.fetch.NetworkAccess):
             fetcher.download()
         # both files should still exist
         self.assertFalse(os.path.exists(os.path.join(self.dldir, "test-file.tar.gz")))
@@ -1196,7 +1197,7 @@ class FetcherNetworkTest(FetcherTest):
     def test_git_submodule_restricted_network_premirrors(self):
         # this test is to ensure that premirrors will be tried in restricted network
         # that is, BB_ALLOWED_NETWORKS does not contain the domain the url uses
-        url = "gitsm://github.com/grpc/grpc.git;protocol=https;name=grpc;branch=v1.60.x;rev=0ef13a7555dbaadd4633399242524129eef5e231"
+        url = "gitsm://git.yoctoproject.org/git-submodule-test;branch=master;rev=38e61644af90dccd73c03ed3acaed98c8dda9294;branch=master;protocol=https"
         # create a download directory to be used as premirror later
         tempdir = tempfile.mkdtemp(prefix="bitbake-fetch-")
         dl_premirror = os.path.join(tempdir, "download-premirror")
@@ -1215,7 +1216,7 @@ class FetcherNetworkTest(FetcherTest):
     def test_git_submodule_dbus_broker(self):
         # The following external repositories have show failures in fetch and unpack operations
         # We want to avoid regressions!
-        url = "gitsm://github.com/bus1/dbus-broker;protocol=https;rev=fc874afa0992d0c75ec25acb43d344679f0ee7d2;branch=main"
+        url = "gitsm://git.yoctoproject.org/bbfetchtests-bus1-dbus-broker;protocol=https;rev=fc874afa0992d0c75ec25acb43d344679f0ee7d2;branch=main"
         fetcher = bb.fetch.Fetch([url], self.d)
         fetcher.download()
         # Previous cwd has been deleted
@@ -1231,7 +1232,7 @@ class FetcherNetworkTest(FetcherTest):
 
     @skipIfNoNetwork()
     def test_git_submodule_CLI11(self):
-        url = "gitsm://github.com/CLIUtils/CLI11;protocol=https;rev=bd4dc911847d0cde7a6b41dfa626a85aab213baf;branch=main"
+        url = "gitsm://git.yoctoproject.org/bbfetchtests-cliutils-cli11;protocol=https;rev=474872a222f61e57b16c2feb774610a4595a729e;branch=main"
         fetcher = bb.fetch.Fetch([url], self.d)
         fetcher.download()
         # Previous cwd has been deleted
@@ -1241,17 +1242,16 @@ class FetcherNetworkTest(FetcherTest):
         repo_path = os.path.join(self.tempdir, 'unpacked', 'git')
         self.assertTrue(os.path.exists(os.path.join(repo_path, '.git/modules/extern/googletest/config')), msg='Missing submodule config "extern/googletest"')
         self.assertTrue(os.path.exists(os.path.join(repo_path, '.git/modules/extern/json/config')), msg='Missing submodule config "extern/json"')
-        self.assertTrue(os.path.exists(os.path.join(repo_path, '.git/modules/extern/sanitizers/config')), msg='Missing submodule config "extern/sanitizers"')
 
     @skipIfNoNetwork()
     def test_git_submodule_update_CLI11(self):
         """ Prevent regression on update detection not finding missing submodule, or modules without needed commits """
-        url = "gitsm://github.com/CLIUtils/CLI11;protocol=https;rev=cf6a99fa69aaefe477cc52e3ef4a7d2d7fa40714;branch=main"
+        url = "gitsm://git.yoctoproject.org/bbfetchtests-cliutils-cli11;protocol=https;rev=fe0e149a0624db734de37dc827af3328855f51cf;branch=main"
         fetcher = bb.fetch.Fetch([url], self.d)
         fetcher.download()
 
         # CLI11 that pulls in a newer nlohmann-json
-        url = "gitsm://github.com/CLIUtils/CLI11;protocol=https;rev=49ac989a9527ee9bb496de9ded7b4872c2e0e5ca;branch=main"
+        url = "gitsm://git.yoctoproject.org/bbfetchtests-cliutils-cli11;protocol=https;rev=141f9dca45bd5ef42e7b1a06637860b7581370c8;branch=main"
         fetcher = bb.fetch.Fetch([url], self.d)
         fetcher.download()
         # Previous cwd has been deleted
@@ -1261,11 +1261,10 @@ class FetcherNetworkTest(FetcherTest):
         repo_path = os.path.join(self.tempdir, 'unpacked', 'git')
         self.assertTrue(os.path.exists(os.path.join(repo_path, '.git/modules/extern/googletest/config')), msg='Missing submodule config "extern/googletest"')
         self.assertTrue(os.path.exists(os.path.join(repo_path, '.git/modules/extern/json/config')), msg='Missing submodule config "extern/json"')
-        self.assertTrue(os.path.exists(os.path.join(repo_path, '.git/modules/extern/sanitizers/config')), msg='Missing submodule config "extern/sanitizers"')
 
     @skipIfNoNetwork()
     def test_git_submodule_aktualizr(self):
-        url = "gitsm://github.com/advancedtelematic/aktualizr;branch=master;protocol=https;rev=d00d1a04cc2366d1a5f143b84b9f507f8bd32c44"
+        url = "gitsm://git.yoctoproject.org/bbfetchtests-advancedtelematic-aktualizr;branch=master;protocol=https;rev=d00d1a04cc2366d1a5f143b84b9f507f8bd32c44"
         fetcher = bb.fetch.Fetch([url], self.d)
         fetcher.download()
         # Previous cwd has been deleted
@@ -1310,11 +1309,11 @@ class FetcherNetworkTest(FetcherTest):
 
     @skipIfNoNetwork()
     def test_git_submodule_reference_to_parent(self):
-        self.recipe_url = "gitsm://github.com/gflags/gflags.git;protocol=https;branch=master"
+        self.recipe_url = "gitsm://git.yoctoproject.org/bbfetchtests-gflags;protocol=https;branch=master"
         self.d.setVar("SRCREV", "14e1138441bbbb584160cb1c0a0426ec1bac35f1")
         with Timeout(60):
             fetcher = bb.fetch.Fetch([self.recipe_url], self.d)
-            with self.assertRaises(bb.fetch2.FetchError):
+            with self.assertRaises(bb.fetch.FetchError):
                 fetcher.download()
 
 class SVNTest(FetcherTest):
@@ -1475,7 +1474,7 @@ class FetchLatestVersionTest(FetcherTest):
 
     test_git_uris = {
         # version pattern "X.Y.Z"
-        ("mx-1.0", "git://github.com/clutter-project/mx.git;branch=mx-1.4;protocol=https", "9b1db6b8060bd00b121a692f942404a24ae2960f", "", "")
+        ("mx-1.0", "git://git.yoctoproject.org/bbfetchtests-clutter-mx;branch=mx-1.4;protocol=https", "9b1db6b8060bd00b121a692f942404a24ae2960f", "", "")
             : "1.99.4",
         # version pattern "vX.Y"
         # mirror of git.infradead.org since network issues interfered with testing
@@ -1502,11 +1501,11 @@ class FetchLatestVersionTest(FetcherTest):
             : "0.4.3",
         ("build-appliance-image", "git://git.yoctoproject.org/poky;branch=master;protocol=https", "b37dd451a52622d5b570183a81583cc34c2ff555", r"(?P<pver>(([0-9][\.|_]?)+[0-9]))", "")
             : "11.0.0",
-        ("chkconfig-alternatives-native", "git://github.com/kergoth/chkconfig;branch=sysroot;protocol=https", "cd437ecbd8986c894442f8fce1e0061e20f04dee", r"chkconfig\-(?P<pver>((\d+[\.\-_]*)+))", "")
+        ("chkconfig-alternatives-native", "git://git.yoctoproject.org/bbfetchtests-kergoth-chkconfig;branch=sysroot;protocol=https", "cd437ecbd8986c894442f8fce1e0061e20f04dee", r"chkconfig\-(?P<pver>((\d+[\.\-_]*)+))", "")
             : "1.3.59",
-        ("remake", "git://github.com/rocky/remake.git;protocol=https;branch=master", "f05508e521987c8494c92d9c2871aec46307d51d", r"(?P<pver>(\d+\.(\d+\.)*\d*(\+dbg\d+(\.\d+)*)*))", "")
+        ("remake", "git://git.yoctoproject.org/bbfetchtests-rocky-remake;protocol=https;branch=master", "f05508e521987c8494c92d9c2871aec46307d51d", r"(?P<pver>(\d+\.(\d+\.)*\d*(\+dbg\d+(\.\d+)*)*))", "")
             : "3.82+dbg0.9",
-        ("sysdig", "git://github.com/draios/sysdig.git;branch=dev;protocol=https", "4fb6288275f567f63515df0ff0a6518043ecfa9b", r"^(?P<pver>\d+(\.\d+)+)", "10.0.0")
+        ("sysdig", "git://git.yoctoproject.org/bbfetchtests-draios-sysdig;branch=dev;protocol=https", "4fb6288275f567f63515df0ff0a6518043ecfa9b", r"^(?P<pver>\d+(\.\d+)+)", "10.0.0")
             : "0.28.0",
     }
 
@@ -1579,7 +1578,7 @@ class FetchLatestVersionTest(FetcherTest):
     test_git_stable_uris = {
         ("dtc", "git://git.yoctoproject.org/bbfetchtests-dtc.git;branch=master;protocol=https", "65cc4d2748a2c2e6f27f1cf39e07a5dbabd80ebf", "", r"^1\.4\.\d+$")
             : ("1.4.0", "1.5.0"),
-        ("systemd", "git://github.com/systemd/systemd.git;protocol=https;branch=stable/v259-stable", "b3d8fc43e9cb531d958c17ef2cd93b374bc14e8a", "", r"^259\.\d+$")
+        ("systemd", "git://git.yoctoproject.org/bbfetchtests-systemd;protocol=https;branch=stable/v259-stable", "b3d8fc43e9cb531d958c17ef2cd93b374bc14e8a", "", r"^259\.\d+$")
             : ("259.5", "260")
     }
 
@@ -1600,7 +1599,7 @@ class FetchLatestVersionTest(FetcherTest):
                 self.d.setVar("PN", k[0])
                 self.d.setVar("SRCREV", k[2])
                 self.d.setVar("UPSTREAM_CHECK_GITTAGREGEX", k[3])
-                ud = bb.fetch2.FetchData(k[1], self.d)
+                ud = bb.fetch.FetchData(k[1], self.d)
                 pupver= ud.method.latest_versionstring(ud, self.d)
                 verstring = pupver[0]
                 self.assertTrue(verstring, msg="Could not find upstream version for %s" % k[0])
@@ -1627,7 +1626,7 @@ class FetchLatestVersionTest(FetcherTest):
                         self.d.setVar("UPSTREAM_CHECK_REGEX", data.check_regex)
 
                     url = "http://127.0.0.1:%s/%s" % (port, data.path)
-                    ud = bb.fetch2.FetchData(url, self.d)
+                    ud = bb.fetch.FetchData(url, self.d)
                     pupver = ud.method.latest_versionstring(ud, self.d)
                     verstring = pupver[0]
                     self.assertTrue(verstring, msg="Could not find upstream version for %s" % data.pn)
@@ -1641,7 +1640,7 @@ class FetchLatestVersionTest(FetcherTest):
         for k, v in self.test_crate_uris.items():
             with self.subTest(pn=k[0]):
                 self.d.setVar("PN", k[0])
-                ud = bb.fetch2.FetchData(k[1], self.d)
+                ud = bb.fetch.FetchData(k[1], self.d)
                 pupver = ud.method.latest_versionstring(ud, self.d)
                 verstring = pupver[0]
                 self.assertTrue(verstring, msg="Could not find upstream version for %s" % k[0])
@@ -1656,7 +1655,7 @@ class FetchLatestVersionTest(FetcherTest):
                 self.d.setVar("SRCREV", k[2])
                 self.d.setVar("UPSTREAM_CHECK_GITTAGREGEX", k[3])
                 filter_regex = k[4]
-                ud = bb.fetch2.FetchData(k[1], self.d)
+                ud = bb.fetch.FetchData(k[1], self.d)
                 pupver= ud.method.latest_versionstring(ud, self.d, filter_regex=filter_regex)
                 verstring = pupver[0]
                 self.assertTrue(verstring, msg="Could not find upstream version for %s" % k[0])
@@ -1679,7 +1678,7 @@ class FetchLatestVersionTest(FetcherTest):
                 if k[4]:
                     self.d.setVar("UPSTREAM_CHECK_REGEX", k[4])
                 filter_regex = k[5]
-                ud = bb.fetch2.FetchData(url, self.d)
+                ud = bb.fetch.FetchData(url, self.d)
                 pupver= ud.method.latest_versionstring(ud, self.d, filter_regex=filter_regex)
                 verstring = pupver[0]
                 self.assertTrue(verstring, msg="Could not find upstream version for %s" % k[0])
@@ -1695,7 +1694,7 @@ class FetchLatestVersionTest(FetcherTest):
         for k, v in self.test_crate_stable_uris.items():
             with self.subTest(pn=k[0]):
                 self.d.setVar("PN", k[0])
-                ud = bb.fetch2.FetchData(k[1], self.d)
+                ud = bb.fetch.FetchData(k[1], self.d)
                 filter_regex = k[2]
                 pupver = ud.method.latest_versionstring(ud, self.d, filter_regex=filter_regex)
                 verstring = pupver[0]
@@ -1715,7 +1714,6 @@ class FetchCheckStatusTest(FetcherTest):
                       "https://docs.yoctoproject.org",
                       "https://downloads.yoctoproject.org/releases/opkg/opkg-0.1.7.tar.gz",
                       "https://downloads.yoctoproject.org/releases/opkg/opkg-0.3.0.tar.gz",
-                      "ftp://sourceware.org/pub/libffi/libffi-1.20.tar.gz",
                       ]
 
     def _start_checkstatus_server(self):
@@ -1749,13 +1747,13 @@ class FetchCheckStatusTest(FetcherTest):
         return server
 
     def _checkstatus(self, url):
-        fetch = bb.fetch2.Fetch([url], self.d)
+        fetch = bb.fetch.Fetch([url], self.d)
         ud = fetch.ud[url]
         return ud.method.checkstatus(fetch, ud, self.d)
 
     @skipIfNoNetwork()
     def test_wget_checkstatus(self):
-        fetch = bb.fetch2.Fetch(self.test_wget_uris, self.d)
+        fetch = bb.fetch.Fetch(self.test_wget_uris, self.d)
         for u in self.test_wget_uris:
             with self.subTest(url=u):
                 ud = fetch.ud[u]
@@ -1765,10 +1763,10 @@ class FetchCheckStatusTest(FetcherTest):
 
     @skipIfNoNetwork()
     def test_wget_checkstatus_connection_cache(self):
-        from bb.fetch2 import FetchConnectionCache
+        from bb.fetch import FetchConnectionCache
 
         connection_cache = FetchConnectionCache()
-        fetch = bb.fetch2.Fetch(self.test_wget_uris, self.d,
+        fetch = bb.fetch.Fetch(self.test_wget_uris, self.d,
                     connection_cache = connection_cache)
 
         for u in self.test_wget_uris:
@@ -1779,6 +1777,74 @@ class FetchCheckStatusTest(FetcherTest):
                 self.assertTrue(ret, msg="URI %s, can't check status" % (u))
 
         connection_cache.close_connections()
+
+    @unittest.skipUnless(shutil.which("openssl"), "openssl not installed")
+    def test_wget_checkstatus_https_connection_cache(self):
+        import ssl
+        from socketserver import ThreadingMixIn
+        from bb.fetch import FetchConnectionCache
+
+        class HTTPSRequestHandler(http.server.BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"
+
+            def do_HEAD(self):
+                self.send_response(200)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
+            def log_message(self, format_str, *args):
+                pass
+
+        class HTTPSServer(ThreadingMixIn, http.server.HTTPServer):
+            daemon_threads = True
+
+            def __init__(self, *args, **kwargs):
+                self.connection_count = 0
+                super().__init__(*args, **kwargs)
+
+            def get_request(self):
+                request, client_address = super().get_request()
+                self.connection_count += 1
+                return request, client_address
+
+        certificate = os.path.join(self.tempdir, "certificate.pem")
+        private_key = os.path.join(self.tempdir, "private-key.pem")
+        result = subprocess.run(
+            ["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+             "-keyout", private_key, "-out", certificate, "-days", "1",
+             "-subj", "/CN=127.0.0.1"],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        self.assertEqual(result.returncode, 0,
+                         "openssl certificate generation failed:\n%s" % result.stdout)
+
+        server = HTTPSServer(("127.0.0.1", 0), HTTPSRequestHandler)
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(certificate, private_key)
+        server.socket = context.wrap_socket(server.socket, server_side=True)
+        server_thread = threading.Thread(target=server.serve_forever)
+        server_thread.daemon = True
+        server_thread.start()
+
+        connection_cache = FetchConnectionCache()
+        try:
+            url = "https://127.0.0.1:%s/test" % server.server_port
+            self.d.setVar("BB_CHECK_SSL_CERTS", "0")
+            fetch = bb.fetch.Fetch([url], self.d,
+                                    connection_cache=connection_cache)
+            ud = fetch.ud[url]
+            self.assertTrue(ud.method.checkstatus(fetch, ud, self.d))
+            self.assertTrue(ud.method.checkstatus(fetch, ud, self.d))
+            self.assertEqual(server.connection_count, 1)
+
+            # A connection established without certificate checks must not be
+            # reused after certificate checking is enabled.
+            self.d.setVar("BB_CHECK_SSL_CERTS", "1")
+            self.assertFalse(ud.method.checkstatus(fetch, ud, self.d))
+        finally:
+            connection_cache.close_connections()
+            server.shutdown()
+            server_thread.join()
+            server.server_close()
 
     def test_wget_checkstatus_same_origin_redirect_keeps_auth(self):
         server = self._start_checkstatus_server()
@@ -1849,7 +1915,7 @@ class GitShallowTest(FetcherTest):
         uri = 'git://%s;protocol=file;subdir=${S};branch=master' % self.srcdir
         self.d.setVar('SRC_URI', uri)
         self.d.setVar('SRCREV', '${AUTOREV}')
-        self.d.setVar('AUTOREV', '${@bb.fetch2.get_autorev(d)}')
+        self.d.setVar('AUTOREV', '${@bb.fetch.get_autorev(d)}')
 
         self.d.setVar('BB_GIT_SHALLOW', '1')
         self.d.setVar('BB_GENERATE_MIRROR_TARBALLS', '0')
@@ -1894,7 +1960,7 @@ class GitShallowTest(FetcherTest):
             uri = d.expand(uri)
             uris = [uri]
 
-        fetcher = bb.fetch2.Fetch(uris, d)
+        fetcher = bb.fetch.Fetch(uris, d)
         fetcher.download()
         ud = fetcher.ud[uri]
         return fetcher, ud
@@ -2225,7 +2291,7 @@ class GitShallowTest(FetcherTest):
         self.add_empty_file('b')
 
         self.d.setVar('BB_GIT_SHALLOW_DEPTH', '-12')
-        with self.assertRaises(bb.fetch2.FetchError):
+        with self.assertRaises(bb.fetch.FetchError):
             self.fetch()
 
     def test_shallow_invalid_depth_default(self):
@@ -2233,7 +2299,7 @@ class GitShallowTest(FetcherTest):
         self.add_empty_file('b')
 
         self.d.setVar('BB_GIT_SHALLOW_DEPTH_default', '-12')
-        with self.assertRaises(bb.fetch2.FetchError):
+        with self.assertRaises(bb.fetch.FetchError):
             self.fetch()
 
     def test_shallow_extra_refs(self):
@@ -2298,7 +2364,7 @@ class GitShallowTest(FetcherTest):
         self.add_empty_file('b')
 
         self.d.setVar('BB_GIT_SHALLOW_EXTRA_REFS', 'refs/heads/foo')
-        with self.assertRaises(bb.fetch2.FetchError):
+        with self.assertRaises(bb.fetch.FetchError):
             self.fetch()
 
     def test_shallow_missing_extra_refs_wildcard(self):
@@ -2337,7 +2403,7 @@ class GitShallowTest(FetcherTest):
         self.d.setVar('BB_GIT_SHALLOW_DEPTH', '0')
         self.d.setVar('BB_GIT_SHALLOW_REVS', 'v0.0')
 
-        with self.assertRaises(bb.fetch2.FetchError):
+        with self.assertRaises(bb.fetch.FetchError):
             self.fetch()
 
     def test_shallow_fetch_missing_revs(self):
@@ -2348,7 +2414,7 @@ class GitShallowTest(FetcherTest):
         self.d.setVar('BB_GIT_SHALLOW_DEPTH', '0')
         self.d.setVar('BB_GIT_SHALLOW_REVS', 'v0.0')
 
-        with self.assertRaises(bb.fetch2.FetchError), self.assertLogs("BitBake.Fetcher", level="ERROR") as cm:
+        with self.assertRaises(bb.fetch.FetchError), self.assertLogs("BitBake.Fetcher", level="ERROR") as cm:
             self.fetch_shallow()
         self.assertIn("fatal: no commits selected for shallow requests", cm.output[0])
 
@@ -2359,7 +2425,7 @@ class GitShallowTest(FetcherTest):
         self.d.setVar('BB_GIT_SHALLOW_DEPTH', '0')
         self.d.setVar('BB_GIT_SHALLOW_REVS', 'v0.0')
 
-        with self.assertRaises(bb.fetch2.FetchError), self.assertLogs("BitBake.Fetcher", level="ERROR") as cm:
+        with self.assertRaises(bb.fetch.FetchError), self.assertLogs("BitBake.Fetcher", level="ERROR") as cm:
             self.fetch_shallow()
         self.assertIn("Unable to find revision v0.0 even from upstream", cm.output[0])
 
@@ -2392,7 +2458,7 @@ class GitShallowTest(FetcherTest):
 
     @skipIfNoNetwork()
     def test_bitbake(self):
-        self.git(['remote', 'add', '--mirror=fetch', 'origin', 'https://github.com/openembedded/bitbake'], cwd=self.srcdir)
+        self.git(['remote', 'add', '--mirror=fetch', 'origin', 'https://git.openembedded.org/bitbake-contrib'], cwd=self.srcdir)
         self.git(['config', 'core.bare', 'true'], cwd=self.srcdir)
         self.git(['fetch'], cwd=self.srcdir)
 
@@ -2416,7 +2482,7 @@ class GitShallowTest(FetcherTest):
         bb.utils.remove(self.gitdir, recurse=True)
         bb.utils.remove(self.dldir, recurse=True)
 
-        with self.assertRaises(bb.fetch2.UnpackError) as context:
+        with self.assertRaises(bb.fetch.UnpackError) as context:
             fetcher.unpack(self.d.getVar('WORKDIR'))
 
         self.assertIn("No up to date source found", context.exception.msg)
@@ -2465,7 +2531,7 @@ class GitLfsTest(FetcherTest):
         self.d.delVar('MIRRORS')
 
         self.d.setVar('SRCREV', '${AUTOREV}')
-        self.d.setVar('AUTOREV', '${@bb.fetch2.get_autorev(d)}')
+        self.d.setVar('AUTOREV', '${@bb.fetch.get_autorev(d)}')
         self.d.setVar("__BBSRCREV_SEEN", "1")
 
         bb.utils.mkdirhier(self.srcdir)
@@ -2490,7 +2556,7 @@ class GitLfsTest(FetcherTest):
         uri = uris[0]
         d = self.d
 
-        fetcher = bb.fetch2.Fetch(uris, d)
+        fetcher = bb.fetch.Fetch(uris, d)
         if download:
             fetcher.download()
         ud = fetcher.ud[uri]
@@ -2689,7 +2755,7 @@ class GitLfsTest(FetcherTest):
 
         fetcher.download()
         # If git-lfs cannot be found, the unpack should throw an error
-        with self.assertRaises(bb.fetch2.FetchError):
+        with self.assertRaises(bb.fetch.FetchError):
             with unittest.mock.patch("shutil.which", return_value=None):
                 shutil.rmtree(self.gitdir, ignore_errors=True)
                 fetcher.unpack(self.d.getVar('WORKDIR'))
@@ -2703,7 +2769,7 @@ class GitLfsTest(FetcherTest):
 
         # If git-lfs cannot be found, the download should throw an error
         with unittest.mock.patch("shutil.which", return_value=None):
-            with self.assertRaises(bb.fetch2.FetchError):
+            with self.assertRaises(bb.fetch.FetchError):
                 fetcher.download()
 
     def test_lfs_disabled_not_installed(self):
@@ -2737,6 +2803,21 @@ class GitLfsTest(FetcherTest):
             fetcher.download()
             shutil.rmtree(self.gitdir, ignore_errors=True)
             fetcher.unpack(self.d.getVar('WORKDIR'))
+
+    @skipIfNoGitLFS()
+    def test_lfs_fetch_failure_raises(self):
+        self.commit_file("a.mp3", "version 1")
+
+        uri = 'git://%s;protocol=file;lfs=1;branch=master' % self.srcdir
+        self.d.setVar('SRC_URI', uri)
+
+        # Simulate a fetch failure by removing the .git/lfs/objects directory
+        # from the source repository
+        shutil.rmtree(os.path.join(self.srcdir, ".git", "lfs", "objects"))
+
+        # Test than exception is raised when LFS objects could not be fetched
+        with self.assertRaises(bb.fetch.FetchError):
+            self.fetch()
 
 class GitURLWithSpacesTest(FetcherTest):
     test_git_urls = {
@@ -2793,7 +2874,7 @@ class FetchLocallyMissingTagFromRemote(FetcherTest):
         self.git(['commit', '-m', 'dummymsg', 'dummyfile'], self.srcdir)
 
     def _fetch_and_unpack(self, uri_to_fetch):
-        fetcher = bb.fetch2.Fetch([uri_to_fetch], self.d)
+        fetcher = bb.fetch.Fetch([uri_to_fetch], self.d)
         fetcher.download()
         fetcher.unpack(self.d.getVar('WORKDIR'))
 
@@ -2827,7 +2908,7 @@ class CrateTest(FetcherTest):
         uris = self.d.getVar('SRC_URI').split()
         d = self.d
 
-        fetcher = bb.fetch2.Fetch(uris, self.d)
+        fetcher = bb.fetch.Fetch(uris, self.d)
         ud = fetcher.ud[fetcher.urls[0]]
 
         self.assertIn("name", ud.parm)
@@ -2853,7 +2934,7 @@ class CrateTest(FetcherTest):
         uris = self.d.getVar('SRC_URI').split()
         d = self.d
 
-        fetcher = bb.fetch2.Fetch(uris, self.d)
+        fetcher = bb.fetch.Fetch(uris, self.d)
         ud = fetcher.ud[fetcher.urls[0]]
 
         self.assertIn("name", ud.parm)
@@ -2876,7 +2957,7 @@ class CrateTest(FetcherTest):
         uris = self.d.getVar('SRC_URI').split()
         d = self.d
 
-        fetcher = bb.fetch2.Fetch(uris, self.d)
+        fetcher = bb.fetch.Fetch(uris, self.d)
         ud = fetcher.ud[fetcher.urls[0]]
 
         self.assertIn("name", ud.parm)
@@ -2900,7 +2981,7 @@ class CrateTest(FetcherTest):
         uris = self.d.getVar('SRC_URI').split()
         d = self.d
 
-        fetcher = bb.fetch2.Fetch(uris, self.d)
+        fetcher = bb.fetch.Fetch(uris, self.d)
         ud = fetcher.ud[fetcher.urls[0]]
 
         self.assertIn("name", ud.parm)
@@ -2931,13 +3012,12 @@ class CrateTest(FetcherTest):
 
         uris = self.d.getVar('SRC_URI').split()
 
-        fetcher = bb.fetch2.Fetch(uris, self.d)
-        with self.assertRaisesRegex(bb.fetch2.FetchError, "Fetcher failure for URL"):
+        fetcher = bb.fetch.Fetch(uris, self.d)
+        with self.assertRaisesRegex(bb.fetch.FetchError, "Fetcher failure for URL"):
             fetcher.download()
 
 class NPMTest(FetcherTest):
     def skipIfNoNpm():
-        return unittest.skip('npm disabled due to security issues')
         if not shutil.which('npm'):
             return unittest.skip('npm not installed')
         return lambda f: f
@@ -2945,7 +3025,9 @@ class NPMTest(FetcherTest):
     @skipIfNoNpm()
     @skipIfNoNetwork()
     def test_npm(self):
-        urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/node-server-example;version=1.0.0']
+        urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/node-server-example;version=1.0.0'
+                ';sha512sum=f2dd7d88cb9a129fbb97eb87a8b5103bab24f783420fd7587f8000a355a12bf7'
+                '83f1263230afc588123958b73e36bb241f63eaf08119aac5aa2a870bc4de9223']
         fetcher = bb.fetch.Fetch(urls, self.d)
         ud = fetcher.ud[fetcher.urls[0]]
         fetcher.download()
@@ -2959,7 +3041,9 @@ class NPMTest(FetcherTest):
     @skipIfNoNpm()
     @skipIfNoNetwork()
     def test_npm_bad_checksum(self):
-        urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/node-server-example;version=1.0.0']
+        urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/node-server-example;version=1.0.0'
+                ';sha512sum=f2dd7d88cb9a129fbb97eb87a8b5103bab24f783420fd7587f8000a355a12bf7'
+                '83f1263230afc588123958b73e36bb241f63eaf08119aac5aa2a870bc4de9223']
         # Fetch once to get a tarball
         fetcher = bb.fetch.Fetch(urls, self.d)
         ud = fetcher.ud[fetcher.urls[0]]
@@ -2978,7 +3062,9 @@ class NPMTest(FetcherTest):
     @skipIfNoNpm()
     @skipIfNoNetwork()
     def test_npm_premirrors(self):
-        urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/node-server-example;version=1.0.0']
+        urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/node-server-example;version=1.0.0'
+                ';sha512sum=f2dd7d88cb9a129fbb97eb87a8b5103bab24f783420fd7587f8000a355a12bf7'
+                '83f1263230afc588123958b73e36bb241f63eaf08119aac5aa2a870bc4de9223']
         # Fetch once to get a tarball
         fetcher = bb.fetch.Fetch(urls, self.d)
         ud = fetcher.ud[fetcher.urls[0]]
@@ -3008,7 +3094,9 @@ class NPMTest(FetcherTest):
     @skipIfNoNpm()
     @skipIfNoNetwork()
     def test_npm_premirrors_with_specified_filename(self):
-        urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/node-server-example;version=1.0.0']
+        urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/node-server-example;version=1.0.0'
+                ';sha512sum=f2dd7d88cb9a129fbb97eb87a8b5103bab24f783420fd7587f8000a355a12bf7'
+                '83f1263230afc588123958b73e36bb241f63eaf08119aac5aa2a870bc4de9223']
         # Fetch once to get a tarball
         fetcher = bb.fetch.Fetch(urls, self.d)
         ud = fetcher.ud[fetcher.urls[0]]
@@ -3030,7 +3118,9 @@ class NPMTest(FetcherTest):
     @skipIfNoNetwork()
     def test_npm_mirrors(self):
         # Fetch once to get a tarball
-        urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/node-server-example;version=1.0.0']
+        urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/node-server-example;version=1.0.0'
+                ';sha512sum=f2dd7d88cb9a129fbb97eb87a8b5103bab24f783420fd7587f8000a355a12bf7'
+                '83f1263230afc588123958b73e36bb241f63eaf08119aac5aa2a870bc4de9223']
         fetcher = bb.fetch.Fetch(urls, self.d)
         ud = fetcher.ud[fetcher.urls[0]]
         fetcher.download()
@@ -3055,7 +3145,10 @@ class NPMTest(FetcherTest):
     @skipIfNoNpm()
     @skipIfNoNetwork()
     def test_npm_destsuffix_downloadfilename(self):
-        urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/node-server-example;version=1.0.0;destsuffix=foo/bar;downloadfilename=foo-bar.tgz']
+        urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/node-server-example;version=1.0.0'
+                ';sha512sum=f2dd7d88cb9a129fbb97eb87a8b5103bab24f783420fd7587f8000a355a12bf7'
+                '83f1263230afc588123958b73e36bb241f63eaf08119aac5aa2a870bc4de9223'
+                ';destsuffix=foo/bar;downloadfilename=foo-bar.tgz']
         fetcher = bb.fetch.Fetch(urls, self.d)
         fetcher.download()
         self.assertTrue(os.path.exists(os.path.join(self.dldir, 'npm2', 'foo-bar.tgz')))
@@ -3063,18 +3156,22 @@ class NPMTest(FetcherTest):
         unpackdir = os.path.join(self.unpackdir, 'foo', 'bar')
         self.assertTrue(os.path.exists(os.path.join(unpackdir, 'package.json')))
 
+    @skipIfNoNpm()
     def test_npm_no_network_no_tarball(self):
-        return unittest.skip('npm disabled due to security issues')
-        urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/node-server-example;version=1.0.0']
+        urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/node-server-example;version=1.0.0'
+                ';sha512sum=f2dd7d88cb9a129fbb97eb87a8b5103bab24f783420fd7587f8000a355a12bf7'
+                '83f1263230afc588123958b73e36bb241f63eaf08119aac5aa2a870bc4de9223']
         self.d.setVar('BB_NO_NETWORK', '1')
         fetcher = bb.fetch.Fetch(urls, self.d)
-        with self.assertRaises(bb.fetch2.NetworkAccess):
+        with self.assertRaises(bb.fetch.NetworkAccess):
             fetcher.download()
 
     @skipIfNoNpm()
     @skipIfNoNetwork()
     def test_npm_no_network_with_tarball(self):
-        urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/node-server-example;version=1.0.0']
+        urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/node-server-example;version=1.0.0'
+                ';sha512sum=f2dd7d88cb9a129fbb97eb87a8b5103bab24f783420fd7587f8000a355a12bf7'
+                '83f1263230afc588123958b73e36bb241f63eaf08119aac5aa2a870bc4de9223']
         # Fetch once to get a tarball
         fetcher = bb.fetch.Fetch(urls, self.d)
         fetcher.download()
@@ -3089,7 +3186,9 @@ class NPMTest(FetcherTest):
     @skipIfNoNpm()
     @skipIfNoNetwork()
     def test_npm_registry_alternate(self):
-        urls = ['npm://skimdb.npmjs.com;package=@savoirfairelinux/node-server-example;version=1.0.0']
+        urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/node-server-example;version=1.0.0'
+                ';sha512sum=f2dd7d88cb9a129fbb97eb87a8b5103bab24f783420fd7587f8000a355a12bf7'
+                '83f1263230afc588123958b73e36bb241f63eaf08119aac5aa2a870bc4de9223']
         fetcher = bb.fetch.Fetch(urls, self.d)
         fetcher.download()
         fetcher.unpack(self.unpackdir)
@@ -3097,57 +3196,111 @@ class NPMTest(FetcherTest):
         self.assertTrue(os.path.exists(os.path.join(unpackdir, 'package.json')))
 
     @skipIfNoNpm()
-    @skipIfNoNetwork()
-    def test_npm_version_latest(self):
+    def test_npm_version_latest_rejected(self):
         url = ['npm://registry.npmjs.org;package=@savoirfairelinux/node-server-example;version=latest']
-        fetcher = bb.fetch.Fetch(url, self.d)
-        fetcher.download()
-        fetcher.unpack(self.unpackdir)
-        unpackdir = os.path.join(self.unpackdir, 'npm')
-        self.assertTrue(os.path.exists(os.path.join(unpackdir, 'package.json')))
+        with self.assertRaises(bb.fetch.ParameterError):
+            bb.fetch.Fetch(url, self.d)
 
     @skipIfNoNpm()
     @skipIfNoNetwork()
     def test_npm_registry_invalid(self):
-        urls = ['npm://registry.invalid.org;package=@savoirfairelinux/node-server-example;version=1.0.0']
+        urls = ['npm://registry.invalid.org;package=@savoirfairelinux/node-server-example;version=1.0.0'
+                ';sha512sum=f2dd7d88cb9a129fbb97eb87a8b5103bab24f783420fd7587f8000a355a12bf7'
+                '83f1263230afc588123958b73e36bb241f63eaf08119aac5aa2a870bc4de9223']
         fetcher = bb.fetch.Fetch(urls, self.d)
-        with self.assertRaises(bb.fetch2.FetchError):
+        with self.assertRaises(bb.fetch.FetchError):
             fetcher.download()
 
     @skipIfNoNpm()
     @skipIfNoNetwork()
     def test_npm_package_invalid(self):
-        urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/invalid;version=1.0.0']
+        urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/invalid;version=1.0.0'
+                ';sha512sum=f2dd7d88cb9a129fbb97eb87a8b5103bab24f783420fd7587f8000a355a12bf7'
+                '83f1263230afc588123958b73e36bb241f63eaf08119aac5aa2a870bc4de9223']
         fetcher = bb.fetch.Fetch(urls, self.d)
-        with self.assertRaises(bb.fetch2.FetchError):
+        with self.assertRaises(bb.fetch.FetchError):
             fetcher.download()
 
     @skipIfNoNpm()
     @skipIfNoNetwork()
     def test_npm_version_invalid(self):
         urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/node-server-example;version=invalid']
-        with self.assertRaises(bb.fetch2.ParameterError):
+        with self.assertRaises(bb.fetch.ParameterError):
             fetcher = bb.fetch.Fetch(urls, self.d)
+
+    @skipIfNoNpm()
+    @skipIfNoNetwork()
+    def test_npm_recipe_checksum(self):
+        """A sha512sum param in SRC_URI is forwarded to the proxy and verified."""
+        import subprocess
+        from bb.fetch.npm import npm_integrity
+        result = subprocess.run(
+            ['npm', 'view', '--json', '@savoirfairelinux/node-server-example@1.0.0'],
+            capture_output=True, text=True)
+        if result.returncode != 0:
+            self.skipTest('npm view failed: %s' % result.stderr.strip())
+        try:
+            view = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            self.skipTest('npm view returned invalid JSON')
+        integrity = view.get('dist', {}).get('integrity')
+        if not integrity:
+            self.skipTest('npm view response missing dist.integrity')
+        checksum_name, hexsum = npm_integrity(integrity)
+        urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/node-server-example'
+                ';version=1.0.0;%s=%s' % (checksum_name, hexsum)]
+        fetcher = bb.fetch.Fetch(urls, self.d)
+        ud = fetcher.ud[fetcher.urls[0]]
+        fetcher.download()
+        self.assertTrue(os.path.exists(ud.localpath))
+
+    @skipIfNoNpm()
+    @skipIfNoNetwork()
+    def test_npm_bad_recipe_checksum_rejected(self):
+        """A wrong sha512sum param in SRC_URI causes the fetch to fail."""
+        urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/node-server-example'
+                ';version=1.0.0;sha512sum=deadbeef00']
+        fetcher = bb.fetch.Fetch(urls, self.d)
+        with self.assertRaises(bb.fetch.FetchError):
+            fetcher.download()
+
+    @skipIfNoNpm()
+    def test_npm_no_checksum_rejected(self):
+        """A missing checksum in SRC_URI is rejected regardless of BB_STRICT_CHECKSUM.
+
+        Unlike wget and other fetchers, npm must not fall back to an
+        unverified download: the registry cannot be trusted to supply its
+        own tamper detection, so the checksum requirement is not gated by
+        the usual opt-in strict-checksum setting.
+        """
+        urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/node-server-example;version=1.0.0']
+        for strict in (None, '0', '1', 'ignore'):
+            if strict is None:
+                self.d.delVar('BB_STRICT_CHECKSUM')
+            else:
+                self.d.setVar('BB_STRICT_CHECKSUM', strict)
+            with self.assertRaises(bb.fetch.MissingParameterError):
+                bb.fetch.Fetch(urls, self.d)
 
     @skipIfNoNpm()
     @skipIfNoNetwork()
     def test_npm_registry_none(self):
         urls = ['npm://;package=@savoirfairelinux/node-server-example;version=1.0.0']
-        with self.assertRaises(bb.fetch2.MalformedUrl):
+        with self.assertRaises(bb.fetch.MalformedUrl):
             fetcher = bb.fetch.Fetch(urls, self.d)
 
     @skipIfNoNpm()
     @skipIfNoNetwork()
     def test_npm_package_none(self):
         urls = ['npm://registry.npmjs.org;version=1.0.0']
-        with self.assertRaises(bb.fetch2.MissingParameterError):
+        with self.assertRaises(bb.fetch.MissingParameterError):
             fetcher = bb.fetch.Fetch(urls, self.d)
 
     @skipIfNoNpm()
     @skipIfNoNetwork()
     def test_npm_version_none(self):
         urls = ['npm://registry.npmjs.org;package=@savoirfairelinux/node-server-example']
-        with self.assertRaises(bb.fetch2.MissingParameterError):
+        with self.assertRaises(bb.fetch.MissingParameterError):
             fetcher = bb.fetch.Fetch(urls, self.d)
 
     def create_shrinkwrap_file(self, data):
@@ -3161,7 +3314,6 @@ class NPMTest(FetcherTest):
 
     @skipIfNoNetwork()
     def test_npmsw(self):
-        return unittest.skip('npm disabled due to security issues')
         swfile = self.create_shrinkwrap_file({
             'packages': {
                 'node_modules/array-flatten': {
@@ -3177,11 +3329,11 @@ class NPMTest(FetcherTest):
                     'resolved': 'https://registry.npmjs.org/content-type/-/content-type-1.0.4.tgz',
                     'integrity': 'sha512-hIP3EEPs8tB9AT1L+NUqtwOAps4mk2Zob89MWXMHjHWg9milF/j4osnnQLXBCBFBk/tvIG/tUc9mOUJiPBhPXA==',
                     'dependencies': {
-                        'cookie': 'git+https://github.com/jshttp/cookie.git#aec1177c7da67e3b3273df96cf476824dbc9ae09'
+                        'cookie': 'git+https://git.yoctoproject.org/bbfetchtests-jshttp-cookie#aec1177c7da67e3b3273df96cf476824dbc9ae09'
                     }
                 },
                 'node_modules/array-flatten/node_modules/content-type/node_modules/cookie': {
-                    'resolved': 'git+https://github.com/jshttp/cookie.git#aec1177c7da67e3b3273df96cf476824dbc9ae09'
+                    'resolved': 'git+https://git.yoctoproject.org/bbfetchtests-jshttp-cookie#aec1177c7da67e3b3273df96cf476824dbc9ae09'
                 }
             }
         })
@@ -3189,7 +3341,7 @@ class NPMTest(FetcherTest):
         fetcher.download()
         self.assertTrue(os.path.exists(os.path.join(self.dldir, 'npm2', 'array-flatten-1.1.1.tgz')))
         self.assertTrue(os.path.exists(os.path.join(self.dldir, 'npm2', 'content-type-1.0.4.tgz')))
-        self.assertTrue(os.path.exists(os.path.join(self.dldir, 'git2', 'github.com.jshttp.cookie.git')))
+        self.assertTrue(os.path.exists(os.path.join(self.dldir, 'git2', 'git.yoctoproject.org.bbfetchtests-jshttp-cookie')))
         fetcher.unpack(self.unpackdir)
         self.assertTrue(os.path.exists(os.path.join(self.unpackdir, 'npm-shrinkwrap.json')))
         self.assertTrue(os.path.exists(os.path.join(self.unpackdir, 'node_modules', 'array-flatten', 'package.json')))
@@ -3198,21 +3350,19 @@ class NPMTest(FetcherTest):
 
     @skipIfNoNetwork()
     def test_npmsw_git(self):
-        return unittest.skip('npm disabled due to security issues')
         swfile = self.create_shrinkwrap_file({
             'packages': {
                 'node_modules/cookie': {
-                    'resolved': 'git+https://github.com/jshttp/cookie.git#aec1177c7da67e3b3273df96cf476824dbc9ae09'
+                    'resolved': 'git+https://git.yoctoproject.org/bbfetchtests-jshttp-cookie#aec1177c7da67e3b3273df96cf476824dbc9ae09'
                 }
             }
         })
         fetcher = bb.fetch.Fetch(['npmsw://' + swfile], self.d)
         fetcher.download()
-        self.assertTrue(os.path.exists(os.path.join(self.dldir, 'git2', 'github.com.jshttp.cookie.git')))
+        self.assertTrue(os.path.exists(os.path.join(self.dldir, 'git2', 'git.yoctoproject.org.bbfetchtests-jshttp-cookie')))
 
     @skipIfNoNetwork()
     def test_npmsw_dev(self):
-        return unittest.skip('npm disabled due to security issues')
         swfile = self.create_shrinkwrap_file({
             'packages': {
                 'node_modules/array-flatten': {
@@ -3241,7 +3391,6 @@ class NPMTest(FetcherTest):
 
     @skipIfNoNetwork()
     def test_npmsw_destsuffix(self):
-        return unittest.skip('npm disabled due to security issues')
         swfile = self.create_shrinkwrap_file({
             'packages': {
                 'node_modules/array-flatten': {
@@ -3257,7 +3406,6 @@ class NPMTest(FetcherTest):
         self.assertTrue(os.path.exists(os.path.join(self.unpackdir, 'foo', 'bar', 'node_modules', 'array-flatten', 'package.json')))
 
     def test_npmsw_no_network_no_tarball(self):
-        return unittest.skip('npm disabled due to security issues')
         swfile = self.create_shrinkwrap_file({
             'packages': {
                 'node_modules/array-flatten': {
@@ -3269,14 +3417,14 @@ class NPMTest(FetcherTest):
         })
         self.d.setVar('BB_NO_NETWORK', '1')
         fetcher = bb.fetch.Fetch(['npmsw://' + swfile], self.d)
-        with self.assertRaises(bb.fetch2.NetworkAccess):
+        with self.assertRaises(bb.fetch.NetworkAccess):
             fetcher.download()
 
     @skipIfNoNpm()
     @skipIfNoNetwork()
     def test_npmsw_no_network_with_tarball(self):
         # Fetch once to get a tarball
-        fetcher = bb.fetch.Fetch(['npm://registry.npmjs.org;package=array-flatten;version=1.1.1'], self.d)
+        fetcher = bb.fetch.Fetch(['npm://registry.npmjs.org;package=array-flatten;version=1.1.1;sha1sum=9a5f699051b1e7073328f2a008968b64ea2955d2'], self.d)
         fetcher.download()
         # Disable network access
         self.d.setVar('BB_NO_NETWORK', '1')
@@ -3297,7 +3445,6 @@ class NPMTest(FetcherTest):
 
     @skipIfNoNetwork()
     def test_npmsw_npm_reusability(self):
-        return unittest.skip('npm disabled due to security issues')
         # Fetch once with npmsw
         swfile = self.create_shrinkwrap_file({
             'packages': {
@@ -3313,14 +3460,13 @@ class NPMTest(FetcherTest):
         # Disable network access
         self.d.setVar('BB_NO_NETWORK', '1')
         # Fetch again with npm
-        fetcher = bb.fetch.Fetch(['npm://registry.npmjs.org;package=array-flatten;version=1.1.1'], self.d)
+        fetcher = bb.fetch.Fetch(['npm://registry.npmjs.org;package=array-flatten;version=1.1.1;sha1sum=9a5f699051b1e7073328f2a008968b64ea2955d2'], self.d)
         fetcher.download()
         fetcher.unpack(self.unpackdir)
         self.assertTrue(os.path.exists(os.path.join(self.unpackdir, 'npm', 'package.json')))
 
     @skipIfNoNetwork()
     def test_npmsw_bad_checksum(self):
-        return unittest.skip('npm disabled due to security issues')
         # Try to fetch with bad checksum
         swfile = self.create_shrinkwrap_file({
             'packages': {
@@ -3332,7 +3478,7 @@ class NPMTest(FetcherTest):
             }
         })
         fetcher = bb.fetch.Fetch(['npmsw://' + swfile], self.d)
-        with self.assertRaises(bb.fetch2.FetchError):
+        with self.assertRaises(bb.fetch.FetchError):
             fetcher.download()
         # Fetch correctly to get a tarball
         swfile = self.create_shrinkwrap_file({
@@ -3362,7 +3508,7 @@ class NPMTest(FetcherTest):
     @skipIfNoNetwork()
     def test_npmsw_premirrors(self):
         # Fetch once to get a tarball
-        fetcher = bb.fetch.Fetch(['npm://registry.npmjs.org;package=array-flatten;version=1.1.1'], self.d)
+        fetcher = bb.fetch.Fetch(['npm://registry.npmjs.org;package=array-flatten;version=1.1.1;sha1sum=9a5f699051b1e7073328f2a008968b64ea2955d2'], self.d)
         ud = fetcher.ud[fetcher.urls[0]]
         fetcher.download()
         self.assertTrue(os.path.exists(ud.localpath))
@@ -3391,7 +3537,7 @@ class NPMTest(FetcherTest):
     @skipIfNoNetwork()
     def test_npmsw_mirrors(self):
         # Fetch once to get a tarball
-        fetcher = bb.fetch.Fetch(['npm://registry.npmjs.org;package=array-flatten;version=1.1.1'], self.d)
+        fetcher = bb.fetch.Fetch(['npm://registry.npmjs.org;package=array-flatten;version=1.1.1;sha1sum=9a5f699051b1e7073328f2a008968b64ea2955d2'], self.d)
         ud = fetcher.ud[fetcher.urls[0]]
         fetcher.download()
         self.assertTrue(os.path.exists(ud.localpath))
@@ -3417,7 +3563,6 @@ class NPMTest(FetcherTest):
 
     @skipIfNoNetwork()
     def test_npmsw_bundled(self):
-        return unittest.skip('npm disabled due to security issues')
         swfile = self.create_shrinkwrap_file({
             'packages': {
                 'node_modules/array-flatten': {
@@ -3501,7 +3646,7 @@ class GitTagVerificationTests(FetcherTest):
     def test_tag_rev_match4(self):
         # Test a url with SRCREV and rev= mismatching errors
         self.d.setVar('SRCREV', 'bade540fc31a1c26839efd2c7785a751ce24ebfb')
-        with self.assertRaises(bb.fetch2.FetchError):
+        with self.assertRaises(bb.fetch.FetchError):
             fetcher = bb.fetch.Fetch(["git://git.openembedded.org/bitbake;branch=2.12;protocol=https;rev=5b4e20377eea8d428edf1aeb2187c18f82ca6757;tag=2.12.0"], self.d)
 
     @skipIfNoNetwork()
@@ -3519,7 +3664,7 @@ class GitTagVerificationTests(FetcherTest):
         self.d.setVar('BB_GIT_SHALLOW', '1')
         fetcher = bb.fetch.Fetch(["git://git.openembedded.org/bitbake;branch=2.12;protocol=https;rev=5b4e20377eea8d428edf1aeb2187c18f82ca6757;tag=2.8.0"], self.d)
         fetcher.download()
-        with self.assertRaises(bb.fetch2.FetchError):
+        with self.assertRaises(bb.fetch.FetchError):
             fetcher.unpack(self.unpackdir)
 
     @skipIfNoNetwork()
@@ -3528,7 +3673,7 @@ class GitTagVerificationTests(FetcherTest):
         self.d.setVar('SRCREV', '5b4e20377eea8d428edf1aeb2187c18f82ca6757')
         fetcher = bb.fetch.Fetch(["git://git.openembedded.org/bitbake;branch=2.12;protocol=https;rev=5b4e20377eea8d428edf1aeb2187c18f82ca6757;tag=2.8.0"], self.d)
         fetcher.download()
-        with self.assertRaises(bb.fetch2.FetchError):
+        with self.assertRaises(bb.fetch.FetchError):
             fetcher.unpack(self.unpackdir)
 
 
@@ -3597,7 +3742,7 @@ class FetchPremirroronlyLocalTest(FetcherTest):
         self.make_git_repo()
         self.d.setVar("SRCREV", "0"*40)
         fetcher = bb.fetch.Fetch([self.recipe_url], self.d)
-        with self.assertRaises(bb.fetch2.NetworkAccess):
+        with self.assertRaises(bb.fetch.NetworkAccess):
             fetcher.download()
 
     def test_mirror_commit_exists(self):
@@ -3610,7 +3755,7 @@ class FetchPremirroronlyLocalTest(FetcherTest):
     def test_mirror_tarball_nonexistent(self):
         self.d.setVar("SRCREV", "0"*40)
         fetcher = bb.fetch.Fetch([self.recipe_url], self.d)
-        with self.assertRaises(bb.fetch2.NetworkAccess):
+        with self.assertRaises(bb.fetch.NetworkAccess):
             fetcher.download()
 
 
@@ -3651,7 +3796,7 @@ class FetchPremirroronlyNetworkTest(FetcherTest):
         ## Upstream commit not in the mirror
         self.d.setVar("SRCREV", "49d65d53c2bf558ae6e9185af0f3af7b79d255ec")
         fetcher = bb.fetch.Fetch([self.recipe_url], self.d)
-        with self.assertRaises(bb.fetch2.NetworkAccess):
+        with self.assertRaises(bb.fetch.NetworkAccess):
             fetcher.download()
 
 class FetchPremirroronlyMercurialTest(FetcherTest):
@@ -3716,7 +3861,7 @@ class FetchPremirroronlyBrokenTarball(FetcherTest):
     def test_mirror_broken_download(self):
         self.d.setVar("SRCREV", "0"*40)
         fetcher = bb.fetch.Fetch([self.recipe_url], self.d)
-        with self.assertRaises(bb.fetch2.FetchError), self.assertLogs() as logs:
+        with self.assertRaises(bb.fetch.FetchError), self.assertLogs() as logs:
             fetcher.download()
         output = "".join(logs.output)
         self.assertFalse(" not a git repository (or any parent up to mount point /)" in output)
@@ -3728,7 +3873,7 @@ class GoModTest(FetcherTest):
         urls = ['gomod://github.com/Azure/azure-sdk-for-go/sdk/storage/azblob;version=v1.0.0;'
                 'sha256sum=9bb69aea32f1d59711701f9562d66432c9c0374205e5009d1d1a62f03fb4fdad']
 
-        fetcher = bb.fetch2.Fetch(urls, self.d)
+        fetcher = bb.fetch.Fetch(urls, self.d)
         ud = fetcher.ud[urls[0]]
         self.assertEqual(ud.url, 'https://proxy.golang.org/github.com/%21azure/azure-sdk-for-go/sdk/storage/azblob/%40v/v1.0.0.zip')
         self.assertEqual(ud.parm['downloadfilename'], 'github.com.Azure.azure-sdk-for-go.sdk.storage.azblob@v1.0.0.zip')
@@ -3747,7 +3892,7 @@ class GoModTest(FetcherTest):
         urls = ['gomod://github.com/Azure/azure-sdk-for-go/sdk/storage/azblob;version=v1.0.0;mod=1;'
                 'sha256sum=7873b8544842329b4f385a3aa6cf82cc2bc8defb41a04fa5291c35fd5900e873']
 
-        fetcher = bb.fetch2.Fetch(urls, self.d)
+        fetcher = bb.fetch.Fetch(urls, self.d)
         ud = fetcher.ud[urls[0]]
         self.assertEqual(ud.url, 'https://proxy.golang.org/github.com/%21azure/azure-sdk-for-go/sdk/storage/azblob/%40v/v1.0.0.mod')
         self.assertEqual(ud.parm['downloadfilename'], 'github.com.Azure.azure-sdk-for-go.sdk.storage.azblob@v1.0.0.mod')
@@ -3763,7 +3908,7 @@ class GoModTest(FetcherTest):
         urls = ['gomod://gopkg.in/ini.v1;version=v1.67.0']
         self.d.setVarFlag('SRC_URI', 'gopkg.in/ini.v1@v1.67.0.sha256sum', 'bd845dfc762a87a56e5a32a07770dc83e86976db7705d7f89c5dbafdc60b06c6')
 
-        fetcher = bb.fetch2.Fetch(urls, self.d)
+        fetcher = bb.fetch.Fetch(urls, self.d)
         ud = fetcher.ud[urls[0]]
         self.assertEqual(ud.url, 'https://proxy.golang.org/gopkg.in/ini.v1/%40v/v1.67.0.zip')
         self.assertEqual(ud.parm['downloadfilename'], 'gopkg.in.ini.v1@v1.67.0.zip')
@@ -3782,7 +3927,7 @@ class GoModTest(FetcherTest):
         urls = ['gomod://gopkg.in/ini.v1;version=v1.67.0;'
                 'sha256sum=bd845dfc762a87a56e5a32a07770dc83e86976db7705d7f89c5dbafdc60b06c6']
 
-        fetcher = bb.fetch2.Fetch(urls, self.d)
+        fetcher = bb.fetch.Fetch(urls, self.d)
         ud = fetcher.ud[urls[0]]
         self.assertEqual(ud.url, 'https://proxy.golang.org/gopkg.in/ini.v1/%40v/v1.67.0.zip')
         self.assertEqual(ud.parm['downloadfilename'], 'gopkg.in.ini.v1@v1.67.0.zip')
@@ -3801,7 +3946,7 @@ class GoModTest(FetcherTest):
         urls = ['gomod://go.opencensus.io;version=v0.24.0;'
                 'sha256sum=203a767d7f8e7c1ebe5588220ad168d1e15b14ae70a636de7ca9a4a88a7e0d0c']
 
-        fetcher = bb.fetch2.Fetch(urls, self.d)
+        fetcher = bb.fetch.Fetch(urls, self.d)
         ud = fetcher.ud[urls[0]]
         self.assertEqual(ud.url, 'https://proxy.golang.org/go.opencensus.io/%40v/v0.24.0.zip')
         self.assertEqual(ud.parm['downloadfilename'], 'go.opencensus.io@v0.24.0.zip')
@@ -3823,7 +3968,7 @@ class GoModGitTest(FetcherTest):
                 'repo=go.googlesource.com/net;'
                 'srcrev=694cff8668bac64e0864b552bffc280cd27f21b1']
 
-        fetcher = bb.fetch2.Fetch(urls, self.d)
+        fetcher = bb.fetch.Fetch(urls, self.d)
         ud = fetcher.ud[urls[0]]
         self.assertEqual(ud.host, 'go.googlesource.com')
         self.assertEqual(ud.path, '/net')
@@ -3848,7 +3993,7 @@ class GoModGitTest(FetcherTest):
                 'repo=github.com/Azure/azure-sdk-for-go;subdir=sdk/storage/azblob;'
                 'srcrev=ec928e0ed34db682b3f783d3739d1c538142e0c3']
 
-        fetcher = bb.fetch2.Fetch(urls, self.d)
+        fetcher = bb.fetch.Fetch(urls, self.d)
         ud = fetcher.ud[urls[0]]
         self.assertEqual(ud.host, 'github.com')
         self.assertEqual(ud.path, '/Azure/azure-sdk-for-go')
@@ -3873,7 +4018,7 @@ class GoModGitTest(FetcherTest):
         urls = ['gomodgit://gopkg.in/ini.v1;version=v1.67.0']
         self.d.setVar('SRCREV_gopkg.in/ini.v1@v1.67.0', 'b2f570e5b5b844226bbefe6fb521d891f529a951')
 
-        fetcher = bb.fetch2.Fetch(urls, self.d)
+        fetcher = bb.fetch.Fetch(urls, self.d)
         ud = fetcher.ud[urls[0]]
         self.assertEqual(ud.host, 'gopkg.in')
         self.assertEqual(ud.path, '/ini.v1')
@@ -3895,7 +4040,7 @@ class GoModGitTest(FetcherTest):
         urls = ['gomodgit://gopkg.in/ini.v1;version=v1.67.0;'
                 'srcrev=b2f570e5b5b844226bbefe6fb521d891f529a951']
 
-        fetcher = bb.fetch2.Fetch(urls, self.d)
+        fetcher = bb.fetch.Fetch(urls, self.d)
         ud = fetcher.ud[urls[0]]
         self.assertEqual(ud.host, 'gopkg.in')
         self.assertEqual(ud.path, '/ini.v1')
@@ -3915,20 +4060,20 @@ class GoModGitTest(FetcherTest):
     @skipIfNoNetwork()
     def test_gomodgit_url_host_only(self):
         urls = ['gomodgit://go.opencensus.io;version=v0.24.0;'
-                'repo=github.com/census-instrumentation/opencensus-go;'
+                'repo=git.yoctoproject.org/bbfetchtests-census-instrumentation-opencensus-go;'
                 'srcrev=b1a01ee95db0e690d91d7193d037447816fae4c5']
 
-        fetcher = bb.fetch2.Fetch(urls, self.d)
+        fetcher = bb.fetch.Fetch(urls, self.d)
         ud = fetcher.ud[urls[0]]
-        self.assertEqual(ud.host, 'github.com')
-        self.assertEqual(ud.path, '/census-instrumentation/opencensus-go')
+        self.assertEqual(ud.host, 'git.yoctoproject.org')
+        self.assertEqual(ud.path, '/bbfetchtests-census-instrumentation-opencensus-go')
         self.assertEqual(ud.name, 'go.opencensus.io@v0.24.0')
         self.assertEqual(self.d.getVar('SRCREV_go.opencensus.io@v0.24.0'), 'b1a01ee95db0e690d91d7193d037447816fae4c5')
 
         fetcher.download()
         fetcher.unpack(self.unpackdir)
         vcsdir = os.path.join(self.unpackdir, 'pkg/mod/cache/vcs')
-        self.assertTrue(os.path.exists(os.path.join(vcsdir, 'aae3ac7b2122ed3345654e6327855e9682f4a5350d63e93dbcfc51c4419df0e1')))
+        self.assertTrue(os.path.exists(os.path.join(vcsdir, '24e4a8be150f9e7343b72e40000115a175fb2f19d015542f54abb6ccdbd52f14')))
         downloaddir = os.path.join(self.unpackdir, 'pkg/mod/cache/download')
         self.assertTrue(os.path.exists(os.path.join(downloaddir, 'go.opencensus.io/@v/v0.24.0.zip')))
         self.assertTrue(os.path.exists(os.path.join(downloaddir, 'go.opencensus.io/@v/v0.24.0.mod')))
@@ -4020,7 +4165,7 @@ class GitUnpackUpdateTest(FetcherTest):
         4. Verify testfile.txt now contains 'updated content'.
         """
         # First fetch at initial revision
-        fetcher = bb.fetch2.Fetch([self.d.getVar('SRC_URI')], self.d)
+        fetcher = bb.fetch.Fetch([self.d.getVar('SRC_URI')], self.d)
         fetcher.download()
         fetcher.unpack(self.unpackdir)
 
@@ -4032,7 +4177,7 @@ class GitUnpackUpdateTest(FetcherTest):
 
         # Update to new revision
         self.d.setVar('SRCREV', self.updated_rev)
-        fetcher = bb.fetch2.Fetch([self.d.getVar('SRC_URI')], self.d)
+        fetcher = bb.fetch.Fetch([self.d.getVar('SRC_URI')], self.d)
         fetcher.download()
 
         # Use unpack_update
@@ -4054,7 +4199,7 @@ class GitUnpackUpdateTest(FetcherTest):
         and its URL must be 'file://<ud.clonedir>'.
         """
         # First fetch
-        fetcher = bb.fetch2.Fetch([self.d.getVar('SRC_URI')], self.d)
+        fetcher = bb.fetch.Fetch([self.d.getVar('SRC_URI')], self.d)
         fetcher.download()
 
         uri = self.d.getVar('SRC_URI')
@@ -4092,7 +4237,7 @@ class GitUnpackUpdateTest(FetcherTest):
         so this test covers those scenarios implicitly.
         """
         # Step 1 - fetch + unpack at initial_rev
-        fetcher = bb.fetch2.Fetch([self.d.getVar('SRC_URI')], self.d)
+        fetcher = bb.fetch.Fetch([self.d.getVar('SRC_URI')], self.d)
         fetcher.download()
         fetcher.unpack(self.unpackdir)
 
@@ -4115,7 +4260,7 @@ class GitUnpackUpdateTest(FetcherTest):
         # Step 3 - advance SRCREV and download; clonedir must now contain
         # updated_rev so that unpack_update can fetch it without network access.
         self.d.setVar('SRCREV', self.updated_rev)
-        fetcher = bb.fetch2.Fetch([self.d.getVar('SRC_URI')], self.d)
+        fetcher = bb.fetch.Fetch([self.d.getVar('SRC_URI')], self.d)
         fetcher.download()
 
         ud = fetcher.ud[uri]
@@ -4148,7 +4293,7 @@ class GitUnpackUpdateTest(FetcherTest):
         the working tree unchanged. No rebase should be attempted because the
         checkout already points at ud.revision.
         """
-        fetcher = bb.fetch2.Fetch([self.d.getVar('SRC_URI')], self.d)
+        fetcher = bb.fetch.Fetch([self.d.getVar('SRC_URI')], self.d)
         fetcher.download()
         fetcher.unpack(self.unpackdir)
 
@@ -4175,7 +4320,7 @@ class GitUnpackUpdateTest(FetcherTest):
         untracked files untouched, so both the upstream update and the untracked
         file must be present after the call.
         """
-        fetcher = bb.fetch2.Fetch([self.d.getVar('SRC_URI')], self.d)
+        fetcher = bb.fetch.Fetch([self.d.getVar('SRC_URI')], self.d)
         fetcher.download()
         fetcher.unpack(self.unpackdir)
 
@@ -4188,7 +4333,7 @@ class GitUnpackUpdateTest(FetcherTest):
 
         # Update to new upstream revision
         self.d.setVar('SRCREV', self.updated_rev)
-        fetcher = bb.fetch2.Fetch([self.d.getVar('SRC_URI')], self.d)
+        fetcher = bb.fetch.Fetch([self.d.getVar('SRC_URI')], self.d)
         fetcher.download()
 
         uri = self.d.getVar('SRC_URI')
@@ -4213,7 +4358,7 @@ class GitUnpackUpdateTest(FetcherTest):
         dirty index. The caller (bitbake-setup) is expected to catch the
         resulting LocalModificationsError and fall back to backup + re-fetch.
         """
-        fetcher = bb.fetch2.Fetch([self.d.getVar('SRC_URI')], self.d)
+        fetcher = bb.fetch.Fetch([self.d.getVar('SRC_URI')], self.d)
         fetcher.download()
         fetcher.unpack(self.unpackdir)
 
@@ -4227,7 +4372,7 @@ class GitUnpackUpdateTest(FetcherTest):
 
         # Update to new upstream revision
         self.d.setVar('SRCREV', self.updated_rev)
-        fetcher = bb.fetch2.Fetch([self.d.getVar('SRC_URI')], self.d)
+        fetcher = bb.fetch.Fetch([self.d.getVar('SRC_URI')], self.d)
         fetcher.download()
 
         uri = self.d.getVar('SRC_URI')
@@ -4235,7 +4380,7 @@ class GitUnpackUpdateTest(FetcherTest):
         git_fetcher = ud.method
 
         # Should fail - git rebase refuses to run with a dirty index
-        with self.assertRaises(bb.fetch2.LocalModificationsError):
+        with self.assertRaises(bb.fetch.LocalModificationsError):
             git_fetcher.unpack_update(ud, self.unpackdir, self.d)
 
     def test_unpack_update_with_modified_tracked_file(self):
@@ -4246,7 +4391,7 @@ class GitUnpackUpdateTest(FetcherTest):
         the caller can fall back to backup + re-fetch rather than silently discarding
         work in progress.
         """
-        fetcher = bb.fetch2.Fetch([self.d.getVar('SRC_URI')], self.d)
+        fetcher = bb.fetch.Fetch([self.d.getVar('SRC_URI')], self.d)
         fetcher.download()
         fetcher.unpack(self.unpackdir)
 
@@ -4258,7 +4403,7 @@ class GitUnpackUpdateTest(FetcherTest):
 
         # Update to new upstream revision
         self.d.setVar('SRCREV', self.updated_rev)
-        fetcher = bb.fetch2.Fetch([self.d.getVar('SRC_URI')], self.d)
+        fetcher = bb.fetch.Fetch([self.d.getVar('SRC_URI')], self.d)
         fetcher.download()
 
         uri = self.d.getVar('SRC_URI')
@@ -4267,7 +4412,7 @@ class GitUnpackUpdateTest(FetcherTest):
 
         # Should fail - unstaged modification to tracked file is detected by
         # 'git status --untracked-files=no --porcelain'
-        with self.assertRaises(bb.fetch2.LocalModificationsError):
+        with self.assertRaises(bb.fetch.LocalModificationsError):
             git_fetcher.unpack_update(ud, self.unpackdir, self.d)
 
     def test_unpack_update_conflict_raises_rebase_error(self):
@@ -4279,7 +4424,7 @@ class GitUnpackUpdateTest(FetcherTest):
         to a backup + re-fetch.
         """
         # Fetch and unpack at the initial revision
-        fetcher = bb.fetch2.Fetch([self.d.getVar('SRC_URI')], self.d)
+        fetcher = bb.fetch.Fetch([self.d.getVar('SRC_URI')], self.d)
         fetcher.download()
         fetcher.unpack(self.unpackdir)
 
@@ -4300,7 +4445,7 @@ class GitUnpackUpdateTest(FetcherTest):
 
         # Update SRCREV to the new upstream commit
         self.d.setVar('SRCREV', conflict_rev)
-        fetcher = bb.fetch2.Fetch([self.d.getVar('SRC_URI')], self.d)
+        fetcher = bb.fetch.Fetch([self.d.getVar('SRC_URI')], self.d)
         fetcher.download()
 
         uri = self.d.getVar('SRC_URI')
@@ -4309,7 +4454,7 @@ class GitUnpackUpdateTest(FetcherTest):
 
         # unpack_update must fail and clean up (rebase --abort) rather than
         # leaving the repo in a mid-rebase state
-        with self.assertRaises(bb.fetch2.RebaseError):
+        with self.assertRaises(bb.fetch.RebaseError):
             git_fetcher.unpack_update(ud, self.unpackdir, self.d)
 
         # Verify the repo is not left in a conflicted / mid-rebase state
@@ -4342,7 +4487,7 @@ class GitUnpackUpdateTest(FetcherTest):
             local file is untouched.
             """
             # Fresh fetch + unpack at the current SRCREV
-            fetcher = bb.fetch2.Fetch([self.d.getVar('SRC_URI')], self.d)
+            fetcher = bb.fetch.Fetch([self.d.getVar('SRC_URI')], self.d)
             fetcher.download()
             fetcher.unpack(self.unpackdir)
 
@@ -4364,7 +4509,7 @@ class GitUnpackUpdateTest(FetcherTest):
                 f.write('local untracked content\n')
 
             self.d.setVar('SRCREV', new_rev)
-            fetcher = bb.fetch2.Fetch([self.d.getVar('SRC_URI')], self.d)
+            fetcher = bb.fetch.Fetch([self.d.getVar('SRC_URI')], self.d)
             fetcher.download()
 
             uri = self.d.getVar('SRC_URI')
@@ -4372,7 +4517,7 @@ class GitUnpackUpdateTest(FetcherTest):
             git_fetcher = ud.method
 
             # git rebase refuses because the untracked file would be overwritten
-            with self.assertRaises(bb.fetch2.RebaseError):
+            with self.assertRaises(bb.fetch.RebaseError):
                 git_fetcher.unpack_update(ud, self.unpackdir, self.d)
 
             # Repo must not be left in a mid-rebase state
@@ -4410,7 +4555,7 @@ class GitUnpackUpdateTest(FetcherTest):
         self.d.setVar('BB_GENERATE_SHALLOW_TARBALLS', '1')
 
         # First fetch at initial revision
-        fetcher = bb.fetch2.Fetch([self.d.getVar('SRC_URI')], self.d)
+        fetcher = bb.fetch.Fetch([self.d.getVar('SRC_URI')], self.d)
         fetcher.download()
 
         # Remove clonedir to force use of shallow tarball
@@ -4422,7 +4567,7 @@ class GitUnpackUpdateTest(FetcherTest):
 
         # Update to new revision
         self.d.setVar('SRCREV', self.updated_rev)
-        fetcher = bb.fetch2.Fetch([self.d.getVar('SRC_URI')], self.d)
+        fetcher = bb.fetch.Fetch([self.d.getVar('SRC_URI')], self.d)
         fetcher.download()
 
         # unpack_update should fail for shallow clones
@@ -4430,7 +4575,7 @@ class GitUnpackUpdateTest(FetcherTest):
         ud = fetcher.ud[uri]
         git_fetcher = ud.method
 
-        with self.assertRaises(bb.fetch2.UnpackError) as context:
+        with self.assertRaises(bb.fetch.UnpackError) as context:
             git_fetcher.unpack_update(ud, self.unpackdir, self.d)
 
         self.assertIn("shallow clone", str(context.exception).lower())
@@ -4443,7 +4588,7 @@ class GitUnpackUpdateTest(FetcherTest):
         update_mode will fail with a FetchError which must be re-raised as
         UnpackError so the caller can fall back to a full re-fetch.
         """
-        fetcher = bb.fetch2.Fetch([self.d.getVar('SRC_URI')], self.d)
+        fetcher = bb.fetch.Fetch([self.d.getVar('SRC_URI')], self.d)
         fetcher.download()
         fetcher.unpack(self.unpackdir)
 
@@ -4451,7 +4596,7 @@ class GitUnpackUpdateTest(FetcherTest):
 
         # Advance SRCREV to trigger update_mode
         self.d.setVar('SRCREV', self.updated_rev)
-        fetcher = bb.fetch2.Fetch([self.d.getVar('SRC_URI')], self.d)
+        fetcher = bb.fetch.Fetch([self.d.getVar('SRC_URI')], self.d)
         fetcher.download()
 
         uri = self.d.getVar('SRC_URI')
@@ -4464,7 +4609,7 @@ class GitUnpackUpdateTest(FetcherTest):
                  cwd=unpack_path)
 
         git_fetcher = ud.method
-        with self.assertRaises(bb.fetch2.UnpackError):
+        with self.assertRaises(bb.fetch.UnpackError):
             git_fetcher.unpack_update(ud, self.unpackdir, self.d)
 
     def test_fetch_unpack_update_toplevel_api(self):
@@ -4476,7 +4621,7 @@ class GitUnpackUpdateTest(FetcherTest):
         fetch again, then call fetcher.unpack_update(root) and confirm the content
         is updated.
         """
-        fetcher = bb.fetch2.Fetch([self.d.getVar('SRC_URI')], self.d)
+        fetcher = bb.fetch.Fetch([self.d.getVar('SRC_URI')], self.d)
         fetcher.download()
         fetcher.unpack(self.unpackdir)
 
@@ -4485,7 +4630,7 @@ class GitUnpackUpdateTest(FetcherTest):
             self.assertEqual(f.read(), 'initial content\n')
 
         self.d.setVar('SRCREV', self.updated_rev)
-        fetcher = bb.fetch2.Fetch([self.d.getVar('SRC_URI')], self.d)
+        fetcher = bb.fetch.Fetch([self.d.getVar('SRC_URI')], self.d)
         fetcher.download()
 
         # Use the public Fetch.unpack_update() rather than the method directly

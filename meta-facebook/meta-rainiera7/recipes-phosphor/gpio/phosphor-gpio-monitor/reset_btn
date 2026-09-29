@@ -1,0 +1,11 @@
+#!/bin/bash
+# shellcheck source=meta-facebook/recipes-fb/obmc_functions/files/fb-common-functions
+source /usr/libexec/fb-common-functions
+
+input="$1"
+
+if [ "$input" == "RISING" ] ; then
+    set_gpio RST_SOC_PORESET_N_BMC 1
+elif [ "$input" == "FALLING" ] ; then
+    set_gpio RST_SOC_PORESET_N_BMC 0
+fi

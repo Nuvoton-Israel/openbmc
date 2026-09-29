@@ -43,11 +43,13 @@ covered by [Jenkins](https://jenkins.openbmc.org/job/ci-openbmc/) CI testing.
   * harma
   * minerva
   * rainiera6
+  * rainiera7
   * sanmiguel
   * santabarbara
   * tiogapass
   * ventura
   * ventura2
+  * ventura2a7
   * yosemite4
   * yosemite4n
   * yosemite5

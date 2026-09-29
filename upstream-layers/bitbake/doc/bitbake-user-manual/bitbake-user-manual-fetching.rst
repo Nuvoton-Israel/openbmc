@@ -11,10 +11,11 @@ with the intricacies of downloading source code and files from remote
 systems. Fetching source code is one of the cornerstones of building
 software. As such, this module forms an important part of BitBake.
 
-The current fetch module is called "fetch2" and refers to the fact that
-it is the second major version of the API. The original version is
-obsolete and has been removed from the codebase. Thus, in all cases,
-"fetch" refers to "fetch2" in this manual.
+The fetch module was previously called ``fetch2`` to distinguish the second
+major version of the API from the original version, which is obsolete and has
+been removed from the codebase. The module has since been renamed back to
+``fetch``. Existing code using ``bb.fetch2`` remains supported by a
+compatibility alias, but new code should use ``bb.fetch``.
 
 The Download (Fetch)
 ====================
@@ -30,7 +31,7 @@ The code to execute the first part of this process, a fetch, looks
 something like the following::
 
    src_uri = (d.getVar('SRC_URI') or "").split()
-   fetcher = bb.fetch2.Fetch(src_uri, d)
+   fetcher = bb.fetch.Fetch(src_uri, d)
    fetcher.download()
 
 This code sets up an instance of the fetch class. The instance uses a
@@ -123,7 +124,7 @@ in the previous example, or you can name the URLs. The following syntax
 shows how you name the URIs::
 
    SRC_URI = "http://example.com/foobar.tar.bz2;name=foo"
-   SRC_URI[foo.md5sum] = 4a8e0f237e961fd7785d19d07fdb994d
+   SRC_URI[foo.md5sum] = "4a8e0f237e961fd7785d19d07fdb994d"
 
 After a file has been downloaded and
 has had its checksum checked, a ".done" stamp is placed in :term:`DL_DIR`.
@@ -715,6 +716,11 @@ on https://crates.io/ but this fetcher supports other crate registries too.
 The format for the :term:`SRC_URI` setting must be::
 
    SRC_URI = "crate://REGISTRY/NAME/VERSION"
+
+This fetcher supports the following parameters:
+
+-  *"protocol":* The protocol used to fetch the crates. The default is "https".
+   You can also use "http".
 
 Here is an example URL::
 
