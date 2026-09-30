@@ -11,7 +11,7 @@ Signed-off-by: Brian Ma <chma0@nuvoton.com>
  1 file changed, 29 insertions(+), 12 deletions(-)
 
 diff --git a/bmc/obmc-flash-bmc b/bmc/obmc-flash-bmc
-index f9cc4e25..3f1be971 100644
+index 2ee0495..25ea163 100644
 --- a/bmc/obmc-flash-bmc
 +++ b/bmc/obmc-flash-bmc
 @@ -1,6 +1,8 @@
@@ -81,15 +81,15 @@ index f9cc4e25..3f1be971 100644
      zstd -d -c "${imgpath}"/"${version}"/image-kernel | dd of="/dev/disk/by-partlabel/boot-${label}"
      number="$(readlink -f /dev/disk/by-partlabel/boot-"${label}")"
      number="${number##*mmcblk0p}"
-     sgdisk --change-name="${number}":boot-"${label}" /dev/mmcblk0 1>/dev/null
+     sfdisk --part-label /dev/mmcblk0 "${number}" boot-"${label}" 1>/dev/null
  
 +    echo "start update rofs: rofs-${label}" >> "${ulog}"
      zstd -d -c "${imgpath}"/"${version}"/image-rofs | dd of="/dev/disk/by-partlabel/rofs-${label}"
      number="$(readlink -f /dev/disk/by-partlabel/rofs-"${label}")"
      number="${number##*mmcblk0p}"
-     sgdisk --change-name="${number}":rofs-"${label}" /dev/mmcblk0 1>/dev/null
+     sfdisk --part-label /dev/mmcblk0 "${number}" rofs-"${label}" 1>/dev/null
  
-     # Run this after sgdisk for labels to take effect.
+     # Run this after sfdisk for labels to take effect.
 -    partprobe
 +    echo "start partprobe" >> "${ulog}"
 +    # fix some mtd device get Invalid partition table
@@ -117,6 +117,3 @@ index f9cc4e25..3f1be971 100644
  }
  
  function mmc_remove() {
--- 
-2.43.0
-
