@@ -24,13 +24,13 @@ Signed-off-by: Saptarsi Saha <saptarsis@nvidia.com>
 Signed-off-by: Deepak Kodihalli <deepak.kodihalli.83@gmail.com>
 Upstream-Status: Submitted [https://gerrit.openbmc.org/c/openbmc/dbus-sensors/+/80452]
 ---
- src/mctp/MCTPEndpoint.cpp    | 160 +++++++++++++++++++++++++++++++++++
- src/mctp/MCTPEndpoint.hpp    |  28 ++++++
+ src/mctp/MCTPEndpoint.cpp    | 160 +++++++++++++++++++++++++++++++++++++++++++
+ src/mctp/MCTPEndpoint.hpp    |  28 ++++++++
  src/mctp/MCTPReactorMain.cpp |  11 ++-
  3 files changed, 197 insertions(+), 2 deletions(-)
 
 diff --git a/src/mctp/MCTPEndpoint.cpp b/src/mctp/MCTPEndpoint.cpp
-index 986e3e0..5bb94ae 100644
+index 192c089d7..cc1ad591d 100644
 --- a/src/mctp/MCTPEndpoint.cpp
 +++ b/src/mctp/MCTPEndpoint.cpp
 @@ -21,6 +21,7 @@
@@ -212,7 +212,7 @@ index 986e3e0..5bb94ae 100644
 +    }
 +}
 diff --git a/src/mctp/MCTPEndpoint.hpp b/src/mctp/MCTPEndpoint.hpp
-index deed905..7e268ca 100644
+index 371d2ad0e..ab62bdee4 100644
 --- a/src/mctp/MCTPEndpoint.hpp
 +++ b/src/mctp/MCTPEndpoint.hpp
 @@ -9,6 +9,7 @@
@@ -255,7 +255,7 @@ index deed905..7e268ca 100644
 +        uint8_t interfaceNum);
 +};
 diff --git a/src/mctp/MCTPReactorMain.cpp b/src/mctp/MCTPReactorMain.cpp
-index 9d2d321..06d9a0a 100644
+index e415214dd..ad2802da4 100644
 --- a/src/mctp/MCTPReactorMain.cpp
 +++ b/src/mctp/MCTPReactorMain.cpp
 @@ -93,6 +93,12 @@ static std::shared_ptr<MCTPDevice> deviceFromConfig(
@@ -279,7 +279,7 @@ index 9d2d321..06d9a0a 100644
 +        if (I2CMCTPDDevice::match(removed) || I3CMCTPDDevice::match(removed) ||
 +            USBMCTPDDevice::match(removed))
          {
-             reactor->unmanageMCTPDevice(path.str);
+             reactor->unmanageMCTPDevice(path);
          }
 @@ -247,7 +254,7 @@ int main()
      boost::asio::post(io, [reactor, systemBus]() {

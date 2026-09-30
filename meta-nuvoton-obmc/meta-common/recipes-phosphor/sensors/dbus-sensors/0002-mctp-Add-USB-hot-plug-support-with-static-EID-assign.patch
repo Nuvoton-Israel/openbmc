@@ -17,15 +17,15 @@ unrelated USB event triggers a configuration refresh.
 Upstream-Status: Inappropriate [oe-specific]
 Signed-off-by: Stanley Chu <yschu@nuvoton.com>
 ---
- src/mctp/MCTPEndpoint.cpp    | 59 +++++++++++++++++++++++++++++++++++-
- src/mctp/MCTPEndpoint.hpp    | 22 ++++++++++++--
- src/mctp/MCTPReactor.cpp     | 42 +++++++++++++++++++++++++
+ src/mctp/MCTPEndpoint.cpp    | 59 +++++++++++++++++++++++++++++++++++++++++++-
+ src/mctp/MCTPEndpoint.hpp    | 22 +++++++++++++++--
+ src/mctp/MCTPReactor.cpp     | 42 +++++++++++++++++++++++++++++++
  src/mctp/MCTPReactor.hpp     |  1 +
- src/mctp/MCTPReactorMain.cpp | 36 ++++++++++++++++++++++
+ src/mctp/MCTPReactorMain.cpp | 36 +++++++++++++++++++++++++++
  5 files changed, 157 insertions(+), 3 deletions(-)
 
 diff --git a/src/mctp/MCTPEndpoint.cpp b/src/mctp/MCTPEndpoint.cpp
-index 5bb94ae9c..2a948d88c 100644
+index cc1ad591d..343cf3ed5 100644
 --- a/src/mctp/MCTPEndpoint.cpp
 +++ b/src/mctp/MCTPEndpoint.cpp
 @@ -125,6 +125,44 @@ void MCTPDDevice::setup(
@@ -107,7 +107,7 @@ index 5bb94ae9c..2a948d88c 100644
      catch (const MCTPException& ex)
      {
 diff --git a/src/mctp/MCTPEndpoint.hpp b/src/mctp/MCTPEndpoint.hpp
-index 7e268ca6e..163126ae9 100644
+index ab62bdee4..1f958a747 100644
 --- a/src/mctp/MCTPEndpoint.hpp
 +++ b/src/mctp/MCTPEndpoint.hpp
 @@ -283,6 +283,16 @@ class MCTPDDevice :
@@ -151,10 +151,10 @@ index 7e268ca6e..163126ae9 100644
  
      static std::string busFromRootHubPath(
 diff --git a/src/mctp/MCTPReactor.cpp b/src/mctp/MCTPReactor.cpp
-index d4f591c8b..a53123e1d 100644
+index 9548d5348..37cc96dd1 100644
 --- a/src/mctp/MCTPReactor.cpp
 +++ b/src/mctp/MCTPReactor.cpp
-@@ -201,6 +201,9 @@ void MCTPReactor::tick()
+@@ -202,6 +202,9 @@ void MCTPReactor::tick()
  {
      for (const auto& entry : devices)
      {
@@ -164,7 +164,7 @@ index d4f591c8b..a53123e1d 100644
          switch (states[entry.second->id()])
          {
              case MCTPDeviceState::Unmanaged:
-@@ -269,6 +272,17 @@ void MCTPReactor::manageMCTPDevice(const std::string& path,
+@@ -270,6 +273,17 @@ void MCTPReactor::manageMCTPDevice(const std::string& path,
                  return;
              }
  
@@ -182,7 +182,7 @@ index d4f591c8b..a53123e1d 100644
              // Unsynchronised termination so we can configure the new device.
              // Paired with presence test when handling MCTPDeviceState::Removing
              // in the subscribed endpoint removed handler
-@@ -294,6 +308,34 @@ void MCTPReactor::manageMCTPDevice(const std::string& path,
+@@ -295,6 +309,34 @@ void MCTPReactor::manageMCTPDevice(const std::string& path,
      }
  }
  
@@ -214,23 +214,23 @@ index d4f591c8b..a53123e1d 100644
 +    }
 +}
 +
- void MCTPReactor::unmanageMCTPDevice(const std::string& path)
+ void MCTPReactor::unmanageMCTPDevice(const sdbusplus::object_path& path)
  {
      auto device = devices.deviceFor(path);
 diff --git a/src/mctp/MCTPReactor.hpp b/src/mctp/MCTPReactor.hpp
-index 5f07a7aa2..4979ef8d3 100644
+index c9f1f9fb0..e758fb2c5 100644
 --- a/src/mctp/MCTPReactor.hpp
 +++ b/src/mctp/MCTPReactor.hpp
 @@ -93,6 +93,7 @@ class MCTPReactor : public std::enable_shared_from_this<MCTPReactor>
      void manageMCTPDevice(const std::string& path,
                            const std::shared_ptr<MCTPDevice>& device);
-     void unmanageMCTPDevice(const std::string& path);
+     void unmanageMCTPDevice(const sdbusplus::object_path& path);
 +    void removeMCTPInterface(const std::string& ifname);
  
    private:
      static std::optional<std::string> findSMBusInterface(int bus);
 diff --git a/src/mctp/MCTPReactorMain.cpp b/src/mctp/MCTPReactorMain.cpp
-index 06d9a0ab5..8f02e245a 100644
+index ad2802da4..58b50714d 100644
 --- a/src/mctp/MCTPReactorMain.cpp
 +++ b/src/mctp/MCTPReactorMain.cpp
 @@ -249,6 +249,42 @@ int main()
@@ -276,6 +276,3 @@ index 06d9a0ab5..8f02e245a 100644
      systemBus->request_name("xyz.openbmc_project.MCTPReactor");
  
      boost::asio::post(io, [reactor, systemBus]() {
--- 
-2.34.1
-
