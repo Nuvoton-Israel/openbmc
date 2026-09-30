@@ -22,3 +22,6 @@ IMAGE_INSTALL:append = " npcm400-fw-tool"
 IMAGE_INSTALL:append = " automation-test-tools"
 IMAGE_INSTALL:append = " v4l-utils"
 IMAGE_INSTALL:append = " usb-network-ecm"
+
+# Disable login shell auto-logout on idle
+DEFAULT_TTY_IDLE_TIMEOUT = "0"
