@@ -1,0 +1,132 @@
+From c0f55eeecb123de9194f9c6b81d7303a0e36963b Mon Sep 17 00:00:00 2001
+From: Stanley Chu <yschu@nuvoton.com>
+Date: Wed, 30 Sep 2026 00:32:50 +0000
+Subject: [PATCH] crypto, hw/misc/npcm_sha: support nettle 4.0
+
+nettle 4.0 dropped the deprecated <nettle/sha.h> compatibility header
+and removed the length argument from all *_digest() functions.
+
+Include <nettle/sha1.h> and <nettle/sha2.h> directly, and call the
+hash/hmac digest callbacks without a length argument when building
+against nettle >= 4. Without this, the casted callbacks would pass the
+length where the output buffer is expected.
+
+Upstream-Status: Pending
+Signed-off-by: Stanley Chu <yschu@nuvoton.com>
+---
+ crypto/hash-nettle.c       | 13 ++++++++++++-
+ crypto/hmac-nettle.c       | 10 ++++++++++
+ hw/misc/npcm_sha.c         |  3 ++-
+ include/hw/misc/npcm_sha.h |  3 ++-
+ 4 files changed, 26 insertions(+), 3 deletions(-)
+
+diff --git a/crypto/hash-nettle.c b/crypto/hash-nettle.c
+index 53f68301ef..be5b533012 100644
+--- a/crypto/hash-nettle.c
++++ b/crypto/hash-nettle.c
+@@ -24,8 +24,10 @@
+ #include "crypto/hash.h"
+ #include "hashpriv.h"
+ #include <nettle/md5.h>
+-#include <nettle/sha.h>
++#include <nettle/sha1.h>
++#include <nettle/sha2.h>
+ #include <nettle/ripemd160.h>
++#include <nettle/version.h>
+ #ifdef CONFIG_CRYPTO_SM3
+ #include <nettle/sm3.h>
+ #endif
+@@ -34,9 +36,14 @@ typedef void (*qcrypto_nettle_init)(void *ctx);
+ typedef void (*qcrypto_nettle_write)(void *ctx,
+                                      size_t len,
+                                      const uint8_t *buf);
++#if NETTLE_VERSION_MAJOR >= 4
++typedef void (*qcrypto_nettle_result)(void *ctx,
++                                      uint8_t *buf);
++#else
+ typedef void (*qcrypto_nettle_result)(void *ctx,
+                                       size_t len,
+                                       uint8_t *buf);
++#endif
+ 
+ union qcrypto_hash_ctx {
+     struct md5_ctx md5;
+@@ -176,7 +183,11 @@ int qcrypto_nettle_hash_finalize(QCryptoHash *hash,
+         return -1;
+     }
+ 
++#if NETTLE_VERSION_MAJOR >= 4
++    qcrypto_hash_alg_map[hash->alg].result(ctx, *result);
++#else
+     qcrypto_hash_alg_map[hash->alg].result(ctx, *result_len, *result);
++#endif
+ 
+     return 0;
+ }
+diff --git a/crypto/hmac-nettle.c b/crypto/hmac-nettle.c
+index 2cff7931e1..c1b2065942 100644
+--- a/crypto/hmac-nettle.c
++++ b/crypto/hmac-nettle.c
+@@ -17,6 +17,7 @@
+ #include "crypto/hmac.h"
+ #include "hmacpriv.h"
+ #include <nettle/hmac.h>
++#include <nettle/version.h>
+ 
+ typedef void (*qcrypto_nettle_hmac_setkey)(void *ctx,
+                                            size_t key_length,
+@@ -26,9 +27,14 @@ typedef void (*qcrypto_nettle_hmac_update)(void *ctx,
+                                            size_t length,
+                                            const uint8_t *data);
+ 
++#if NETTLE_VERSION_MAJOR >= 4
++typedef void (*qcrypto_nettle_hmac_digest)(void *ctx,
++                                           uint8_t *digest);
++#else
+ typedef void (*qcrypto_nettle_hmac_digest)(void *ctx,
+                                            size_t length,
+                                            uint8_t *digest);
++#endif
+ 
+ typedef struct QCryptoHmacNettle QCryptoHmacNettle;
+ struct QCryptoHmacNettle {
+@@ -176,7 +182,11 @@ qcrypto_nettle_hmac_bytesv(QCryptoHmac *hmac,
+         return -1;
+     }
+ 
++#if NETTLE_VERSION_MAJOR >= 4
++    qcrypto_hmac_alg_map[hmac->alg].digest(&ctx->u, *result);
++#else
+     qcrypto_hmac_alg_map[hmac->alg].digest(&ctx->u, *resultlen, *result);
++#endif
+ 
+     return 0;
+ }
+diff --git a/hw/misc/npcm_sha.c b/hw/misc/npcm_sha.c
+index fd7f1936c4..9f1759c9d3 100644
+--- a/hw/misc/npcm_sha.c
++++ b/hw/misc/npcm_sha.c
+@@ -12,7 +12,8 @@
+ #include "migration/vmstate.h"
+ #include "qemu/log.h"
+ #include "trace.h"
+-#include <nettle/sha.h>
++#include <nettle/sha1.h>
++#include <nettle/sha2.h>
+ #include <byteswap.h>
+ 
+ #define NPCM8XX_SHA_REG_SIZE   0x1000
+diff --git a/include/hw/misc/npcm_sha.h b/include/hw/misc/npcm_sha.h
+index 13902d1533..b569361340 100644
+--- a/include/hw/misc/npcm_sha.h
++++ b/include/hw/misc/npcm_sha.h
+@@ -10,7 +10,8 @@
+ #define NPCM_SHA_H
+ 
+ #include "hw/core/sysbus.h"
+-#include <nettle/sha.h>
++#include <nettle/sha1.h>
++#include <nettle/sha2.h>
+ 
+ typedef struct NPCM8xxSHAState {
+     SysBusDevice parent_obj;

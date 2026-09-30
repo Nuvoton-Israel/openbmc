@@ -10,6 +10,7 @@ PV = "11.0.0+git${SRCPV}"
 SRC_URI:append = " \
     file://0010-configure-lookup-meson-exutable-from-PATH.patch \
     file://0011-qemu-Ensure-pip-and-the-python-venv-aren-t-used-for-.patch \
+    file://0012-crypto-hw-misc-npcm_sha-support-nettle-4.0.patch \
     "
 
 # Since qemu-native runs on the build host and doesn't see machine overrides like npcm7xx/npcm8xx,
