@@ -3,7 +3,7 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 # Override source URI to Nuvoton's fork
 QBRANCH = "npcm-v11.0.0"
 SRC_URI = "gitsm://github.com/Nuvoton-Israel/qemu.git;protocol=https;branch=${QBRANCH}"
-SRCREV = "47bb2e94cbfd328cb56ca7323d7d9d8ead91e3ed"
+SRCREV = "379c9e82360cf4ca1120d9a132bc289175230e4a"
 
 PV = "11.0.0+git${SRCPV}"
 
