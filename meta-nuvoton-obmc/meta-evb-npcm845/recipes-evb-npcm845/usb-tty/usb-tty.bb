@@ -7,7 +7,8 @@ RDEPENDS:${PN} += "libsystemd"
 RDEPENDS:${PN} += "bash"
 
 SRC_URI += "file://usb_tty.sh \
-           file://usb_tty.service"
+           file://usb_tty.service \
+           file://serial-getty-ttyGS0.conf"
 
 S = "${UNPACKDIR}/sources"
 
@@ -18,7 +19,13 @@ do_install() {
 
     install -d ${D}${systemd_unitdir}/system/
     install -m 0644 ${UNPACKDIR}/usb_tty.service ${D}${systemd_unitdir}/system
+
+    install -d ${D}${systemd_unitdir}/system/serial-getty@ttyGS0.service.d
+    install -m 0644 ${UNPACKDIR}/serial-getty-ttyGS0.conf \
+        ${D}${systemd_unitdir}/system/serial-getty@ttyGS0.service.d/10-no-tty-reset.conf
 }
+
+FILES:${PN} += "${systemd_unitdir}/system/serial-getty@ttyGS0.service.d"
 
 NATIVE_SYSTEMD_SUPPORT = "1"
 SYSTEMD_PACKAGES = "${PN}"
