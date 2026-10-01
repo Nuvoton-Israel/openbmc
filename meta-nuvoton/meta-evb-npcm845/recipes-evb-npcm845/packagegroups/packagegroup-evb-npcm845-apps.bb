@@ -61,4 +61,6 @@ RDEPENDS:${PN}-system = " \
         persistent-net-name \
         libnpcm-jtag \
         openocd \
+        nuv-ocp-recovery \
+        phosphor-gpio-monitor-monitor \
         "

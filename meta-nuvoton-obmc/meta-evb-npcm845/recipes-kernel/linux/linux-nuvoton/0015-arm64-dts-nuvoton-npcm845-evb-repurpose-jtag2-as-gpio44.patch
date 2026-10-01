@@ -1,0 +1,45 @@
+From 32bf076b4d246eaba0f4f0ad727dfad430c9dd71 Mon Sep 17 00:00:00 2001
+From: Tyrone Ting <kfting@nuvoton.com>
+Date: Tue, 1 Sep 2026 14:48:30 +0800
+Subject: [PATCH] arm64: dts: nuvoton: npcm845-evb: repurpose JTAG2 as GPIO44
+ input
+
+Switch the pinctrl-0 group from jtag2_pins to a new gpio44_pins group and
+add that pinmux node (bias-disable, input-enable) so the JTAG2 pin is muxed
+as GPIO44 input.  This GPIO is used as the OCP recovery low-pulse trigger.
+
+Upstream-Status: Inappropriate [oe-specific]
+Signed-off-by: Tyrone Ting <kfting@nuvoton.com>
+---
+ arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+index 70598ef..801c908 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+@@ -599,7 +599,7 @@
+ &pinctrl {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <
+-			&jtag2_pins
++			&gpio44_pins
+ 			&lpc_pins
+ 			&spix_pins
+ 			&pin4_slew
+@@ -647,6 +647,12 @@
+ 			input-enable;
+ 		};
+ 
++		gpio44_pins: gpio44-pins {
++			pins = "GPIO44/SI1_nCTS/BU1_nCTS/CP_TDI/TP_TDI/CP_TP_TDI";
++			bias-disable;
++			input-enable;
++		};
++
+ 		gpio3: gpio@f0013000 {
+ 			/* SMC_FORCE_DL=gpio96 */
+ 			gpio-line-names =
+-- 
+2.34.1
+

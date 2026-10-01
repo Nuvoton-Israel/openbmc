@@ -59,3 +59,12 @@ SRC_URI:append = " file://0013-arm64-dts-nuvoton-npcm845-evb-repurpose-GPIO12-13
 
 # FPGA test
 SRC_URI:append = " file://0014-dts-remove-i2c5-8-11-and-24-26.patch"
+
+# Repurpose JTAG2 pin as GPIO44 input (OCP recovery low-pulse trigger)
+SRC_URI:append = " file://0015-arm64-dts-nuvoton-npcm845-evb-repurpose-jtag2-as-gpio44.patch"
+
+# EVB i3c tuning changes (dts i3c4, clk mclk, svc driver)
+SRC_URI:append = " file://0016-arm64-npcm845-evb-i3c-tuning-changes.patch"
+
+# i3c: master: add 'detach' sysfs interface (used by nuv-ocp-recovery)
+SRC_URI:append = " file://0017-i3c-master-Add-sysfs-interface-to-detach-I3C-device.patch"

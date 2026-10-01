@@ -1,0 +1,12 @@
+[
+    {
+        "Name": "GPIO44_OCP_RECOVERY",
+        "GpioNum": 12,
+        "ChipId": "gpiochip1",
+        "EventMon": "BOTH",
+        "Continue": true,
+        "PulseTarget": "nuv-ocp-recovery.service",
+        "PulseLowMinUs": 500,
+        "PulseLowMaxUs": 1500
+    }
+]

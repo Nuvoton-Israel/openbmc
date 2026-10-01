@@ -1,0 +1,6 @@
+{
+    "BusNumber": 2,
+    "FwImage": "/usr/share/nuv-ocp-recovery/fw_image.bin",
+    "SocManifest": "/usr/share/nuv-ocp-recovery/soc_manifest.bin",
+    "McuRuntime": "/usr/share/nuv-ocp-recovery/mcu_rt.bin"
+}
