@@ -1,0 +1,82 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: OpenBMC Nuvoton <openbmc@nuvoton.com>
+Date: Tue, 23 Sep 2025 12:00:00 +0800
+Subject: [PATCH] mctpd: attach Common.UUID when learned after publish
+
+Static-EID endpoints expose a real UUID over MCTP (Get Endpoint UUID,
+control command 0x03), but that UUID never reaches D-Bus for these
+devices, so consumers such as spdmd fail to match them to inventory
+("couldn't get UUID for .../endpoints/<eid>").
+
+Root cause: when a device reports a static EID that differs from the one
+mctpd allocated, endpoint_send_set_endpoint_id() triggers the
+"Mismatch of requested from received EID, resetting the pool" path which
+calls change_peer_eid(). change_peer_eid() unpublishes and immediately
+re-publishes the peer while peer->uuid is still NULL, so publish_peer()
+marks the peer published without attaching xyz.openbmc_project.Common.UUID.
+
+setup_added_peer() then runs query_peer_properties(), which successfully
+learns the UUID and stores it in peer->uuid, and calls publish_peer()
+again. But publish_peer() early-returns because peer->published is
+already true, so the Common.UUID interface is never registered even
+though mctpd holds a valid UUID in memory.
+
+Fix publish_peer() so that when it is called for an already-published
+peer whose UUID has since become known (peer->uuid set, peer->slot_uuid
+still NULL), it attaches the Common.UUID vtable and emits
+InterfacesAdded so D-Bus clients (ObjectMapper, spdmd) observe it.
+
+Upstream-Status: Pending
+
+Signed-off-by: OpenBMC Nuvoton <openbmc@nuvoton.com>
+---
+ src/mctpd.c | 33 ++++++++++++++++++++++++++++++++-
+ 1 file changed, 32 insertions(+), 1 deletion(-)
+
+diff --git a/src/mctpd.c b/src/mctpd.c
+index a7036ad..b7036ad 100644
+--- a/src/mctpd.c
++++ b/src/mctpd.c
+@@ -3230,8 +3230,39 @@ static int publish_peer(struct peer *peer)
+ {
+ 	int rc = 0;
+ 
+-	if (peer->published)
++	if (peer->published) {
++		/*
++		 * The peer may have been published before its UUID was known.
++		 * For static-EID endpoints the requested/received EID mismatch
++		 * path publishes the object via change_peer_eid() before
++		 * query_peer_properties() has run, so peer->uuid is only learned
++		 * afterwards. setup_added_peer() then calls publish_peer() again;
++		 * without this the xyz.openbmc_project.Common.UUID interface is
++		 * never attached even though mctpd holds a valid UUID, which
++		 * breaks consumers such as spdmd that match inventory by UUID.
++		 * Attach it now and notify D-Bus clients.
++		 */
++		if (peer->uuid && !peer->slot_uuid) {
++			rc = sd_bus_add_object_vtable(
++				peer->ctx->bus, &peer->slot_uuid, peer->path,
++				OPENBMC_IFACE_COMMON_UUID,
++				bus_endpoint_uuid_vtable, peer);
++			if (rc < 0) {
++				warnx("mctpd: failed to attach late Common.UUID to %s: %s",
++				      peer->path, strerror(-rc));
++				return rc;
++			}
++			rc = sd_bus_emit_interfaces_added(
++				peer->ctx->bus, peer->path,
++				OPENBMC_IFACE_COMMON_UUID, NULL);
++			if (rc < 0)
++				warnx("mctpd: failed to emit late Common.UUID for %s: %s",
++				      peer->path, strerror(-rc));
++			warnx("mctpd: attached Common.UUID to %s after late UUID discovery",
++			      peer->path);
++		}
+ 		return 0;
++	}
+ 
+ 	rc = asprintf(&peer->path, "%s/networks/%d/endpoints/%d",
+ 		      MCTP_DBUS_PATH, peer->net, peer->eid);
+-- 
+2.34.1

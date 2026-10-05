@@ -1,0 +1,152 @@
+From 8a68b23b80b13b51c04a8f54cbc0a8d8e0fd232b Mon Sep 17 00:00:00 2001
+From: xilingsun <xilingsun@microsoft.com>
+Date: Thu, 20 Aug 2026 16:16:58 -0700
+Subject: [PATCH 1/5] mailbox: synchronize NPCM channel shutdown
+
+NPCM clients can be removed while the threaded mailbox IRQ is
+handling a response. The existing shutdown path frees channel
+metadata before the mailbox core clears the client pointer. This can
+race the controller handler and client callback.
+
+Keep channel metadata for the controller lifetime, mark it inactive
+before shutdown, and synchronize the IRQ. Also acknowledge inactive
+doorbells so the shared IRQ cannot retrigger indefinitely.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: xilingsun <xilingsun@microsoft.com>
+---
+ drivers/mailbox/npcm-mailbox.c | 52 +++++++++++++++++++++-------------
+ 1 file changed, 33 insertions(+), 19 deletions(-)
+
+diff --git a/drivers/mailbox/npcm-mailbox.c b/drivers/mailbox/npcm-mailbox.c
+index 83ff5f5c64bb..69a426f88615 100644
+--- a/drivers/mailbox/npcm-mailbox.c
++++ b/drivers/mailbox/npcm-mailbox.c
+@@ -21,25 +21,29 @@ struct npcm_mbox_hw {
+ 	struct device		*dev;
+ 	void __iomem		*base;
+ 	struct mbox_controller	*controller;
++	int			irq;
+ };
+ 
+ /**
+- * NPCM mailbox allocated channel information
+- *
++ * struct npcm_mbox_channel - NPCM mailbox channel information
+  * @mhw: Pointer to parent mailbox device
++ * @pchan: Physical mailbox channel
+  * @doorbell: doorbell number pertaining to this channel
++ * @active: Whether the channel is bound to a client
+  */
+ struct npcm_mbox_channel {
+ 	struct npcm_mbox_hw	*mhw;
+ 	unsigned int		pchan;
+ 	unsigned int		doorbell;
++	bool			active;
+ };
+ 
+ static inline struct mbox_chan *
+ npcm_mbox_to_channel(struct mbox_controller *controller, unsigned int doorbell)
+ {
+ 	struct npcm_mbox_channel *chan_info = controller->chans[doorbell].con_priv;
+-	if (chan_info && chan_info->doorbell == doorbell)
++	if (chan_info && READ_ONCE(chan_info->active) &&
++	    chan_info->doorbell == doorbell)
+ 		return &controller->chans[doorbell];
+ 
+ 	return NULL;
+@@ -75,9 +79,12 @@ static struct mbox_chan *npcm_mbox_irq_to_channel(struct npcm_mbox_hw *mhw)
+ 		chan = npcm_mbox_to_channel(controller, doorbell);
+ 		if (chan)
+ 			break;
+-		dev_err(controller->dev,
+-			"Channel 0 not registered yet, doorbell: %d\n",
+-			doorbell);
++
++		writel_relaxed(BIT(doorbell),
++			       mhw->base + NPCM_CP2BST_REG_OFFSET);
++		dev_warn_ratelimited(controller->dev,
++				     "doorbell %d has no active channel\n",
++				     doorbell);
+ 	}
+ 	return chan;
+ }
+@@ -108,6 +115,9 @@ static int npcm_send_data(struct mbox_chan *chan, void *data)
+ 
+ static int npcm_startup(struct mbox_chan *chan)
+ {
++	struct npcm_mbox_channel *chan_info = chan->con_priv;
++
++	WRITE_ONCE(chan_info->active, true);
+ 	npcm_mbox_clear_irq(chan);
+ 	return 0;
+ }
+@@ -115,12 +125,10 @@ static int npcm_startup(struct mbox_chan *chan)
+ static void npcm_shutdown(struct mbox_chan *chan)
+ {
+ 	struct npcm_mbox_channel *chan_info = chan->con_priv;
+-	struct mbox_controller *controller = chan_info->mhw->controller;
+ 
+-	/* Reset channel */
++	WRITE_ONCE(chan_info->active, false);
+ 	npcm_mbox_clear_irq(chan);
+-	devm_kfree(controller->dev, chan->con_priv);
+-	chan->con_priv = NULL;
++	synchronize_irq(chan_info->mhw->irq);
+ }
+ 
+ static bool npcm_last_tx_done(struct mbox_chan *chan)
+@@ -169,18 +177,20 @@ static struct mbox_chan *npcm_mbox_xlate(struct mbox_controller *controller,
+ 	}
+ 
+ 	chan = &controller->chans[doorbell];
+-	chan_info =
+-		devm_kzalloc(controller->dev, sizeof(*chan_info), GFP_KERNEL);
+-	if (!chan_info)
+-		return ERR_PTR(-ENOMEM);
++	chan_info = chan->con_priv;
++	if (!chan_info) {
++		chan_info = devm_kzalloc(controller->dev, sizeof(*chan_info), GFP_KERNEL);
++		if (!chan_info)
++			return ERR_PTR(-ENOMEM);
++		chan->con_priv = chan_info;
++	}
+ 
+ 	chan_info->mhw = mhw;
+ 	chan_info->doorbell = doorbell;
+ 	chan_info->pchan = pchan;
+-	chan->con_priv = chan_info;
+ 
+ 	dev_info(controller->dev,
+-		 "controller: created channel 0, doorbell: %d\n", doorbell);
++		 "controller: activated channel 0, doorbell: %d\n", doorbell);
+ 
+ 	return chan;
+ }
+@@ -220,7 +230,7 @@ static int npcm_mbox_probe(struct platform_device *pdev)
+ 	if (!chans)
+ 		return -ENOMEM;
+ 
+-	mhw->dev	= &pdev->dev; 
++	mhw->dev	= &pdev->dev;
+ 	mhw->controller	= mbox;
+ 
+ 	mbox->dev = mhw->dev;
+@@ -241,8 +251,12 @@ static int npcm_mbox_probe(struct platform_device *pdev)
+ 	/* Clear all IRQs before claiming IRQ handler */
+ 	writel_relaxed(0xFFFFFFFF, mhw->base + NPCM_CP2BST_REG_OFFSET);
+ 
+-	err = devm_request_threaded_irq(&pdev->dev, platform_get_irq(pdev, 0),
+-					NULL, npcm_mbox_rx_handler,
++	mhw->irq = platform_get_irq(pdev, 0);
++	if (mhw->irq < 0)
++		return mhw->irq;
++
++	err = devm_request_threaded_irq(&pdev->dev, mhw->irq, NULL,
++					npcm_mbox_rx_handler,
+ 					IRQF_ONESHOT, "npcm_mbox", mhw);
+ 	if (err) {
+ 		dev_err(&pdev->dev, "Can't claim IRQ handler %d\n", err);
+-- 
+2.43.0
+

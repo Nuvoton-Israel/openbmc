@@ -25,3 +25,6 @@ IMAGE_INSTALL:append = " usb-network-ecm"
 
 # Disable login shell auto-logout on idle
 DEFAULT_TTY_IDLE_TIMEOUT = "0"
+
+# curl for exercising the Composite EAT Redfish API on target
+IMAGE_INSTALL:append:df-composite-eat = " curl"

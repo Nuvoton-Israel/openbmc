@@ -1,0 +1,34 @@
+From e7f1ba0dc95c2b42475a2613abb2e3733a9e061f Mon Sep 17 00:00:00 2001
+From: xilingsun <xilingsun@microsoft.com>
+Date: Thu, 20 Aug 2026 16:16:58 -0700
+Subject: [PATCH] arm64: dts: npcm845: correct TIP RNG register size
+
+The TIP RNG client accesses three 32-bit registers at offsets 0, 4,
+and 8, but its DT resource includes a fourth scratchpad. Composite EAT
+uses that fourth register as scratchpad 24.
+
+Limit the RNG resource to the registers it owns so both clients can be
+described without overlapping MMIO resources.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: xilingsun <xilingsun@microsoft.com>
+---
+ arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi b/arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi
+index 708a778ac934..4f57815d36ec 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi
+@@ -304,7 +304,7 @@ tip_mbox: mailbox@f080d000 {
+ 
+ 		rng_tip: rng_tip@0 {
+ 			compatible = "nuvoton,npcm845-rng-tip";
+-			reg = <0x0 0xf0800E54 0x0 0x10>;
++			reg = <0x0 0xf0800E54 0x0 0x0c>;
+ 			status = "disabled";
+ 		};
+ 
+-- 
+2.43.0
+

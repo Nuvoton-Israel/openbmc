@@ -1,0 +1,39 @@
+From 9a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Wed, 16 Sep 2026 21:32:00 +0800
+Subject: [PATCH 3/3] spdmd: fix Boost.Asio timer cancel API mismatch
+Upstream-Status: Pending
+
+Modern Boost.Asio (basic_waitable_timer) does not provide an error_code&
+overload for cancel(). Update timer cancel calls to timer->cancel()
+and overallTimer.cancel().
+
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ spdmd/dbus_impl_composite.cpp | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/spdmd/dbus_impl_composite.cpp b/spdmd/dbus_impl_composite.cpp
+--- a/spdmd/dbus_impl_composite.cpp
++++ b/spdmd/dbus_impl_composite.cpp
+@@ -255,8 +255,7 @@ void DbusImplComposite::onDeviceComplete(std::uint8_t eid, bool success)
+     done[eid] = true;
+     if (auto& t = perDevTimers[eid])
+     {
+-        boost::system::error_code ec;
+-        t->cancel(ec);
++        t->cancel();
+     }
+     for (auto& r : active)
+     {
+@@ -269,8 +268,7 @@ void DbusImplComposite::onDeviceComplete(std::uint8_t eid, bool success)
+     }
+     if (pending == 0)
+     {
+-        boost::system::error_code ec;
+-        overallTimer.cancel(ec);
++        overallTimer.cancel();
+         finalize();
+     }
+ }
+-- 

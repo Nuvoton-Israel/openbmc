@@ -4,6 +4,14 @@ SRC_URI:append = " file://mctp-config"
 SRC_URI:append = " file://setup-eid.conf"
 SRC_URI:append = " file://90-mctp.rules"
 
+# Fix: static-EID endpoints report a UUID over MCTP but it never reaches
+# D-Bus because the requested/received EID mismatch path publishes the peer
+# (via change_peer_eid) before query_peer_properties() learns the UUID, and
+# publish_peer() early-returns on the second call. Attach Common.UUID when it
+# becomes known after the initial publish so spdmd can match inventory by UUID.
+# Must be listed after 0002 (both touch publish_peer()).
+SRC_URI:append:df-composite-eat = " file://0003-mctpd-attach-Common.UUID-when-learned-after-publish.patch"
+
 FILES:${PN} += "${systemd_system_unitdir}/*"
 FILES:${PN} += "${sysconfdir}/udev/rules.d/90-mctp.rules"
 FILES:${PN} += "${@bb.utils.contains('MCTPD_ROLE', 'endpoint', '${sysconfdir}/mctpd.conf', '', d)}"

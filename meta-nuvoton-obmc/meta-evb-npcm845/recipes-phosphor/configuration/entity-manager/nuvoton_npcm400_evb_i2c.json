@@ -9,5 +9,10 @@
     ],
     "Name": "NPCM400 SMC EVB with MCTP I2C",
     "Probe": "FALSE",
-    "Type": "Board"
+    "Type": "Board",
+    "xyz.openbmc_project.Inventory.Item.Board": {},
+    "xyz.openbmc_project.Inventory.Item.SPDMResponder": {},
+    "xyz.openbmc_project.Common.UUID": {
+        "UUID": "11223344-5566-7788-99aa-bbccddeeff00"
+    }
 }

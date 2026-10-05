@@ -1,0 +1,429 @@
+From: Nuvoton OpenBMC <noreply@nuvoton.com>
+Subject: [PATCH] fix build/integration issues for this distro's sdbusplus and mctpd
+
+Three independent fixes needed to build and run NVIDIA's Core-26.05-1_br
+spdm daemon against this distro's stack:
+
+1. NVIDIA's Core-26.05-1_br branch is written against
+   sdbusplus::message::object_path and sdbusplus::bus::bus, which are the
+   spellings from an older sdbusplus. The version currently pinned by
+   meta-phosphor's sdbusplus recipe has already renamed these to
+   sdbusplus::object_path and sdbusplus::bus_t (the old spellings no
+   longer exist / are deprecated-as-error under -Werror). This is a
+   mechanical rename only, to the exact same underlying types, so it is
+   safe against any sdbusplus version that has them.
+
+2. Under -Ddiscovery_only_from_mctp_control=enabled,
+   mctpNewObjectSignal() in mctp_endpoint_discovery.cpp references an
+   `invPath` local that is only declared in the (disabled)
+   Inventory.Item.SPDMResponder-matching branch, so it fails to compile.
+   Declares an empty sdbusplus::object_path in its place, which is the
+   correct "no inventory object" value for that build configuration.
+
+3. getBindingType() requires xyz.openbmc_project.MCTP.Binding on the
+   MCTP endpoint object, aborting discovery for every endpoint if it's
+   absent. codeconstruct's mctpd (au.com.codeconstruct.MCTP1, what this
+   distro's mctpd.service actually runs) never exposes that interface on
+   endpoint objects, so every endpoint discovery was silently dropped
+   with "Unable to get binding type". bindingType is purely informational
+   (stored on the Responder dbus object; used only for duplicate-responder
+   comparison, never for transport selection), so fall back to a fixed
+   value when the interface is absent, mirroring the fallback
+   getMediumType() already has for the same situation.
+
+Upstream-Status: Inappropriate [layer-local: adapts an out-of-tree
+fork's build to this distro's pinned sdbusplus version and mctpd
+implementation; not applicable upstream]
+
+diff -ruN spdm-orig/common_headers/utils.hpp spdm-fixed/common_headers/utils.hpp
+--- a/common_headers/utils.hpp	2026-09-17 23:27:24.192358722 +0800
++++ b/common_headers/utils.hpp	2026-09-17 23:27:24.218025385 +0800
+@@ -87,7 +87,7 @@
+ 
+ using PropertyMap = std::map<Property, Value>;
+ using InterfaceMap = std::map<Interface, PropertyMap>;
+-using ObjectValueTree = std::map<sdbusplus::message::object_path, InterfaceMap>;
++using ObjectValueTree = std::map<sdbusplus::object_path, InterfaceMap>;
+ 
+ /**
+  *  @brief Helper struct for getting the Service name from the ObjectMapper
+@@ -125,12 +125,12 @@
+     // xyz.openbmc_project.ObjectMapper throwing "Call failed: path or object
+     // not found" instead of returning the correct values (even though the
+     // services are running, and it seems to work in qemu)
+-    std::string getService(sdbusplus::bus::bus& /*bus*/) const
++    std::string getService(sdbusplus::bus_t& /*bus*/) const
+     {
+         return defaultService;
+     }
+ #else
+-    std::string getService(sdbusplus::bus::bus& bus) const
++    std::string getService(sdbusplus::bus_t& bus) const
+     {
+         constexpr auto mapperService = "xyz.openbmc_project.ObjectMapper";
+         constexpr auto mapperPath = "/xyz/openbmc_project/object_mapper";
+@@ -159,7 +159,7 @@
+      *
+      *  @throw sdbusplus::exception::exception when it fails
+      */
+-    std::string getServiceWithFallback(sdbusplus::bus::bus& bus) const
++    std::string getServiceWithFallback(sdbusplus::bus_t& bus) const
+     {
+         try
+         {
+@@ -185,7 +185,7 @@
+      *  @throw sdbusplus::exception::exception when it fails
+      */
+     // NOLINTNEXTLINE readability-identifier-naming
+-    auto new_method_call(sdbusplus::bus::bus& bus, const char* method) const
++    auto new_method_call(sdbusplus::bus_t& bus, const char* method) const
+     {
+         return bus.new_method_call(getServiceWithFallback(bus).c_str(), path,
+                                    interface, method);
+@@ -197,7 +197,7 @@
+      *  @throw sdbusplus::exception::exception when it fails
+      */
+     // NOLINTNEXTLINE readability-identifier-naming
+-    auto new_method_call(sdbusplus::bus::bus& bus, const char* interface,
++    auto new_method_call(sdbusplus::bus_t& bus, const char* interface,
+                          const char* method) const
+     {
+         return bus.new_method_call(getServiceWithFallback(bus).c_str(), path,
+@@ -209,7 +209,7 @@
+      *  @throw sdbusplus::exception::exception when it fails
+      */
+     // NOLINTNEXTLINE readability-identifier-naming
+-    auto new_method_call(sdbusplus::bus::bus& bus, const char* path,
++    auto new_method_call(sdbusplus::bus_t& bus, const char* path,
+                          const char* interface, const char* method) const
+     {
+         return bus.new_method_call(getServiceWithFallback(bus).c_str(), path,
+@@ -230,7 +230,7 @@
+         return defaultService;
+     }
+ 
+-    void waitForService(sdbusplus::bus::bus& bus) const
++    void waitForService(sdbusplus::bus_t& bus) const
+     {
+         bool wait = true;
+         sdbusplus::bus::match_t match(
+diff -ruN spdm-orig/spdmd/dbus_impl_responder.cpp spdm-fixed/spdmd/dbus_impl_responder.cpp
+--- a/spdmd/dbus_impl_responder.cpp	2026-09-17 23:27:24.196025388 +0800
++++ b/spdmd/dbus_impl_responder.cpp	2026-09-17 23:27:24.218025385 +0800
+@@ -53,8 +53,8 @@
+ 
+ Responder::Responder(SpdmdAppContext& appCtx, const std::string& path,
+                      uint8_t eid,
+-                     const sdbusplus::message::object_path& mctpPath,
+-                     const sdbusplus::message::object_path& invPath,
++                     const sdbusplus::object_path& mctpPath,
++                     const sdbusplus::object_path& invPath,
+                      std::string transportMedium, std::string bindingType,
+                      std::string socketPath) :
+     ResponderIntf(appCtx.getConn(), path.c_str(), action::defer_emit),
+diff -ruN spdm-orig/spdmd/dbus_impl_responder.hpp spdm-fixed/spdmd/dbus_impl_responder.hpp
+--- a/spdmd/dbus_impl_responder.hpp	2026-09-17 23:27:24.196025388 +0800
++++ b/spdmd/dbus_impl_responder.hpp	2026-09-17 23:27:24.218025385 +0800
+@@ -56,8 +56,8 @@
+     std::string uuid;
+     std::string medium;
+     std::string bindingType;
+-    sdbusplus::message::object_path mctpPath;
+-    sdbusplus::message::object_path inventoryPath;
++    sdbusplus::object_path mctpPath;
++    sdbusplus::object_path inventoryPath;
+     std::string socketPath;
+ };
+ 
+@@ -129,8 +129,8 @@
+      *  @param[in] socketPath      - IO device path
+      */
+     Responder(SpdmdAppContext& appCtx, const std::string& path, uint8_t eid,
+-              const sdbusplus::message::object_path& mctpPath,
+-              const sdbusplus::message::object_path& inventPath,
++              const sdbusplus::object_path& mctpPath,
++              const sdbusplus::object_path& inventPath,
+               std::string transportMedium, std::string bindingType,
+               std::string socketPath);
+ 
+@@ -202,7 +202,7 @@
+     spdmcpp::LogClass& log;
+     spdmcpp::ConnectionClass connection;
+     MctpTransportClass transport;
+-    sdbusplus::message::object_path inventoryPath;
++    sdbusplus::object_path inventoryPath;
+     std::string transportMedium;
+     std::string bindingType;
+     uint8_t eid;
+diff -ruN spdm-orig/spdmd/mctp_endpoint_discovery.cpp spdm-fixed/spdmd/mctp_endpoint_discovery.cpp
+--- a/spdmd/mctp_endpoint_discovery.cpp	2026-09-17 23:27:24.196025388 +0800
++++ b/spdmd/mctp_endpoint_discovery.cpp	2026-09-17 23:43:22.448735108 +0800
+@@ -46,7 +46,7 @@
+         sdbusplus::bus::match::rules::interfacesAddedAtPath(
+             inventorySPDMResponderBasePath),
+         [this](sdbusplus::message::message& msg) {
+-            sdbusplus::message::object_path objPath;
++            sdbusplus::object_path objPath;
+             dbus::InterfaceMap interfaces;
+             msg.read(objPath, interfaces);
+             if (!interfaces.contains(inventorySPDMResponderIntfName))
+@@ -82,7 +82,7 @@
+     mctpMatch = std::make_unique<sdbusplus::bus::match_t>(
+         bus, sdbusplus::bus::match::rules::interfacesAdded(mctpPath),
+         [this](sdbusplus::message::message& msg) {
+-            sdbusplus::message::object_path objPath;
++            sdbusplus::object_path objPath;
+             dbus::InterfaceMap interfaces;
+             msg.read(objPath, interfaces);
+             using namespace std::chrono_literals;
+@@ -283,7 +283,7 @@
+ }
+ 
+ void MctpDiscovery::mctpNewObjectSignal(
+-    const sdbusplus::message::object_path& objPath,
++    const sdbusplus::object_path& objPath,
+     const dbus::InterfaceMap& interfaces)
+ {
+     spdmApp.getLog().iprintln("mctpNewObjectSignal: " + std::string(objPath));
+@@ -367,6 +367,11 @@
+ #else
+     auto sockPath = "";
+ #endif
++    // discovery_only_from_mctp_control skips the Inventory.Item.SPDMResponder
++    // matching path entirely (see the #else branch below), so there is no
++    // real inventory object path to report here; an empty object_path is the
++    // correct "none" value for ResponderArgs::inventoryPath.
++    sdbusplus::object_path invPath{};
+     dbus_api::ResponderArgs args{};
+     if (eid.has_value())
+     {
+@@ -447,7 +452,7 @@
+ #endif
+     getInventoryPathAsync(uuid, [this, eid, uuid, objPath, mediumType,
+                                  bindingType, sockPath, eidValue1](
+-                                    sdbusplus::message::object_path invPath) {
++                                    sdbusplus::object_path invPath) {
+         if (invPath.filename().empty())
+         {
+             static constexpr auto confName = "name";
+@@ -503,7 +508,7 @@
+ 
+ #ifndef DISCOVERY_ONLY_FROM_MCTP_CONTROL
+ void MctpDiscovery::inventoryNewObjectSignal(
+-    const sdbusplus::message::object_path& objPath,
++    const sdbusplus::object_path& objPath,
+     const dbus::InterfaceMap& interfaces)
+ {
+     if (!interfaces.contains(inventorySPDMResponderIntfName))
+@@ -942,7 +947,7 @@
+ 
+ void MctpDiscovery::getInventoryPathAsync(
+     const std::string& uuid,
+-    std::function<void(sdbusplus::message::object_path)> callback)
++    std::function<void(sdbusplus::object_path)> callback)
+ {
+     SPDMCPP_LOG_TRACE_FUNC(spdmApp.getLog());
+ 
+@@ -963,7 +968,7 @@
+             boost::system::error_code ec,
+             sdbusplus::message::message& replyMsg) {
+             auto resultPathPtr =
+-                std::make_shared<sdbusplus::message::object_path>();
++                std::make_shared<sdbusplus::object_path>();
+ 
+             if (ec)
+             {
+@@ -1057,7 +1062,7 @@
+                      processNextPtr](std::string propertyVal) mutable {
+                         if (uuid == propertyVal)
+                         {
+-                            *resultPathPtr = sdbusplus::message::object_path(
++                            *resultPathPtr = sdbusplus::object_path(
+                                 (*candidates)[*sharedIndex].objectPath);
+                             callback(*resultPathPtr);
+                             return;
+@@ -1117,7 +1122,15 @@
+ {
+     try
+     {
+-        std::string bindingType;
++        // The codeconstruct mctpd used by this distro does not expose
++        // xyz.openbmc_project.MCTP.Binding on endpoint objects (unlike the
++        // mctpd this was originally written against), so mctpBindingIntfProperty
++        // is never found here. bindingType is purely informational (stored on
++        // the Responder dbus object and used only for duplicate-responder
++        // comparison, never for actual transport selection), so fall back to
++        // a fixed value rather than aborting discovery, matching the pattern
++        // already used by getMediumType() above for the same situation.
++        std::string bindingType = "xyz.openbmc_project.MCTP.Binding.MediaTypes.I2C";
+         auto intf = interfaces.find(mctpBindingIntfProperty);
+         if (intf != interfaces.end())
+         {
+diff -ruN spdm-orig/spdmd/mctp_endpoint_discovery.hpp spdm-fixed/spdmd/mctp_endpoint_discovery.hpp
+--- a/spdmd/mctp_endpoint_discovery.hpp	2026-09-17 23:27:24.196025388 +0800
++++ b/spdmd/mctp_endpoint_discovery.hpp	2026-09-17 23:27:24.218025385 +0800
+@@ -58,7 +58,7 @@
+   private:
+     struct Object
+     {
+-        sdbusplus::message::object_path path;
++        sdbusplus::object_path path;
+         dbus::InterfaceMap interfaces;
+         bool isValid() const
+         {
+@@ -67,7 +67,7 @@
+     };
+ 
+     /** @brief reference to the systemd bus */
+-    sdbusplus::bus::bus& bus;
++    sdbusplus::bus_t& bus;
+ 
+     /** @brief reference to the SPDM app, used to create responder */
+     SpdmdApp& spdmApp;
+@@ -92,7 +92,7 @@
+ 
+ #ifndef DISCOVERY_ONLY_FROM_MCTP_CONTROL
+     /** @brief Inventory new object signal queue */
+-    std::deque<std::pair<sdbusplus::message::object_path, dbus::InterfaceMap>>
++    std::deque<std::pair<sdbusplus::object_path, dbus::InterfaceMap>>
+         inventorySignalQueue;
+ 
+     /** @brief Per-path UUID cache for EM-sourced inventory objects.
+@@ -103,17 +103,17 @@
+      *  it can be injected when the SPDMResponder signal arrives without it.
+      *  The entry is removed once the object is fully processed.
+      */
+-    std::map<sdbusplus::message::object_path, std::string> uuidCache;
++    std::map<sdbusplus::object_path, std::string> uuidCache;
+ #endif
+ 
+     /** @brief Called when a new mctp endpoint is discovered */
+-    void mctpNewObjectSignal(const sdbusplus::message::object_path& objectPath,
++    void mctpNewObjectSignal(const sdbusplus::object_path& objectPath,
+                              const dbus::InterfaceMap& interfaces);
+ 
+ #ifndef DISCOVERY_ONLY_FROM_MCTP_CONTROL
+     /** @brief Called when a new PLDM inventory object is discovered */
+     void inventoryNewObjectSignal(
+-        const sdbusplus::message::object_path& objectPath,
++        const sdbusplus::object_path& objectPath,
+         const dbus::InterfaceMap& interfaces);
+ #endif
+ 
+@@ -267,7 +267,7 @@
+      */
+     void getInventoryPathAsync(
+         const std::string& uuid,
+-        std::function<void(sdbusplus::message::object_path)> callback);
++        std::function<void(sdbusplus::object_path)> callback);
+ 
+     /** @brief Get the unique services from the object mapper asynchronously
+      *  @param[in] callback - Function to call with the set of service names
+diff -ruN spdm-orig/spdmd/spdmd_app_context.cpp spdm-fixed/spdmd/spdmd_app_context.cpp
+--- a/spdmd/spdmd_app_context.cpp	2026-09-17 23:27:24.196025388 +0800
++++ b/spdmd/spdmd_app_context.cpp	2026-09-17 23:27:24.218025385 +0800
+@@ -101,7 +101,7 @@
+     {
+         auto reply = bus.call(method);
+         std::vector<
+-            std::tuple<uint32_t, std::string, sdbusplus::message::object_path>>
++            std::tuple<uint32_t, std::string, sdbusplus::object_path>>
+             users;
+         reply.read(users);
+         for (auto& user : users)
+diff -ruN spdm-orig/spdmutil/enumerate_endpoints.cpp spdm-fixed/spdmutil/enumerate_endpoints.cpp
+--- a/spdmutil/enumerate_endpoints.cpp	2026-09-17 23:27:24.196025388 +0800
++++ b/spdmutil/enumerate_endpoints.cpp	2026-09-17 23:27:24.218025385 +0800
+@@ -44,7 +44,7 @@
+     enumerateMCTPDBusObjects(bus, m_eid);
+ }
+ 
+-auto EnumerateEndpoints::enumerateMCTPDBusObjects(sdbusplus::bus::bus& bus,
++auto EnumerateEndpoints::enumerateMCTPDBusObjects(sdbusplus::bus_t& bus,
+                                                   int m_eid) -> void
+ {
+ 
+@@ -84,7 +84,7 @@
+ }
+ 
+ auto EnumerateEndpoints::exploreMctpItem(
+-    const sdbusplus::message::object_path& path, const DbusInterfaceMap& ifc)
++    const sdbusplus::object_path& path, const DbusInterfaceMap& ifc)
+     -> void
+ {
+     if (const auto eid = getEid(ifc); eid)
+@@ -213,7 +213,7 @@
+     return {};
+ }
+ 
+-auto EnumerateEndpoints::getMCTPServices(sdbusplus::bus::bus& bus, int m_eid)
++auto EnumerateEndpoints::getMCTPServices(sdbusplus::bus_t& bus, int m_eid)
+     -> std::vector<std::pair<std::string, std::string>>
+ {
+     static constexpr auto mapperService = "xyz.openbmc_project.ObjectMapper";
+@@ -268,7 +268,7 @@
+     return devServices;
+ }
+ 
+-auto EnumerateEndpoints::getPropertyValue(sdbusplus::bus::bus& bus,
++auto EnumerateEndpoints::getPropertyValue(sdbusplus::bus_t& bus,
+                                           const std::string& service,
+                                           const std::string& path,
+                                           const std::string& interface,
+diff -ruN spdm-orig/spdmutil/enumerate_endpoints.hpp spdm-fixed/spdmutil/enumerate_endpoints.hpp
+--- a/spdmutil/enumerate_endpoints.hpp	2026-09-17 23:27:24.196025388 +0800
++++ b/spdmutil/enumerate_endpoints.hpp	2026-09-17 23:27:24.218025385 +0800
+@@ -58,7 +58,7 @@
+ 
+   private:
+     /** @brief Explore MCTP spdm objects */
+-    auto enumerateMCTPDBusObjects(sdbusplus::bus::bus& bus, int m_eid) -> void;
++    auto enumerateMCTPDBusObjects(sdbusplus::bus_t& bus, int m_eid) -> void;
+ 
+     /** @brief Explore a single MCTP item
+      *
+@@ -67,7 +67,7 @@
+      *
+      * @return void This method doesn't return a value
+      */
+-    auto exploreMctpItem(const sdbusplus::message::object_path& path,
++    auto exploreMctpItem(const sdbusplus::object_path& path,
+                          const DbusInterfaceMap& ifc) -> void;
+     /** @brief Get endpoint EID*/
+     auto getEid(const DbusInterfaceMap& ifc) -> std::optional<size_t>;
+@@ -82,12 +82,12 @@
+     /** @brief Get the unique service from the object mapper
+      *
+      * @param bus The D-Bus connection to use for querying the object mapper
+-     * @type bus: sdbusplus::bus::bus&
++     * @type bus: sdbusplus::bus_t&
+      *
+      * @return std::unordered_set<std::string> A set of unique MCTP service
+      * names
+      */
+-    auto getMCTPServices(sdbusplus::bus::bus& bus, int m_eid)
++    auto getMCTPServices(sdbusplus::bus_t& bus, int m_eid)
+         -> std::vector<std::pair<std::string, std::string>>;
+ 
+     /** @brief Extract a particular value from the service and path
+@@ -99,7 +99,7 @@
+      *
+      * @return std::string The value of the requested property
+      */
+-    auto getPropertyValue(sdbusplus::bus::bus& bus, const std::string& service,
++    auto getPropertyValue(sdbusplus::bus_t& bus, const std::string& service,
+                           const std::string& path, const std::string& interface,
+                           const std::string& property) -> size_t;
+ 
+diff -ruN spdm-orig/spdmutil/enumerate_utils.hpp spdm-fixed/spdmutil/enumerate_utils.hpp
+--- a/spdmutil/enumerate_utils.hpp	2026-09-17 23:27:24.196025388 +0800
++++ b/spdmutil/enumerate_utils.hpp	2026-09-17 23:27:24.218025385 +0800
+@@ -38,7 +38,7 @@
+ using DbusPropertyMap = std::map<DbusProperty, DbusValue>;
+ using DbusInterfaceMap = std::map<DbusInterface, DbusPropertyMap>;
+ using DbusObjectValueTree =
+-    std::map<sdbusplus::message::object_path, DbusInterfaceMap>;
++    std::map<sdbusplus::object_path, DbusInterfaceMap>;
+ 
+ /** @brief SPDM type of an MCTP message */
+ static constexpr uint8_t mctpTypeSPDM = 5;
