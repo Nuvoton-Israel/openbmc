@@ -78,6 +78,9 @@ Make emmc image with entity-manager (boot linux/openbmc from emmc)
 Make inventory-manager target
      bitbake obmc-phosphor-image
 
+Make BMC-mediated Composite EAT attestation target
+     DISTRO=arbel-evb-composite-eat bitbake obmc-phosphor-image
+
 Make entity-manager target
      DISTRO=arbel-evb-entity bitbake obmc-phosphor-image
 

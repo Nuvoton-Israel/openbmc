@@ -1,0 +1,73 @@
+From fdd7085ea692dbad4ebef1e11467ea54e4313837 Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Wed, 16 Sep 2026 09:28:41 +0800
+Subject: [PATCH] dts: npcm845: composite_eat test
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ .../dts/nuvoton/nuvoton-common-npcm8xx.dtsi   |  9 ++++++++
+ .../boot/dts/nuvoton/nuvoton-npcm845-evb.dts  | 23 ++++++++++++-------
+ 2 files changed, 24 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi b/arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi
+index 708a778ac934..f686c8493426 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-common-npcm8xx.dtsi
+@@ -302,6 +302,12 @@ tip_mbox: mailbox@f080d000 {
+ 			status = "disabled";
+ 		};
+ 
++		composite_eat: composite-eat@f0800e60 {
++			compatible = "nuvoton,npcm845-composite-eat";
++			reg = <0x0 0xf0800e60 0x0 0x20>;
++			status = "disabled";
++		};
++
+ 		rng_tip: rng_tip@0 {
+ 			compatible = "nuvoton,npcm845-rng-tip";
+ 			reg = <0x0 0xf0800E54 0x0 0x10>;
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+index 1561c9fe6ec6..8f739eba3be4 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+@@ -212,16 +212,12 @@ tip_reserved: tip@0x0 {
+-			reg = <0x0 0x0 0x0 0x6200000>;
++			reg = <0x0 0x0 0x0 0x6200000>;
+ 		};
+ 
+-		/*linux,cma {
+-			compatible = "shared-dma-pool";
+-			reusable;
+-			size = <0x0 0x8000000>;
+-			alloc-ranges = <0x0 0x20000000 0x0 0x8000000>;
+-			linux,cma-default;
+-		};*/
++		composite_eat_shm: composite-eat-shm@6201000 {
++			reg = <0x0 0x6201000 0x0 0x00005000>;
++			no-map;
++		};
+ 	};
+ 
+-
+ 	mdio0: mdio@0 {
+ 		compatible = "virtual,mdio-gpio";
+ 		gpios = <&gpio1 25 GPIO_ACTIVE_HIGH>,
+@@ -844,3 +840,14 @@ &ece {
+ &tip_mbox {
+ 	status = "okay";
+ };
++
++&composite_eat {
++	mboxes = <&tip_mbox 0 4>;
++    mbox-names = "composite-eat";
++    memory-region = <&composite_eat_shm>;
++	status = "okay";
++};
++
++&rng_tip {
++	status = "okay";
++};
+-- 
+2.43.0
+

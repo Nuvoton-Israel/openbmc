@@ -1,0 +1,57 @@
+From: Nuvoton OpenBMC <noreply@nuvoton.com>
+Subject: [PATCH] spdmd: publish "authenticating" association for ComponentIntegrity
+
+bmcweb's Redfish ComponentIntegrity resource (added by this distro's
+meta-evb-npcm845 bmcweb patches) resolves TargetComponentURI by reading
+the D-Bus association named "authenticating" off each
+xyz.openbmc_project.Attestation.ComponentIntegrity object
+(redfish-core/lib/component_integrity.hpp: afterGetComponentTarget()
+queries "<objectPath>/authenticating"). Without it, the ObjectMapper has
+no such association object and bmcweb's GetAssociatedSubTreePaths call
+fails with EBADR ("Invalid request descriptor"), which bmcweb reports as
+an internal error on every GET of /redfish/v1/ComponentIntegrity/{id}.
+
+NVIDIA's Responder::Responder only ever publishes "transport_object" and
+"inventory_object" associations, which bmcweb never looks for, so the
+target link was never populated for any board using this fork.
+
+Publish an additional "authenticating" association pointing at the same
+invPath already passed to the constructor, so bmcweb can map it to a
+Board/Chassis/Cpu/Dimm/PCIeDevice inventory interface as documented.
+Guard on invPath actually being known (its filename is non-empty):
+under this distro's -Ddiscovery_only_from_mctp_control=enabled build,
+invPath is intentionally left empty when no Inventory.Item.SPDMResponder
+match exists, and publishing an association to a bogus/root path would
+just trade one confusing bmcweb error for another. In that case
+ComponentIntegrity's target association legitimately doesn't exist yet
+until this board's SPDM endpoints are given a real inventory path
+(follow-up work, tracked separately).
+
+Upstream-Status: Inappropriate [layer-local: bridges an out-of-tree
+fork's D-Bus association naming to this distro's own bmcweb
+ComponentIntegrity patches; not applicable upstream]
+
+diff -ruN spdm-orig/spdmd/dbus_impl_responder.cpp spdm-fixed/spdmd/dbus_impl_responder.cpp
+--- a/spdmd/dbus_impl_responder.cpp	2026-09-17 23:43:00.000000000 +0800
++++ b/spdmd/dbus_impl_responder.cpp	2026-09-17 23:44:00.000000000 +0800
+@@ -70,6 +70,20 @@
+                           mctpPath);
+         prop.emplace_back("inventory_object", "spdm_responder_object", invPath);
+
++        // bmcweb's Redfish ComponentIntegrity resource (see the
++        // meta-evb-npcm845 bmcweb patches) resolves TargetComponentURI by
++        // reading the "authenticating" association off this object. Publish
++        // it whenever a real inventory object is known; upstream only
++        // publishes "inventory_object"/"transport_object", which nothing in
++        // bmcweb looks for, so ComponentIntegrity's target link was never
++        // populated. Skip it when invPath is empty (e.g. this distro's
++        // discovery_only_from_mctp_control build) rather than pointing the
++        // association at a bogus path.
++        if (!invPath.filename().empty())
++        {
++            prop.emplace_back("authenticating", "authenticated_by", invPath);
++        }
++
+         associations(std::move(prop));
+     }
+     connection.registerTransport(transport);

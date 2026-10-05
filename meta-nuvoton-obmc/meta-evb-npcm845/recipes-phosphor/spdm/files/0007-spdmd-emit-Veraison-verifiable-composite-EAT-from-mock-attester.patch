@@ -1,0 +1,667 @@
+From 155616f660a7da858e463bff1e78e9f399fbdaef Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Thu, 1 Oct 2026 20:34:34 +0800
+Subject: [PATCH] spdmd: emit Veraison-verifiable composite EAT from the mock
+ attester
+
+The ocp-composite-eat verifier rejected the mock Lead Attester bundle:
+the COSE protected header lacked x5t, Lead measurements were encoded as
+a text-keyed map instead of [content-format, bstr], the signing key and
+UEID were regenerated on every boot (so they could never be enrolled or
+chained to an evidence root), and detached Claims-Sets used the legacy
+direct-map carriage.
+
+- eat_builder: add x5t [-43, SHA-384(leaf)] to the protected header and
+  encode each measurement as [content-format, bstr].
+- mock_attester: load a provisioned P-384 key, certificate chain, UEID,
+  profile and Concise Evidence measurement from /etc/spdmd/mock-attester
+  (fail closed if present but invalid; ephemeral fallback otherwise).
+- claims_set_builder/orchestrator: add Record CMW carriage
+  {299: [media-type, native evidence, 4]} and select it in spdmd.
+
+Upstream-Status: Inappropriate [lab mock Lead Attester for QEMU]
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ spdmd/composite/claims_set_builder.cpp     |  62 +++++++
+ spdmd/composite/claims_set_builder.hpp     |  23 +++
+ spdmd/composite/composite_orchestrator.cpp |  10 +-
+ spdmd/composite/composite_orchestrator.hpp |  16 +-
+ spdmd/mock_attester/eat_builder.cpp        |  38 +++--
+ spdmd/mock_attester/eat_builder.hpp        |  12 +-
+ spdmd/mock_attester/mock_attester.cpp      | 182 ++++++++++++++++++++-
+ spdmd/mock_attester/mock_attester.hpp      |  24 ++-
+ spdmd/spdmd.cpp                            |   7 +-
+ 9 files changed, 343 insertions(+), 31 deletions(-)
+
+diff --git a/spdmd/composite/claims_set_builder.cpp b/spdmd/composite/claims_set_builder.cpp
+index 039a8e6..3150d54 100644
+--- a/spdmd/composite/claims_set_builder.cpp
++++ b/spdmd/composite/claims_set_builder.cpp
+@@ -19,7 +19,9 @@
+ 
+ #include "cbor_det.hpp"
+ 
++#include <span>
+ #include <stdexcept>
++#include <string_view>
+ 
+ namespace spdmd::composite
+ {
+@@ -96,8 +98,68 @@ std::vector<std::uint8_t> buildDeviceEat(const CollectedEvidence& ev)
+     return m.encode();
+ }
+ 
++std::vector<std::uint8_t> cmwRecordClaimsSet(std::string_view mediaType,
++                                             std::span<const std::uint8_t> value)
++{
++    std::vector<std::vector<std::uint8_t>> record;
++    record.push_back(cbor::textVal(mediaType));
++    record.push_back(cbor::bytesVal(value));
++    record.push_back(cbor::uintVal(kCmwIndicatorEvidence));
++
++    cbor::Map m;
++    m.addInt(kClaimCmw, cbor::arrayVal(record));
++    return m.encode();
++}
++
+ } // namespace
+ 
++std::vector<std::uint8_t> buildCmwClaimsSet(const CollectedEvidence& ev)
++{
++    switch (ev.pattern)
++    {
++        case EvidencePattern::SpdmMeasurements:
++        {
++            if (ev.signedMeasurements.empty())
++            {
++                throw std::invalid_argument(
++                    "buildCmwClaimsSet: signed_measurements is empty");
++            }
++            if (ev.certificateChainDer.empty())
++            {
++                throw std::invalid_argument(
++                    "buildCmwClaimsSet: cert_chain is empty");
++            }
++            if (ev.includeVca && ev.vca.empty())
++            {
++                throw std::invalid_argument(
++                    "buildCmwClaimsSet: vca is required");
++            }
++            std::vector<std::vector<std::uint8_t>> fields;
++            fields.push_back(cbor::bytesVal(ev.signedMeasurements));
++            fields.push_back(cbor::bytesVal(ev.certificateChainDer));
++            if (ev.includeVca)
++            {
++                fields.push_back(cbor::bytesVal(ev.vca));
++            }
++            return cmwRecordClaimsSet(kMediaTypeSpdmEvidence,
++                                      cbor::arrayVal(fields));
++        }
++        case EvidencePattern::DeviceEat:
++            if (ev.deviceTokenFormat.empty())
++            {
++                throw std::invalid_argument(
++                    "buildCmwClaimsSet: token_format is empty");
++            }
++            if (ev.deviceToken.empty())
++            {
++                throw std::invalid_argument(
++                    "buildCmwClaimsSet: device_token is empty");
++            }
++            return cmwRecordClaimsSet(ev.deviceTokenFormat, ev.deviceToken);
++    }
++    throw std::invalid_argument("buildCmwClaimsSet: unknown pattern");
++}
++
+ std::vector<std::uint8_t> buildClaimsSet(const CollectedEvidence& ev,
+                                          bool typedValues)
+ {
+diff --git a/spdmd/composite/claims_set_builder.hpp b/spdmd/composite/claims_set_builder.hpp
+index 5e83026..374e33d 100644
+--- a/spdmd/composite/claims_set_builder.hpp
++++ b/spdmd/composite/claims_set_builder.hpp
+@@ -61,4 +61,27 @@ inline constexpr std::uint64_t kCfSpdmVca = 65002;
+ std::vector<std::uint8_t> buildClaimsSet(const CollectedEvidence& ev,
+                                          bool typedValues = false);
+ 
++/// RFC 9711 / draft-ietf-rats-msg-wrap CMW claim key carrying a Record CMW.
++inline constexpr std::int64_t kClaimCmw = 299;
++/// CMW indicator bit for Evidence.
++inline constexpr std::uint64_t kCmwIndicatorEvidence = 4;
++/// Media type of the native SPDM evidence record
++/// [signed_measurements, cert_chain, ?vca] carried in a Record CMW.
++inline constexpr const char* kMediaTypeSpdmEvidence =
++    "application/spdm-evidence+cbor";
++
++/// Build the detached Claims-Set as a single Record CMW claim:
++///   { 299: [ media-type, bstr native-evidence, 4 (Evidence) ] }
++///
++///   Pattern A / C -> media-type "application/spdm-evidence+cbor", value is
++///                    the deterministic CBOR array
++///                    [ signed_measurements, cert_chain, ?vca ].
++///   Pattern B     -> media-type is the device token format, value is the
++///                    device token bytes verbatim.
++///
++/// The evidence bytes are carried unmodified; the BMC still never parses
++/// or re-authors device evidence.
++/// @throws std::invalid_argument on empty required fields.
++std::vector<std::uint8_t> buildCmwClaimsSet(const CollectedEvidence& ev);
++
+ } // namespace spdmd::composite
+diff --git a/spdmd/composite/composite_orchestrator.cpp b/spdmd/composite/composite_orchestrator.cpp
+index b498163..2c28c4d 100644
+--- a/spdmd/composite/composite_orchestrator.cpp
++++ b/spdmd/composite/composite_orchestrator.cpp
+@@ -41,8 +41,9 @@ std::string CompositeStatus::toStatusString() const
+     return "PartialSuccess";
+ }
+ 
+-CompositeOrchestrator::CompositeOrchestrator(PlatformAttester& a, bool typed) :
+-    attester(a), typedClaimsSets(typed)
++CompositeOrchestrator::CompositeOrchestrator(PlatformAttester& a, bool typed,
++                                             Carriage c) :
++    attester(a), typedClaimsSets(typed), carriage(c)
+ {}
+ 
+ CompositeOrchestrator::Result CompositeOrchestrator::produce(
+@@ -51,6 +52,7 @@ CompositeOrchestrator::Result CompositeOrchestrator::produce(
+     std::optional<std::string> corimLoc)
+ {
+     using composite::buildClaimsSet;
++    using composite::buildCmwClaimsSet;
+     using composite::CompositeEatRequest;
+     using composite::makeSubmoduleRecord;
+     using composite::SubmoduleRecord;
+@@ -75,7 +77,9 @@ CompositeOrchestrator::Result CompositeOrchestrator::produce(
+         }
+         try
+         {
+-            std::vector<std::uint8_t> cs = buildClaimsSet(ev, typedClaimsSets);
++            std::vector<std::uint8_t> cs =
++                carriage == Carriage::Cmw ? buildCmwClaimsSet(ev)
++                                          : buildClaimsSet(ev, typedClaimsSets);
+             records.push_back(makeSubmoduleRecord(ev.environmentId, cs));
+             detachedClaimsSets.emplace_back(ev.environmentId, std::move(cs));
+             ++out.status.devicesSucceeded;
+diff --git a/spdmd/composite/composite_orchestrator.hpp b/spdmd/composite/composite_orchestrator.hpp
+index f0c6671..0587418 100644
+--- a/spdmd/composite/composite_orchestrator.hpp
++++ b/spdmd/composite/composite_orchestrator.hpp
+@@ -76,11 +76,22 @@ class CompositeOrchestrator
+         std::string errorMsg;
+     };
+ 
++    /// Detached Claims-Set carriage.
++    enum class Carriage
++    {
++        /// Legacy text-keyed map {signed_measurements, cert_chain, ?vca}.
++        DirectMap,
++        /// Single Record CMW claim (299) wrapping the native evidence.
++        Cmw,
++    };
++
+     /// @param attester  Lead Attester to delegate signing to.
+     /// @param typedClaimsSets  Use CMW-style typed values in SPDM
+-    ///        Claims-Sets (default off).
++    ///        direct-map Claims-Sets (default off).
++    /// @param carriage  Detached Claims-Set carriage (default direct map).
+     explicit CompositeOrchestrator(PlatformAttester& attester,
+-                                   bool typedClaimsSets = false);
++                                   bool typedClaimsSets = false,
++                                   Carriage carriage = Carriage::DirectMap);
+ 
+     /// Produce the composite bundle from collected evidence.
+     ///
+@@ -94,6 +105,7 @@ class CompositeOrchestrator
+   private:
+     PlatformAttester& attester;
+     bool typedClaimsSets;
++    Carriage carriage;
+ };
+ 
+ } // namespace spdmd
+diff --git a/spdmd/mock_attester/eat_builder.cpp b/spdmd/mock_attester/eat_builder.cpp
+index 4888d88..d214cd7 100644
+--- a/spdmd/mock_attester/eat_builder.cpp
++++ b/spdmd/mock_attester/eat_builder.cpp
+@@ -20,7 +20,9 @@
+ #include "composite/cbor_det.hpp"
+ 
+ #include <mbedtls/base64.h>
++#include <mbedtls/md.h>
+ 
++#include <array>
+ #include <stdexcept>
+ #include <string>
+ 
+@@ -36,6 +38,10 @@ namespace
+ constexpr std::int64_t kCoseHeaderAlg = 1;
+ constexpr std::int64_t kCoseHeaderContentType = 3;
+ constexpr std::int64_t kCoseHeaderX5chain = 33;
++constexpr std::int64_t kCoseHeaderX5t = 34;
++
++// COSE Algorithms registry id for SHA-384 (x5t hash).
++constexpr std::int64_t kCoseAlgSha384 = -43;
+ 
+ // EAT claim keys (RFC 9711 / RFC 8392).
+ constexpr std::int64_t kEatClaimNonce = 10;
+@@ -52,10 +58,6 @@ constexpr std::int64_t kEatClaimPlatformCorimId = -75000;
+ constexpr std::uint64_t kCborTagCwt = 61;
+ constexpr std::uint64_t kCborTagCoseSign1 = 18;
+ 
+-// Measurement entry keys.
+-constexpr const char* kMeasContentFormat = "content-format";
+-constexpr const char* kMeasValue = "value";
+-
+ /// Encode one detached-submodule-digest: [hash-alg, digest].
+ std::vector<std::uint8_t>
+     encodeSubmodDigest(const composite::SubmoduleRecord& r)
+@@ -66,7 +68,8 @@ std::vector<std::uint8_t>
+     return cbor::arrayVal(elems);
+ }
+ 
+-/// Encode one Lead Attester measurement: {"content-format", "value"}.
++/// Encode one Lead Attester measurement (RFC 9711 measurements-format):
++/// [content-format, bstr value].
+ std::vector<std::uint8_t>
+     encodeMeasurement(const composite::LeadAttesterMeasurement& m)
+ {
+@@ -75,10 +78,10 @@ std::vector<std::uint8_t>
+         throw std::invalid_argument(
+             "Lead Attester measurement content-format is required");
+     }
+-    cbor::Map em;
+-    em.addText(kMeasContentFormat, cbor::uintVal(*m.contentFormat));
+-    em.addText(kMeasValue, cbor::bytesVal(m.value));
+-    return em.encode();
++    std::vector<std::vector<std::uint8_t>> elems;
++    elems.push_back(cbor::uintVal(*m.contentFormat));
++    elems.push_back(cbor::bytesVal(m.value));
++    return cbor::arrayVal(elems);
+ }
+ 
+ } // namespace
+@@ -132,11 +135,26 @@ std::vector<std::uint8_t> buildCompositeClaims(
+     return claims.encode();
+ }
+ 
+-std::vector<std::uint8_t> buildProtectedHeader(int alg)
++std::vector<std::uint8_t>
++    buildProtectedHeader(int alg, std::span<const std::uint8_t> x5tLeafDer)
+ {
+     cbor::Map hdr;
+     hdr.addInt(kCoseHeaderAlg, cbor::intVal(alg));
+     hdr.addInt(kCoseHeaderContentType, cbor::textVal(kContentTypeEatCwt));
++    if (!x5tLeafDer.empty())
++    {
++        std::array<std::uint8_t, 48> thumbprint{};
++        if (mbedtls_md(mbedtls_md_info_from_type(MBEDTLS_MD_SHA384),
++                       x5tLeafDer.data(), x5tLeafDer.size(),
++                       thumbprint.data()) != 0)
++        {
++            throw std::runtime_error("x5t: SHA-384 failed");
++        }
++        std::vector<std::vector<std::uint8_t>> x5t;
++        x5t.push_back(cbor::intVal(kCoseAlgSha384));
++        x5t.push_back(cbor::bytesVal(thumbprint));
++        hdr.addInt(kCoseHeaderX5t, cbor::arrayVal(x5t));
++    }
+     return hdr.encode();
+ }
+ 
+diff --git a/spdmd/mock_attester/eat_builder.hpp b/spdmd/mock_attester/eat_builder.hpp
+index bcc490c..248f31c 100644
+--- a/spdmd/mock_attester/eat_builder.hpp
++++ b/spdmd/mock_attester/eat_builder.hpp
+@@ -57,7 +57,8 @@ constexpr const char* kContentTypeEatCwt = "application/eat+cwt";
+ /// @param profileUri  Composite EAT profile -> eat_profile (265).
+ /// @param submods     Per-device detached digests -> submods (266),
+ ///                    keyed by env.* with value [hash-alg, digest].
+-/// @param measurements Lead Attester measurements -> measurements (273).
++/// @param measurements Lead Attester measurements -> measurements (273),
++///                     each encoded as [content-format, bstr value].
+ /// @param platformCorimLocator If present -> Platform CoRIM locator hint.
+ std::vector<std::uint8_t> buildCompositeClaims(
+     std::span<const std::uint8_t, composite::kNonceLen> nonce,
+@@ -66,8 +67,13 @@ std::vector<std::uint8_t> buildCompositeClaims(
+     std::span<const composite::LeadAttesterMeasurement> measurements,
+     const std::optional<std::string>& platformCorimLocator);
+ 
+-/// Build CBOR-encoded COSE protected header: {1: alg, 3: content-type}.
+-std::vector<std::uint8_t> buildProtectedHeader(int alg = kAlgEs384);
++/// Build CBOR-encoded COSE protected header:
++///   {1: alg, 3: content-type, ?34: x5t}.
++/// When @p x5tLeafDer is non-empty, x5t (RFC 9360) binds the signing leaf
++/// certificate as [-43 (SHA-384), SHA-384(leaf DER)].
++std::vector<std::uint8_t>
++    buildProtectedHeader(int alg = kAlgEs384,
++                         std::span<const std::uint8_t> x5tLeafDer = {});
+ 
+ /// Build COSE Sig_Structure per RFC 9052 §4.4 — the bytes the signer
+ /// signs: ["Signature1", body_protected, h'', payload].
+diff --git a/spdmd/mock_attester/mock_attester.cpp b/spdmd/mock_attester/mock_attester.cpp
+index 36d34ef..eef67da 100644
+--- a/spdmd/mock_attester/mock_attester.cpp
++++ b/spdmd/mock_attester/mock_attester.cpp
+@@ -24,13 +24,19 @@
+ #include <mbedtls/error.h>
+ #include <mbedtls/md.h>
+ #include <mbedtls/pk.h>
++#include <mbedtls/platform_util.h>
+ #include <mbedtls/x509_crt.h>
+ 
+ #include <array>
++#include <cctype>
+ #include <cstdint>
++#include <cstdio>
+ #include <cstring>
+ #include <ctime>
++#include <filesystem>
++#include <fstream>
+ #include <iostream>
++#include <iterator>
+ #include <stdexcept>
+ #include <string>
+ #include <utility>
+@@ -104,6 +110,53 @@ bool derEcdsaToP1363(const std::uint8_t* der, std::size_t derLen,
+     return true;
+ }
+ 
++/// CoAP Content-Format for Concise Evidence (application/ce+cbor).
++constexpr std::uint64_t kCfConciseEvidence = 10571;
++
++bool readFile(const std::filesystem::path& path, std::string& out)
++{
++    std::ifstream f(path, std::ios::binary);
++    if (!f)
++    {
++        return false;
++    }
++    out.assign(std::istreambuf_iterator<char>(f),
++               std::istreambuf_iterator<char>());
++    return true;
++}
++
++std::string trimmed(const std::string& s)
++{
++    const auto first = s.find_first_not_of(" \t\r\n");
++    if (first == std::string::npos)
++    {
++        return {};
++    }
++    const auto last = s.find_last_not_of(" \t\r\n");
++    return s.substr(first, last - first + 1);
++}
++
++bool hexToBytes(const std::string& hex, std::vector<std::uint8_t>& out)
++{
++    if (hex.size() % 2 != 0)
++    {
++        return false;
++    }
++    out.clear();
++    for (std::size_t i = 0; i < hex.size(); i += 2)
++    {
++        unsigned value = 0;
++        if (std::sscanf(hex.c_str() + i, "%2x", &value) != 1 ||
++            !std::isxdigit(static_cast<unsigned char>(hex[i])) ||
++            !std::isxdigit(static_cast<unsigned char>(hex[i + 1])))
++        {
++            return false;
++        }
++        out.push_back(static_cast<std::uint8_t>(value));
++    }
++    return true;
++}
++
+ std::string yyyymmddhhmmssUtc(std::time_t t)
+ {
+     std::tm tmv{};
+@@ -124,10 +177,12 @@ struct MockAttester::Impl
+     std::string certChainPem;
+ 
+     // Mock Lead Attester identity material.
+-    std::array<std::uint8_t, 16> ueid{};
++    std::vector<std::uint8_t> ueid;
+     // Mock RoT/BMC measurement value (a fixed digest standing in for
+     // platform firmware measurements).
+     std::array<std::uint8_t, 48> bmcMeasurement{};
++    // Provisioned Lead Attester measurement (Concise Evidence), if any.
++    std::vector<std::uint8_t> provisionedMeasurement;
+ 
+     mbedtls_entropy_context entropy{};
+     mbedtls_ctr_drbg_context ctrDrbg{};
+@@ -164,7 +219,21 @@ struct MockAttester::Impl
+             return false;
+         }
+ 
++        std::error_code ec;
++        if (std::filesystem::is_directory(cfg.provisionDir, ec))
++        {
++            if (!loadProvisioned())
++            {
++                std::cerr << "MockAttester: invalid provisioned identity in "
++                          << cfg.provisionDir << '\n';
++                return false;
++            }
++            ready = true;
++            return true;
++        }
++
+         // Stable-per-instance mock identity material.
++        ueid.resize(16);
+         if (mbedtls_ctr_drbg_random(&ctrDrbg, ueid.data(), ueid.size()) != 0)
+         {
+             return false;
+@@ -202,6 +271,91 @@ struct MockAttester::Impl
+         return true;
+     }
+ 
++    bool loadProvisioned()
++    {
++        const std::filesystem::path dir{cfg.provisionDir};
++
++        std::string keyPem;
++        if (!readFile(dir / "key.pem", keyPem))
++        {
++            std::cerr << "MockAttester: missing key.pem\n";
++            return false;
++        }
++        int rc = mbedtls_pk_parse_key(
++            &pk, reinterpret_cast<const unsigned char*>(keyPem.c_str()),
++            keyPem.size() + 1, nullptr, 0, mbedtls_ctr_drbg_random,
++            &ctrDrbg);
++        mbedtls_platform_zeroize(keyPem.data(), keyPem.size());
++        if (rc != 0 || mbedtls_pk_get_type(&pk) != MBEDTLS_PK_ECKEY ||
++            mbedtls_ecp_keypair_get_group_id(mbedtls_pk_ec(pk)) !=
++                MBEDTLS_ECP_DP_SECP384R1)
++        {
++            std::cerr << "MockAttester: key.pem is not an EC P-384 key\n";
++            return false;
++        }
++
++        if (!readFile(dir / "chain.pem", certChainPem))
++        {
++            std::cerr << "MockAttester: missing chain.pem\n";
++            return false;
++        }
++        mbedtls_x509_crt chain;
++        mbedtls_x509_crt_init(&chain);
++        rc = mbedtls_x509_crt_parse(
++            &chain, reinterpret_cast<const unsigned char*>(certChainPem.c_str()),
++            certChainPem.size() + 1);
++        if (rc == 0)
++        {
++            rc = mbedtls_pk_check_pair(&chain.pk, &pk, mbedtls_ctr_drbg_random,
++                                       &ctrDrbg);
++        }
++        mbedtls_x509_crt_free(&chain);
++        if (rc != 0)
++        {
++            std::cerr << "MockAttester: chain.pem leaf does not match key.pem\n";
++            return false;
++        }
++
++        std::string text;
++        if (!readFile(dir / "ueid", text) || !hexToBytes(trimmed(text), ueid) ||
++            ueid.size() < 7 || ueid.size() > 33)
++        {
++            std::cerr << "MockAttester: ueid must be 7..33 hex bytes\n";
++            return false;
++        }
++
++        if (readFile(dir / "profile", text))
++        {
++            cfg.profileUri = trimmed(text);
++            if (cfg.profileUri.empty())
++            {
++                std::cerr << "MockAttester: profile is empty\n";
++                return false;
++            }
++        }
++
++        if (readFile(dir / "measurement.cbor", text))
++        {
++            if (text.empty())
++            {
++                std::cerr << "MockAttester: measurement.cbor is empty\n";
++                return false;
++            }
++            provisionedMeasurement.assign(text.begin(), text.end());
++        }
++        else
++        {
++            static constexpr const char* label = "mock-bmc-fw-measurement";
++            if (mbedtls_md(mbedtls_md_info_from_type(MBEDTLS_MD_SHA384),
++                           reinterpret_cast<const unsigned char*>(label),
++                           std::strlen(label), bmcMeasurement.data()) != 0)
++            {
++                return false;
++            }
++        }
++        return true;
++    }
++
+     bool makeSelfSignedLeaf()
+     {
+         mbedtls_x509write_cert crt;
+@@ -277,12 +431,28 @@ struct MockAttester::Impl
+         std::vector<composite::LeadAttesterMeasurement> measurements;
+         {
+             composite::LeadAttesterMeasurement m;
+-            m.contentFormat = 42; // application/octet-stream
+-            m.value.assign(bmcMeasurement.begin(), bmcMeasurement.end());
++            if (!provisionedMeasurement.empty())
++            {
++                m.contentFormat = kCfConciseEvidence;
++                m.value = provisionedMeasurement;
++            }
++            else
++            {
++                m.contentFormat = 42; // application/octet-stream
++                m.value.assign(bmcMeasurement.begin(), bmcMeasurement.end());
++            }
+             measurements.push_back(std::move(m));
+         }
+ 
+-        // 1. Build composite EAT claims and the COSE protected header.
++        auto chainDer = eat::pemToDerChain(certChainPem);
++        if (chainDer.empty())
++        {
++            result.errorMsg = "signing certificate chain is empty";
++            return result;
++        }
++
++        // 1. Build composite EAT claims and the COSE protected header
++        //    (x5t binds the signing leaf, chainDer[0]).
+         std::vector<std::uint8_t> claims;
+         std::vector<std::uint8_t> protectedHdr;
+         try
+@@ -291,7 +461,8 @@ struct MockAttester::Impl
+                 std::span<const std::uint8_t, composite::kNonceLen>{req.nonce},
+                 ueid, cfg.profileUri, req.deviceRecords, measurements,
+                 req.platformCorimLocator);
+-            protectedHdr = eat::buildProtectedHeader();
++            protectedHdr =
++                eat::buildProtectedHeader(eat::kAlgEs384, chainDer.front());
+         }
+         catch (const std::exception& ex)
+         {
+@@ -334,7 +505,6 @@ struct MockAttester::Impl
+         }
+ 
+         // 5. Assemble final CWT(COSE_Sign1) token.
+-        auto chainDer = eat::pemToDerChain(certChainPem);
+         try
+         {
+             result.compositeEat = eat::assembleCwtCoseSign1(
+diff --git a/spdmd/mock_attester/mock_attester.hpp b/spdmd/mock_attester/mock_attester.hpp
+index 180e003..9ab2c30 100644
+--- a/spdmd/mock_attester/mock_attester.hpp
++++ b/spdmd/mock_attester/mock_attester.hpp
+@@ -18,10 +18,21 @@
+ // MockAttester — software-only PlatformAttester backend.
+ //
+ // Development backend (attester-backend=mock). Acts as a stand-in Lead
+-// Attester / RoT: it owns a mock eat_profile,
+-// a mock ueid, and a mock measurements set, generates an ephemeral
+-// ECDSA-P384 key + self-signed leaf at construction, and produces
+-// verifier-compatible CWT(COSE_Sign1) composite EAT tokens in userspace.
++// Attester / RoT and produces verifier-compatible CWT(COSE_Sign1)
++// composite EAT tokens in userspace.
++//
++// Identity: when MockAttesterConfig::provisionDir exists, the mock loads a
++// provisioned (lab/test) Lead Attester identity from it so a verifier can
++// enroll it ahead of time:
++//   key.pem          ECDSA P-384 private key (PEM)
++//   chain.pem        signing leaf first, then any intermediates (PEM)
++//   ueid             Lead Attester UEID, hex (7..33 bytes)
++//   profile          optional composite EAT profile URI (overrides config)
++//   measurement.cbor optional Concise Evidence (CoAP CF 10571) reported as
++//                    the Lead Attester measurement
++// A present but invalid provisioning directory fails initialization. When
++// the directory is absent, the mock falls back to an ephemeral ECDSA-P384
++// key + self-signed leaf and a random UEID generated at construction.
+ //
+ // Its status is always SoftwareMock when initialized.
+ 
+@@ -46,6 +57,9 @@ struct MockAttesterConfig
+ 
+     /// Common Name placed in the self-signed mock leaf certificate.
+     std::string leafCn = "PlatformAttesterMock";
++
++    /// Directory holding a provisioned mock Lead Attester identity.
++    std::string provisionDir = "/etc/spdmd/mock-attester";
+ };
+ 
+ class MockAttester : public PlatformAttester
+@@ -67,7 +81,7 @@ class MockAttester : public PlatformAttester
+     /// Test hook: PEM cert chain that signs the composite token.
+     const std::string& getCertChainPEM() const;
+ 
+-    /// Test hook: the mock Lead Attester ueid bytes (16 bytes).
++    /// Test hook: the mock Lead Attester ueid bytes.
+     std::span<const std::uint8_t> getUeid() const;
+ 
+   private:
+diff --git a/spdmd/spdmd.cpp b/spdmd/spdmd.cpp
+index 42b7673..6fd9cec 100644
+--- a/spdmd/spdmd.cpp
++++ b/spdmd/spdmd.cpp
+@@ -600,8 +600,11 @@ int main(int argc, char** argv)
+         std::unique_ptr<spdmd::DbusImplComposite> compositeDbus;
+         if (attester)
+         {
+-            orchestrator =
+-                std::make_unique<spdmd::CompositeOrchestrator>(*attester);
++            // Detached Claims-Sets use Record CMW carriage so verifiers
++            // (e.g. Veraison ocp-composite-eat) need no legacy shim.
++            orchestrator = std::make_unique<spdmd::CompositeOrchestrator>(
++                *attester, false,
++                spdmd::CompositeOrchestrator::Carriage::Cmw);
+             compositeObjServer =
+                 std::make_unique<sdbusplus::asio::object_server>(
+                     spdmApp.getConnPtr());
+-- 
+2.43.0
+

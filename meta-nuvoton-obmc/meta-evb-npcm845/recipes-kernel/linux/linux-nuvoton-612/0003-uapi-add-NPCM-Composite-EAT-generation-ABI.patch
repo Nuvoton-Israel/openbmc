@@ -1,0 +1,110 @@
+From 2aa6c883a93c022eac4d3ec38a257477c9341c33 Mon Sep 17 00:00:00 2001
+From: xilingsun <xilingsun@microsoft.com>
+Date: Thu, 20 Aug 2026 16:17:28 -0700
+Subject: [PATCH 3/5] uapi: add NPCM Composite EAT generation ABI
+
+Define a versioned ioctl interface for submitting a bounded Composite
+EAT request and receiving the signed response.
+
+Use aligned 64-bit user pointers for an identical compat layout,
+publish all firmware status values, and reserve ioctl type 0xE6.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: xilingsun <xilingsun@microsoft.com>
+---
+ .../userspace-api/ioctl/ioctl-number.rst      |  1 +
+ MAINTAINERS                                   |  1 +
+ include/uapi/linux/npcm-composite-eat.h       | 57 +++++++++++++++++++
+ 3 files changed, 59 insertions(+)
+ create mode 100644 include/uapi/linux/npcm-composite-eat.h
+
+diff --git a/Documentation/userspace-api/ioctl/ioctl-number.rst b/Documentation/userspace-api/ioctl/ioctl-number.rst
+index e4be1378ba26..713693715dcf 100644
+--- a/Documentation/userspace-api/ioctl/ioctl-number.rst
++++ b/Documentation/userspace-api/ioctl/ioctl-number.rst
+@@ -382,6 +382,7 @@ Code  Seq#    Include File                                           Comments
+ 0xDD  00-3F                                                          ZFCP device driver see drivers/s390/scsi/
+                                                                      <mailto:aherrman@de.ibm.com>
+ 0xE5  00-3F  linux/fuse.h
++0xE6  01     uapi/linux/npcm-composite-eat.h                         Nuvoton NPCM Composite EAT
+ 0xEC  00-01  drivers/platform/chrome/cros_ec_dev.h                   ChromeOS EC driver
+ 0xEE  00-09  uapi/linux/pfrut.h                                      Platform Firmware Runtime Update and Telemetry
+ 0xF3  00-3F  drivers/usb/misc/sisusbvga/sisusb.h                     sisfb (in development)
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 1cce96b7cb7e..c7bb9c1f9018 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2757,6 +2757,7 @@ F:	drivers/*/*npcm*
+ F:	drivers/rtc/rtc-nct3018y.c
+ F:	include/dt-bindings/clock/nuvoton,npcm7xx-clock.h
+ F:	include/dt-bindings/clock/nuvoton,npcm845-clk.h
++F:	include/uapi/linux/npcm-composite-eat.h
+ 
+ ARM/NUVOTON NPCM VIDEO ENGINE DRIVER
+ M:	Joseph Liu <kwliu@nuvoton.com>
+diff --git a/include/uapi/linux/npcm-composite-eat.h b/include/uapi/linux/npcm-composite-eat.h
+new file mode 100644
+index 000000000000..d71634dbf60e
+--- /dev/null
++++ b/include/uapi/linux/npcm-composite-eat.h
+@@ -0,0 +1,57 @@
++/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
++#ifndef _UAPI_LINUX_NPCM_COMPOSITE_EAT_H
++#define _UAPI_LINUX_NPCM_COMPOSITE_EAT_H
++
++#include <linux/ioctl.h>
++#include <linux/types.h>
++
++#define NPCM_COMPOSITE_EAT_ABI_VERSION 1
++#define NPCM_COMPOSITE_EAT_IOCTL_MAGIC 0xE6
++
++enum npcm_composite_eat_status {
++	NPCM_COMPOSITE_EAT_STATUS_OK = 0,
++	NPCM_COMPOSITE_EAT_STATUS_BAD_VERSION = 1,
++	NPCM_COMPOSITE_EAT_STATUS_BAD_REQUEST = 2,
++	NPCM_COMPOSITE_EAT_STATUS_TOO_MANY_RECORDS = 3,
++	NPCM_COMPOSITE_EAT_STATUS_REQUEST_TOO_LARGE = 4,
++	NPCM_COMPOSITE_EAT_STATUS_RESPONSE_TOO_SMALL = 5,
++	NPCM_COMPOSITE_EAT_STATUS_ADDRESS_INVALID = 6,
++	NPCM_COMPOSITE_EAT_STATUS_SIGN_FAILED = 7,
++	NPCM_COMPOSITE_EAT_STATUS_BUSY = 8,
++	NPCM_COMPOSITE_EAT_STATUS_INTERNAL = 9,
++	NPCM_COMPOSITE_EAT_STATUS_UNSUPPORTED = 10,
++};
++
++/**
++ * struct npcm_composite_eat_io - Generate a signed Composite EAT.
++ * @abi_version: Must be %NPCM_COMPOSITE_EAT_ABI_VERSION.
++ * @reserved: Must be zero.
++ * @req_ptr: Userspace pointer to the encoded request.
++ * @req_len: Request length in bytes.
++ * @reserved_req: Must be zero.
++ * @resp_ptr: Userspace pointer to the response buffer.
++ * @resp_cap: Response buffer capacity in bytes.
++ * @resp_len: Actual response length, or required length when @status is
++ *            %NPCM_COMPOSITE_EAT_STATUS_RESPONSE_TOO_SMALL.
++ * @status: Firmware status from &enum npcm_composite_eat_status. A valid
++ *          nonzero firmware status is returned with an ioctl return value of
++ *          zero so userspace can inspect @status and @resp_len.
++ * @reserved_resp: Must be zero.
++ */
++struct npcm_composite_eat_io {
++	__u32 abi_version;
++	__u32 reserved;
++	__aligned_u64 req_ptr;
++	__u32 req_len;
++	__u32 reserved_req;
++	__aligned_u64 resp_ptr;
++	__u32 resp_cap;
++	__u32 resp_len;
++	__u32 status;
++	__u32 reserved_resp;
++};
++
++#define NPCM_COMPOSITE_EAT_GENERATE \
++	_IOWR(NPCM_COMPOSITE_EAT_IOCTL_MAGIC, 1, struct npcm_composite_eat_io)
++
++#endif /* _UAPI_LINUX_NPCM_COMPOSITE_EAT_H */
+-- 
+2.43.0
+

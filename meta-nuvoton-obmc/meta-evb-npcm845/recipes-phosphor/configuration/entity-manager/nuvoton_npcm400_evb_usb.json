@@ -2,7 +2,7 @@
     "Exposes": [
         {
             "Configuration": "1",
-            "InterfaceNum": "2",
+            "InterfaceNum": "0",
             "Name": "MCTP USB Device 0",
             "Port": "1",
             "RootHubPath": "/sys/devices/platform/ahb/f0828100.usb",
@@ -11,5 +11,10 @@
     ],
     "Name": "NPCM400 SMC EVB with MCTP USB",
     "Probe": "TRUE",
-    "Type": "Board"
+    "Type": "Board",
+    "xyz.openbmc_project.Inventory.Item.Board": {},
+    "xyz.openbmc_project.Inventory.Item.SPDMResponder": {},
+    "xyz.openbmc_project.Common.UUID": {
+        "UUID": "f72d6f50-5675-11ed-9b6a-0242ac120003"
+    }
 }

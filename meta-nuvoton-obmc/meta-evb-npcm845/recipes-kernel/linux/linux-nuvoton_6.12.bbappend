@@ -50,3 +50,15 @@ SRC_URI:append = " file://iio_rescale.cfg"
 # Dsiable USB hub remote wakeup
 SRC_URI:append = " file://0015-usb-disable-hub-remote-wakeup.patch"
 
+
+# BMC-mediated Composite EAT: TIP mailbox client, UAPI and DT bindings
+SRC_URI:append:df-composite-eat = " \
+    file://0001-dts-npcm845-composite_eat-test.patch \
+    file://0001-arm64-dts-npcm845-correct-TIP-RNG-register-size.patch \
+    file://0001-mailbox-synchronize-NPCM-channel-shutdown.patch \
+    file://0002-dt-bindings-soc-nuvoton-add-Composite-EAT-client.patch \
+    file://0003-uapi-add-NPCM-Composite-EAT-generation-ABI.patch \
+    file://0004-soc-nuvoton-add-Composite-EAT-mailbox-client.patch \
+    file://0005-soc-nuvoton-add-Composite-EAT-KUnit-tests.patch \
+    file://composite-eat.cfg \
+    "

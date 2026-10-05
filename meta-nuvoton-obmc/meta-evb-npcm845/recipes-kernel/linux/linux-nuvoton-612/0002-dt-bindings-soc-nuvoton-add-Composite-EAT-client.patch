@@ -1,0 +1,122 @@
+From ebd722f0b848012064baa37875988b9b056cdab6 Mon Sep 17 00:00:00 2001
+From: xilingsun <xilingsun@microsoft.com>
+Date: Thu, 20 Aug 2026 16:17:12 -0700
+Subject: [PATCH 2/5] dt-bindings: soc: nuvoton: add Composite EAT client
+
+Describe the NPCM845 mailbox client used to request signed Composite
+EAT tokens from TIP firmware.
+
+Document the scratchpad resource, mailbox doorbell, and fixed ABI
+version 1 reserved-memory layout.
+
+Upstream-Status: Pending [Not submitted to upstream yet]
+Signed-off-by: xilingsun <xilingsun@microsoft.com>
+---
+ .../nuvoton,npcm845-composite-eat.yaml        | 82 +++++++++++++++++++
+ MAINTAINERS                                   |  1 +
+ 2 files changed, 83 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/nuvoton/nuvoton,npcm845-composite-eat.yaml
+
+diff --git a/Documentation/devicetree/bindings/soc/nuvoton/nuvoton,npcm845-composite-eat.yaml b/Documentation/devicetree/bindings/soc/nuvoton/nuvoton,npcm845-composite-eat.yaml
+new file mode 100644
+index 000000000000..2cd5b095abe3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/nuvoton/nuvoton,npcm845-composite-eat.yaml
+@@ -0,0 +1,82 @@
++# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
++%YAML 1.2
++---
++$id: http://devicetree.org/schemas/soc/nuvoton/nuvoton,npcm845-composite-eat.yaml#
++$schema: http://devicetree.org/meta-schemas/core.yaml#
++
++title: Nuvoton NPCM845 Composite EAT mailbox client
++
++maintainers:
++  - Xiling Sun <xsun@microsoft.com>
++
++description: |
++  The NPCM845 Composite EAT client exchanges a CBOR request and a signed EAT
++  response with TIP firmware through reserved shared memory. Scratchpad
++  registers carry request metadata and mailbox doorbell 4 signals each side.
++
++  ABI version 1 requires a 20-KiB reserved-memory region at physical address
++  0x061fb000. The first 4 KiB hold the request and the remaining 16 KiB hold
++  the response.
++
++properties:
++  compatible:
++    const: nuvoton,npcm845-composite-eat
++
++  reg:
++    maxItems: 1
++    description: Scratchpad registers used by the BMC_DIRECT Composite EAT ABI.
++
++  mboxes:
++    maxItems: 1
++    description: NPCM TIP mailbox physical channel 0, doorbell 4.
++
++  mbox-names:
++    const: composite-eat
++
++  memory-region:
++    maxItems: 1
++    description: ABI v1 reserved-memory region at 0x061fb000, size 0x5000.
++
++required:
++  - compatible
++  - reg
++  - mboxes
++  - mbox-names
++  - memory-region
++
++additionalProperties: false
++
++examples:
++  - |
++    / {
++        compatible = "nuvoton,npcm845-evb", "nuvoton,npcm845";
++        model = "Nuvoton NPCM845 Composite EAT example";
++        #address-cells = <2>;
++        #size-cells = <2>;
++
++        reserved-memory {
++            #address-cells = <2>;
++            #size-cells = <2>;
++            ranges;
++
++            composite_eat_shm: composite-eat-shm@61fb000 {
++                reg = <0x0 0x061fb000 0x0 0x00005000>;
++                no-map;
++            };
++        };
++
++
++        tip_mbox: mailbox@f080d000 {
++            compatible = "nuvoton,npcm845-mbox";
++            reg = <0x0 0xf080d000 0x0 0x1000>;
++            #mbox-cells = <2>;
++        };
++
++        composite-eat@f0800e60 {
++            compatible = "nuvoton,npcm845-composite-eat";
++            reg = <0x0 0xf0800e60 0x0 0x20>;
++            mboxes = <&tip_mbox 0 4>;
++            mbox-names = "composite-eat";
++            memory-region = <&composite_eat_shm>;
++        };
++      };
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 02e0f330fa60..1cce96b7cb7e 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2747,6 +2747,7 @@ L:	openbmc@lists.ozlabs.org (moderated for non-subscribers)
+ S:	Supported
+ F:	Documentation/devicetree/bindings/*/*/*npcm*
+ F:	Documentation/devicetree/bindings/*/*npcm*
++F:	Documentation/devicetree/bindings/soc/nuvoton/nuvoton,npcm845-composite-eat.yaml
+ F:	Documentation/devicetree/bindings/rtc/nuvoton,nct3018y.yaml
+ F:	arch/arm/boot/dts/nuvoton/nuvoton-npcm*
+ F:	arch/arm/mach-npcm/
+-- 
+2.43.0
+

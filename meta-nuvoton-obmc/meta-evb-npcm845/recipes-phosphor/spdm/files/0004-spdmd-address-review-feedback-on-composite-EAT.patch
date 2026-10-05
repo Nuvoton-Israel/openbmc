@@ -1,0 +1,1736 @@
+From 5627b8844ab298477ee4d0ab744d24266e7c6b28 Mon Sep 17 00:00:00 2001
+From: xilingsun <xilingsun@microsoft.com>
+Date: Mon, 17 Aug 2026 21:47:21 -0700
+Subject: [PATCH 2/2] spdmd: address review feedback on composite EAT
+Upstream-Status: Pending
+---
+ libspdmcpp/connection.cpp                     |  83 ++++++--
+ .../headers_public/spdmcpp/connection.hpp     |  22 +-
+ libspdmcpp/tests/connection_test.cpp          | 128 ++++++++++-
+ spdmd/composite/claims_set_builder.cpp        |   9 +-
+ spdmd/composite/claims_set_builder.hpp        |   3 +-
+ spdmd/composite/collection_plan.cpp           | 198 +++++++++++++-----
+ spdmd/composite/collection_plan.hpp           |  14 +-
+ spdmd/composite/composite_orchestrator.cpp    |   9 +-
+ spdmd/composite/composite_orchestrator.hpp    |   8 +
+ spdmd/composite/evidence_builder.cpp          |   6 +-
+ spdmd/composite/evidence_builder.hpp          |   2 +-
+ spdmd/composite/meson.build                   |   1 -
+ spdmd/composite/pem.cpp                       |  82 --------
+ spdmd/composite/pem.hpp                       |  34 ---
+ spdmd/composite/submodule_digest.cpp          |  12 +-
+ spdmd/composite/types.hpp                     |   8 +-
+ spdmd/dbus_impl_composite.cpp                 |  47 ++---
+ spdmd/dbus_impl_responder.cpp                 |  17 +-
+ spdmd/dbus_impl_responder.hpp                 |   6 +-
+ spdmd/mock_attester/eat_builder.cpp           |   8 +-
+ spdmd/mock_attester/mock_attester.cpp         |   2 +-
+ spdmd/platform_attester.hpp                   |   4 -
+ .../composite/claims_set_builder_test.cpp     |  24 ++-
+ .../tests/composite/collection_plan_test.cpp  |  43 +++-
+ .../tests/composite/evidence_builder_test.cpp |  14 +-
+ spdmd/tests/composite/meson.build             |   1 -
+ spdmd/tests/composite/pem_test.cpp            |  71 -------
+ spdmd/tests/composite/run_standalone_tests.sh |   4 +-
+ .../tests/composite/submodule_digest_test.cpp |   4 +-
+ .../composite_orchestrator_test.cpp           |  57 ++++-
+ .../tests/mock_attester/eat_builder_test.cpp  |  16 +-
+ 31 files changed, 565 insertions(+), 372 deletions(-)
+ delete mode 100644 spdmd/composite/pem.cpp
+ delete mode 100644 spdmd/composite/pem.hpp
+ delete mode 100644 spdmd/tests/composite/pem_test.cpp
+
+diff --git a/libspdmcpp/connection.cpp b/libspdmcpp/connection.cpp
+index 41c1516..a76206f 100644
+--- a/libspdmcpp/connection.cpp
++++ b/libspdmcpp/connection.cpp
+@@ -27,8 +27,10 @@
+ #include <bit>
+ #include <fstream>
+ #include <functional>
++#include <mutex>
+ #include <ranges>
+ #include <type_traits>
++#include <unordered_map>
+ 
+ // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
+ #define SPDMCPP_CONNECTION_RS_ERROR_RETURN(rs)                                 \
+@@ -88,6 +90,35 @@ namespace spdmcpp
+ 
+ namespace
+ {
++
++std::mutex measurementSpecificationsMutex;
++std::unordered_map<const ConnectionClass*, uint8_t>
++    connectionMeasurementSpecifications;
++
++uint8_t getMeasurementSpecifications(const ConnectionClass* connection)
++{
++    std::lock_guard lock(measurementSpecificationsMutex);
++    if (auto it = connectionMeasurementSpecifications.find(connection);
++        it != connectionMeasurementSpecifications.end())
++    {
++        return it->second;
++    }
++    return ConnectionClass::measurementSpecificationDmtf;
++}
++
++void setMeasurementSpecifications(const ConnectionClass* connection,
++                                  uint8_t specifications)
++{
++    std::lock_guard lock(measurementSpecificationsMutex);
++    connectionMeasurementSpecifications[connection] = specifications;
++}
++
++void eraseMeasurementSpecifications(const ConnectionClass* connection)
++{
++    std::lock_guard lock(measurementSpecificationsMutex);
++    connectionMeasurementSpecifications.erase(connection);
++}
++
+ /**
+  * @param[in] RTDExp Exponent value of base wait time
+  * @param[in] RTDM RTDM multiplier for maximum allowed time
+@@ -106,12 +137,24 @@ auto calcResponseIfReadyWaitTimeMs(uint8_t RTDExp, uint8_t RTDM)
+ 
+ ConnectionClass::ConnectionClass(const ContextClass& cont, LogClass& log,
+                                  uint8_t eid, std::string sockPath) :
+-    context(cont),
+-    Log(log), sockPath(std::move(sockPath)), m_eid(eid)
++    context(cont), Log(log), sockPath(std::move(sockPath)), m_eid(eid)
+ {
+     resetConnection();
+ }
+ 
++ConnectionClass::ConnectionClass(const ContextClass& cont, LogClass& log,
++                                 uint8_t eid, std::string sockPath,
++                                 uint8_t measurementSpecifications) :
++    ConnectionClass(cont, log, eid, std::move(sockPath))
++{
++    setMeasurementSpecifications(this, measurementSpecifications);
++}
++
++ConnectionClass::~ConnectionClass()
++{
++    eraseMeasurementSpecifications(this);
++}
++
+ RetStat ConnectionClass::refreshMeasurements(SlotIdx slotidx)
+ {
+     CertificateSlotIdx = slotidx;
+@@ -224,21 +267,6 @@ bool ConnectionClass::getCertificatesDER(std::vector<uint8_t>& buf,
+     return true;
+ }
+ 
+-bool ConnectionClass::getCertificateChainObject(std::vector<uint8_t>& buf,
+-                                                SlotIdx slotidx) const
+-{
+-    SPDMCPP_LOG_TRACE_FUNC(Log);
+-    buf.clear();
+-
+-    if (!slotHasInfo(slotidx, SlotInfoEnum::CERTIFICATES))
+-    {
+-        return false;
+-    }
+-
+-    buf = Slots[slotidx].Certificates;
+-    return !buf.empty();
+-}
+-
+ bool ConnectionClass::getCertificatesPEM(std::string& str,
+                                          SlotIdx slotidx) const
+ {
+@@ -554,7 +582,7 @@ RetStat ConnectionClass::tryNegotiateAlgorithms()
+ 
+     PacketNegotiateAlgorithmsRequestVar request;
+     request.Min.Header.MessageVersion = MessageVersion;
+-    request.Min.MeasurementSpecification = measurementSpecificationDmtf;
++    request.Min.MeasurementSpecification = getMeasurementSpecifications(this);
+ 
+     request.Min.BaseAsymAlgo = BaseAsymAlgoFlags::TPM_ALG_ECDSA_ECC_NIST_P256 |
+                                BaseAsymAlgoFlags::TPM_ALG_ECDSA_ECC_NIST_P384 |
+@@ -608,6 +636,19 @@ RetStat ConnectionClass::handleRecv<PacketAlgorithmsResponseVar>()
+         rs = RetStat::ERROR_INVALID_RESERVED;
+         SPDMCPP_CONNECTION_RS_ERROR_RETURN_WITH_VERSION(rs);
+     }
++    const uint8_t selectedMeasurementSpecification =
++        resp.Min.MeasurementSpecification;
++    const uint8_t supportedMeasurementSpecifications =
++        getMeasurementSpecifications(this);
++    if ((!skipMeasurements() && selectedMeasurementSpecification == 0) ||
++        (selectedMeasurementSpecification != 0 &&
++         (std::popcount(selectedMeasurementSpecification) != 1 ||
++          (selectedMeasurementSpecification &
++           supportedMeasurementSpecifications) == 0)))
++    {
++        rs = RetStat::ERROR_WRONG_ALGO_BITS;
++        SPDMCPP_CONNECTION_RS_ERROR_RETURN_WITH_VERSION(rs);
++    }
+     if (std::popcount(
+             static_cast<std::underlying_type_t<MeasurementHashAlgoFlags>>(
+                 resp.Min.MeasurementHashAlgo)) > 1)
+@@ -975,6 +1016,12 @@ RetStat ConnectionClass::handleRecv<PacketMeasurementsResponseVar>()
+     // parse and store DMTF Measurements
+     for (const auto& block : resp.MeasurementBlockVector)
+     {
++        if (block.Min.MeasurementSpecification !=
++            Algorithms.Min.MeasurementSpecification)
++        {
++            rs = RetStat::ERROR_WRONG_ALGO_BITS;
++            SPDMCPP_CONNECTION_RS_ERROR_RETURN_WITH_VERSION(rs);
++        }
+         if (block.Min.MeasurementSpecification == measurementSpecificationDmtf)
+         {
+             if (DMTFMeasurements.find(block.Min.Index) !=
+diff --git a/libspdmcpp/headers_public/spdmcpp/connection.hpp b/libspdmcpp/headers_public/spdmcpp/connection.hpp
+index 9558cf3..48205c3 100644
+--- a/libspdmcpp/headers_public/spdmcpp/connection.hpp
++++ b/libspdmcpp/headers_public/spdmcpp/connection.hpp
+@@ -165,7 +165,12 @@ class ConnectionClass : public NonCopyable
+     explicit ConnectionClass(const ContextClass& context, LogClass& log,
+                              uint8_t eid, std::string sockPath);
+ 
+-    ~ConnectionClass() = default;
++    /** @brief Constructor with explicit requester measurement specifications.
++     */
++    ConnectionClass(const ContextClass& context, LogClass& log, uint8_t eid,
++                    std::string sockPath, uint8_t measurementSpecifications);
++
++    ~ConnectionClass();
+ 
+     /** @brief get send timeout during the connection
+      *
+@@ -366,21 +371,8 @@ class ConnectionClass : public NonCopyable
+         return MessageVersion;
+     }
+ 
+-    /** @brief Returns the certificate chain for the given slot index
+-     *  @details Note this function will return false if the certificate chain
+-     * was not fetched for the given slot (even if it is available on the device
+-     * itself)
+-     *  @param[out] buf - the buffer into which the certificate chain is written
+-     *  @returns true if the certificate chain was available and written into
+-     * buf, false otherwise
+-     */
+-    bool getCertificateChainObject(std::vector<uint8_t>& buf,
+-                                   SlotIdx slotidx) const;
+-
+     /** @brief Returns the DER certificate chain for the given slot index
+      *  @details This strips the SPDM certificate-chain header and RootHash.
+-     * Use getCertificateChainObject() when the verifier needs native SPDM
+-     * evidence bytes.
+      *  @param[out] buf - the buffer into which the DER chain is written
+      *  @returns true if the certificate chain was available and written into
+      * buf, false otherwise
+@@ -439,7 +431,7 @@ class ConnectionClass : public NonCopyable
+         return CombinedMeasurementTranscript;
+     }
+ 
+-    /** @brief VERSION/CAPABILITIES/ALGORITHMS transcript bytes. */
++    /** @brief VERSION, CAPABILITIES, and ALGORITHMS request/response bytes. */
+     const std::vector<uint8_t>& getVcaTranscript() const
+     {
+         return refBuf(BufEnum::A);
+diff --git a/libspdmcpp/tests/connection_test.cpp b/libspdmcpp/tests/connection_test.cpp
+index 307e748..c36248f 100644
+--- a/libspdmcpp/tests/connection_test.cpp
++++ b/libspdmcpp/tests/connection_test.cpp
+@@ -127,9 +127,11 @@ class ConnectionFixture
+     ContextClass Context;
+     ConnectionClass Connection;
+ 
+-    ConnectionFixture() :
++    explicit ConnectionFixture(
++        uint8_t measurementSpecifications =
++            ConnectionClass::measurementSpecificationDmtf) :
+         logg(std::cout), IO(std::make_shared<FixtureIOClass>()),
+-        Connection(Context, logg, 0, "pcie")
++        Connection(Context, logg, 0, "pcie", measurementSpecifications)
+     {
+ #ifndef MCTP_IN_KERNEL
+         Context.registerIo(IO, "pcie");
+@@ -260,6 +262,8 @@ void testConnectionFlow(BaseAsymAlgoFlags asymAlgo, BaseHashAlgoFlags hashAlgo)
+ 
+     algoResp.Min.BaseAsymAlgo = asymAlgo;
+     algoResp.Min.BaseHashAlgo = hashAlgo;
++    algoResp.Min.MeasurementSpecification =
++        ConnectionClass::measurementSpecificationDmtf;
+     algoResp.Min.MeasurementHashAlgo =
+         MeasurementHashAlgoFlags::TPM_ALG_SHA_512;
+ 
+@@ -306,6 +310,8 @@ void testConnectionFlow(BaseAsymAlgoFlags asymAlgo, BaseHashAlgoFlags hashAlgo)
+         PacketNegotiateAlgorithmsRequestVar req;
+         auto rs = fix.interpret(req, MessageHashEnum::M);
+         ASSERT_EQ(rs, RetStat::OK);
++        EXPECT_EQ(req.Min.MeasurementSpecification,
++              ConnectionClass::measurementSpecificationDmtf);
+         EXPECT_FLAG_SET(req.Min.BaseAsymAlgo,
+                         BaseAsymAlgoFlags::TPM_ALG_ECDSA_ECC_NIST_P256);
+         EXPECT_FLAG_SET(req.Min.BaseHashAlgo,
+@@ -538,9 +544,15 @@ enum class Spdm12MeasurementsFault : uint8_t
+ 
+ void testConnectionFlow_SPDM12(
+     BaseAsymAlgoFlags asymAlgo, BaseHashAlgoFlags hashAlgo,
+-    Spdm12MeasurementsFault fault = Spdm12MeasurementsFault::None)
++    Spdm12MeasurementsFault fault = Spdm12MeasurementsFault::None,
++    uint8_t requesterMeasurementSpecifications =
++        ConnectionClass::measurementSpecificationDmtf,
++    uint8_t selectedMeasurementSpecification =
++        ConnectionClass::measurementSpecificationDmtf,
++    uint8_t blockMeasurementSpecification = 0,
++    RetStat expectedAlgorithmsResult = RetStat::OK)
+ {
+-    ConnectionFixture fix;
++    ConnectionFixture fix(requesterMeasurementSpecifications);
+ 
+     fix.Connection.refreshMeasurements(0);
+ 
+@@ -550,6 +562,7 @@ void testConnectionFlow_SPDM12(
+ 
+     algoResp.Min.BaseAsymAlgo = asymAlgo;
+     algoResp.Min.BaseHashAlgo = hashAlgo;
++    algoResp.Min.MeasurementSpecification = selectedMeasurementSpecification;
+     algoResp.Min.MeasurementHashAlgo =
+         MeasurementHashAlgoFlags::TPM_ALG_SHA_512;
+ 
+@@ -596,6 +609,8 @@ void testConnectionFlow_SPDM12(
+         PacketNegotiateAlgorithmsRequestVar req;
+         auto rs = fix.interpret(req, MessageHashEnum::M);
+         ASSERT_EQ(rs, RetStat::OK);
++        EXPECT_EQ(req.Min.MeasurementSpecification,
++                  requesterMeasurementSpecifications);
+     }
+ 
+     PacketDecodeInfo info;
+@@ -656,7 +671,18 @@ void testConnectionFlow_SPDM12(
+         auto rs = fix.push(algoResp, MessageHashEnum::M);
+         ASSERT_EQ(rs, RetStat::OK);
+         rs = fix.handleRecv();
+-        ASSERT_EQ(rs, RetStat::OK);
++        if (isError(expectedAlgorithmsResult))
++        {
++            EXPECT_EQ(rs, RetStat::OK);
++            EXPECT_FALSE(
++                fix.Connection.hasInfo(ConnectionInfoEnum::ALGORITHMS));
++            mbedtls_x509_crt_free(&caCert);
++            mbedtls_pk_free(&pkctx);
++            return;
++        }
++        ASSERT_EQ(rs, expectedAlgorithmsResult);
++        EXPECT_EQ(fix.Connection.getMeasurementSpecification(),
++                  selectedMeasurementSpecification);
+     }
+ 
+     {
+@@ -669,6 +695,7 @@ void testConnectionFlow_SPDM12(
+     digestResp.Min.Header.MessageVersion = MessageVersionEnum::SPDM_1_2;
+     PacketCertificateResponseVar certResp;
+     certResp.Min.Header.MessageVersion = MessageVersionEnum::SPDM_1_2;
++    std::vector<uint8_t> expectedCertificateChainDer;
+ 
+     {
+         std::vector<uint8_t>& certBuf = certResp.CertificateVector;
+@@ -678,6 +705,7 @@ void testConnectionFlow_SPDM12(
+         // NOLINTNEXTLINE cppcoreguidelines-pro-bounds-pointer-arithmetic
+         std::copy(caCert.raw.p, caCert.raw.p + caCert.raw.len,
+                   rootCert.begin());
++        expectedCertificateChainDer = rootCert;
+ 
+         std::vector<uint8_t> rootCertHash;
+         HashClass::compute(rootCertHash, toHash(algoResp.Min.BaseHashAlgo),
+@@ -720,6 +748,12 @@ void testConnectionFlow_SPDM12(
+         ASSERT_EQ(rs, RetStat::OK);
+         rs = fix.handleRecv();
+         ASSERT_EQ(rs, RetStat::OK);
++
++        std::vector<uint8_t> certificateChainDer;
++        ASSERT_TRUE(fix.Connection.getCertificatesDER(certificateChainDer, 0));
++        EXPECT_EQ(certificateChainDer, expectedCertificateChainDer);
++        ASSERT_FALSE(certificateChainDer.empty());
++        EXPECT_EQ(certificateChainDer.front(), 0x30);
+     }
+ 
+     {
+@@ -738,7 +772,16 @@ void testConnectionFlow_SPDM12(
+         {
+             PacketMeasurementBlockVar block;
+             block.Min.Index = 1;
+-            block.Min.MeasurementSpecification = 1;
++            block.Min.MeasurementSpecification =
++                blockMeasurementSpecification == 0
++                    ? selectedMeasurementSpecification
++                    : blockMeasurementSpecification;
++            if (block.Min.MeasurementSpecification ==
++                ConnectionClass::measurementSpecificationEat)
++            {
++                block.MeasurementVector = {0xD8, 0x3D, 0x84, 0x40};
++            }
++            else
+             {
+                 PacketMeasurementFieldVar field;
+                 field.Min.Type = 0x80;
+@@ -804,18 +847,34 @@ void testConnectionFlow_SPDM12(
+         rs = fix.push(resp);
+         ASSERT_EQ(rs, RetStat::OK);
+         rs = fix.handleRecv();
+-        if (fault == Spdm12MeasurementsFault::None)
++        const bool specificationMismatch =
++            blockMeasurementSpecification != 0 &&
++            blockMeasurementSpecification != selectedMeasurementSpecification;
++        if (fault == Spdm12MeasurementsFault::None && !specificationMismatch)
+         {
+             ASSERT_EQ(rs, RetStat::OK);
+         }
++        else if (specificationMismatch)
++        {
++            EXPECT_EQ(rs, RetStat::OK);
++        }
+     }
+ 
+-    if (fault != Spdm12MeasurementsFault::None)
++    if (fault != Spdm12MeasurementsFault::None ||
++        (blockMeasurementSpecification != 0 &&
++         blockMeasurementSpecification != selectedMeasurementSpecification))
+     {
+         EXPECT_FALSE(fix.Connection.hasInfo(ConnectionInfoEnum::MEASUREMENTS))
+             << "Malformed measurements / attestation (SPDM 1.2) must not mark "
+                "MEASUREMENTS";
+     }
++    else if (selectedMeasurementSpecification ==
++             ConnectionClass::measurementSpecificationEat)
++    {
++        EXPECT_EQ(fix.Connection.getDeviceEatToken(),
++                  (std::vector<uint8_t>{0xD8, 0x3D, 0x84, 0x40}));
++        EXPECT_TRUE(fix.Connection.getDMTFMeasurements().empty());
++    }
+ 
+     mbedtls_x509_crt_free(&caCert);
+     mbedtls_pk_free(&pkctx);
+@@ -833,6 +892,59 @@ TEST(Connection, FullFlow_SPDM12_ECDSA_256_SHA_384)
+                               BaseHashAlgoFlags::TPM_ALG_SHA_384);
+ }
+ 
++TEST(Connection, FullFlow_SPDM12_AdvertisesEatMeasurementSpecification)
++{
++    constexpr uint8_t supported =
++        ConnectionClass::measurementSpecificationDmtf |
++        ConnectionClass::measurementSpecificationEat;
++    testConnectionFlow_SPDM12(
++        BaseAsymAlgoFlags::TPM_ALG_ECDSA_ECC_NIST_P256,
++        BaseHashAlgoFlags::TPM_ALG_SHA_384, Spdm12MeasurementsFault::None,
++        supported, ConnectionClass::measurementSpecificationEat);
++}
++
++TEST(Connection, SPDM12RejectsZeroMeasurementSpecificationSelection)
++{
++    testConnectionFlow_SPDM12(
++        BaseAsymAlgoFlags::TPM_ALG_ECDSA_ECC_NIST_P256,
++        BaseHashAlgoFlags::TPM_ALG_SHA_384, Spdm12MeasurementsFault::None,
++        ConnectionClass::measurementSpecificationDmtf, 0, 0,
++        RetStat::ERROR_WRONG_ALGO_BITS);
++}
++
++TEST(Connection, SPDM12RejectsUnadvertisedMeasurementSpecification)
++{
++    testConnectionFlow_SPDM12(
++        BaseAsymAlgoFlags::TPM_ALG_ECDSA_ECC_NIST_P256,
++        BaseHashAlgoFlags::TPM_ALG_SHA_384, Spdm12MeasurementsFault::None,
++        ConnectionClass::measurementSpecificationDmtf,
++        ConnectionClass::measurementSpecificationEat, 0,
++        RetStat::ERROR_WRONG_ALGO_BITS);
++}
++
++TEST(Connection, SPDM12RejectsMultipleMeasurementSpecificationSelection)
++{
++    constexpr uint8_t supported =
++        ConnectionClass::measurementSpecificationDmtf |
++        ConnectionClass::measurementSpecificationEat;
++    testConnectionFlow_SPDM12(
++        BaseAsymAlgoFlags::TPM_ALG_ECDSA_ECC_NIST_P256,
++        BaseHashAlgoFlags::TPM_ALG_SHA_384, Spdm12MeasurementsFault::None,
++        supported, supported, 0, RetStat::ERROR_WRONG_ALGO_BITS);
++}
++
++TEST(Connection, SPDM12RejectsMeasurementBlockSpecificationMismatch)
++{
++    constexpr uint8_t supported =
++        ConnectionClass::measurementSpecificationDmtf |
++        ConnectionClass::measurementSpecificationEat;
++    testConnectionFlow_SPDM12(
++        BaseAsymAlgoFlags::TPM_ALG_ECDSA_ECC_NIST_P256,
++        BaseHashAlgoFlags::TPM_ALG_SHA_384, Spdm12MeasurementsFault::None,
++        supported, ConnectionClass::measurementSpecificationEat,
++        ConnectionClass::measurementSpecificationDmtf);
++}
++
+ TEST(Connection, FullFlow_SPDM12_InvalidMeasurementSignature)
+ {
+     testConnectionFlow_SPDM12(BaseAsymAlgoFlags::TPM_ALG_ECDSA_ECC_NIST_P256,
+diff --git a/spdmd/composite/claims_set_builder.cpp b/spdmd/composite/claims_set_builder.cpp
+index 35540f7..039a8e6 100644
+--- a/spdmd/composite/claims_set_builder.cpp
++++ b/spdmd/composite/claims_set_builder.cpp
+@@ -34,8 +34,7 @@ constexpr const char* kKeyVca = "vca";
+ constexpr const char* kKeyTokenFormat = "token_format";
+ constexpr const char* kKeyDeviceToken = "device_token";
+ 
+-/// Encode a byte field either plain (bstr) or CMW-style typed
+-/// ([content-format, value]).
++/// Encode a Pattern A/C byte field either plain or CMW-style typed.
+ std::vector<std::uint8_t> byteField(std::span<const std::uint8_t> bytes,
+                                     bool typedValues,
+                                     std::uint64_t contentFormat)
+@@ -58,7 +57,7 @@ std::vector<std::uint8_t> buildSpdmEvidence(const CollectedEvidence& ev,
+         throw std::invalid_argument(
+             "buildClaimsSet: signed_measurements is empty");
+     }
+-    if (ev.certChainSpdm.empty())
++    if (ev.certificateChainDer.empty())
+     {
+         throw std::invalid_argument("buildClaimsSet: cert_chain is empty");
+     }
+@@ -71,8 +70,8 @@ std::vector<std::uint8_t> buildSpdmEvidence(const CollectedEvidence& ev,
+     m.addText(
+         kKeySignedMeasurements,
+         byteField(ev.signedMeasurements, typedValues, kCfSpdmMeasurements));
+-    m.addText(kKeyCertChain,
+-              byteField(ev.certChainSpdm, typedValues, kCfSpdmCertChain));
++    m.addText(kKeyCertChain, byteField(ev.certificateChainDer, typedValues,
++                                      kCfConcatenatedDerCertificates));
+     if (ev.includeVca)
+     {
+         m.addText(kKeyVca, byteField(ev.vca, typedValues, kCfSpdmVca));
+diff --git a/spdmd/composite/claims_set_builder.hpp b/spdmd/composite/claims_set_builder.hpp
+index c75ce27..5e83026 100644
+--- a/spdmd/composite/claims_set_builder.hpp
++++ b/spdmd/composite/claims_set_builder.hpp
+@@ -24,6 +24,7 @@
+ //
+ //   Pattern A / C  -> spdm-evidence-claims-set
+ //                       { "signed_measurements", "cert_chain", ?"vca" }
++//                     cert_chain is concatenated DER certificates.
+ //   Pattern B      -> device-eat-claims-set
+ //                       { "token_format", "device_token" }
+ //
+@@ -45,7 +46,7 @@ namespace spdmd::composite
+ /// CoAP Content-Formats used by the optional typed-value wrapping. These
+ /// are profile-local placeholders pending registration.
+ inline constexpr std::uint64_t kCfSpdmMeasurements = 65000;
+-inline constexpr std::uint64_t kCfSpdmCertChain = 65001;
++inline constexpr std::uint64_t kCfConcatenatedDerCertificates = 65001;
+ inline constexpr std::uint64_t kCfSpdmVca = 65002;
+ 
+ /// Build the deterministic CBOR detached Claims-Set for one successfully
+diff --git a/spdmd/composite/collection_plan.cpp b/spdmd/composite/collection_plan.cpp
+index 44c026f..ba0f01f 100644
+--- a/spdmd/composite/collection_plan.cpp
++++ b/spdmd/composite/collection_plan.cpp
+@@ -25,17 +25,128 @@
+ namespace spdmd::composite
+ {
+ 
++namespace
++{
++
++std::optional<CollectionPlan> collectionPlanFromDocument(
++    const nlohmann::json& doc, std::string& err)
++{
++    if (doc.is_discarded() || !doc.is_object())
++    {
++        err = "composite.json: not a JSON object";
++        return std::nullopt;
++    }
++
++    CollectionPlan plan;
++
++    if (auto it = doc.find("platformCorimLocator"); it != doc.end())
++    {
++        if (!it->is_string())
++        {
++            err = "composite.json: platformCorimLocator must be a string";
++            return std::nullopt;
++        }
++        plan.setPlatformCorimLocator(it->get<std::string>());
++    }
++
++    auto envs = doc.find("environments");
++    if (envs == doc.end())
++    {
++        return plan;
++    }
++    if (!envs->is_array())
++    {
++        err = "composite.json: environments must be an array";
++        return std::nullopt;
++    }
++
++    for (const auto& item : *envs)
++    {
++        if (!item.is_object() || !item.contains("env") ||
++            !item["env"].is_string())
++        {
++            err = "composite.json: each environment needs a string 'env'";
++            return std::nullopt;
++        }
++        CollectionPlan::Entry entry;
++        entry.env = item["env"].get<std::string>();
++
++        auto match = item.find("match");
++        if (match == item.end() || !match->is_object())
++        {
++            err = "composite.json: environment match must be an object";
++            return std::nullopt;
++        }
++
++        bool hasPredicate = false;
++        if (auto value = match->find("mctpEid"); value != match->end())
++        {
++            if (!value->is_number_unsigned() ||
++                value->get<std::uint64_t>() > 0xff)
++            {
++                err = "composite.json: mctpEid must be an unsigned byte";
++                return std::nullopt;
++            }
++            entry.mctpEid =
++                static_cast<std::uint8_t>(value->get<std::uint64_t>());
++            hasPredicate = true;
++        }
++        if (auto value = match->find("redfishUri"); value != match->end())
++        {
++            if (!value->is_string())
++            {
++                err = "composite.json: redfishUri must be a string";
++                return std::nullopt;
++            }
++            entry.redfishUri = value->get<std::string>();
++            hasPredicate = true;
++        }
++        if (auto value = match->find("pcieBdf"); value != match->end())
++        {
++            if (!value->is_string())
++            {
++                err = "composite.json: pcieBdf must be a string";
++                return std::nullopt;
++            }
++            entry.pcieBdf = value->get<std::string>();
++            hasPredicate = true;
++        }
++        if (auto value = match->find("i2cAddr"); value != match->end())
++        {
++            if (!value->is_string())
++            {
++                err = "composite.json: i2cAddr must be a string";
++                return std::nullopt;
++            }
++            entry.i2cAddr = value->get<std::string>();
++            hasPredicate = true;
++        }
++        if (!hasPredicate)
++        {
++            err = "composite.json: environment match needs a supported "
++                  "predicate";
++            return std::nullopt;
++        }
++
++        if (!plan.addEntry(std::move(entry)))
++        {
++            err = "composite.json: invalid env id (must be env.* per "
++                  "the composite attestation profile)";
++            return std::nullopt;
++        }
++    }
++
++    return plan;
++}
++
++} // namespace
++
+ bool CollectionPlan::isValidEnvId(std::string_view id)
+ {
+     if (id.empty() || id.size() > 64)
+     {
+         return false;
+     }
+-    // Must start with "env" and be either "env" or "env.".
+-    if (id == "env")
+-    {
+-        return true;
+-    }
+     if (id.size() < 5 || id.substr(0, 4) != "env.")
+     {
+         return false;
+@@ -116,6 +227,14 @@ std::string CollectionPlan::resolveByEid(std::uint8_t eid) const
+ 
+ std::optional<CollectionPlan> CollectionPlan::fromJson(std::string_view json,
+                                                        std::string& err)
++{
++    nlohmann::json doc =
++        nlohmann::json::parse(json, nullptr, false /*no exceptions*/);
++    return collectionPlanFromDocument(doc, err);
++}
++
++std::optional<ParsedCompositeConfig>
++    parseCompositeConfig(std::string_view json, std::string& err)
+ {
+     nlohmann::json doc =
+         nlohmann::json::parse(json, nullptr, false /*no exceptions*/);
+@@ -125,71 +244,34 @@ std::optional<CollectionPlan> CollectionPlan::fromJson(std::string_view json,
+         return std::nullopt;
+     }
+ 
+-    CollectionPlan plan;
+-
+-    if (auto it = doc.find("platformCorimLocator"); it != doc.end())
++    auto plan = collectionPlanFromDocument(doc, err);
++    if (!plan)
+     {
+-        if (!it->is_string())
+-        {
+-            err = "composite.json: platformCorimLocator must be a string";
+-            return std::nullopt;
+-        }
+-        plan.setPlatformCorimLocator(it->get<std::string>());
++        return std::nullopt;
+     }
+ 
+-    auto envs = doc.find("environments");
+-    if (envs == doc.end())
++    ParsedCompositeConfig config;
++    config.plan = std::move(*plan);
++    if (auto it = doc.find("allowUnknownEnvironments");
++        it != doc.end() && it->is_boolean())
+     {
+-        return plan; // empty plan is valid (everything resolves to fallback)
++        config.allowUnknownEnvironments = it->get<bool>();
+     }
+-    if (!envs->is_array())
++    if (auto it = doc.find("skipDevices");
++        it != doc.end() && it->is_array())
+     {
+-        err = "composite.json: environments must be an array";
+-        return std::nullopt;
+-    }
+-
+-    for (const auto& item : *envs)
+-    {
+-        if (!item.is_object() || !item.contains("env") ||
+-            !item["env"].is_string())
+-        {
+-            err = "composite.json: each environment needs a string 'env'";
+-            return std::nullopt;
+-        }
+-        Entry e;
+-        e.env = item["env"].get<std::string>();
+-
+-        if (auto m = item.find("match"); m != item.end() && m->is_object())
++        for (const auto& eid : *it)
+         {
+-            if (auto v = m->find("mctpEid");
+-                v != m->end() && v->is_number_unsigned())
+-            {
+-                e.mctpEid =
+-                    static_cast<std::uint8_t>(v->get<unsigned>() & 0xFFU);
+-            }
+-            if (auto v = m->find("redfishUri"); v != m->end() && v->is_string())
+-            {
+-                e.redfishUri = v->get<std::string>();
+-            }
+-            if (auto v = m->find("pcieBdf"); v != m->end() && v->is_string())
+-            {
+-                e.pcieBdf = v->get<std::string>();
+-            }
+-            if (auto v = m->find("i2cAddr"); v != m->end() && v->is_string())
++            if (eid.is_number_unsigned() &&
++                eid.get<std::uint64_t>() <= 0xff)
+             {
+-                e.i2cAddr = v->get<std::string>();
++                config.skipDevices.push_back(
++                    static_cast<std::uint8_t>(eid.get<std::uint64_t>()));
+             }
+         }
+-
+-        if (!plan.addEntry(std::move(e)))
+-        {
+-            err = "composite.json: invalid env id (must be env.* per "
+-                  "the composite attestation profile)";
+-            return std::nullopt;
+-        }
+     }
+ 
+-    return plan;
++    return config;
+ }
+ 
+ } // namespace spdmd::composite
+diff --git a/spdmd/composite/collection_plan.hpp b/spdmd/composite/collection_plan.hpp
+index b740864..06d3e53 100644
+--- a/spdmd/composite/collection_plan.hpp
++++ b/spdmd/composite/collection_plan.hpp
+@@ -60,8 +60,8 @@ class CollectionPlan
+     };
+ 
+     /// Validate an env.* identifier per the composite attestation profile:
+-    /// lowercase ASCII,
+-    /// dot-separated, first component "env", <= 64 bytes.
++    /// lowercase ASCII, dot-separated, first component "env", at least one
++    /// target component, <= 64 bytes.
+     static bool isValidEnvId(std::string_view id);
+ 
+     /// Add a mapping rule. Returns false if env is invalid.
+@@ -100,4 +100,14 @@ class CollectionPlan
+     std::optional<std::string> corimLocator;
+ };
+ 
++struct ParsedCompositeConfig
++{
++    CollectionPlan plan;
++    std::vector<std::uint8_t> skipDevices;
++    bool allowUnknownEnvironments = false;
++};
++
++std::optional<ParsedCompositeConfig>
++    parseCompositeConfig(std::string_view json, std::string& err);
++
+ } // namespace spdmd::composite
+diff --git a/spdmd/composite/composite_orchestrator.cpp b/spdmd/composite/composite_orchestrator.cpp
+index e553cdf..b498163 100644
+--- a/spdmd/composite/composite_orchestrator.cpp
++++ b/spdmd/composite/composite_orchestrator.cpp
+@@ -38,10 +38,6 @@ std::string CompositeStatus::toStatusString() const
+     {
+         return "Success";
+     }
+-    if (devicesSucceeded == 0)
+-    {
+-        return "Error";
+-    }
+     return "PartialSuccess";
+ }
+ 
+@@ -72,6 +68,9 @@ CompositeOrchestrator::Result CompositeOrchestrator::produce(
+         if (!ev.success)
+         {
+             ++out.status.devicesFailed;
++            out.status.deviceFailures.push_back(
++                {ev.eid, ev.environmentId,
++                 ev.errorMsg.empty() ? "collection failed" : ev.errorMsg});
+             continue;
+         }
+         try
+@@ -84,6 +83,8 @@ CompositeOrchestrator::Result CompositeOrchestrator::produce(
+         catch (const std::exception& e)
+         {
+             ++out.status.devicesFailed;
++            out.status.deviceFailures.push_back(
++                {ev.eid, ev.environmentId, e.what()});
+             // A malformed device is treated as a collection failure; it
+             // contributes no Claims-Set and no submod.
+         }
+diff --git a/spdmd/composite/composite_orchestrator.hpp b/spdmd/composite/composite_orchestrator.hpp
+index 73b3c3b..f0c6671 100644
+--- a/spdmd/composite/composite_orchestrator.hpp
++++ b/spdmd/composite/composite_orchestrator.hpp
+@@ -47,12 +47,20 @@ namespace spdmd
+ /// string (Idle / Collecting / Success / PartialSuccess / Error).
+ struct CompositeStatus
+ {
++    struct DeviceFailure
++    {
++        std::uint8_t eid = 0;
++        std::string environmentId;
++        std::string errorMsg;
++    };
++
+     std::size_t totalDevices = 0;
+     std::size_t devicesSucceeded = 0;
+     std::size_t devicesFailed = 0;
+     bool tokenProduced = false;
+     std::string platformAttesterStatus; // Ready / SoftwareMock / Unavailable
+     std::string attesterErrorMsg;       // empty if attestation succeeded
++    std::vector<DeviceFailure> deviceFailures;
+ 
+     std::string toStatusString() const;
+ };
+diff --git a/spdmd/composite/evidence_builder.cpp b/spdmd/composite/evidence_builder.cpp
+index 21e11cf..48d616e 100644
+--- a/spdmd/composite/evidence_builder.cpp
++++ b/spdmd/composite/evidence_builder.cpp
+@@ -80,11 +80,11 @@ CollectedEvidence buildCollectedEvidence(const EvidenceBuilderInput& input)
+                                   "missing SPDM signed measurements");
+     }
+ 
+-    ev.certChainSpdm = input.certificateChainObject;
+-    if (ev.certChainSpdm.empty())
++    ev.certificateChainDer = input.certificateChainDer;
++    if (ev.certificateChainDer.empty())
+     {
+         return makeFailedEvidence(input.eid, input.environmentId,
+-                                  "missing SPDM certificate chain object");
++                                  "missing DER certificate chain");
+     }
+ 
+     if (isV10or11(input.spdmVersion))
+diff --git a/spdmd/composite/evidence_builder.hpp b/spdmd/composite/evidence_builder.hpp
+index fe9a3a6..55735ac 100644
+--- a/spdmd/composite/evidence_builder.hpp
++++ b/spdmd/composite/evidence_builder.hpp
+@@ -38,7 +38,7 @@ struct EvidenceBuilderInput
+     std::uint8_t measurementSpecification = kSpdmMeasurementSpecDmtf;
+ 
+     std::vector<std::uint8_t> signedMeasurements;
+-    std::vector<std::uint8_t> certificateChainObject;
++    std::vector<std::uint8_t> certificateChainDer;
+     std::vector<std::uint8_t> vcaTranscript;
+     std::vector<std::uint8_t> deviceEatToken;
+ };
+diff --git a/spdmd/composite/meson.build b/spdmd/composite/meson.build
+index c599e1d..e89acfe 100644
+--- a/spdmd/composite/meson.build
++++ b/spdmd/composite/meson.build
+@@ -15,7 +15,6 @@ composite_sources = files(
+     'evidence_builder.cpp',
+     'bundle_assembler.cpp',
+     'composite_orchestrator.cpp',
+-    'pem.cpp',
+ )
+ 
+ # '.' resolves "cbor_det.hpp"; '..' resolves "composite/..." and
+diff --git a/spdmd/composite/pem.cpp b/spdmd/composite/pem.cpp
+deleted file mode 100644
+index b714851..0000000
+--- a/spdmd/composite/pem.cpp
++++ /dev/null
+@@ -1,82 +0,0 @@
+-/*
+- * SPDX-FileCopyrightText: Copyright (c) 2022-2024 NVIDIA CORPORATION &
+- * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- * http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-#include "pem.hpp"
+-
+-#include <mbedtls/base64.h>
+-
+-#include <string>
+-
+-namespace spdmd::composite
+-{
+-
+-std::vector<std::uint8_t> pemToDerConcat(std::string_view pem)
+-{
+-    static constexpr std::string_view kBegin = "-----BEGIN CERTIFICATE-----";
+-    static constexpr std::string_view kEnd = "-----END CERTIFICATE-----";
+-
+-    std::vector<std::uint8_t> out;
+-    std::size_t pos = 0;
+-    while (pos < pem.size())
+-    {
+-        const auto begin = pem.find(kBegin, pos);
+-        if (begin == std::string_view::npos)
+-        {
+-            break;
+-        }
+-        const auto end = pem.find(kEnd, begin);
+-        if (end == std::string_view::npos)
+-        {
+-            break;
+-        }
+-        std::string b64;
+-        b64.reserve(end - begin);
+-        for (std::size_t i = begin + kBegin.size(); i < end; ++i)
+-        {
+-            const char c = pem[i];
+-            if (c != '\n' && c != '\r' && c != ' ' && c != '\t')
+-            {
+-                b64.push_back(c);
+-            }
+-        }
+-        std::size_t derLen = 0;
+-        mbedtls_base64_decode(
+-            nullptr, 0, &derLen,
+-            reinterpret_cast<const unsigned char*>(b64.data()), b64.size());
+-        if (derLen > 0)
+-        {
+-            const std::size_t before = out.size();
+-            out.resize(before + derLen);
+-            std::size_t written = 0;
+-            if (mbedtls_base64_decode(
+-                    out.data() + before, derLen, &written,
+-                    reinterpret_cast<const unsigned char*>(b64.data()),
+-                    b64.size()) == 0)
+-            {
+-                out.resize(before + written);
+-            }
+-            else
+-            {
+-                out.resize(before);
+-            }
+-        }
+-        pos = end + kEnd.size();
+-    }
+-    return out;
+-}
+-
+-} // namespace spdmd::composite
+diff --git a/spdmd/composite/pem.hpp b/spdmd/composite/pem.hpp
+deleted file mode 100644
+index 80fd92c..0000000
+--- a/spdmd/composite/pem.hpp
++++ /dev/null
+@@ -1,34 +0,0 @@
+-/*
+- * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION &
+- * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- * http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-// PEM -> DER helper for composite attestation. Concatenates the DER of
+-// every certificate in a PEM chain (leaf-first order preserved), used to
+-// turn a Responder's PEM chain into the raw SPDM cert_chain bytes for a
+-// detached Claims-Set.
+-
+-#pragma once
+-
+-#include <cstdint>
+-#include <string_view>
+-#include <vector>
+-
+-namespace spdmd::composite
+-{
+-
+-std::vector<std::uint8_t> pemToDerConcat(std::string_view pem);
+-
+-} // namespace spdmd::composite
+diff --git a/spdmd/composite/submodule_digest.cpp b/spdmd/composite/submodule_digest.cpp
+index ec664f4..6a6bfcd 100644
+--- a/spdmd/composite/submodule_digest.cpp
++++ b/spdmd/composite/submodule_digest.cpp
+@@ -20,6 +20,7 @@
+ #include <mbedtls/md.h>
+ 
+ #include <stdexcept>
++#include <string>
+ #include <utility>
+ 
+ namespace spdmd::composite
+@@ -30,10 +31,15 @@ std::array<std::uint8_t, kSha384Len> sha384(std::span<const std::uint8_t> b)
+     std::array<std::uint8_t, kSha384Len> out{};
+     const mbedtls_md_info_t* info =
+         mbedtls_md_info_from_type(MBEDTLS_MD_SHA384);
+-    if (info == nullptr ||
+-        mbedtls_md(info, b.data(), b.size(), out.data()) != 0)
++    if (info == nullptr)
+     {
+-        throw std::runtime_error("SubmoduleDigest: SHA-384 failed");
++        throw std::runtime_error("SubmoduleDigest: SHA-384 is unavailable");
++    }
++    const int rc = mbedtls_md(info, b.data(), b.size(), out.data());
++    if (rc != 0)
++    {
++        throw std::runtime_error("SubmoduleDigest: SHA-384 failed: " +
++                                 std::to_string(rc));
+     }
+     return out;
+ }
+diff --git a/spdmd/composite/types.hpp b/spdmd/composite/types.hpp
+index 5be7597..94ba14b 100644
+--- a/spdmd/composite/types.hpp
++++ b/spdmd/composite/types.hpp
+@@ -103,8 +103,8 @@ struct CollectedEvidence
+     // --- Pattern A / C inputs ---
+     /// Redfish/SPDM SignedMeasurements value, verbatim.
+     std::vector<std::uint8_t> signedMeasurements;
+-    /// Raw reassembled SPDM certificate-chain object (not PEM).
+-    std::vector<std::uint8_t> certChainSpdm;
++    /// Concatenated DER certificates, excluding the SPDM header and RootHash.
++    std::vector<std::uint8_t> certificateChainDer;
+     /// Observed VCA transcript; required for SPDM 1.0/1.1, omitted for
+     /// 1.2+. Included only when @ref includeVca is true.
+     std::vector<std::uint8_t> vca;
+@@ -130,8 +130,8 @@ struct SubmoduleRecord
+ /// Authored entirely by the Lead Attester; the mock backend fills it.
+ struct LeadAttesterMeasurement
+ {
+-    std::uint64_t contentFormat = 0; // CoAP Content-Format
+-    std::vector<std::uint8_t> value; // opaque payload bytes
++    std::optional<std::uint64_t> contentFormat; // CoAP Content-Format
++    std::vector<std::uint8_t> value;            // opaque payload bytes
+ };
+ 
+ /// Request handed to the Lead Attester. Note: no eat_profile — the RoT
+diff --git a/spdmd/dbus_impl_composite.cpp b/spdmd/dbus_impl_composite.cpp
+index d726cc0..0b5b31d 100644
+--- a/spdmd/dbus_impl_composite.cpp
++++ b/spdmd/dbus_impl_composite.cpp
+@@ -19,7 +19,6 @@
+ 
+ #include "composite/evidence_builder.hpp"
+ 
+-#include <nlohmann/json.hpp>
+ #include <sdbusplus/exception.hpp>
+ 
+ #include <algorithm>
+@@ -41,40 +40,16 @@ CompositeConfig loadCompositeConfig(const std::string& path)
+     }
+     std::stringstream ss;
+     ss << f.rdbuf();
+-    nlohmann::json doc =
+-        nlohmann::json::parse(ss.str(), nullptr, false /*no exceptions*/);
+-    if (doc.is_object())
+-    {
+-        if (auto it = doc.find("allowUnknownEnvironments");
+-            it != doc.end() && it->is_boolean())
+-        {
+-            cfg.allowUnknownEnvironments = it->get<bool>();
+-        }
+-        // Endpoints listed in skipDevices are discovered SPDM responders that
+-        // must not contribute a composite submodule (for example a platform
+-        // Root of Trust that also answers SPDM but signs the composite EAT
+-        // rather than being measured by it).
+-        if (auto it = doc.find("skipDevices");
+-            it != doc.end() && it->is_array())
+-        {
+-            for (const auto& eid : *it)
+-            {
+-                if (eid.is_number_unsigned() && eid.get<unsigned>() <= 0xff)
+-                {
+-                    cfg.skipDevices.push_back(
+-                        static_cast<std::uint8_t>(eid.get<unsigned>()));
+-                }
+-            }
+-        }
+-    }
+     std::string err;
+-    if (auto plan = composite::CollectionPlan::fromJson(ss.str(), err))
++    if (auto parsed = composite::parseCompositeConfig(ss.str(), err))
+     {
+-        cfg.plan = std::move(*plan);
++        cfg.plan = std::move(parsed->plan);
++        cfg.skipDevices = std::move(parsed->skipDevices);
++        cfg.allowUnknownEnvironments = parsed->allowUnknownEnvironments;
+     }
+     else
+     {
+-        std::cerr << "composite.json: " << err << " — using defaults\n";
++        std::cerr << err << " - using defaults\n";
+     }
+     return cfg;
+ }
+@@ -247,8 +222,7 @@ composite::CollectedEvidence
+ 
+     auto sm = resp.signedMeasurements();
+     input.signedMeasurements.assign(sm.begin(), sm.end());
+-    (void)resp.certificateChainObject(input.certificateChainObject,
+-                                      resp.slot());
++    (void)resp.certificateChainDer(input.certificateChainDer, resp.slot());
+ 
+     const auto& vca = resp.vcaTranscript();
+     input.vcaTranscript.assign(vca.begin(), vca.end());
+@@ -300,7 +274,14 @@ void DbusImplComposite::finalize()
+     auto res = orchestrator.produce(std::span<const std::uint8_t, 32>{nonce},
+                                     std::span{evidences},
+                                     config.plan.platformCorimLocator());
+-    if (res.success && res.status.devicesSucceeded > 0)
++    for (const auto& failure : res.status.deviceFailures)
++    {
++        std::cerr << "composite collection failed for "
++                  << failure.environmentId << " (EID "
++                  << static_cast<unsigned>(failure.eid)
++                  << "): " << failure.errorMsg << '\n';
++    }
++    if (res.success)
+     {
+         bundle = std::move(res.bundle);
+         if (iface)
+diff --git a/spdmd/dbus_impl_responder.cpp b/spdmd/dbus_impl_responder.cpp
+index bafbda8..949e9f3 100644
+--- a/spdmd/dbus_impl_responder.cpp
++++ b/spdmd/dbus_impl_responder.cpp
+@@ -30,6 +30,20 @@ namespace spdmd
+ namespace dbus_api
+ {
+ 
++namespace
++{
++
++#ifdef ENABLE_COMPOSITE_ATTESTATION
++constexpr std::uint8_t requesterMeasurementSpecifications =
++    spdmcpp::ConnectionClass::measurementSpecificationDmtf |
++    spdmcpp::ConnectionClass::measurementSpecificationEat;
++#else
++constexpr std::uint8_t requesterMeasurementSpecifications =
++    spdmcpp::ConnectionClass::measurementSpecificationDmtf;
++#endif
++
++} // namespace
++
+ /**
+  * @brief Convert SPDM version to string
+  *
+@@ -59,7 +73,8 @@ Responder::Responder(SpdmdAppContext& appCtx, const std::string& path,
+                      std::string socketPath) :
+     ResponderIntf(appCtx.getConn(), path.c_str(), action::defer_emit),
+     appContext(appCtx), log(appCtx.getLog()),
+-    connection(appCtx.context, log, eid, std::move(socketPath)),
++    connection(appCtx.context, log, eid, std::move(socketPath),
++               requesterMeasurementSpecifications),
+     transport(eid, *this, std::move(transportMedium), log),
+     inventoryPath(invPath), bindingType(bindingType), eid(eid)
+ {
+diff --git a/spdmd/dbus_impl_responder.hpp b/spdmd/dbus_impl_responder.hpp
+index 61e6ac4..969602c 100644
+--- a/spdmd/dbus_impl_responder.hpp
++++ b/spdmd/dbus_impl_responder.hpp
+@@ -181,10 +181,10 @@ class Responder :
+         return connection.getVcaTranscript();
+     }
+ 
+-    bool certificateChainObject(std::vector<uint8_t>& certChain,
+-                                uint8_t slotIdx) const
++    bool certificateChainDer(std::vector<uint8_t>& certificateChainDer,
++                             uint8_t slotIdx) const
+     {
+-        return connection.getCertificateChainObject(certChain, slotIdx);
++        return connection.getCertificatesDER(certificateChainDer, slotIdx);
+     }
+ 
+     /** @brief Event callback for receiving events
+diff --git a/spdmd/mock_attester/eat_builder.cpp b/spdmd/mock_attester/eat_builder.cpp
+index 509eb2f..4888d88 100644
+--- a/spdmd/mock_attester/eat_builder.cpp
++++ b/spdmd/mock_attester/eat_builder.cpp
+@@ -21,6 +21,7 @@
+ 
+ #include <mbedtls/base64.h>
+ 
++#include <stdexcept>
+ #include <string>
+ 
+ namespace spdmd::mock_attester::eat
+@@ -69,8 +70,13 @@ std::vector<std::uint8_t>
+ std::vector<std::uint8_t>
+     encodeMeasurement(const composite::LeadAttesterMeasurement& m)
+ {
++    if (!m.contentFormat)
++    {
++        throw std::invalid_argument(
++            "Lead Attester measurement content-format is required");
++    }
+     cbor::Map em;
+-    em.addText(kMeasContentFormat, cbor::uintVal(m.contentFormat));
++    em.addText(kMeasContentFormat, cbor::uintVal(*m.contentFormat));
+     em.addText(kMeasValue, cbor::bytesVal(m.value));
+     return em.encode();
+ }
+diff --git a/spdmd/mock_attester/mock_attester.cpp b/spdmd/mock_attester/mock_attester.cpp
+index 3e8885f..36d34ef 100644
+--- a/spdmd/mock_attester/mock_attester.cpp
++++ b/spdmd/mock_attester/mock_attester.cpp
+@@ -277,7 +277,7 @@ struct MockAttester::Impl
+         std::vector<composite::LeadAttesterMeasurement> measurements;
+         {
+             composite::LeadAttesterMeasurement m;
+-            m.contentFormat = 0;
++            m.contentFormat = 42; // application/octet-stream
+             m.value.assign(bmcMeasurement.begin(), bmcMeasurement.end());
+             measurements.push_back(std::move(m));
+         }
+diff --git a/spdmd/platform_attester.hpp b/spdmd/platform_attester.hpp
+index 212262d..f7cbf79 100644
+--- a/spdmd/platform_attester.hpp
++++ b/spdmd/platform_attester.hpp
+@@ -49,9 +49,7 @@ enum class PlatformAttesterStatus
+ {
+     Unavailable,
+     Ready,
+-#ifdef ATTESTER_BACKEND_MOCK
+     SoftwareMock,
+-#endif
+ };
+ 
+ inline std::string_view toString(PlatformAttesterStatus status)
+@@ -62,10 +60,8 @@ inline std::string_view toString(PlatformAttesterStatus status)
+             return "Unavailable";
+         case PlatformAttesterStatus::Ready:
+             return "Ready";
+-#ifdef ATTESTER_BACKEND_MOCK
+         case PlatformAttesterStatus::SoftwareMock:
+             return "SoftwareMock";
+-#endif
+     }
+     return "Unavailable";
+ }
+diff --git a/spdmd/tests/composite/claims_set_builder_test.cpp b/spdmd/tests/composite/claims_set_builder_test.cpp
+index 9b0458a..e21d576 100644
+--- a/spdmd/tests/composite/claims_set_builder_test.cpp
++++ b/spdmd/tests/composite/claims_set_builder_test.cpp
+@@ -39,7 +39,7 @@ CollectedEvidence spdmDevice(bool withVca)
+     e.success = true;
+     e.pattern = EvidencePattern::SpdmMeasurements;
+     e.signedMeasurements = {0x01, 0x02, 0x03, 0x04};
+-    e.certChainSpdm = {0xAA, 0xBB, 0xCC};
++    e.certificateChainDer = {0x30, 0x01, 0xAA, 0x30, 0x01, 0xBB};
+     if (withVca)
+     {
+         e.vca = {0x10, 0x20};
+@@ -73,7 +73,9 @@ TEST(ClaimsSetBuilder, SpdmPatternFieldsNoVca)
+ 
+     auto cc = root->atText("cert_chain");
+     ASSERT_TRUE(cc && cc->isBytes());
+-    EXPECT_EQ(cc->bytes, (std::vector<std::uint8_t>{0xAA, 0xBB, 0xCC}));
++    EXPECT_EQ(cc->bytes,
++              (std::vector<std::uint8_t>{0x30, 0x01, 0xAA, 0x30, 0x01,
++                                         0xBB}));
+ 
+     EXPECT_EQ(root->atText("vca"), nullptr);
+ }
+@@ -115,6 +117,22 @@ TEST(ClaimsSetBuilder, TypedValuesWrapSpdmFields)
+     EXPECT_TRUE(sm->array[0]->isUint());
+     EXPECT_EQ(sm->array[0]->uarg, kCfSpdmMeasurements);
+     EXPECT_TRUE(sm->array[1]->isBytes());
++
++    auto certChain = root->atText("cert_chain");
++    ASSERT_TRUE(certChain && certChain->isArray());
++    ASSERT_EQ(certChain->array.size(), 2u);
++    EXPECT_EQ(certChain->array[0]->uarg,
++              kCfConcatenatedDerCertificates);
++    EXPECT_EQ(certChain->array[1]->bytes,
++              spdmDevice(false).certificateChainDer);
++}
++
++TEST(ClaimsSetBuilder, TypedValuesDoNotWrapDeviceEatFields)
++{
++    auto cs = buildClaimsSet(eatDevice(), /*typedValues=*/true);
++    auto root = cbortest::decode(cs);
++    auto token = root->atText("device_token");
++    ASSERT_TRUE(token && token->isBytes());
+ }
+ 
+ TEST(ClaimsSetBuilder, Deterministic)
+@@ -133,7 +151,7 @@ TEST(ClaimsSetBuilder, ThrowsOnEmptySignedMeasurements)
+ TEST(ClaimsSetBuilder, ThrowsOnEmptyCertChain)
+ {
+     auto e = spdmDevice(false);
+-    e.certChainSpdm.clear();
++    e.certificateChainDer.clear();
+     EXPECT_THROW(buildClaimsSet(e), std::invalid_argument);
+ }
+ 
+diff --git a/spdmd/tests/composite/collection_plan_test.cpp b/spdmd/tests/composite/collection_plan_test.cpp
+index b28e623..5f91483 100644
+--- a/spdmd/tests/composite/collection_plan_test.cpp
++++ b/spdmd/tests/composite/collection_plan_test.cpp
+@@ -31,13 +31,14 @@ namespace
+ 
+ TEST(CollectionPlan, EnvIdValidation)
+ {
+-    EXPECT_TRUE(CollectionPlan::isValidEnvId("env"));
+     EXPECT_TRUE(CollectionPlan::isValidEnvId("env.gpu.0"));
+     EXPECT_TRUE(CollectionPlan::isValidEnvId("env.nic.primary"));
+     EXPECT_TRUE(CollectionPlan::isValidEnvId("env.m2.boot"));
+     EXPECT_TRUE(CollectionPlan::isValidEnvId("env.pcie.4"));
++    EXPECT_TRUE(CollectionPlan::isValidEnvId("env.unknown.14"));
+ 
+     EXPECT_FALSE(CollectionPlan::isValidEnvId(""));
++    EXPECT_FALSE(CollectionPlan::isValidEnvId("env"));       // no target
+     EXPECT_FALSE(CollectionPlan::isValidEnvId("gpu.0"));     // no env prefix
+     EXPECT_FALSE(CollectionPlan::isValidEnvId("ENV.gpu.0")); // uppercase
+     EXPECT_FALSE(CollectionPlan::isValidEnvId("env.GPU"));   // uppercase
+@@ -115,6 +116,25 @@ TEST(CollectionPlan, FromJsonValid)
+     EXPECT_EQ(plan->resolveByEid(7), "env.unknown.7");
+ }
+ 
++TEST(CollectionPlan, ParseCompositeConfig)
++{
++    const std::string json = R"({
++        "allowUnknownEnvironments": true,
++        "skipDevices": [12, 64, 256, 4294967309, "bad"],
++        "environments": [
++            { "env": "env.gpu.0", "match": { "mctpEid": 13 } }
++        ]
++    })";
++
++    std::string err;
++    auto config = parseCompositeConfig(json, err);
++    ASSERT_TRUE(config.has_value()) << err;
++    EXPECT_TRUE(config->allowUnknownEnvironments);
++    EXPECT_EQ(config->skipDevices,
++              (std::vector<std::uint8_t>{12, 64}));
++    EXPECT_EQ(config->plan.resolveByEid(13), "env.gpu.0");
++}
++
+ TEST(CollectionPlan, FromJsonRejectsInvalidEnv)
+ {
+     const std::string json = R"({
+@@ -126,6 +146,27 @@ TEST(CollectionPlan, FromJsonRejectsInvalidEnv)
+     EXPECT_FALSE(err.empty());
+ }
+ 
++TEST(CollectionPlan, FromJsonRejectsMalformedMatch)
++{
++    const std::vector<std::string> invalid{
++        R"({"environments":[{"env":"env.gpu.0"}]})",
++        R"({"environments":[{"env":"env.gpu.0","match":[]}]})",
++        R"({"environments":[{"env":"env.gpu.0","match":{}}]})",
++        R"({"environments":[{"env":"env.gpu.0","match":{"unknown":1}}]})",
++        R"({"environments":[{"env":"env.gpu.0","match":{"mctpEid":269}}]})",
++        R"({"environments":[{"env":"env.gpu.0","match":{"mctpEid":4294967309}}]})",
++        R"({"environments":[{"env":"env.gpu.0","match":{"mctpEid":"13"}}]})",
++        R"({"environments":[{"env":"env.gpu.0","match":{"pcieBdf":1}}]})",
++    };
++
++    for (const auto& json : invalid)
++    {
++        std::string err;
++        EXPECT_FALSE(CollectionPlan::fromJson(json, err).has_value()) << json;
++        EXPECT_FALSE(err.empty()) << json;
++    }
++}
++
+ TEST(CollectionPlan, FromJsonEmptyPlanIsValid)
+ {
+     std::string err;
+diff --git a/spdmd/tests/composite/evidence_builder_test.cpp b/spdmd/tests/composite/evidence_builder_test.cpp
+index 570788b..b48ca9b 100644
+--- a/spdmd/tests/composite/evidence_builder_test.cpp
++++ b/spdmd/tests/composite/evidence_builder_test.cpp
+@@ -35,7 +35,7 @@ EvidenceBuilderInput baseSpdmInput()
+     input.spdmVersion = 0x12;
+     input.measurementSpecification = kSpdmMeasurementSpecDmtf;
+     input.signedMeasurements = {0x01, 0x02, 0x03};
+-    input.certificateChainObject = {0x30, 0x82, 0x01, 0x02};
++    input.certificateChainDer = {0x30, 0x82, 0x01, 0x02};
+     return input;
+ }
+ 
+@@ -52,7 +52,7 @@ TEST(EvidenceBuilder, RefreshFailurePropagatesError)
+     EXPECT_EQ(ev.errorMsg, "timeout");
+ }
+ 
+-TEST(EvidenceBuilder, SpdmEvidenceUsesRawCertificateChainObject)
++TEST(EvidenceBuilder, SpdmEvidenceUsesDerCertificateChain)
+ {
+     auto input = baseSpdmInput();
+     auto ev = buildCollectedEvidence(input);
+@@ -61,7 +61,7 @@ TEST(EvidenceBuilder, SpdmEvidenceUsesRawCertificateChainObject)
+     EXPECT_EQ(ev.pattern, EvidencePattern::SpdmMeasurements);
+     EXPECT_EQ(ev.signedMeasurements,
+               (std::vector<std::uint8_t>{0x01, 0x02, 0x03}));
+-    EXPECT_EQ(ev.certChainSpdm,
++    EXPECT_EQ(ev.certificateChainDer,
+               (std::vector<std::uint8_t>{0x30, 0x82, 0x01, 0x02}));
+     EXPECT_FALSE(ev.includeVca);
+ }
+@@ -98,14 +98,14 @@ TEST(EvidenceBuilder, MissingSignedMeasurementsFails)
+     EXPECT_EQ(ev.errorMsg, "missing SPDM signed measurements");
+ }
+ 
+-TEST(EvidenceBuilder, MissingCertificateChainObjectFails)
++TEST(EvidenceBuilder, MissingDerCertificateChainFails)
+ {
+     auto input = baseSpdmInput();
+-    input.certificateChainObject.clear();
++    input.certificateChainDer.clear();
+ 
+     auto ev = buildCollectedEvidence(input);
+     EXPECT_FALSE(ev.success);
+-    EXPECT_EQ(ev.errorMsg, "missing SPDM certificate chain object");
++    EXPECT_EQ(ev.errorMsg, "missing DER certificate chain");
+ }
+ 
+ TEST(EvidenceBuilder, EatMeasurementSpecWithTokenBuildsDeviceEatEvidence)
+@@ -120,7 +120,7 @@ TEST(EvidenceBuilder, EatMeasurementSpecWithTokenBuildsDeviceEatEvidence)
+     EXPECT_EQ(ev.deviceTokenFormat, "application/eat+cwt");
+     EXPECT_EQ(ev.deviceToken, (std::vector<std::uint8_t>{0xD8, 0x3D, 0x84}));
+     EXPECT_TRUE(ev.signedMeasurements.empty());
+-    EXPECT_TRUE(ev.certChainSpdm.empty());
++    EXPECT_TRUE(ev.certificateChainDer.empty());
+ }
+ 
+ TEST(EvidenceBuilder, UnknownEnvironmentDetection)
+diff --git a/spdmd/tests/composite/meson.build b/spdmd/tests/composite/meson.build
+index 6d6857c..56c8db4 100644
+--- a/spdmd/tests/composite/meson.build
++++ b/spdmd/tests/composite/meson.build
+@@ -12,7 +12,6 @@ composite_unit_tests = {
+     'bundle_assembler_test': files('bundle_assembler_test.cpp'),
+     'evidence_builder_test': files('evidence_builder_test.cpp'),
+     'evidence_pattern_test': files('evidence_pattern_test.cpp'),
+-    'pem_test': files('pem_test.cpp'),
+ }
+ 
+ foreach test_name, test_sources : composite_unit_tests
+diff --git a/spdmd/tests/composite/pem_test.cpp b/spdmd/tests/composite/pem_test.cpp
+deleted file mode 100644
+index 76ab49c..0000000
+--- a/spdmd/tests/composite/pem_test.cpp
++++ /dev/null
+@@ -1,71 +0,0 @@
+-/*
+- * SPDX-FileCopyrightText: Copyright (c) 2022-2024 NVIDIA CORPORATION &
+- * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- * http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-// Unit test for composite::pemToDerConcat — round-trips a known DER cert
+-// through PEM and back, and concatenates a 2-cert chain.
+-
+-#include "composite/pem.hpp"
+-
+-#include <mbedtls/base64.h>
+-
+-#include <string>
+-#include <vector>
+-
+-#include <gtest/gtest.h>
+-
+-namespace spdmd::composite
+-{
+-namespace
+-{
+-
+-std::string pemOf(const std::vector<std::uint8_t>& der)
+-{
+-    std::size_t n = 0;
+-    mbedtls_base64_encode(nullptr, 0, &n, der.data(), der.size());
+-    std::string b64(n, '\0');
+-    std::size_t w = 0;
+-    mbedtls_base64_encode(reinterpret_cast<unsigned char*>(b64.data()),
+-                          b64.size(), &w, der.data(), der.size());
+-    b64.resize(w);
+-    return "-----BEGIN CERTIFICATE-----\n" + b64 +
+-           "\n-----END CERTIFICATE-----\n";
+-}
+-
+-TEST(Pem, SingleCertRoundTrips)
+-{
+-    std::vector<std::uint8_t> der{0x30, 0x82, 0x01, 0x02, 0xDE, 0xAD};
+-    auto out = pemToDerConcat(pemOf(der));
+-    EXPECT_EQ(out, der);
+-}
+-
+-TEST(Pem, ConcatenatesChain)
+-{
+-    std::vector<std::uint8_t> a{0x30, 0x03, 0x01, 0x02, 0x03};
+-    std::vector<std::uint8_t> b{0x30, 0x02, 0xAA, 0xBB};
+-    auto out = pemToDerConcat(pemOf(a) + pemOf(b));
+-    std::vector<std::uint8_t> expect = a;
+-    expect.insert(expect.end(), b.begin(), b.end());
+-    EXPECT_EQ(out, expect);
+-}
+-
+-TEST(Pem, EmptyOnNoCerts)
+-{
+-    EXPECT_TRUE(pemToDerConcat("no certs here").empty());
+-}
+-
+-} // namespace
+-} // namespace spdmd::composite
+diff --git a/spdmd/tests/composite/run_standalone_tests.sh b/spdmd/tests/composite/run_standalone_tests.sh
+index 81dc2cb..ee0cbd9 100755
+--- a/spdmd/tests/composite/run_standalone_tests.sh
++++ b/spdmd/tests/composite/run_standalone_tests.sh
+@@ -31,7 +31,6 @@ SRCS=(
+   "$SPDMD/composite/evidence_builder.cpp"
+   "$SPDMD/composite/bundle_assembler.cpp"
+   "$SPDMD/composite/composite_orchestrator.cpp"
+-  "$SPDMD/composite/pem.cpp"
+   "$SPDMD/mock_attester/eat_builder.cpp"
+   "$SPDMD/mock_attester/mock_attester.cpp"
+   "$TCBOR/cborencoder.c"
+@@ -58,7 +57,6 @@ declare -A TESTS=(
+   [evidence_builder_test]="$SPDMD/tests/composite/evidence_builder_test.cpp"
+   [bundle_assembler_test]="$SPDMD/tests/composite/bundle_assembler_test.cpp"
+   [evidence_pattern_test]="$SPDMD/tests/composite/evidence_pattern_test.cpp"
+-  [pem_test]="$SPDMD/tests/composite/pem_test.cpp"
+   [eat_builder_test]="$SPDMD/tests/mock_attester/eat_builder_test.cpp"
+   [mock_attester_test]="$SPDMD/tests/mock_attester/mock_attester_test.cpp"
+   [composite_orchestrator_test]="$SPDMD/tests/mock_attester/composite_orchestrator_test.cpp"
+@@ -72,7 +70,7 @@ echo "== running tests =="
+ rc=0
+ for name in cbor_det_test claims_set_builder_test submodule_digest_test \
+             collection_plan_test evidence_builder_test bundle_assembler_test \
+-            evidence_pattern_test pem_test eat_builder_test \
++            evidence_pattern_test eat_builder_test \
+             mock_attester_test composite_orchestrator_test; do
+   echo "---- $name ----"
+   "$OUT/$name" --gtest_brief=0 2>&1 | tail -4 || rc=1
+diff --git a/spdmd/tests/composite/submodule_digest_test.cpp b/spdmd/tests/composite/submodule_digest_test.cpp
+index 5a46e2b..436afbb 100644
+--- a/spdmd/tests/composite/submodule_digest_test.cpp
++++ b/spdmd/tests/composite/submodule_digest_test.cpp
+@@ -70,7 +70,7 @@ TEST(SubmoduleDigest, RecordMatchesClaimsSetDigest)
+     e.success = true;
+     e.pattern = EvidencePattern::SpdmMeasurements;
+     e.signedMeasurements = {0x01, 0x02, 0x03};
+-    e.certChainSpdm = {0xAA, 0xBB};
++    e.certificateChainDer = {0x30, 0x01, 0xAA};
+ 
+     auto cs = buildClaimsSet(e);
+     auto rec = makeSubmoduleRecord(e.environmentId, cs);
+@@ -91,7 +91,7 @@ TEST(SubmoduleDigest, DigestIsOverUnwrappedBytes)
+     CollectedEvidence a;
+     a.success = true;
+     a.signedMeasurements = {0x01};
+-    a.certChainSpdm = {0x02};
++    a.certificateChainDer = {0x30, 0x01, 0x02};
+     CollectedEvidence b = a;
+     b.signedMeasurements = {0x09};
+ 
+diff --git a/spdmd/tests/mock_attester/composite_orchestrator_test.cpp b/spdmd/tests/mock_attester/composite_orchestrator_test.cpp
+index 9c8a7c5..c377647 100644
+--- a/spdmd/tests/mock_attester/composite_orchestrator_test.cpp
++++ b/spdmd/tests/mock_attester/composite_orchestrator_test.cpp
+@@ -46,7 +46,7 @@ composite::CollectedEvidence spdmDev(const std::string& env, std::uint8_t eid,
+     e.success = true;
+     e.pattern = composite::EvidencePattern::SpdmMeasurements;
+     e.signedMeasurements = {fill, std::uint8_t(fill + 1), 0x03};
+-    e.certChainSpdm = {0xAA, fill};
++    e.certificateChainDer = {0x30, 0x01, fill};
+     return e;
+ }
+ 
+@@ -105,6 +105,10 @@ TEST(CompositeOrchestrator, PartialSuccessExcludesFailedDevice)
+     EXPECT_EQ(res.status.devicesSucceeded, 1u);
+     EXPECT_EQ(res.status.devicesFailed, 1u);
+     EXPECT_EQ(res.status.toStatusString(), "PartialSuccess");
++    ASSERT_EQ(res.status.deviceFailures.size(), 1u);
++    EXPECT_EQ(res.status.deviceFailures[0].eid, 64u);
++    EXPECT_EQ(res.status.deviceFailures[0].environmentId, "env.nic.0");
++    EXPECT_EQ(res.status.deviceFailures[0].errorMsg, "collection failed");
+ 
+     // The failed device must appear in neither submods nor the detached
+     // Claims-Set map.
+@@ -114,6 +118,57 @@ TEST(CompositeOrchestrator, PartialSuccessExcludesFailedDevice)
+     EXPECT_EQ(csMap->atText("env.nic.0"), nullptr);
+ }
+ 
++TEST(CompositeOrchestrator, AllFailedDevicesStillProduceBundle)
++{
++    mock_attester::MockAttester att;
++    CompositeOrchestrator orch(att);
++    std::vector<composite::CollectedEvidence> evs{
++        failedDev("env.gpu.0", 13), failedDev("env.nic.0", 64)};
++
++    auto res = orch.produce(nonce(0x03), evs);
++
++    ASSERT_TRUE(res.success) << res.errorMsg;
++    EXPECT_EQ(res.status.devicesSucceeded, 0u);
++    EXPECT_EQ(res.status.devicesFailed, 2u);
++    EXPECT_EQ(res.status.toStatusString(), "PartialSuccess");
++    auto bundle = cbortest::decode(res.bundle);
++    auto csMap = bundle->tagged->array[1];
++    ASSERT_TRUE(csMap->isMap());
++    EXPECT_TRUE(csMap->map.empty());
++}
++
++TEST(CompositeOrchestrator, EmptyEvidenceStillProducesBundle)
++{
++    mock_attester::MockAttester att;
++    CompositeOrchestrator orch(att);
++    std::vector<composite::CollectedEvidence> evs;
++
++    auto res = orch.produce(nonce(0x04), evs);
++
++    ASSERT_TRUE(res.success) << res.errorMsg;
++    EXPECT_EQ(res.status.toStatusString(), "Success");
++    auto bundle = cbortest::decode(res.bundle);
++    EXPECT_TRUE(bundle->tagged->array[1]->map.empty());
++}
++
++TEST(CompositeOrchestrator, MalformedEvidenceReportsFailureReason)
++{
++    mock_attester::MockAttester att;
++    CompositeOrchestrator orch(att);
++    auto malformed = spdmDev("env.gpu.0", 13, 0x10);
++    malformed.signedMeasurements.clear();
++    std::vector<composite::CollectedEvidence> evs{std::move(malformed)};
++
++    auto res = orch.produce(nonce(0x05), evs);
++
++    ASSERT_TRUE(res.success) << res.errorMsg;
++    ASSERT_EQ(res.status.deviceFailures.size(), 1u);
++    EXPECT_EQ(res.status.deviceFailures[0].environmentId, "env.gpu.0");
++    EXPECT_NE(res.status.deviceFailures[0].errorMsg.find(
++                  "signed_measurements is empty"),
++              std::string::npos);
++}
++
+ // The core the composite attestation profile step-7 verifier check.
+ TEST(CompositeOrchestrator, SubmodDigestsMatchDetachedClaimsSets)
+ {
+diff --git a/spdmd/tests/mock_attester/eat_builder_test.cpp b/spdmd/tests/mock_attester/eat_builder_test.cpp
+index b7017dd..1169891 100644
+--- a/spdmd/tests/mock_attester/eat_builder_test.cpp
++++ b/spdmd/tests/mock_attester/eat_builder_test.cpp
+@@ -69,7 +69,7 @@ std::vector<std::uint8_t> buildSample(bool withCorim,
+     std::vector<std::uint8_t> ueid{0x01, 0x02, 0x03, 0x04};
+     std::vector<LeadAttesterMeasurement> meas;
+     LeadAttesterMeasurement m;
+-    m.contentFormat = 0;
++    m.contentFormat = 42;
+     m.value = {0xDE, 0xAD, 0xBE, 0xEF};
+     meas.push_back(m);
+ 
+@@ -143,11 +143,25 @@ TEST(EatBuilder, MeasurementsArrayShape)
+     ASSERT_TRUE(entry->isMap());
+     auto cf = entry->atText("content-format");
+     ASSERT_TRUE(cf && cf->isUint());
++    EXPECT_EQ(cf->uarg, 42u);
+     auto val = entry->atText("value");
+     ASSERT_TRUE(val && val->isBytes());
+     EXPECT_EQ(val->bytes, (std::vector<std::uint8_t>{0xDE, 0xAD, 0xBE, 0xEF}));
+ }
+ 
++TEST(EatBuilder, MeasurementRequiresContentFormat)
++{
++    auto nonce = nonceFill(0xAB);
++    std::vector<std::uint8_t> ueid{0x01};
++    std::vector<LeadAttesterMeasurement> meas(1);
++    meas[0].value = {0xDE};
++
++    EXPECT_THROW(buildCompositeClaims(
++                     std::span<const std::uint8_t, 32>{nonce}, ueid,
++                     "tag:example,2026:profile", {}, meas, std::nullopt),
++                 std::invalid_argument);
++}
++
+ TEST(EatBuilder, OptionalCorimLocator)
+ {
+     std::vector<SubmoduleRecord> recs{recordFor("env.gpu.0", 0x11)};
+-- 
+2.43.0
+

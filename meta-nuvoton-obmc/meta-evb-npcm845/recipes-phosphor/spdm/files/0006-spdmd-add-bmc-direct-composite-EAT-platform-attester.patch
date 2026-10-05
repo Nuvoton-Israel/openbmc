@@ -1,0 +1,633 @@
+From a21445178af611a7bf95d06ae3b9d202df8986ae Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Mon, 21 Sep 2026 14:09:00 +0800
+Subject: [PATCH] spdmd: add bmc-direct composite EAT platform attester backend
+
+Add the bmc_direct PlatformAttester backend, selected with
+-Dattester-backend=bmc-direct-composite-eat. It encodes the composite EAT
+request and submits it to the NPCM iRoT through the /dev/npcm-composite-eat
+ioctl interface provided by the kernel mailbox client.
+
+Vendor include/uapi/linux/npcm-composite-eat.h under
+spdmd/bmc_direct/linux/ because linux-libc-headers does not export it.
+It must stay identical to the kernel copy.
+
+Upstream-Status: Pending
+---
+ meson_options.txt                             |   2 +-
+ .../bmc_direct_composite_eat_transport.cpp    | 140 ++++++++++++++++++
+ .../bmc_direct_composite_eat_transport.hpp    |  59 ++++++++
+ .../bmc_direct_platform_attester.cpp          |  65 ++++++++
+ .../bmc_direct_platform_attester.hpp          |  30 ++++
+ spdmd/bmc_direct/linux/npcm-composite-eat.h   |  57 +++++++
+ spdmd/bmc_direct/meson.build                  |  23 +++
+ spdmd/bmc_direct/request_encoder.cpp          |  87 +++++++++++
+ spdmd/bmc_direct/request_encoder.hpp          |  22 +++
+ spdmd/meson.build                             |   5 +
+ spdmd/spdmd.cpp                               |  14 ++
+ 11 files changed, 503 insertions(+), 1 deletion(-)
+ create mode 100644 spdmd/bmc_direct/bmc_direct_composite_eat_transport.cpp
+ create mode 100644 spdmd/bmc_direct/bmc_direct_composite_eat_transport.hpp
+ create mode 100644 spdmd/bmc_direct/bmc_direct_platform_attester.cpp
+ create mode 100644 spdmd/bmc_direct/bmc_direct_platform_attester.hpp
+ create mode 100644 spdmd/bmc_direct/linux/npcm-composite-eat.h
+ create mode 100644 spdmd/bmc_direct/meson.build
+ create mode 100644 spdmd/bmc_direct/request_encoder.cpp
+ create mode 100644 spdmd/bmc_direct/request_encoder.hpp
+
+diff --git a/meson_options.txt b/meson_options.txt
+index 952e5e9..c83ae15 100644
+--- a/meson_options.txt
++++ b/meson_options.txt
+@@ -21,4 +21,4 @@ option('csm_service_enabled', type: 'feature', description: 'Skip check for ccsm
+ # Composite attestation (BMC-mediated platform composite attestation).
+ option('composite-attestation', type: 'feature', value: 'disabled', description: 'Build BMC-mediated composite attestation producer')
+ # Selects the Lead Attester backend that signs the composite EAT.
+-option('attester-backend', type: 'combo', choices: ['none', 'mock'], value: 'none', description: 'Lead Attester backend for composite attestation')
++option('attester-backend', type: 'combo', choices: ['none', 'mock', 'bmc-direct-composite-eat'], value: 'none', description: 'Lead Attester backend for composite attestation')
+diff --git a/spdmd/bmc_direct/bmc_direct_composite_eat_transport.cpp b/spdmd/bmc_direct/bmc_direct_composite_eat_transport.cpp
+new file mode 100644
+index 0000000..342394e
+--- /dev/null
++++ b/spdmd/bmc_direct/bmc_direct_composite_eat_transport.cpp
+@@ -0,0 +1,140 @@
++// SPDX-License-Identifier: Apache-2.0
++// Copyright (c) 2026 spdm contributors
++
++#include "bmc_direct_composite_eat_transport.hpp"
++
++#include <fcntl.h>
++#include <linux/npcm-composite-eat.h>
++#include <sys/ioctl.h>
++#include <unistd.h>
++
++#include <cerrno>
++#include <cstring>
++#include <limits>
++#include <string_view>
++
++namespace spdmd::bmc_direct
++{
++
++namespace
++{
++
++static_assert(sizeof(npcm_composite_eat_io) == 48);
++
++class LinuxBmcDirectCompositeEatSyscalls : public BmcDirectCompositeEatSyscalls
++{
++  public:
++    int open(const char* path, int flags) override
++    {
++        return ::open(path, flags);
++    }
++
++    int ioctl(int fd, unsigned long request, void* argument) override
++    {
++        return ::ioctl(fd, request, argument);
++    }
++
++    int close(int fd) override
++    {
++        return ::close(fd);
++    }
++};
++
++std::string systemError(std::string_view operation, int error)
++{
++    return std::string{operation} + ": " + std::strerror(error);
++}
++
++} // namespace
++
++BmcDirectCompositeEatTransport::BmcDirectCompositeEatTransport(
++    std::string devicePath,
++    std::shared_ptr<BmcDirectCompositeEatSyscalls> calls) :
++    syscalls(calls ? std::move(calls)
++                   : std::make_shared<LinuxBmcDirectCompositeEatSyscalls>())
++{
++    fd = syscalls->open(devicePath.c_str(), O_RDWR | O_CLOEXEC);
++    if (fd < 0)
++    {
++        openError = systemError("open " + devicePath, errno);
++    }
++}
++
++BmcDirectCompositeEatTransport::~BmcDirectCompositeEatTransport()
++{
++    if (fd >= 0)
++    {
++        syscalls->close(fd);
++    }
++}
++
++bool BmcDirectCompositeEatTransport::isReady() const
++{
++    return fd >= 0;
++}
++
++BmcDirectCompositeEatTransportResult BmcDirectCompositeEatTransport::submit(
++    std::span<const std::uint8_t> request, std::size_t responseCapacity)
++{
++    BmcDirectCompositeEatTransportResult result;
++    if (!isReady())
++    {
++        result.errorMsg = openError;
++        return result;
++    }
++    if (request.empty() || request.size() > kMaxRequestSize)
++    {
++        result.errorMsg = "composite EAT request length must be in 1..4096";
++        return result;
++    }
++    if (responseCapacity == 0 || responseCapacity > kMaxResponseSize ||
++        responseCapacity > std::numeric_limits<std::uint32_t>::max())
++    {
++        result.errorMsg = "composite EAT response capacity must be in 1..16384";
++        return result;
++    }
++
++    std::vector<std::uint8_t> response(responseCapacity);
++    npcm_composite_eat_io io{
++        .abi_version = NPCM_COMPOSITE_EAT_ABI_VERSION,
++        .reserved = 0,
++        .req_ptr = reinterpret_cast<std::uintptr_t>(request.data()),
++        .req_len = static_cast<std::uint32_t>(request.size()),
++        .reserved_req = 0,
++        .resp_ptr = reinterpret_cast<std::uintptr_t>(response.data()),
++        .resp_cap = static_cast<std::uint32_t>(response.size()),
++        .resp_len = 0,
++        .status = 0,
++        .reserved_resp = 0,
++    };
++
++    if (syscalls->ioctl(fd, NPCM_COMPOSITE_EAT_GENERATE, &io) < 0)
++    {
++        result.errorMsg = systemError("NPCM_COMPOSITE_EAT_GENERATE", errno);
++        return result;
++    }
++
++    result.status = io.status;
++    result.requiredResponseSize = io.resp_len;
++    if (io.status != NPCM_COMPOSITE_EAT_STATUS_OK)
++    {
++        result.errorMsg = "composite EAT generation failed with status " +
++                          std::to_string(io.status) + ", response length " +
++                          std::to_string(io.resp_len);
++        return result;
++    }
++    if (io.resp_len == 0 || io.resp_len > response.size())
++    {
++        result.errorMsg =
++            "composite EAT service returned invalid successful response length " +
++            std::to_string(io.resp_len);
++        return result;
++    }
++
++    response.resize(io.resp_len);
++    result.response = std::move(response);
++    result.success = true;
++    return result;
++}
++
++} // namespace spdmd::bmc_direct
+\ No newline at end of file
+diff --git a/spdmd/bmc_direct/bmc_direct_composite_eat_transport.hpp b/spdmd/bmc_direct/bmc_direct_composite_eat_transport.hpp
+new file mode 100644
+index 0000000..ed86f9e
+--- /dev/null
++++ b/spdmd/bmc_direct/bmc_direct_composite_eat_transport.hpp
+@@ -0,0 +1,59 @@
++// SPDX-License-Identifier: Apache-2.0
++// Copyright (c) 2026 spdm contributors
++
++#pragma once
++
++#include "request_encoder.hpp"
++
++#include <cstdint>
++#include <memory>
++#include <span>
++#include <string>
++#include <vector>
++
++namespace spdmd::bmc_direct
++{
++
++struct BmcDirectCompositeEatTransportResult
++{
++    std::vector<std::uint8_t> response;
++    std::uint32_t status = 0;
++    std::uint32_t requiredResponseSize = 0;
++    bool success = false;
++    std::string errorMsg;
++};
++
++class BmcDirectCompositeEatSyscalls
++{
++  public:
++    virtual ~BmcDirectCompositeEatSyscalls() = default;
++    virtual int open(const char* path, int flags) = 0;
++    virtual int ioctl(int fd, unsigned long request, void* argument) = 0;
++    virtual int close(int fd) = 0;
++};
++
++class BmcDirectCompositeEatTransport
++{
++  public:
++    explicit BmcDirectCompositeEatTransport(
++        std::string devicePath = "/dev/npcm-composite-eat",
++        std::shared_ptr<BmcDirectCompositeEatSyscalls> syscalls = {});
++    virtual ~BmcDirectCompositeEatTransport();
++
++    BmcDirectCompositeEatTransport(const BmcDirectCompositeEatTransport&) = delete;
++    BmcDirectCompositeEatTransport& operator=(const BmcDirectCompositeEatTransport&) = delete;
++    BmcDirectCompositeEatTransport(BmcDirectCompositeEatTransport&&) = delete;
++    BmcDirectCompositeEatTransport& operator=(BmcDirectCompositeEatTransport&&) = delete;
++
++    virtual bool isReady() const;
++    virtual BmcDirectCompositeEatTransportResult
++        submit(std::span<const std::uint8_t> request,
++               std::size_t responseCapacity = kMaxResponseSize);
++
++  private:
++    std::shared_ptr<BmcDirectCompositeEatSyscalls> syscalls;
++    int fd = -1;
++    std::string openError;
++};
++
++} // namespace spdmd::bmc_direct
+\ No newline at end of file
+diff --git a/spdmd/bmc_direct/bmc_direct_platform_attester.cpp b/spdmd/bmc_direct/bmc_direct_platform_attester.cpp
+new file mode 100644
+index 0000000..f8c1a42
+--- /dev/null
++++ b/spdmd/bmc_direct/bmc_direct_platform_attester.cpp
+@@ -0,0 +1,65 @@
++// SPDX-License-Identifier: Apache-2.0
++// Copyright (c) 2026 spdm contributors
++
++#include "bmc_direct_platform_attester.hpp"
++
++#include "request_encoder.hpp"
++
++#include <exception>
++#include <utility>
++
++namespace spdmd::bmc_direct
++{
++
++BmcDirectPlatformAttester::BmcDirectPlatformAttester() :
++    BmcDirectPlatformAttester(
++        std::make_unique<BmcDirectCompositeEatTransport>())
++{}
++
++BmcDirectPlatformAttester::BmcDirectPlatformAttester(
++    std::unique_ptr<BmcDirectCompositeEatTransport> compositeEatTransport) :
++    transport(std::move(compositeEatTransport))
++{}
++
++composite::CompositeEatResponse BmcDirectPlatformAttester::generateCompositeEat(
++    const composite::CompositeEatRequest& request)
++{
++    composite::CompositeEatResponse result;
++    if (getStatus() != PlatformAttesterStatus::Ready)
++    {
++        result.errorMsg = "BMC_DIRECT Platform Attester is offline";
++        return result;
++    }
++
++    std::vector<std::uint8_t> encoded;
++    try
++    {
++        encoded = encodeRequest(request);
++    }
++    catch (const std::exception& error)
++    {
++        result.errorMsg = error.what();
++        return result;
++    }
++
++    BmcDirectCompositeEatTransportResult transportResult =
++        transport->submit(encoded);
++    if (!transportResult.success)
++    {
++        result.errorMsg = std::move(transportResult.errorMsg);
++        return result;
++    }
++
++    result.compositeEat = std::move(transportResult.response);
++    result.success = true;
++    return result;
++}
++
++PlatformAttesterStatus BmcDirectPlatformAttester::getStatus() const
++{
++    return (transport && transport->isReady())
++               ? PlatformAttesterStatus::Ready
++               : PlatformAttesterStatus::Unavailable;
++}
++
++} // namespace spdmd::bmc_direct
+\ No newline at end of file
+diff --git a/spdmd/bmc_direct/bmc_direct_platform_attester.hpp b/spdmd/bmc_direct/bmc_direct_platform_attester.hpp
+new file mode 100644
+index 0000000..89bec01
+--- /dev/null
++++ b/spdmd/bmc_direct/bmc_direct_platform_attester.hpp
+@@ -0,0 +1,30 @@
++// SPDX-License-Identifier: Apache-2.0
++// Copyright (c) 2026 spdm contributors
++
++#pragma once
++
++#include "bmc_direct_composite_eat_transport.hpp"
++#include "platform_attester.hpp"
++
++#include <memory>
++#include <string>
++
++namespace spdmd::bmc_direct
++{
++
++class BmcDirectPlatformAttester : public PlatformAttester
++{
++  public:
++    BmcDirectPlatformAttester();
++    explicit BmcDirectPlatformAttester(
++        std::unique_ptr<BmcDirectCompositeEatTransport> compositeEatTransport);
++
++    composite::CompositeEatResponse generateCompositeEat(
++        const composite::CompositeEatRequest& request) override;
++    PlatformAttesterStatus getStatus() const override;
++
++  private:
++    std::unique_ptr<BmcDirectCompositeEatTransport> transport;
++};
++
++} // namespace spdmd::bmc_direct
+\ No newline at end of file
+diff --git a/spdmd/bmc_direct/linux/npcm-composite-eat.h b/spdmd/bmc_direct/linux/npcm-composite-eat.h
+new file mode 100644
+index 0000000..d71634d
+--- /dev/null
++++ b/spdmd/bmc_direct/linux/npcm-composite-eat.h
+@@ -0,0 +1,57 @@
++/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
++#ifndef _UAPI_LINUX_NPCM_COMPOSITE_EAT_H
++#define _UAPI_LINUX_NPCM_COMPOSITE_EAT_H
++
++#include <linux/ioctl.h>
++#include <linux/types.h>
++
++#define NPCM_COMPOSITE_EAT_ABI_VERSION 1
++#define NPCM_COMPOSITE_EAT_IOCTL_MAGIC 0xE6
++
++enum npcm_composite_eat_status {
++	NPCM_COMPOSITE_EAT_STATUS_OK = 0,
++	NPCM_COMPOSITE_EAT_STATUS_BAD_VERSION = 1,
++	NPCM_COMPOSITE_EAT_STATUS_BAD_REQUEST = 2,
++	NPCM_COMPOSITE_EAT_STATUS_TOO_MANY_RECORDS = 3,
++	NPCM_COMPOSITE_EAT_STATUS_REQUEST_TOO_LARGE = 4,
++	NPCM_COMPOSITE_EAT_STATUS_RESPONSE_TOO_SMALL = 5,
++	NPCM_COMPOSITE_EAT_STATUS_ADDRESS_INVALID = 6,
++	NPCM_COMPOSITE_EAT_STATUS_SIGN_FAILED = 7,
++	NPCM_COMPOSITE_EAT_STATUS_BUSY = 8,
++	NPCM_COMPOSITE_EAT_STATUS_INTERNAL = 9,
++	NPCM_COMPOSITE_EAT_STATUS_UNSUPPORTED = 10,
++};
++
++/**
++ * struct npcm_composite_eat_io - Generate a signed Composite EAT.
++ * @abi_version: Must be %NPCM_COMPOSITE_EAT_ABI_VERSION.
++ * @reserved: Must be zero.
++ * @req_ptr: Userspace pointer to the encoded request.
++ * @req_len: Request length in bytes.
++ * @reserved_req: Must be zero.
++ * @resp_ptr: Userspace pointer to the response buffer.
++ * @resp_cap: Response buffer capacity in bytes.
++ * @resp_len: Actual response length, or required length when @status is
++ *            %NPCM_COMPOSITE_EAT_STATUS_RESPONSE_TOO_SMALL.
++ * @status: Firmware status from &enum npcm_composite_eat_status. A valid
++ *          nonzero firmware status is returned with an ioctl return value of
++ *          zero so userspace can inspect @status and @resp_len.
++ * @reserved_resp: Must be zero.
++ */
++struct npcm_composite_eat_io {
++	__u32 abi_version;
++	__u32 reserved;
++	__aligned_u64 req_ptr;
++	__u32 req_len;
++	__u32 reserved_req;
++	__aligned_u64 resp_ptr;
++	__u32 resp_cap;
++	__u32 resp_len;
++	__u32 status;
++	__u32 reserved_resp;
++};
++
++#define NPCM_COMPOSITE_EAT_GENERATE \
++	_IOWR(NPCM_COMPOSITE_EAT_IOCTL_MAGIC, 1, struct npcm_composite_eat_io)
++
++#endif /* _UAPI_LINUX_NPCM_COMPOSITE_EAT_H */
+diff --git a/spdmd/bmc_direct/meson.build b/spdmd/bmc_direct/meson.build
+new file mode 100644
+index 0000000..1848b45
+--- /dev/null
++++ b/spdmd/bmc_direct/meson.build
+@@ -0,0 +1,23 @@
++# SPDX-License-Identifier: Apache-2.0
++
++bmc_direct_inc = include_directories('.', '..')
++
++bmc_direct_lib = static_library(
++    'bmc_direct_attester',
++    files(
++        'request_encoder.cpp',
++        'bmc_direct_composite_eat_transport.cpp',
++        'bmc_direct_platform_attester.cpp',
++    ),
++    implicit_include_directories: false,
++    include_directories: bmc_direct_inc,
++    dependencies: [composite_dep],
++    cpp_args: ['-DATTESTER_BACKEND_BMC_DIRECT'],
++)
++
++bmc_direct_dep = declare_dependency(
++    include_directories: bmc_direct_inc,
++    link_with: bmc_direct_lib,
++    dependencies: [composite_dep],
++    compile_args: ['-DATTESTER_BACKEND_BMC_DIRECT'],
++)
+\ No newline at end of file
+diff --git a/spdmd/bmc_direct/request_encoder.cpp b/spdmd/bmc_direct/request_encoder.cpp
+new file mode 100644
+index 0000000..d4899e4
+--- /dev/null
++++ b/spdmd/bmc_direct/request_encoder.cpp
+@@ -0,0 +1,87 @@
++// SPDX-License-Identifier: Apache-2.0
++// Copyright (c) 2026 spdm contributors
++
++#include "request_encoder.hpp"
++
++#include "composite/cbor_det.hpp"
++#include "composite/collection_plan.hpp"
++
++#include <stdexcept>
++#include <string>
++#include <unordered_set>
++#include <vector>
++
++namespace spdmd::bmc_direct
++{
++
++namespace
++{
++
++constexpr std::uint64_t kAbiVersion = 1;
++std::vector<std::uint8_t> encodeRecord(const composite::SubmoduleRecord& record)
++{
++    if (!composite::CollectionPlan::isValidEnvId(record.environmentId))
++    {
++        throw std::invalid_argument(
++            "composite EAT environment ID must match the env.* grammar");
++    }
++    if (record.hashAlgId != composite::kCoseAlgSha384)
++    {
++        throw std::invalid_argument(
++            "composite EAT device record digest algorithm must be COSE SHA-384 (-43)");
++    }
++
++    std::vector<std::vector<std::uint8_t>> digest;
++    digest.push_back(composite::cbor::intVal(record.hashAlgId));
++    digest.push_back(composite::cbor::bytesVal(record.digest));
++
++    composite::cbor::Map encoded;
++    encoded.addInt(1, composite::cbor::textVal(record.environmentId));
++    encoded.addInt(2, composite::cbor::arrayVal(digest));
++    return encoded.encode();
++}
++
++} // namespace
++
++std::vector<std::uint8_t>
++    encodeRequest(const composite::CompositeEatRequest& request)
++{
++    if (request.deviceRecords.empty() ||
++        request.deviceRecords.size() > kMaxDeviceRecords)
++    {
++        throw std::invalid_argument(
++            "composite EAT request requires 1..64 device records");
++    }
++    if (request.platformCorimLocator)
++    {
++        throw std::invalid_argument(
++            "BMC_DIRECT composite EAT ABI v1 does not support a Platform CoRIM locator");
++    }
++
++    std::vector<std::vector<std::uint8_t>> records;
++    records.reserve(request.deviceRecords.size());
++    std::unordered_set<std::string> environmentIds;
++    for (const auto& record : request.deviceRecords)
++    {
++        if (!environmentIds.insert(record.environmentId).second)
++        {
++            throw std::invalid_argument(
++                "composite EAT request contains a duplicate environment ID");
++        }
++        records.push_back(encodeRecord(record));
++    }
++
++    composite::cbor::Map encoded;
++    encoded.addInt(1, composite::cbor::uintVal(kAbiVersion));
++    encoded.addInt(2, composite::cbor::bytesVal(request.nonce));
++    encoded.addInt(3, composite::cbor::arrayVal(records));
++
++    std::vector<std::uint8_t> result = encoded.encode();
++    if (result.size() > kMaxRequestSize)
++    {
++        throw std::length_error("composite EAT request exceeds 4096 bytes");
++    }
++    return result;
++}
++
++} // namespace spdmd::bmc_direct
+\ No newline at end of file
+diff --git a/spdmd/bmc_direct/request_encoder.hpp b/spdmd/bmc_direct/request_encoder.hpp
+new file mode 100644
+index 0000000..9c33ddf
+--- /dev/null
++++ b/spdmd/bmc_direct/request_encoder.hpp
+@@ -0,0 +1,22 @@
++// SPDX-License-Identifier: Apache-2.0
++// Copyright (c) 2026 spdm contributors
++
++#pragma once
++
++#include "composite/types.hpp"
++
++#include <cstddef>
++#include <cstdint>
++#include <vector>
++
++namespace spdmd::bmc_direct
++{
++
++inline constexpr std::size_t kMaxRequestSize = 0x1000;
++inline constexpr std::size_t kMaxResponseSize = 0x4000;
++inline constexpr std::size_t kMaxDeviceRecords = 64;
++
++std::vector<std::uint8_t>
++    encodeRequest(const composite::CompositeEatRequest& request);
++
++} // namespace spdmd::bmc_direct
+\ No newline at end of file
+diff --git a/spdmd/meson.build b/spdmd/meson.build
+index 6b6c3fb..273af28 100644
+--- a/spdmd/meson.build
++++ b/spdmd/meson.build
+@@ -20,6 +20,11 @@ if composite_attestation.enabled()
+         attester_extra_link += [mock_attester_lib]
+         attester_extra_deps += [mock_attester_dep]
+         attester_cpp_args += ['-DATTESTER_BACKEND_MOCK']
++    elif attester_backend == 'bmc-direct-composite-eat'
++        subdir('bmc_direct')
++        attester_extra_link += [bmc_direct_lib]
++        attester_extra_deps += [bmc_direct_dep]
++        attester_cpp_args += ['-DATTESTER_BACKEND_BMC_DIRECT']
+     endif
+ endif
+ 
+diff --git a/spdmd/spdmd.cpp b/spdmd/spdmd.cpp
+index 3454025..42b7673 100644
+--- a/spdmd/spdmd.cpp
++++ b/spdmd/spdmd.cpp
+@@ -29,6 +29,8 @@
+ 
+ #ifdef ATTESTER_BACKEND_MOCK
+ #include "mock_attester/mock_attester.hpp"
++#elif defined(ATTESTER_BACKEND_BMC_DIRECT)
++#include "bmc_direct/bmc_direct_platform_attester.hpp"
+ #endif
+ #endif
+ 
+@@ -78,6 +80,18 @@ std::unique_ptr<PlatformAttester> createConfiguredPlatformAttester()
+ #endif
+     }
+ 
++    if (backend == "bmc-direct-composite-eat")
++    {
++#ifdef ATTESTER_BACKEND_BMC_DIRECT
++        return std::make_unique<bmc_direct::BmcDirectPlatformAttester>();
++#else
++        std::cerr << "PlatformAttester: backend 'bmc-direct-composite-eat' "
++                     "requested but ATTESTER_BACKEND_BMC_DIRECT not compiled "
++                     "in.\n";
++        return nullptr;
++#endif
++    }
++
+     std::cerr << "PlatformAttester: unknown backend '" << backend << "'\n";
+     return nullptr;
+ }
