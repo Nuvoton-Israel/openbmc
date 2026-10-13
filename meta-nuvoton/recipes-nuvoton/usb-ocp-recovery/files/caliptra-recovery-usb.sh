@@ -2,22 +2,22 @@
 # Recover the Caliptra MCU over USB OCP, bring up MCTP-over-USB, then push a
 # PLDM firmware package to it.
 #
-# usage: caliptra-recovery-usb.sh [TFTP_SERVER]
-#   Fetches the firmware images from TFTP_SERVER (default: 192.168.1.100) into
-#   the current directory. usb_ocp_recovery and caliptra_mcu.cfg come from the
-#   image.
+# usage: caliptra-recovery-usb.sh [FW_DIR]
+#   Uses the firmware images installed in the image under FW_DIR (default:
+#   /usr/share/usb-ocp-recovery). usb_ocp_recovery and caliptra_mcu.cfg also
+#   come from the image.
 
 set -e
 
-TFTP_SERVER=${1:-192.168.1.100}
-PLDM_PKG=NPCM5_pldm.bin
+FW_DIR=${1:-/usr/share/usb-ocp-recovery}
+PLDM_PKG=$FW_DIR/NPCM5_pldm.bin
 MCTP_IF=mctpusb0
 WAIT_SEC=30
 
 die() { echo "error: $*" >&2; exit 1; }
 
-for f in runtime-npcm500.bin $PLDM_PKG soc_manifest.bin caliptra_fw.bin; do
-    tftp -g -r "$f" "$TFTP_SERVER" || die "tftp $f from $TFTP_SERVER failed"
+for f in runtime-npcm500.bin NPCM5_pldm.bin soc_manifest.bin caliptra_fw.bin; do
+    [ -r "$FW_DIR/$f" ] || die "missing firmware $FW_DIR/$f"
 done
 
 # The recovery device has no fixed bus/dev number, so find it as the usbfs node
@@ -41,7 +41,8 @@ while [ -z "$usbdev" ]; do
 done
 echo "recovery device: $usbdev"
 
-usb_ocp_recovery --fifo "$usbdev" caliptra_fw.bin soc_manifest.bin runtime-npcm500.bin
+usb_ocp_recovery --fifo "$usbdev" \
+    "$FW_DIR/caliptra_fw.bin" "$FW_DIR/soc_manifest.bin" "$FW_DIR/runtime-npcm500.bin"
 
 i=0
 until [ -e /sys/class/net/$MCTP_IF ]; do

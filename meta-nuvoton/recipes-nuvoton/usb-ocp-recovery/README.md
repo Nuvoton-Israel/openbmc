@@ -2,9 +2,9 @@
 
 Bench setup for recovering the NPCM500 Caliptra MCU over USB OCP from the NPCM845 (Arbel) BMC,
 then pushing a PLDM firmware package to it over MCTP-over-USB. The work is done by
-`caliptra-recovery-usb.sh`, which this recipe installs in the BMC image; this README documents
-what you have to provide around it. Bench-only files are in `bench/`; the recipe does not install
-them.
+`caliptra-recovery-usb.sh`, which this recipe installs in the BMC image together with the tested
+firmware images from `bench/` (in `/usr/share/usb-ocp-recovery/`); this README documents the setup
+around it.
 
 ## Bench setup
 
@@ -65,11 +65,12 @@ USB OCP recovery boot is enabled only when all three hold:
 
 ## What you need
 
-### 1. Firmware images on the TFTP server
+### 1. Firmware images
 
-The script downloads these four files by exact name. A missing or misnamed file stops it at the
-TFTP step. A tested set of all four is in `bench/`; rebuild them only to test new
-firmware.
+The script reads these four files by exact name from `/usr/share/usb-ocp-recovery/` on the BMC. A
+missing file stops it before anything is touched. A tested set of all four is in `bench/` and is
+installed into the image by the recipe; rebuild them only to test new firmware (replace the files
+in `bench/` and rebuild the image, or copy them to the BMC and pass that directory to the script).
 
 | File (exact name)       | Used for                                    | How to rebuild                         |
 |-------------------------|---------------------------------------------|----------------------------------------|
@@ -81,7 +82,7 @@ firmware.
 The three recovery images must come from the same build, because the SoC manifest authorizes that
 exact runtime.
 
-The package name is hard-coded as `PLDM_PKG` in the script. If your package has another name,
+The package name is hard-coded as `NPCM5_pldm.bin` in the script. If your package has another name,
 rename the file or edit `PLDM_PKG`.
 
 ### 2. In the BMC image (nothing to copy)
@@ -90,22 +91,22 @@ rename the file or edit `PLDM_PKG`.
 |----------------------------------------------|---------------------------------------------------|
 | `/usr/bin/caliptra-recovery-usb.sh`          | `usb-ocp-recovery` recipe                         |
 | `/usr/bin/usb_ocp_recovery`                  | `usb-ocp-recovery` recipe                         |
+| `/usr/share/usb-ocp-recovery/*.bin`          | `usb-ocp-recovery` recipe (from `bench/`)         |
 | `/usr/share/openocd/scripts/caliptra_mcu.cfg`| `openocd` bbappend (meta-evb-npcm845)             |
-| `openocd` with the `npcm_jtag` adapter       | `openocd` bbappend (meta-evb-npcm845)             |
-| `tftp`, `gpioset`, `mctp`, `mctpd`, `pldmd`, `busctl` | standard image packages                  |
+| `gpioset`, `mctp`, `mctpd`, `pldmd`, `busctl` | standard image packages                  |
 
 ## Usage
 
-1. Copy the four `.bin` files from `bench/` to the TFTP server root.
-2. On the BMC console, from a writable directory:
+On the BMC console:
 
-   ```sh
-   cd /tmp
-   caliptra-recovery-usb.sh 192.168.1.100   # TFTP server, default 192.168.1.100
-   ```
+```sh
+caliptra-recovery-usb.sh                  # uses /usr/share/usb-ocp-recovery
+caliptra-recovery-usb.sh /tmp/fw          # or another directory holding the four .bin files
+```
 
 ## What the script does
 
+1. Checks that the four firmware files exist in the firmware
 1. TFTP-fetches the four firmware files into the current directory.
 2. `gpioset 2 6=0` enables the Arbel JTAG master; OpenOCD pulses `0x400C3069` and resumes the MCU.
 3. Waits up to 30 s for a new `/dev/bus/usb/*/*` node (the recovery device has no fixed address).
@@ -114,4 +115,4 @@ rename the file or edit `PLDM_PKG`.
 6. Restarts `pldmd` and calls `StartUpdate` with the PLDM package, apply time `Immediate`.
 
 TFTP is unauthenticated, so use this only on an isolated bench network. The recovery images are
-still verified by Caliptra before they run.
+she recovery images are
