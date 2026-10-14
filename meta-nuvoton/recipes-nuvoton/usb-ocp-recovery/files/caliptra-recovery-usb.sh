@@ -4,8 +4,8 @@
 #
 # usage: caliptra-recovery-usb.sh [FW_DIR]
 #   Uses the firmware images installed in the image under FW_DIR (default:
-#   /usr/share/usb-ocp-recovery). usb_ocp_recovery and caliptra_mcu.cfg also
-#   come from the image.
+#   /usr/share/usb-ocp-recovery). usb_ocp_recovery, caliptra_mcu.cfg and
+#   rtc_switch.tcl also come from the image.
 #
 # Demo presentation (environment, all optional):
 #   DEMO_BIG=0        plain banners instead of DEC double-height lines, for
@@ -94,9 +94,12 @@ done
 before=$(ls /dev/bus/usb/*/* 2>/dev/null || true)
 
 gpioset 2 6=0
-openocd -f caliptra_mcu.cfg -c init \
+# No reset after the RTC switch: it re-locks the debug module (authenticated=0).
+openocd -f caliptra_mcu.cfg -f rtc_switch.tcl -c init \
+    -c "npcm500_switch_32k_to_rtc" \
     -c "mwb 0x400C3069 0x60" -c "mwb 0x400C3069 0x40" \
-    -c resume -c "riscv.tap.0 curstate" -c shutdown
+    -c resume -c "riscv.tap.0 curstate" -c shutdown \
+    || die "openocd RTC switch / MCU release failed"
 
 # ---------------------------------------------------------------------------
 banner "$C_TITLE" "Detecting USB OCP Recovery Device"
