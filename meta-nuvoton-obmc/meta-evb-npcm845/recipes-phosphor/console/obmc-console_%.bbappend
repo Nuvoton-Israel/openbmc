@@ -1,6 +1,7 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 
 SRC_URI:append = " file://80-evb-npcm845-sol.rules"
+SRC_URI:append = " file://0001-Support-arbitrary-UART-baud-rates.patch"
 
 
 # Remove what installed by common recipe

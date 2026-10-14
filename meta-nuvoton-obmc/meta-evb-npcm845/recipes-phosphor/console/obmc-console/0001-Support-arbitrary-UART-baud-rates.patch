@@ -1,0 +1,443 @@
+From c3e4143157e424d6d2cfe372e1ece3bfff4a7b21 Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Wed, 14 Oct 2026 14:20:42 +0800
+Subject: [PATCH] Support arbitrary UART baud rates
+
+The baud rate for the server tty ("baud") and the local tty
+("local-tty-baud"), as well as the D-Bus Baud property, were limited to
+the standard termios Bxxx rates. Some hosts use non-standard rates such
+as 134400, which could not be configured.
+
+Store baud rates as plain integers and program the tty through the
+Linux termios2 interface (TCGETS2/TCSETS2 with BOTHER), which accepts
+any rate the UART driver can approximate. Standard rates keep working
+unchanged.
+
+Upstream-Status: Pending
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ config.c         | 83 ++++++------------------------------------------
+ config.h         |  5 +--
+ console-dbus.c   | 13 +++-----
+ console-server.c | 13 ++++----
+ console-server.h |  4 +--
+ meson.build      |  1 +
+ tty-baud.c       | 46 +++++++++++++++++++++++++++
+ tty-baud.h       | 22 +++++++++++++
+ tty-handler.c    | 27 +++++-----------
+ 9 files changed, 100 insertions(+), 114 deletions(-)
+ create mode 100644 tty-baud.c
+ create mode 100644 tty-baud.h
+
+diff --git a/config.c b/config.c
+index 855ef38..bf1241e 100644
+--- a/config.c
++++ b/config.c
+@@ -24,7 +24,6 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <strings.h>
+-#include <termios.h> /* for speed_t */
+ #include <unistd.h>
+ 
+ #include <sys/mman.h>
+@@ -143,83 +142,19 @@ void config_fini(struct config *config)
+ 	free(config);
+ }
+ 
+-struct terminal_speed_name {
+-	speed_t speed;
+-	uint32_t baud;
+-	const char *name;
+-};
+-
+-#define TERM_SPEED(x) { B##x, x, #x }
+-
+-// clang-format off
+-static const struct terminal_speed_name terminal_speeds[] = {
+-	TERM_SPEED(50),
+-	TERM_SPEED(75),
+-	TERM_SPEED(110),
+-	TERM_SPEED(134),
+-	TERM_SPEED(150),
+-	TERM_SPEED(200),
+-	TERM_SPEED(300),
+-	TERM_SPEED(600),
+-	TERM_SPEED(1200),
+-	TERM_SPEED(1800),
+-	TERM_SPEED(2400),
+-	TERM_SPEED(4800),
+-	TERM_SPEED(9600),
+-	TERM_SPEED(19200),
+-	TERM_SPEED(38400),
+-	TERM_SPEED(57600),
+-	TERM_SPEED(115200),
+-	TERM_SPEED(230400),
+-	TERM_SPEED(460800),
+-	TERM_SPEED(500000),
+-	TERM_SPEED(576000),
+-	TERM_SPEED(921600),
+-	TERM_SPEED(1000000),
+-	TERM_SPEED(1152000),
+-	TERM_SPEED(1500000),
+-	TERM_SPEED(2000000),
+-	TERM_SPEED(2500000),
+-	TERM_SPEED(3000000),
+-	TERM_SPEED(3500000),
+-	TERM_SPEED(4000000),
+-};
+-// clang-format on
+-
+-int config_parse_baud(speed_t *speed, const char *baud_string)
++int config_parse_baud(uint32_t *baud, const char *baud_string)
+ {
+-	size_t i;
+-
+-	for (i = 0; i < ARRAY_SIZE(terminal_speeds); i++) {
+-		if (strcmp(baud_string, terminal_speeds[i].name) == 0) {
+-			*speed = terminal_speeds[i].speed;
+-			return 0;
+-		}
+-	}
+-	return -1;
+-}
++	unsigned long val;
++	char *endp;
+ 
+-uint32_t parse_baud_to_int(speed_t speed)
+-{
+-	size_t i;
+-
+-	for (i = 0; i < ARRAY_SIZE(terminal_speeds); i++) {
+-		if (terminal_speeds[i].speed == speed) {
+-			return terminal_speeds[i].baud;
+-		}
++	errno = 0;
++	val = strtoul(baud_string, &endp, 10);
++	if (errno || endp == baud_string || *endp != '\0' || val == 0 ||
++	    val > UINT32_MAX) {
++		return -1;
+ 	}
+-	return 0;
+-}
+-
+-speed_t parse_int_to_baud(uint32_t baud)
+-{
+-	size_t i;
+ 
+-	for (i = 0; i < ARRAY_SIZE(terminal_speeds); i++) {
+-		if (terminal_speeds[i].baud == baud) {
+-			return terminal_speeds[i].speed;
+-		}
+-	}
++	*baud = (uint32_t)val;
+ 	return 0;
+ }
+ 
+diff --git a/config.h b/config.h
+index 918ecc9..549a71b 100644
+--- a/config.h
++++ b/config.h
+@@ -19,7 +19,6 @@
+ 
+ #include <stddef.h>
+ #include <stdint.h>
+-#include <termios.h>
+ 
+ struct config;
+ 
+@@ -31,9 +30,7 @@ const char *config_resolve_console_id(struct config *config,
+ 				      const char *id_arg);
+ void config_fini(struct config *config);
+ 
+-int config_parse_baud(speed_t *speed, const char *baud_string);
+-uint32_t parse_baud_to_int(speed_t speed);
+-speed_t parse_int_to_baud(uint32_t baud);
++int config_parse_baud(uint32_t *baud, const char *baud_string);
+ int config_parse_bytesize(const char *size_str, size_t *size);
+ 
+ int config_count_sections(struct config *config);
+diff --git a/console-dbus.c b/console-dbus.c
+index 778f1cd..6277fc2 100644
+--- a/console-dbus.c
++++ b/console-dbus.c
+@@ -65,7 +65,6 @@ static int set_baud_handler(sd_bus *bus, const char *path,
+ {
+ 	struct console *console = userdata;
+ 	uint64_t baudrate;
+-	speed_t speed;
+ 	int r;
+ 
+ 	if (!console) {
+@@ -73,18 +72,17 @@ static int set_baud_handler(sd_bus *bus, const char *path,
+ 	}
+ 
+ 	r = sd_bus_message_read(msg, "t", &baudrate);
+-	if (r < 0 || baudrate > UINT32_MAX) {
++	if (r < 0) {
+ 		return -EINVAL;
+ 	}
+ 
+-	speed = parse_int_to_baud((uint32_t)baudrate);
+-	if (!speed) {
++	if (baudrate == 0 || baudrate > UINT32_MAX) {
+ 		warnx("Invalid baud rate: '%" PRIu64 "'", baudrate);
+ 		return -EINVAL;
+ 	}
+ 
+ 	assert(console->server->tty.type == TTY_DEVICE_UART);
+-	console->server->tty.uart.baud = speed;
++	console->server->tty.uart.baud = (uint32_t)baudrate;
+ 	tty_change_baudrate(console);
+ 
+ 	sd_bus_emit_properties_changed(bus, path, interface, property, NULL);
+@@ -105,10 +103,7 @@ static int get_baud_handler(sd_bus *bus __attribute__((unused)),
+ 	int r;
+ 
+ 	assert(server->tty.type == TTY_DEVICE_UART);
+-	baudrate = parse_baud_to_int(server->tty.uart.baud);
+-	if (!baudrate) {
+-		warnx("Invalid baud rate: '%d'", server->tty.uart.baud);
+-	}
++	baudrate = server->tty.uart.baud;
+ 
+ 	r = sd_bus_message_append(reply, "t", baudrate);
+ 
+diff --git a/console-server.c b/console-server.c
+index b38de9b..c446604 100644
+--- a/console-server.c
++++ b/console-server.c
+@@ -39,6 +39,7 @@
+ #include <poll.h>
+ 
+ #include "console-mux.h"
++#include "tty-baud.h"
+ 
+ #include "console-server.h"
+ #include "config.h"
+@@ -340,12 +341,6 @@ void tty_init_termios(struct console_server *server)
+ 		return;
+ 	}
+ 
+-	if (server->tty.type == TTY_DEVICE_UART && server->tty.uart.baud) {
+-		if (cfsetspeed(&termios, server->tty.uart.baud) < 0) {
+-			warn("Couldn't set speeds for %s", server->tty.kname);
+-		}
+-	}
+-
+ 	/* Set console to raw mode: we don't want any processing to occur on
+ 	 * the underlying terminal input/output.
+ 	 */
+@@ -355,6 +350,12 @@ void tty_init_termios(struct console_server *server)
+ 	if (rc) {
+ 		warn("Can't set terminal options for %s", server->tty.kname);
+ 	}
++
++	if (server->tty.type == TTY_DEVICE_UART && server->tty.uart.baud) {
++		if (tty_set_baud(server->tty.fd, server->tty.uart.baud) < 0) {
++			warn("Couldn't set speeds for %s", server->tty.kname);
++		}
++	}
+ }
+ 
+ /**
+diff --git a/console-server.h b/console-server.h
+index 7c45f18..d0a91ab 100644
+--- a/console-server.h
++++ b/console-server.h
+@@ -51,7 +51,7 @@ struct handler_type {
+ 	struct handler *(*init)(const struct handler_type *type,
+ 				struct console *console, struct config *config);
+ 	void (*fini)(struct handler *handler);
+-	int (*baudrate)(struct handler *handler, speed_t baudrate);
++	int (*baudrate)(struct handler *handler, uint32_t baudrate);
+ 	void (*deselect)(struct handler *handler);
+ };
+ 
+@@ -111,7 +111,7 @@ struct console_server {
+ 				uint16_t lpc_addr;
+ 			} vuart;
+ 			struct {
+-				speed_t baud;
++				uint32_t baud;
+ 			} uart;
+ 		};
+ 	} tty;
+diff --git a/meson.build b/meson.build
+index db987d4..4ff017e 100644
+--- a/meson.build
++++ b/meson.build
+@@ -73,6 +73,7 @@ server = executable(
+     'log-handler.c',
+     'ringbuffer.c',
+     'socket-handler.c',
++    'tty-baud.c',
+     'tty-handler.c',
+     'util.c',
+     c_args: [
+diff --git a/tty-baud.c b/tty-baud.c
+new file mode 100644
+index 0000000..02e8b9b
+--- /dev/null
++++ b/tty-baud.c
+@@ -0,0 +1,46 @@
++/**
++ * Copyright © 2026 Nuvoton Technology Corp.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++/*
++ * This file deliberately avoids <termios.h>: the termios2 interface lives in
++ * <asm/termbits.h>, whose definitions conflict with the libc ones.
++ */
++#include <asm/termbits.h>
++#include <sys/ioctl.h>
++
++#include "tty-baud.h"
++
++int tty_set_baud(int fd, uint32_t baud)
++{
++	struct termios2 tio;
++
++	if (!baud) {
++		return -1;
++	}
++
++	if (ioctl(fd, TCGETS2, &tio) < 0) {
++		return -1;
++	}
++
++	/* BOTHER takes the rate from c_ispeed/c_ospeed rather than a Bxxx code,
++	 * which allows non-standard rates such as 134400. */
++	tio.c_cflag &= ~(CBAUD | (CBAUD << IBSHIFT));
++	tio.c_cflag |= BOTHER | (BOTHER << IBSHIFT);
++	tio.c_ispeed = baud;
++	tio.c_ospeed = baud;
++
++	return ioctl(fd, TCSETS2, &tio) < 0 ? -1 : 0;
++}
+diff --git a/tty-baud.h b/tty-baud.h
+new file mode 100644
+index 0000000..4829a8b
+--- /dev/null
++++ b/tty-baud.h
+@@ -0,0 +1,22 @@
++/**
++ * Copyright © 2026 Nuvoton Technology Corp.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#pragma once
++
++#include <stdint.h>
++
++/* Set both input and output speed of a tty to an arbitrary integer baud rate */
++int tty_set_baud(int fd, uint32_t baud);
+diff --git a/tty-handler.c b/tty-handler.c
+index a722d24..48eb451 100644
+--- a/tty-handler.c
++++ b/tty-handler.c
+@@ -26,6 +26,7 @@
+ 
+ #include "console-server.h"
+ #include "config.h"
++#include "tty-baud.h"
+ 
+ struct tty_handler {
+ 	struct handler handler;
+@@ -192,25 +193,13 @@ err:
+ }
+ 
+ static int set_terminal_baud(struct tty_handler *th, const char *tty_name,
+-			     speed_t speed)
++			     uint32_t baud)
+ {
+-	struct termios term_options;
+-
+-	if (tcgetattr(th->fd, &term_options) < 0) {
+-		warn("Can't get config for %s", tty_name);
+-		return -1;
+-	}
+-
+-	if (cfsetspeed(&term_options, speed) < 0) {
++	if (tty_set_baud(th->fd, baud) < 0) {
+ 		warn("Couldn't set speeds for %s", tty_name);
+ 		return -1;
+ 	}
+ 
+-	if (tcsetattr(th->fd, TCSAFLUSH, &term_options) < 0) {
+-		warn("Couldn't commit terminal options for %s", tty_name);
+-		return -1;
+-	}
+-
+ 	return 0;
+ }
+ 
+@@ -243,7 +232,7 @@ static struct handler *tty_init(const struct handler_type *type
+ 				struct config *config __attribute__((unused)))
+ {
+ 	struct tty_handler *th;
+-	speed_t desired_speed;
++	uint32_t desired_baud;
+ 	const char *tty_name;
+ 	const char *tty_baud;
+ 	char *tty_path;
+@@ -277,12 +266,12 @@ static struct handler *tty_init(const struct handler_type *type
+ 
+ 	tty_baud = config_get_value(config, "local-tty-baud");
+ 	if (tty_baud != NULL) {
+-		rc = config_parse_baud(&desired_speed, tty_baud);
++		rc = config_parse_baud(&desired_baud, tty_baud);
+ 		if (rc) {
+ 			fprintf(stderr, "%s is not a valid baud rate\n",
+ 				tty_baud);
+ 		} else {
+-			rc = set_terminal_baud(th, tty_name, desired_speed);
++			rc = set_terminal_baud(th, tty_name, desired_baud);
+ 			if (rc) {
+ 				fprintf(stderr,
+ 					"Couldn't set baud rate for %s to %s\n",
+@@ -314,7 +303,7 @@ static void tty_fini(struct handler *handler)
+ 	free(th);
+ }
+ 
+-static int tty_baudrate(struct handler *handler, speed_t baudrate)
++static int tty_baudrate(struct handler *handler, uint32_t baudrate)
+ {
+ 	const char *tty_name = "local-tty";
+ 	struct tty_handler *th = to_tty_handler(handler);
+@@ -324,7 +313,7 @@ static int tty_baudrate(struct handler *handler, speed_t baudrate)
+ 	}
+ 
+ 	if (set_terminal_baud(th, tty_name, baudrate) != 0) {
+-		fprintf(stderr, "Couldn't set baud rate for %s to %d\n",
++		fprintf(stderr, "Couldn't set baud rate for %s to %u\n",
+ 			tty_name, baudrate);
+ 		return -1;
+ 	}
+-- 
+2.43.0
+
