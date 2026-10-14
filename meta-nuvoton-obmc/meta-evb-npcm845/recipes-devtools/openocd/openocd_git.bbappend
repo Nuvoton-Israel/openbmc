@@ -15,6 +15,7 @@ SRC_URI:append = " \
     file://cm7.cfg \
     file://npcm500_evb.cfg \
     file://caliptra_mcu.cfg \
+    file://rtc_switch.tcl \
 "
 
 do_install:append() {
@@ -23,6 +24,7 @@ do_install:append() {
     install -m 0644 ${UNPACKDIR}/cm7.cfg ${D}${datadir}/openocd/scripts/cm7.cfg
     install -m 0644 ${UNPACKDIR}/npcm500_evb.cfg ${D}${datadir}/openocd/scripts/npcm500_evb.cfg
     install -m 0644 ${UNPACKDIR}/caliptra_mcu.cfg ${D}${datadir}/openocd/scripts/caliptra_mcu.cfg
+    install -m 0644 ${UNPACKDIR}/rtc_switch.tcl ${D}${datadir}/openocd/scripts/rtc_switch.tcl
 }
 
 # Override PACKAGECONFIG to only enable linuxgpiod and npcm-jtag
