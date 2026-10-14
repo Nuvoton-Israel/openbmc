@@ -6,8 +6,8 @@ Subject: [PATCH] arm64: dts: npcm845-evb: enable more serial interfaces
 Upstream-Status: Pending [Not submitted to upstream yet]
 Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
 ---
- .../boot/dts/nuvoton/nuvoton-npcm845-evb.dts  | 26 +++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ .../boot/dts/nuvoton/nuvoton-npcm845-evb.dts   | 28 +++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
 index 9d68c3310731..aabb0d9e6793 100644
@@ -25,11 +25,13 @@ index 9d68c3310731..aabb0d9e6793 100644
  		ethernet0 = &gmac0;
  		ethernet1 = &gmac1;
  		ethernet2 = &gmac2;
-@@ -235,6 +240,27 @@ &serial0 {
+@@ -235,6 +240,29 @@ &serial0 {
  	status = "okay";
  };
  
 +&serial1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&bmcuart1_pins>;
 +	status = "okay";
 +};
 +
