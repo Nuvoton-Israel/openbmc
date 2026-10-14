@@ -9,10 +9,16 @@
 // Uses USBDEVFS_CONTROL directly, so it needs only Linux userspace headers.
 //
 // usage: usb_ocp_recovery [--fifo] /dev/bus/usb/BBB/DDD IMG0 [IMG1 ...]
+//
+// Demo presentation (optional):
+//   OCP_DEMO_BIG=0        plain banners instead of DEC double-height lines,
+//                         for terminals that do not support ESC#3/ESC#4
 
 #include <errno.h>
 #include <fcntl.h>
+#include <libgen.h>
 #include <linux/usbdevice_fs.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,6 +57,62 @@
 // Wall-clock cap on how long to wait for the device to report AwaitingImage.
 #define AWAIT_TIMEOUT_SEC 120
 #define AWAIT_DELAY_US 5000
+
+#define C_RESET "\033[0m"
+#define C_TITLE "1;36" // bold cyan: step banners
+#define C_OK    "1;32" // bold green: step completed
+#define C_INFO  "1;33" // bold yellow: details
+
+static int demo_big = 1;
+static int use_color;
+
+// Print a step banner. With DEC double-height enabled the text is emitted
+// twice (top half ESC#3, bottom half ESC#4), which renders it at 2x size on
+// xterm, PuTTY and Windows Terminal. Double-height lines are also double-width,
+// so keep the text under 40 characters.
+static void banner(const char *color, const char *fmt, ...) {
+    char text[128];
+    va_list ap;
+
+    va_start(ap, fmt);
+    vsnprintf(text, sizeof(text), fmt, ap);
+    va_end(ap);
+
+    if (!use_color) {
+        printf("\n==> %s\n", text);
+    } else if (demo_big) {
+        printf("\n\033[%sm\033#3%s\n\033#4%s" C_RESET "\n", color, text, text);
+    } else {
+        printf("\n\033[%sm>> %s" C_RESET "\n", color, text);
+    }
+    fflush(stdout);
+}
+
+static void note(const char *color, const char *fmt, ...) {
+    va_list ap;
+
+    printf("   ");
+    if (use_color) {
+        printf("\033[%sm", color);
+    }
+    va_start(ap, fmt);
+    vprintf(fmt, ap);
+    va_end(ap);
+    printf("%s\n", use_color ? C_RESET : "");
+    fflush(stdout);
+}
+
+static void show_progress(size_t done, size_t total) {
+    static const char hashes[] = "########################################";
+    const int width = sizeof(hashes) - 1;
+    int pct = total ? (int)(done * 100 / total) : 100;
+    int fill = pct * width / 100;
+
+    printf("\r   [%s%.*s%s%*s] %3d%%  %zu / %zu bytes",
+           use_color ? "\033[1;32m" : "", fill, hashes,
+           use_color ? C_RESET : "", width - fill, "", pct, done, total);
+    fflush(stdout);
+}
 
 static int ctrl(int fd, uint8_t type, uint16_t value, void *data, uint16_t len) {
     struct usbdevfs_ctrltransfer x = {
@@ -106,6 +168,7 @@ static int wait_awaiting(int fd) {
 // rounds the write pointer up to a 4-byte boundary per transfer.
 static int stream(int fd, uint8_t cmd, const uint8_t *buf, size_t len, size_t chunk) {
     size_t off = 0;
+    int last_pct = -1;
     while (off < len) {
         size_t n = len - off;
         if (n > chunk) {
@@ -113,12 +176,18 @@ static int stream(int fd, uint8_t cmd, const uint8_t *buf, size_t len, size_t ch
         }
         int rc = ctrl(fd, REQTYPE_WRITE, cmd, (void *)(buf + off), (uint16_t)n);
         if (rc < 0) {
-            fprintf(stderr, "stream cmd 0x%02x @%zu len %zu: %s\n",
+            fprintf(stderr, "\nstream cmd 0x%02x @%zu len %zu: %s\n",
                     cmd, off, n, strerror(errno));
             return -1;
         }
         off += n;
+        int pct = (int)(off * 100 / len);
+        if (pct != last_pct) {
+            show_progress(off, len);
+            last_pct = pct;
+        }
     }
+    printf("\n");
     return 0;
 }
 
@@ -215,8 +284,10 @@ static int read_prot_cap(int fd) {
         fprintf(stderr, "device does not support host-pushed image (caps=0x%04x)\n", caps);
         return -1;
     }
-    printf("PROT_CAP ok: v%u.%u caps=0x%04x cms_regions=%u\n",
-           cap[8], cap[9], caps, cap[12]);
+    note(C_INFO, "Protocol      : OCP Secure Firmware Recovery v%u.%u",
+         cap[8], cap[9]);
+    note(C_INFO, "Capabilities  : 0x%04x (host-pushed image supported)", caps);
+    note(C_INFO, "CMS regions   : %u", cap[12]);
     return 0;
 }
 
@@ -253,6 +324,12 @@ int main(int argc, char **argv) {
 #endif
     int use_fifo = 0;
     int argi = 1;
+
+    use_color = isatty(STDOUT_FILENO);
+    if (getenv("OCP_DEMO_BIG") && strcmp(getenv("OCP_DEMO_BIG"), "0") == 0) {
+        demo_big = 0;
+    }
+
     if (argi < argc && strcmp(argv[argi], "--fifo") == 0) {
         use_fifo = 1;
         argi++;
@@ -276,15 +353,27 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    banner(C_TITLE, "Reading OCP Recovery Capability");
     if (read_prot_cap(fd) < 0) {
         close(fd);
         return 1;
     }
+    note(C_OK, "[OK] OCP recovery device ready");
 
     int nstages = argc - argi;
+    banner(C_TITLE, "Start Streaming Boot over USB");
+    note(C_INFO, "Transport     : USB EP0 control transfers");
+    note(C_INFO, "Image path    : %s",
+         use_fifo ? "Indirect FIFO (CMS 1)" : "Indirect memory window (CMS 0)");
+    note(C_INFO, "Images        : %d", nstages);
+
     for (int s = 0; s < nstages; s++) {
         const char *path = argv[argi + s];
+        char name[256];
 
+        snprintf(name, sizeof(name), "%s", path);
+        banner(C_TITLE, "Stage %d/%d: %s", s + 1, nstages, basename(name));
+        note(C_INFO, "Waiting for device to request recovery image ...");
         if (wait_awaiting(fd) < 0) {
             fprintf(stderr, "stage %d/%d: device never reached AwaitingImage\n",
                     s + 1, nstages);
@@ -299,8 +388,8 @@ int main(int argc, char **argv) {
             return 1;
         }
 
-        printf("stage %d/%d: pushing %s (%zu bytes) via %s\n",
-               s + 1, nstages, path, len, use_fifo ? "FIFO" : "indirect");
+        note(C_INFO, "Device is awaiting image, streaming %zu bytes over USB",
+             len);
 
         int rc = use_fifo ? push_fifo(fd, buf, len) : push_indirect(fd, buf, len);
         free(buf);
@@ -309,6 +398,7 @@ int main(int argc, char **argv) {
             close(fd);
             return 1;
         }
+        note(C_OK, "[OK] Image delivered and activated, device verifying");
     }
 
     // Best-effort completion check. After the final activate the device boots
@@ -317,13 +407,14 @@ int main(int argc, char **argv) {
     uint8_t dev_st[7] = {0};
     int rc = ctrl(fd, REQTYPE_READ, CMD_DEVICE_STATUS, dev_st, sizeof(dev_st));
     if (rc >= 1) {
-        printf("final DEVICE_STATUS=0x%02x%s\n", dev_st[0],
-               dev_st[0] == DEV_RUNNING_RECOVERY_IMG ? " (RunningRecoveryImage)" : "");
+        note(C_INFO, "Final DEVICE_STATUS=0x%02x%s", dev_st[0],
+             dev_st[0] == DEV_RUNNING_RECOVERY_IMG ? " (RunningRecoveryImage)" : "");
     } else {
-        printf("device stopped responding after activate (expected: booting firmware)\n");
+        note(C_INFO, "Device left recovery mode and is booting the new firmware");
     }
 
-    printf("recovery push complete: %d stage(s) activated\n", nstages);
+    banner(C_OK, "Streaming Boot Complete");
+    note(C_OK, "[OK] %d image(s) recovered over USB", nstages);
     close(fd);
     return 0;
 }
