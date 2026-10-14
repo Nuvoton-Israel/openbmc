@@ -1,0 +1,67 @@
+From a108156c7c00f03b4843b54b28ccba799c8a62d1 Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Wed, 14 Oct 2026 15:19:40 +0800
+Subject: [PATCH] console-client: add output-crlf option
+
+Some hosts terminate console lines with a bare LF. obmc-console-client
+puts the local terminal in raw mode, which disables output
+post-processing, so those lines stair-step across the screen instead
+of returning to column 0.
+
+Add an "output-crlf" config option. When set to "true", the client keeps
+OPOST|ONLCR on its terminal so LF is displayed as CRLF. Hosts that
+already send CRLF are unaffected, since the extra CR is a no-op.
+
+Upstream-Status: Pending
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ console-client.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/console-client.c b/console-client.c
+index 67d163a..fa9dc12 100644
+--- a/console-client.c
++++ b/console-client.c
+@@ -59,6 +59,7 @@ struct console_client {
+ 	int fd_in;
+ 	int fd_out;
+ 	bool is_tty;
++	bool output_crlf;
+ 	struct termios orig_termios;
+ 	enum esc_type esc_type;
+ 	union {
+@@ -204,6 +205,12 @@ static int client_tty_init(struct console_client *client)
+ 	memcpy(&client->orig_termios, &termios, sizeof(client->orig_termios));
+ 	cfmakeraw(&termios);
+ 
++	/* Some hosts terminate lines with a bare LF. Keep output post-processing
++	 * enabled so the terminal maps it to CRLF instead of stair-stepping. */
++	if (client->output_crlf) {
++		termios.c_oflag |= OPOST | ONLCR;
++	}
++
+ 	rc = tcsetattr(client->fd_in, TCSANOW, &termios);
+ 	if (rc) {
+ 		warn("Can't set terminal attributes for console");
+@@ -274,6 +281,7 @@ int main(int argc, char *argv[])
+ 	struct config *config = NULL;
+ 	const char *console_id = NULL;
+ 	const uint8_t *esc = NULL;
++	const char *val;
+ 	int rc;
+ 
+ 	client = &_client;
+@@ -331,6 +339,9 @@ int main(int argc, char *argv[])
+ 			esc = (const uint8_t *)config_get_value(
+ 				config, "escape-sequence");
+ 		}
++
++		val = config_get_value(config, "output-crlf");
++		client->output_crlf = val && !strcmp(val, "true");
+ 	}
+ 
+ 	if (esc) {
+-- 
+2.43.0
+
