@@ -1,0 +1,380 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * OBMF (Open Boot and Management Framework) overlay for the Nuvoton NPCM845 EVB.
+ *
+ * Describes the OBMF SMC on ehci1 port 1: eSPI/SPI
+ * flash, GPIO/SGPIO/VW GPIO, I2C controller/target and I3C channels,
+ * plus the reserved memory backing the eSPI flash.
+ *
+ * Applied at build time on nuvoton-npcm845-evb.dtb to produce
+ * nuvoton-npcm845-evb-obmf.dtb.
+ */
+
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/i2c/i2c.h>
+
+/*
+ * Overlay labels cannot be referenced from /aliases (dtc would emit the
+ * fragment path), so the OBMF I2C channels are aliased by absolute path.
+ */
+&{/aliases} {
+	i2c27 = "/ahb/usb@f0828100/smc@1/i2c-ch@10/i2c";
+	i2c28 = "/ahb/usb@f0828100/smc@1/i2c-ch@11/i2c";
+	i2c29 = "/ahb/usb@f0828100/smc@1/i2c-ch@12/i2c";
+	i2c30 = "/ahb/usb@f0828100/smc@1/i2c-ch@13/i2c";
+};
+
+&{/reserved-memory} {
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	espi_flash_memory: espi_flash@10000000 {
+		reg = <0x0 0x10000000 0x0 0x4000000>;
+		no-map;
+	};
+};
+
+&espi_flash {
+	memory-region = <&espi_flash_memory>;
+	status = "okay";
+};
+
+&ehci1 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	smc@1 {
+		reg = <1>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		spi@4 {
+			reg = <4>;
+			nuvoton,flash-type = "espi";
+			nuvoton,mtd-name = "npcm-espi-flash";
+		};
+
+		smc-gpio@5 {
+			reg = <5>;
+			gpio-line-names =
+				"SMC1GPIO0",  "SMC1GPIO1",  "SMC1GPIO2",  "SMC1GPIO3",
+				"SMC1GPIO4",  "SMC1GPIO5",  "SMC1GPIO6",  "SMC1GPIO7",
+				"SMC1GPIO8",  "SMC1GPIO9",  "SMC1GPIO10";
+		};
+
+		sgpio0@6 {
+			reg = <6>;
+			gpio-line-names =
+				"SMC1SGPIO0GPIO0",   "SMC1SGPIO0GPIO1",   "SMC1SGPIO0GPIO2",   "SMC1SGPIO0GPIO3",
+				"SMC1SGPIO0GPIO4",   "SMC1SGPIO0GPIO5",   "SMC1SGPIO0GPIO6",   "SMC1SGPIO0GPIO7",
+				"SMC1SGPIO0GPIO8",   "SMC1SGPIO0GPIO9",   "SMC1SGPIO0GPIO10",  "SMC1SGPIO0GPIO11",
+				"SMC1SGPIO0GPIO12",  "SMC1SGPIO0GPIO13",  "SMC1SGPIO0GPIO14",  "SMC1SGPIO0GPIO15",
+				"SMC1SGPIO0GPIO16",  "SMC1SGPIO0GPIO17",  "SMC1SGPIO0GPIO18",  "SMC1SGPIO0GPIO19",
+				"SMC1SGPIO0GPIO20",  "SMC1SGPIO0GPIO21",  "SMC1SGPIO0GPIO22",  "SMC1SGPIO0GPIO23",
+				"SMC1SGPIO0GPIO24",  "SMC1SGPIO0GPIO25",  "SMC1SGPIO0GPIO26",  "SMC1SGPIO0GPIO27",
+				"SMC1SGPIO0GPIO28",  "SMC1SGPIO0GPIO29",  "SMC1SGPIO0GPIO30",  "SMC1SGPIO0GPIO31",
+				"SMC1SGPIO0GPIO32",  "SMC1SGPIO0GPIO33",  "SMC1SGPIO0GPIO34",  "SMC1SGPIO0GPIO35",
+				"SMC1SGPIO0GPIO36",  "SMC1SGPIO0GPIO37",  "SMC1SGPIO0GPIO38",  "SMC1SGPIO0GPIO39",
+				"SMC1SGPIO0GPIO40",  "SMC1SGPIO0GPIO41",  "SMC1SGPIO0GPIO42",  "SMC1SGPIO0GPIO43",
+				"SMC1SGPIO0GPIO44",  "SMC1SGPIO0GPIO45",  "SMC1SGPIO0GPIO46",  "SMC1SGPIO0GPIO47",
+				"SMC1SGPIO0GPIO48",  "SMC1SGPIO0GPIO49",  "SMC1SGPIO0GPIO50",  "SMC1SGPIO0GPIO51",
+				"SMC1SGPIO0GPIO52",  "SMC1SGPIO0GPIO53",  "SMC1SGPIO0GPIO54",  "SMC1SGPIO0GPIO55",
+				"SMC1SGPIO0GPIO56",  "SMC1SGPIO0GPIO57",  "SMC1SGPIO0GPIO58",  "SMC1SGPIO0GPIO59",
+				"SMC1SGPIO0GPIO60",  "SMC1SGPIO0GPIO61",  "SMC1SGPIO0GPIO62",  "SMC1SGPIO0GPIO63",
+				"SMC1SGPIO0GPIO64",  "SMC1SGPIO0GPIO65",  "SMC1SGPIO0GPIO66",  "SMC1SGPIO0GPIO67",
+				"SMC1SGPIO0GPIO68",  "SMC1SGPIO0GPIO69",  "SMC1SGPIO0GPIO70",  "SMC1SGPIO0GPIO71",
+				"SMC1SGPIO0GPIO72",  "SMC1SGPIO0GPIO73",  "SMC1SGPIO0GPIO74",  "SMC1SGPIO0GPIO75",
+				"SMC1SGPIO0GPIO76",  "SMC1SGPIO0GPIO77",  "SMC1SGPIO0GPIO78",  "SMC1SGPIO0GPIO79",
+				"SMC1SGPIO0GPIO80",  "SMC1SGPIO0GPIO81",  "SMC1SGPIO0GPIO82",  "SMC1SGPIO0GPIO83",
+				"SMC1SGPIO0GPIO84",  "SMC1SGPIO0GPIO85",  "SMC1SGPIO0GPIO86",  "SMC1SGPIO0GPIO87",
+				"SMC1SGPIO0GPIO88",  "SMC1SGPIO0GPIO89",  "SMC1SGPIO0GPIO90",  "SMC1SGPIO0GPIO91",
+				"SMC1SGPIO0GPIO92",  "SMC1SGPIO0GPIO93",  "SMC1SGPIO0GPIO94",  "SMC1SGPIO0GPIO95",
+				"SMC1SGPIO0GPIO96",  "SMC1SGPIO0GPIO97",  "SMC1SGPIO0GPIO98",  "SMC1SGPIO0GPIO99",
+				"SMC1SGPIO0GPIO100", "SMC1SGPIO0GPIO101", "SMC1SGPIO0GPIO102", "SMC1SGPIO0GPIO103",
+				"SMC1SGPIO0GPIO104", "SMC1SGPIO0GPIO105", "SMC1SGPIO0GPIO106", "SMC1SGPIO0GPIO107",
+				"SMC1SGPIO0GPIO108", "SMC1SGPIO0GPIO109", "SMC1SGPIO0GPIO110", "SMC1SGPIO0GPIO111",
+				"SMC1SGPIO0GPIO112", "SMC1SGPIO0GPIO113", "SMC1SGPIO0GPIO114", "SMC1SGPIO0GPIO115",
+				"SMC1SGPIO0GPIO116", "SMC1SGPIO0GPIO117", "SMC1SGPIO0GPIO118", "SMC1SGPIO0GPIO119",
+				"SMC1SGPIO0GPIO120", "SMC1SGPIO0GPIO121", "SMC1SGPIO0GPIO122", "SMC1SGPIO0GPIO123",
+				"SMC1SGPIO0GPIO124", "SMC1SGPIO0GPIO125", "SMC1SGPIO0GPIO126", "SMC1SGPIO0GPIO127";
+		};
+
+		sgpio1@7 {
+			reg = <7>;
+			gpio-line-names =
+				"SMC1SGPIO1GPIO0",   "SMC1SGPIO1GPIO1",   "SMC1SGPIO1GPIO2",   "SMC1SGPIO1GPIO3",
+				"SMC1SGPIO1GPIO4",   "SMC1SGPIO1GPIO5",   "SMC1SGPIO1GPIO6",   "SMC1SGPIO1GPIO7",
+				"SMC1SGPIO1GPIO8",   "SMC1SGPIO1GPIO9",   "SMC1SGPIO1GPIO10",  "SMC1SGPIO1GPIO11",
+				"SMC1SGPIO1GPIO12",  "SMC1SGPIO1GPIO13",  "SMC1SGPIO1GPIO14",  "SMC1SGPIO1GPIO15",
+				"SMC1SGPIO1GPIO16",  "SMC1SGPIO1GPIO17",  "SMC1SGPIO1GPIO18",  "SMC1SGPIO1GPIO19",
+				"SMC1SGPIO1GPIO20",  "SMC1SGPIO1GPIO21",  "SMC1SGPIO1GPIO22",  "SMC1SGPIO1GPIO23",
+				"SMC1SGPIO1GPIO24",  "SMC1SGPIO1GPIO25",  "SMC1SGPIO1GPIO26",  "SMC1SGPIO1GPIO27",
+				"SMC1SGPIO1GPIO28",  "SMC1SGPIO1GPIO29",  "SMC1SGPIO1GPIO30",  "SMC1SGPIO1GPIO31",
+				"SMC1SGPIO1GPIO32",  "SMC1SGPIO1GPIO33",  "SMC1SGPIO1GPIO34",  "SMC1SGPIO1GPIO35",
+				"SMC1SGPIO1GPIO36",  "SMC1SGPIO1GPIO37",  "SMC1SGPIO1GPIO38",  "SMC1SGPIO1GPIO39",
+				"SMC1SGPIO1GPIO40",  "SMC1SGPIO1GPIO41",  "SMC1SGPIO1GPIO42",  "SMC1SGPIO1GPIO43",
+				"SMC1SGPIO1GPIO44",  "SMC1SGPIO1GPIO45",  "SMC1SGPIO1GPIO46",  "SMC1SGPIO1GPIO47",
+				"SMC1SGPIO1GPIO48",  "SMC1SGPIO1GPIO49",  "SMC1SGPIO1GPIO50",  "SMC1SGPIO1GPIO51",
+				"SMC1SGPIO1GPIO52",  "SMC1SGPIO1GPIO53",  "SMC1SGPIO1GPIO54",  "SMC1SGPIO1GPIO55",
+				"SMC1SGPIO1GPIO56",  "SMC1SGPIO1GPIO57",  "SMC1SGPIO1GPIO58",  "SMC1SGPIO1GPIO59",
+				"SMC1SGPIO1GPIO60",  "SMC1SGPIO1GPIO61",  "SMC1SGPIO1GPIO62",  "SMC1SGPIO1GPIO63",
+				"SMC1SGPIO1GPIO64",  "SMC1SGPIO1GPIO65",  "SMC1SGPIO1GPIO66",  "SMC1SGPIO1GPIO67",
+				"SMC1SGPIO1GPIO68",  "SMC1SGPIO1GPIO69",  "SMC1SGPIO1GPIO70",  "SMC1SGPIO1GPIO71",
+				"SMC1SGPIO1GPIO72",  "SMC1SGPIO1GPIO73",  "SMC1SGPIO1GPIO74",  "SMC1SGPIO1GPIO75",
+				"SMC1SGPIO1GPIO76",  "SMC1SGPIO1GPIO77",  "SMC1SGPIO1GPIO78",  "SMC1SGPIO1GPIO79",
+				"SMC1SGPIO1GPIO80",  "SMC1SGPIO1GPIO81",  "SMC1SGPIO1GPIO82",  "SMC1SGPIO1GPIO83",
+				"SMC1SGPIO1GPIO84",  "SMC1SGPIO1GPIO85",  "SMC1SGPIO1GPIO86",  "SMC1SGPIO1GPIO87",
+				"SMC1SGPIO1GPIO88",  "SMC1SGPIO1GPIO89",  "SMC1SGPIO1GPIO90",  "SMC1SGPIO1GPIO91",
+				"SMC1SGPIO1GPIO92",  "SMC1SGPIO1GPIO93",  "SMC1SGPIO1GPIO94",  "SMC1SGPIO1GPIO95",
+				"SMC1SGPIO1GPIO96",  "SMC1SGPIO1GPIO97",  "SMC1SGPIO1GPIO98",  "SMC1SGPIO1GPIO99",
+				"SMC1SGPIO1GPIO100", "SMC1SGPIO1GPIO101", "SMC1SGPIO1GPIO102", "SMC1SGPIO1GPIO103",
+				"SMC1SGPIO1GPIO104", "SMC1SGPIO1GPIO105", "SMC1SGPIO1GPIO106", "SMC1SGPIO1GPIO107",
+				"SMC1SGPIO1GPIO108", "SMC1SGPIO1GPIO109", "SMC1SGPIO1GPIO110", "SMC1SGPIO1GPIO111",
+				"SMC1SGPIO1GPIO112", "SMC1SGPIO1GPIO113", "SMC1SGPIO1GPIO114", "SMC1SGPIO1GPIO115",
+				"SMC1SGPIO1GPIO116", "SMC1SGPIO1GPIO117", "SMC1SGPIO1GPIO118", "SMC1SGPIO1GPIO119",
+				"SMC1SGPIO1GPIO120", "SMC1SGPIO1GPIO121", "SMC1SGPIO1GPIO122", "SMC1SGPIO1GPIO123",
+				"SMC1SGPIO1GPIO124", "SMC1SGPIO1GPIO125", "SMC1SGPIO1GPIO126", "SMC1SGPIO1GPIO127";
+		};
+
+		vwgpio@8 {
+			reg = <8>;
+			gpio-line-names =
+				"SMC1VWGPIO0", "SMC1VWGPIO1", "SMC1VWGPIO2", "SMC1VWGPIO3",
+				"SMC1VWGPIO4", "SMC1VWGPIO5", "SMC1VWGPIO6", "SMC1VWGPIO7",
+				"SMC1VWGPIO8", "SMC1VWGPIO9", "SMC1VWGPIO10", "SMC1VWGPIO11",
+				"SMC1VWGPIO12", "SMC1VWGPIO13", "SMC1VWGPIO14", "SMC1VWGPIO15",
+				"SMC1VWGPIO16", "SMC1VWGPIO17", "SMC1VWGPIO18", "SMC1VWGPIO19",
+				"SMC1VWGPIO20", "SMC1VWGPIO21", "SMC1VWGPIO22", "SMC1VWGPIO23",
+				"SMC1VWGPIO24", "SMC1VWGPIO25", "SMC1VWGPIO26", "SMC1VWGPIO27",
+				"SMC1VWGPIO28", "SMC1VWGPIO29", "SMC1VWGPIO30", "SMC1VWGPIO31",
+				"SMC1VWGPIO32", "SMC1VWGPIO33", "SMC1VWGPIO34", "SMC1VWGPIO35",
+				"SMC1VWGPIO36", "SMC1VWGPIO37", "SMC1VWGPIO38", "SMC1VWGPIO39",
+				"SMC1VWGPIO40", "SMC1VWGPIO41", "SMC1VWGPIO42", "SMC1VWGPIO43",
+				"SMC1VWGPIO44", "SMC1VWGPIO45", "SMC1VWGPIO46", "SMC1VWGPIO47",
+				"SMC1VWGPIO48", "SMC1VWGPIO49", "SMC1VWGPIO50", "SMC1VWGPIO51",
+				"SMC1VWGPIO52", "SMC1VWGPIO53", "SMC1VWGPIO54", "SMC1VWGPIO55",
+				"SMC1VWGPIO56", "SMC1VWGPIO57", "SMC1VWGPIO58", "SMC1VWGPIO59",
+				"SMC1VWGPIO60", "SMC1VWGPIO61", "SMC1VWGPIO62", "SMC1VWGPIO63",
+				"SMC1VWGPIO64", "SMC1VWGPIO65", "SMC1VWGPIO66", "SMC1VWGPIO67",
+				"SMC1VWGPIO68", "SMC1VWGPIO69", "SMC1VWGPIO70", "SMC1VWGPIO71",
+				"SMC1VWGPIO72", "SMC1VWGPIO73", "SMC1VWGPIO74", "SMC1VWGPIO75",
+				"SMC1VWGPIO76", "SMC1VWGPIO77", "SMC1VWGPIO78", "SMC1VWGPIO79",
+				"SMC1VWGPIO80", "SMC1VWGPIO81", "SMC1VWGPIO82", "SMC1VWGPIO83",
+				"SMC1VWGPIO84", "SMC1VWGPIO85", "SMC1VWGPIO86", "SMC1VWGPIO87",
+				"SMC1VWGPIO88", "SMC1VWGPIO89", "SMC1VWGPIO90", "SMC1VWGPIO91",
+				"SMC1VWGPIO92", "SMC1VWGPIO93", "SMC1VWGPIO94", "SMC1VWGPIO95",
+				"SMC1VWGPIO96", "SMC1VWGPIO97", "SMC1VWGPIO98", "SMC1VWGPIO99",
+				"SMC1VWGPIO100", "SMC1VWGPIO101", "SMC1VWGPIO102", "SMC1VWGPIO103",
+				"SMC1VWGPIO104", "SMC1VWGPIO105", "SMC1VWGPIO106", "SMC1VWGPIO107",
+				"SMC1VWGPIO108", "SMC1VWGPIO109", "SMC1VWGPIO110", "SMC1VWGPIO111",
+				"SMC1VWGPIO112", "SMC1VWGPIO113", "SMC1VWGPIO114", "SMC1VWGPIO115",
+				"SMC1VWGPIO116", "SMC1VWGPIO117", "SMC1VWGPIO118", "SMC1VWGPIO119",
+				"SMC1VWGPIO120", "SMC1VWGPIO121", "SMC1VWGPIO122", "SMC1VWGPIO123",
+				"SMC1VWGPIO124", "SMC1VWGPIO125", "SMC1VWGPIO126", "SMC1VWGPIO127";
+		};
+
+		i2c-ch@10 {
+			reg = <10>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			i2c27: i2c {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				mctp-controller;
+				mctp@12 {
+					compatible = "mctp-i2c-controller";
+					reg = <(0x12 | I2C_OWN_SLAVE_ADDRESS)>;
+				};
+			};
+		};
+
+		i2c-ch@11 {
+			reg = <11>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			i2c28: i2c {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				mctp-controller;
+				mctp@14 {
+					compatible = "mctp-i2c-controller";
+					reg = <(0x14 | I2C_OWN_SLAVE_ADDRESS)>;
+				};
+			};
+		};
+
+		i2c-ch@12 {
+			reg = <12>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			i2c29: i2c {
+				#address-cells = <1>;
+				#size-cells = <0>;
+			};
+		};
+
+		i2c-ch@13 {
+			reg = <13>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			i2c30: i2c {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				tca6416_obmf: gpio@20 {
+					compatible = "ti,tca6416";
+					reg = <0x20>;
+					gpio-controller;
+					#gpio-cells = <2>;
+				};
+
+				hwmon_obmf: hwmon@23 {
+					compatible = "nuvoton,nct7363";
+					reg = <0x23>;
+
+					nuvoton,fscpxduty = <0x7F>;
+					#pwm-cells = <2>;
+					fan-0 {
+						pwms = <&hwmon_obmf 0 50000>;
+						tach-ch = /bits/ 8 <0x00>;
+					};
+				};
+
+				i2c-mux@71 {
+					compatible = "nxp,pca9848";
+					reg = <0x71>;
+					#address-cells = <1>;
+					#size-cells = <0>;
+					i2c-mux-idle-disconnect;
+
+					i2c@0 {
+						#address-cells = <1>;
+						#size-cells = <0>;
+						reg = <0>;
+
+						tmp75@48 {
+							compatible = "ti,tmp75";
+							reg = <0x48>;
+						};
+					};
+
+					i2c@1 {
+						#address-cells = <1>;
+						#size-cells = <0>;
+						reg = <1>;
+
+						tmp75@48 {
+							compatible = "ti,tmp75";
+							reg = <0x48>;
+						};
+					};
+
+					i2c@2 {
+						#address-cells = <1>;
+						#size-cells = <0>;
+						reg = <2>;
+
+						tmp75@48 {
+							compatible = "ti,tmp75";
+							reg = <0x48>;
+						};
+					};
+
+					i2c@3 {
+						#address-cells = <1>;
+						#size-cells = <0>;
+						reg = <3>;
+
+						tmp75@48 {
+							compatible = "ti,tmp75";
+							reg = <0x48>;
+						};
+					};
+
+					i2c@4 {
+						#address-cells = <1>;
+						#size-cells = <0>;
+						reg = <4>;
+
+						tmp75@49 {
+							compatible = "ti,tmp75";
+							reg = <0x49>;
+						};
+					};
+
+					i2c@5 {
+						#address-cells = <1>;
+						#size-cells = <0>;
+						reg = <5>;
+
+						tmp75@4a {
+							compatible = "ti,tmp75";
+							reg = <0x4a>;
+						};
+					};
+
+					i2c@6 {
+						#address-cells = <1>;
+						#size-cells = <0>;
+						reg = <6>;
+
+						tmp75@4c {
+							compatible = "ti,tmp75";
+							reg = <0x4c>;
+						};
+					};
+
+					i2c@7 {
+						#address-cells = <1>;
+						#size-cells = <0>;
+						reg = <7>;
+
+						tmp75@4d {
+							compatible = "ti,tmp75";
+							reg = <0x4d>;
+						};
+					};
+				};
+			};
+		};
+
+		i2c-tgt@14 {
+			reg = <14>;
+			obmf,paired-controller = <&i2c27>;
+		};
+
+		i2c-tgt@15 {
+			reg = <15>;
+			obmf,paired-controller = <&i2c28>;
+		};
+
+		spi@17 {
+			reg = <17>;
+			nuvoton,flash-type = "spi-nor";
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			nuvoton,flash-size = <0x4000000>;
+			nuvoton,flash-erasesize = <0x1000>;
+			nuvoton,flash-cs = <0x1>;
+			nuvoton,mtd-name = "npcm-spi-flash";
+		};
+
+		i3c-ch@18 {
+			reg = <18>;
+			i3c {
+				#address-cells = <3>;
+				#size-cells    = <0>;
+				mctp-controller;
+			};
+		};
+	};
+};

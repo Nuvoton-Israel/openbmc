@@ -62,3 +62,24 @@ SRC_URI:append:df-composite-eat = " \
     file://0005-soc-nuvoton-add-Composite-EAT-KUnit-tests.patch \
     file://composite-eat.cfg \
     "
+
+# OBMF (Open Boot and Management Framework) over USB: OBMF kernel branch, drivers
+# and an evb overlay applied at build time into nuvoton-npcm845-evb-obmf.dtb
+KBRANCH:df-obmf = "NPCM-6.12-OBMF-dev"
+SRCREV:df-obmf = "959a9d70d0a1ce757a2a11ccf7f6fa7e590f10b8"
+
+SRC_URI:append:df-obmf = " \
+    file://0016-hwmon-add-nct7363.patch \
+    file://nuvoton-npcm845-evb-obmf.dtso \
+    file://obmf.cfg \
+    "
+
+do_patch:append:df-obmf() {
+    dts=${S}/arch/arm64/boot/dts/nuvoton
+    cp ${UNPACKDIR}/nuvoton-npcm845-evb-obmf.dtso ${dts}/
+    if ! grep -q "nuvoton-npcm845-evb-obmf" ${dts}/Makefile; then
+        printf '%s\n' \
+            'nuvoton-npcm845-evb-obmf-dtbs := nuvoton-npcm845-evb.dtb nuvoton-npcm845-evb-obmf.dtbo' \
+            'dtb-$(CONFIG_ARCH_NPCM) += nuvoton-npcm845-evb-obmf.dtb' >> ${dts}/Makefile
+    fi
+}

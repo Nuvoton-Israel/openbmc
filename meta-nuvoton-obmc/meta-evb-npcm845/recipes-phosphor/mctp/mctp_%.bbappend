@@ -1,6 +1,11 @@
 FILESEXTRAPATHS:prepend:nuvoton := "${THISDIR}/${PN}:"
 
-SRC_URI:append = " file://mctp-config"
+# The OBMF distro (df-obmf) uses its own link layout (mctpi3c2/mctpi2c27) and
+# caps the MTU so I2C packets fit the OBMF I2C controller request buffer.
+MCTP_CONFIG_SRC = "mctp-config"
+MCTP_CONFIG_SRC:df-obmf = "mctp-config-obmf"
+
+SRC_URI:append = " file://${MCTP_CONFIG_SRC}"
 SRC_URI:append = " file://setup-eid.conf"
 SRC_URI:append = " file://90-mctp.rules"
 
@@ -31,8 +36,8 @@ do_install:append () {
 
     install -d ${D}${libexecdir}/mctp
 
-    install -m 0755 ${UNPACKDIR}/mctp-config \
-            ${D}${libexecdir}/mctp/
+    install -m 0755 ${UNPACKDIR}/${MCTP_CONFIG_SRC} \
+            ${D}${libexecdir}/mctp/mctp-config
 
     install -d ${D}${sysconfdir}/udev/rules.d/
     install -m 0644 ${UNPACKDIR}/90-mctp.rules ${D}${sysconfdir}/udev/rules.d
