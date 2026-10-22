@@ -4,17 +4,6 @@ This document describes OBMF support on the Nuvoton NPCM845 EVB
 (`meta-evb-npcm845`). For general board setup, build and flash instructions,
 see the [NPCM845 EVB README](README.md).
 
-## Table of Contents
-
-- [Build the OBMF Image](#build-the-obmf-image)
-- [What the OBMF Distro Enables](#what-the-obmf-distro-enables)
-- [MCTP Link Configuration and MTU](#mctp-link-configuration-and-mtu)
-- [Kernel Config Matrix](#kernel-config-matrix)
-- [USB Topology and Hierarchical DTS Design](#usb-topology-and-hierarchical-dts-design)
-- [Channel Type to Linux Device Mapping](#channel-type-to-linux-device-mapping)
-- [What You Should See on the BMC](#what-you-should-see-on-the-bmc)
-- [Channel Test Guide](#channel-test-guide)
-
 OBMF-ICP lets the BMC use a USB-attached SMC (OpenBIC / OBMF device) as a
 bridge to remote I/O: GPIO, UART, IPMI, SPI, eSPI flash, I2C and I3C. The
 BMC-side implementation is the OBMF USB class driver in the Nuvoton Linux
@@ -29,7 +18,59 @@ The generic driver sections below follow the OBMF kernel driver README
 (`drivers/usb/class/obmf/README.md`, also published as
 [obmf-kernel-driver](https://github.com/Nuvoton-Israel/obmf-kernel-driver/tree/obmf-0.9)).
 
-## Build the OBMF Image
+## Table of Contents
+
+**Build and configuration**
+
+1. [Build the OBMF Image](#1-build-the-obmf-image)
+2. [What the OBMF Distro Enables](#2-what-the-obmf-distro-enables)
+   - [2.1 Recipe changes](#21-recipe-changes)
+   - [2.2 EVB channel map](#22-evb-channel-map)
+3. [MCTP Link Configuration and MTU](#3-mctp-link-configuration-and-mtu)
+4. [Kernel Config Matrix](#4-kernel-config-matrix)
+
+**Device Tree design**
+
+5. [USB Topology and Hierarchical DTS Design](#5-usb-topology-and-hierarchical-dts-design)
+   - [5.1 Where the DTS lives and how it is applied](#51-where-the-dts-lives-and-how-it-is-applied)
+   - [5.2 How the driver matches a USB device to a DT node](#52-how-the-driver-matches-a-usb-device-to-a-dt-node)
+   - [5.3 Determining the port numbers](#53-determining-the-port-numbers)
+   - [5.4 Case A: device directly on the root port (no hub)](#54-case-a-device-directly-on-the-root-port-no-hub)
+   - [5.5 Case B: device behind one hub](#55-case-b-device-behind-one-hub)
+   - [5.6 Case C: device behind two hubs](#56-case-c-device-behind-two-hubs)
+   - [5.7 Rules and pitfalls](#57-rules-and-pitfalls)
+   - [5.8 Verifying the topology](#58-verifying-the-topology)
+
+**Runtime reference**
+
+6. [Channel Type to Linux Device Mapping](#6-channel-type-to-linux-device-mapping)
+7. [What You Should See on the BMC](#7-what-you-should-see-on-the-bmc)
+   - [7.1 Kernel logs](#71-kernel-logs)
+   - [7.2 USB driver binding](#72-usb-driver-binding)
+   - [7.3 OBMF sysfs hierarchy](#73-obmf-sysfs-hierarchy)
+   - [7.4 Device nodes and subsystem devices](#74-device-nodes-and-subsystem-devices)
+
+**Testing**
+
+8. [Channel Test Guide](#8-channel-test-guide) (overview and test index)
+   - [Test 1: Base bring-up](#test-1-base-bring-up)
+   - [Test 2: GPIO](#test-2-gpio)
+   - [Test 3: IPMI](#test-3-ipmi)
+   - [Test 4: SPI flash](#test-4-spi-flash)
+   - [Test 5: Memory Device (eSPI flash)](#test-5-memory-device-espi-flash)
+   - [Test 6: UART / Serial](#test-6-uart--serial)
+     - [Host console (obmc-console)](#host-console-obmc-console)
+   - [Test 7: Port 80 / POST code](#test-7-port-80--post-code)
+   - [Test 8: I2C Controller](#test-8-i2c-controller)
+   - [Test 9: I2C Target (MCTP over I2C)](#test-9-i2c-target-mctp-over-i2c)
+   - [Test 10: I3C Controller (MCTP over I3C)](#test-10-i3c-controller-mctp-over-i3c)
+     - [MCTP over I3C data flow (IBI)](#mctp-over-i3c-data-flow-ibi)
+     - [Hot-Join](#hot-join)
+
+Every section and test ends with a [Back to contents](#table-of-contents)
+link.
+
+## 1. Build the OBMF Image
 
 ```bash
 $ . setup evb-npcm845-stage
@@ -54,7 +95,11 @@ $ kernel_build_dir=$(bitbake -e virtual/kernel | sed -n 's/^B="\(.*\)"/\1/p')
 $ grep -E '^CONFIG_USB_OBMF(=|_)' "$kernel_build_dir/.config"
 ```
 
-## What the OBMF Distro Enables
+[Back to contents](#table-of-contents)
+
+## 2. What the OBMF Distro Enables
+
+### 2.1 Recipe changes
 
 `obmf.inc` adds `obmf` to `DISTRO_FEATURES` and the `df-obmf` override.
 Recipes use the override to add the following only for this distro:
@@ -62,39 +107,66 @@ Recipes use the override to add the following only for this distro:
 | Component | Change |
 |---|---|
 | Kernel | `KBRANCH = "NPCM-6.12-OBMF-dev"` (pinned `SRCREV`), `PREFERRED_VERSION_linux-nuvoton = "6.12.%"`, `0016-hwmon-add-nct7363.patch` |
-| Kernel config | `obmf.cfg`: USB OBMF core and I2C/GPIO/SPI/Serial/IPMI/I3C channel handlers, I3C + `i3cdev`, MCTP I3C transport, PCA953x GPIO expander, PCA954x I2C mux, NCT7363 hwmon, `usbmon`, NPCM eSPI flash |
+| Kernel config | `obmf.cfg`: USB OBMF core and I2C/GPIO/SPI/Serial/IPMI/I3C channel handlers, I3C + `i3cdev`, MCTP I3C transport, PCA953x GPIO expander, PCA954x I2C mux, NCT7363 hwmon, `usbmon`, NPCM eSPI flash. The Memory Device handler (`CONFIG_USB_OBMF_MEM_DEV`) is enabled by its Kconfig default. |
 | Device Tree | `nuvoton-npcm845-evb-obmf.dtso` is applied on `nuvoton-npcm845-evb.dtb` at build time to produce `nuvoton-npcm845-evb-obmf.dtb` (`KERNEL_DEVICETREE`) |
-| mctp | `mctp-config-obmf` replaces the default `mctp-config` (see below) |
-| entity-manager | `nuvoton_npcm400_evb_i2c-obmf.json` replaces the default `nuvoton_npcm400_evb_i2c.json`: the NPCM400 MCTP I2C device is on bus 27 (the OBMF I2C channel) with `"Probe": "TRUE"`, so `xyz.openbmc_project.mctpreactor.service` sets up the endpoint at boot |
-| obmc-console | Adds the `ttyOBMF0_0` and `ttyOBMF0_1` host consoles, reachable over SSH on ports 2230 and 2231 (see [6. UART / Serial test](#6-uart--serial-test)) |
+| mctp | `mctp-config-obmf` replaces the default `mctp-config` (see [section 3](#3-mctp-link-configuration-and-mtu)) |
+| entity-manager | `nuvoton_npcm400_evb_i2c-obmf.json` replaces the default `nuvoton_npcm400_evb_i2c.json`: the NPCM400 MCTP I2C device is on bus 27 (the OBMF I2C channel) with `"Probe": "TRUE"`, so `xyz.openbmc_project.mctpreactor.service` sets up the endpoint at boot. `npcm400_evb_i3c_obmf.json` is added only on this distro and does the same for the MCTP I3C target (SMC2) on I3C bus 2 (see [Test 10](#test-10-i3c-controller-mctp-over-i3c)) |
+| obmc-console | Adds the `ttyOBMF0_0` and `ttyOBMF0_1` host consoles, reachable over SSH on ports 2230 and 2231 (see [Host console (obmc-console)](#host-console-obmc-console)) |
 
 Other distros (`arbel-evb-entity`, `arbel-evb-emmc`, ...) do not get any of
 these changes.
 
-The OBMF overlay describes one SMC on `ehci1` port 1 (USB path `1-1`) with
-these channels, plus the reserved memory that backs the eSPI flash:
+### 2.2 EVB channel map
 
-| Channel | DT node | Use on the EVB |
-|---:|---|---|
-| 4 | `spi@4` (`nuvoton,flash-type = "espi"`) | eSPI flash, MTD `npcm-espi-flash` |
-| 5 | `smc-gpio@5` | SMC GPIO (`SMC1GPIO*`) |
-| 6, 7 | `sgpio0@6`, `sgpio1@7` | SMC SGPIO (`SMC1SGPIO0GPIO*`, `SMC1SGPIO1GPIO*`) |
-| 8 | `vwgpio@8` | eSPI virtual wire GPIO (`SMC1VWGPIO*`) |
-| 10 | `i2c-ch@10` -> `i2c-27` | MCTP over I2C, BMC own address `0x12` |
-| 11 | `i2c-ch@11` -> `i2c-28` | MCTP over I2C, BMC own address `0x14` |
-| 12 | `i2c-ch@12` -> `i2c-29` | Plain I2C controller |
-| 13 | `i2c-ch@13` -> `i2c-30` | TCA6416 (`0x20`), NCT7363 (`0x23`), PCA9848 mux (`0x71`) with TMP75 sensors |
-| 14 | `i2c-tgt@14` | I2C Target paired with `i2c-27` |
-| 15 | `i2c-tgt@15` | I2C Target paired with `i2c-28` |
-| 17 | `spi@17` (`spi-nor`) | SMC SPI NOR flash, MTD `npcm-spi-flash` |
-| 18 | `i3c-ch@18` | I3C controller with MCTP |
+The OBMF overlay describes one SMC on `ehci1` port 1 (USB path `1-1`, OBMF
+device index 0, so device nodes are named `obmf0-*` / `OBMF0 *`) with these
+channels, plus the reserved memory that backs the eSPI flash:
+
+| Channel | DT node | Use on the EVB | Test |
+|---:|---|---|---|
+| 4 | `spi@4` | Memory Device (eSPI flash), MTD `npcm-espi-flash` | [Test 5](#test-5-memory-device-espi-flash) |
+| 5 | `smc-gpio@5` | SMC GPIO (`SMC1GPIO*`) | [Test 2](#test-2-gpio) |
+| 6, 7 | `sgpio0@6`, `sgpio1@7` | SMC SGPIO (`SMC1SGPIO0GPIO*`, `SMC1SGPIO1GPIO*`) | [Test 2](#test-2-gpio) |
+| 8 | `vwgpio@8` | eSPI virtual wire GPIO (`SMC1VWGPIO*`) | [Test 2](#test-2-gpio) |
+| 10 | `i2c-ch@10` -> `i2c-27` | MCTP over I2C, BMC own address `0x12` | [Test 9](#test-9-i2c-target-mctp-over-i2c) |
+| 11 | `i2c-ch@11` -> `i2c-28` | MCTP over I2C, BMC own address `0x14` | [Test 9](#test-9-i2c-target-mctp-over-i2c) |
+| 12 | `i2c-ch@12` -> `i2c-29` | Plain I2C controller | [Test 8](#test-8-i2c-controller) |
+| 13 | `i2c-ch@13` -> `i2c-30` | TCA6416 (`0x20`), NCT7363 (`0x23`), PCA9848 mux (`0x71`) with TMP75 sensors | [Test 8](#test-8-i2c-controller) |
+| 14 | `i2c-tgt@14` | I2C Target paired with `i2c-27` | [Test 9](#test-9-i2c-target-mctp-over-i2c) |
+| 15 | `i2c-tgt@15` | I2C Target paired with `i2c-28` | [Test 9](#test-9-i2c-target-mctp-over-i2c) |
+| 17 | `spi@17` | SPI Controller to the SMC SPI NOR flash, MTD `npcm-spi-flash` | [Test 4](#test-4-spi-flash) |
+| 18 | `i3c-ch@18` | I3C controller with MCTP, driven by SMC `i3c4` (datasheet I3C5, balls A9/B9, 3.3 V) | [Test 10](#test-10-i3c-controller-mctp-over-i3c) |
+
+The SMC firmware (OpenBIC `smc-npcm400-obmf`) also reports these channels,
+which have no node in the overlay:
+
+| Channel | SMC side | BMC device | Test |
+|---:|---|---|---|
+| 1 | MMIO | `/dev/obmf0-mmio-1` | - |
+| 2 | Serial 0: `uart1` (CR_UART2), externally looped back to eSPI UARTB | `/dev/ttyOBMF0_0` | [Test 6](#test-6-uart--serial) |
+| 3 | IPMI (KCS) | `/dev/ipmi-obmf0-3` | [Test 3](#test-3-ipmi) |
+| 9 | IO (Port 80) | `/dev/obmf0-io-9` | [Test 7](#test-7-port-80--post-code) |
+| 16 | Serial 1: `uart2` (CR_UART3) on the CR_SIN3/CR_SOUT3 pins (GPIOC0/GPIOC1) | `/dev/ttyOBMF0_1` | [Test 6](#test-6-uart--serial) |
+
+Notes:
+
+- The driver matches channel nodes by `reg` only; node names are cosmetic.
+  Channel 4 is still named `spi@4`, and both `spi@4` and `spi@17` carry a
+  leftover `nuvoton,flash-type` property. The current kernel ignores
+  `nuvoton,flash-type`: the channel type reported by the SMC decides which
+  handler runs.
+- Channels that need no DT data (Serial, IPMI, IO, MMIO, OEM) are not in the
+  overlay. They are registered from discovery alone, so their device nodes
+  depend on what the SMC firmware reports.
 
 The overlay adds `/aliases` entries `i2c27`..`i2c30` for channels 10..13, so
 the OBMF I2C adapter numbers are fixed at `i2c-27`..`i2c-30` (and the MCTP
 links at `mctpi2c27`/`mctpi2c28`). The I3C bus number has no alias and is
 still assigned dynamically.
 
-## MCTP Link Configuration and MTU
+[Back to contents](#table-of-contents)
+
+## 3. MCTP Link Configuration and MTU
 
 The OBMF I2C channel request buffer is 256 bytes plus a 4-byte header, while
 the MCTP I2C transport can build a packet of up to 258 bytes. To keep every
@@ -133,19 +205,24 @@ Notes:
   endpoints are not configured by hand: entity-manager publishes the
   `MCTPI2CTarget` from `npcm400_evb_i2c.json` and
   `xyz.openbmc_project.mctpreactor.service` asks `mctpd` to set it up (see
-  [I2C Target test](#9-i2c-target-test)).
+  [Test 9](#test-9-i2c-target-mctp-over-i2c)).
 
-## Kernel Config Matrix
+[Back to contents](#table-of-contents)
+
+## 4. Kernel Config Matrix
 
 Check the effective kernel configuration before following the
-[Channel Test Guide](#channel-test-guide). The OBMF channel switches default
+[Channel Test Guide](#8-channel-test-guide). The OBMF channel switches default
 to `y` only when their dependencies and `CONFIG_USB_OBMF` are enabled. A
 disabled handler does not prevent channel discovery, but it does prevent
 that channel's Linux device from being registered.
 
+On the `arbel-evb-obmf` distro every option below is enabled, from
+`obmf.cfg`, `af_mctp.cfg` and the EVB defconfig.
+
 | Feature you want to use | Required kernel config | Configuration note |
 |---|---|---|
-| OBMF core, discovery, MMIO and IO channels | `CONFIG_USB_OBMF=y` | Select built-in for boot-time bring-up, or `m` for a module. |
+| OBMF core, discovery, MMIO, IO and OEM channels | `CONFIG_USB_OBMF=y` | Select built-in for boot-time bring-up, or `m` for a module. |
 | GPIO channel | `CONFIG_USB_OBMF_GPIO=y`, `CONFIG_GPIOLIB=y` | OBMF switch defaults to `y` if dependencies are met. |
 | Serial channel | `CONFIG_USB_OBMF_SERIAL=y`, `CONFIG_TTY=y` | OBMF switch defaults to `y` if dependencies are met. |
 | IPMI channel | `CONFIG_USB_OBMF_IPMI=y` | OBMF switch defaults to `y` if core is enabled. |
@@ -159,7 +236,9 @@ that channel's Linux device from being registered.
 | MCTP over the OBMF I3C channel | `CONFIG_MCTP=y`, `CONFIG_MCTP_TRANSPORT_I3C=y` | Enable separately for MCTP tests. |
 | USB packet tracing with `usbmon` | `CONFIG_USB_MON=y`, `CONFIG_DEBUG_FS=y` | Enable separately for tracing. |
 
-## USB Topology and Hierarchical DTS Design
+[Back to contents](#table-of-contents)
+
+## 5. USB Topology and Hierarchical DTS Design
 
 An OBMF device does not have to sit directly on a BMC USB root port. It may
 be attached behind one or more USB hubs (for example, a hub board that fans
@@ -168,13 +247,16 @@ how the driver locates the Device Tree node for a given USB device, and how
 to write the DTS for direct, one-hub, and two-hub topologies. These are board
 DTS examples, not patches to copy as-is.
 
-### 1. Where the DTS lives and how it is applied
+### 5.1 Where the DTS lives and how it is applied
 
 In this layer the OBMF topology lives in
-`recipes-kernel/linux/linux-nuvoton-612/nuvoton-npcm845-evb-obmf.dtso`. If
-your physical topology differs, edit that overlay. Describe exactly one
-physical topology per host port; do not combine the direct-device and hub
-examples under the same `reg`.
+`recipes-kernel/linux/linux-nuvoton-612/nuvoton-npcm845-evb-obmf.dtso`. The
+`linux-nuvoton_6.12.bbappend` copies it into the kernel tree in
+`do_patch:append:df-obmf` and adds a Makefile rule that builds
+`nuvoton-npcm845-evb-obmf.dtb` from `nuvoton-npcm845-evb.dtb` plus the
+overlay. If your physical topology differs, edit that overlay. Describe
+exactly one physical topology per host port; do not combine the
+direct-device and hub examples under the same `reg`.
 
 After changing the DTS, rebuild the kernel:
 
@@ -182,7 +264,7 @@ After changing the DTS, rebuild the kernel:
 $ DISTRO=arbel-evb-obmf bitbake virtual/kernel
 ```
 
-### 2. How the driver matches a USB device to a DT node
+### 5.2 How the driver matches a USB device to a DT node
 
 The driver does not require any special "USB device" compatible string. It
 walks the physical USB port chain and mirrors it in the DT:
@@ -206,7 +288,7 @@ This means:
   `#address-cells = <1>; #size-cells = <0>;`, including the host-controller
   node itself (`&ehci1`).
 
-### 3. Determining the port numbers
+### 5.3 Determining the port numbers
 
 Before writing the DTS, find the real USB path of the target device:
 
@@ -225,7 +307,7 @@ tier, and maps to one `reg` value at one DT nesting level.
 | `1-1.1` | Root port 1 -> hub port 1 (Case B, SMC1) | `&ehci1 { hub@1 { reg = <1>; smc@1 { reg = <1>; ... } } }` |
 | `1-1.2.1` | Root port 1 -> hub port 2 -> hub port 1 (Case C, SMC1) | `&ehci1 { hub@1 { reg = <1>; hub@2 { reg = <2>; smc@1 { reg = <1>; ... } } } }` |
 
-### 4. Case A: device directly on the root port (no hub)
+### 5.4 Case A: device directly on the root port (no hub)
 
 Topology: `BMC(ehci1) -- smc@1 (SMC1, 1-1)`
 
@@ -254,7 +336,7 @@ Topology: `BMC(ehci1) -- smc@1 (SMC1, 1-1)`
 };
 ```
 
-### 5. Case B: device behind one hub
+### 5.5 Case B: device behind one hub
 
 Topology:
 
@@ -313,7 +395,7 @@ shared, e.g. distinct `nuvoton,mtd-name` values and a separate
 };
 ```
 
-### 6. Case C: device behind two hubs
+### 5.6 Case C: device behind two hubs
 
 Topology:
 
@@ -373,7 +455,7 @@ The rule is simply "one nested hub node per USB tier":
 A third hub simply adds one more nested `hubN@<port>` level following the
 same pattern, up to the USB spec limit of 7 tiers.
 
-### 7. Rules and pitfalls
+### 5.7 Rules and pitfalls
 
 - Add one DT node per physical USB tier; do not skip levels even if a hub
   itself needs no configuration.
@@ -395,7 +477,7 @@ same pattern, up to the USB spec limit of 7 tiers.
 - The port-chain buffer supports up to 8 entries; the USB specification
   limits topology depth to 7 tiers total, not 7 hubs plus a device.
 
-### 8. Verifying the topology
+### 5.8 Verifying the topology
 
 ```bash
 lsusb -t
@@ -457,7 +539,9 @@ If the SMC is moved to a different hub port (or a second hub tier is added),
 the trailing segment(s) of the `obmf <path>:1.1` prefix change accordingly, and
 the matching `smc@N` / `hub@N` `reg` values in the DTS must be updated.
 
-## Channel Type to Linux Device Mapping
+[Back to contents](#table-of-contents)
+
+## 6. Channel Type to Linux Device Mapping
 
 The kernel driver discovers Channel 0 first, then registers each discovered
 channel into the corresponding Linux subsystem.
@@ -467,7 +551,7 @@ channel into the corresponding Linux subsystem.
 | Config / Discovery | `0x00` | Mandatory Channel 0 for discovery and channel config reads | No standalone device node; visible through kernel logs and OBMF sysfs hierarchy |
 | MMIO | `0x01` | Generic MMIO channel | `/dev/obmf<device>-mmio-<channel>` miscdevice |
 | GPIO | `0x02` | Optimized GPIO channel | `gpiochipN` device with label like `obmf<device>-gpio-ch<channel>` |
-| Serial | `0x03` | Optimized UART/serial channel | `/dev/ttyOBMF*` |
+| Serial | `0x03` | Optimized UART/serial channel | `/dev/ttyOBMF<device>_<n>`, where `<n>` is the serial port index (0, 1, ... in channel order), not the channel ID |
 | I2C Controller | `0x04` | Optimized I2C master/controller channel | `/dev/i2c-*` adapter named `OBMF<device> I2C ch<channel>` |
 | I2C Target | `0x05` | Protocol-defined target mode | Requires `obmf,paired-controller` pointing at the I2C Controller adapter node |
 | I3C Controller | `0x06` | Optimized I3C controller channel | I3C bus exposed to the MCTP stack as an `mctpi3c*` link |
@@ -475,7 +559,7 @@ channel into the corresponding Linux subsystem.
 | SPI Controller | `0x08` | Optimized SPI controller channel | Host-initiated, virtual MTD device named by `nuvoton,mtd-name` (for example `npcm-spi-flash`) |
 | IO | `0x09` | Optimized IO channel | `/dev/obmf<device>-io-<channel>` miscdevice |
 | Memory Device | `0x0A` | Byte-addressable device-initiated memory channel | MTD device named by `nuvoton,mtd-name` (default `npcm-espi-flash`), linked as `mtd` under the channel's sysfs directory |
-| OEM | `0xF8-0xFF` | OEM-specific extension space | Framework exists, but device shape depends on OEM handler implementation |
+| OEM | `0xF8-0xFF` | OEM-specific extension space | `/dev/obmf<device>-oem-<channel>` miscdevice; payload format depends on the OEM firmware |
 
 Notes:
 
@@ -486,12 +570,14 @@ Notes:
   Device-initiated byte-addressable access lives on the separate Memory Device
   channel (`0x0A`).
 
-## What You Should See on the BMC
+[Back to contents](#table-of-contents)
+
+## 7. What You Should See on the BMC
 
 Once the BMC boots with the OBMF kernel and the OBMF device is attached, you
 can confirm bring-up in several places.
 
-### Kernel logs
+### 7.1 Kernel logs
 
 ```bash
 dmesg | grep -i obmf
@@ -505,19 +591,24 @@ Typical messages include:
 - `Device Name: ...`
 - `NUM_OF_CHANNELS = ...`
 - `chX: type=0x.. name="..." config_offset=... config_size=...`
-- `chX: registered GPIO chip (...)`
-- `chX: registered /dev/ipmi-obmf...`
-- `chX: registered SPI Controller (MTD: <mtd-name>)`
+- `chX: registered GPIO chip (<n> lines)`
+- `chX: registered ttyOBMF<n>`
+- `chX: registered /dev/ipmi-obmf<device>-<channel>`
+- `chX: registered /dev/obmf<device>-io-<channel> (I/O Port)`
+- `chX: registered I2C adapter OBMF<device> I2C ch<channel>`
+- `chX: registered I2C target (paired with i2c-<n>)`
+- `chX: registered I3C master (bus-<n>) with assoc I2C`
+- `chX: registered virtual SPI-NOR MTD '<mtd-name>' (<size> bytes, erasesize <n>, cs<n>)`
 - `chX: registered Memory Device (MTD: <mtd-name>, <size> bytes, erasesize <n>)`
 - `OBMF-ICP obmf<device> ready: <count> channels, ver 0x....`
 
-### USB driver binding
+### 7.2 USB driver binding
 
 ```bash
 ls /sys/bus/usb/drivers/obmf
 ```
 
-### OBMF sysfs hierarchy
+### 7.3 OBMF sysfs hierarchy
 
 The OBMF driver creates a per-channel sysfs tree under the USB interface
 device:
@@ -536,11 +627,12 @@ Expected structure:
 
 Depending on channel type, the channel directory may contain links such as:
 
-- `device` for GPIO, I2C, Serial, and IPMI-backed Linux devices
+- `device` for GPIO, I2C, Serial, IPMI and other subsystem-backed Linux devices
 - `mmio` for MMIO channel miscdevices
+- `io` for IO channel miscdevices
 - `mtd` for the backing MTD device used by the Memory Device channel
 
-### Device nodes and subsystem devices
+### 7.4 Device nodes and subsystem devices
 
 ```bash
 ls /dev | grep -E 'obmf|ttyOBMF|ipmi-obmf'
@@ -550,7 +642,9 @@ cat /proc/mtd
 i2cdetect -l
 ```
 
-## Channel Test Guide
+[Back to contents](#table-of-contents)
+
+## 8. Channel Test Guide
 
 This section lists practical sanity tests that match the current kernel
 interfaces. The exact approach may vary with the firmware's OBMF
@@ -575,20 +669,25 @@ Unless a test says otherwise, run every command on the **BMC**; "remote /
 host side" actions must be triggered on the SMC or on whatever platform it is
 wired to.
 
-| Test | Hardware topology | Who initiates | BMC-side interface |
-|---|---|---|---|
-| 1. Base bring-up | BMC — (USB) — SMC | BMC | `dmesg`, sysfs |
-| 2. GPIO | GPIO pins — SMC — (USB) — BMC | either side | `gpiochipN` |
-| 3. IPMI | Host — (eSPI / KCS) — SMC — (USB) — BMC | host | `/dev/ipmi-obmf*` |
-| 4. SPI flash | BMC — (USB) — SMC — (SPI) — NOR flash | BMC | MTD (`npcm-spi-flash`) |
-| 5. Memory Device | Host — (eSPI flash) — SMC — (USB) — BMC | host | MTD (`npcm-espi-flash`) |
-| 6. UART / Serial | UART peer — SMC — (USB) — BMC | either side | `/dev/ttyOBMF*` |
-| 7. Port 80 / POST | Host — (eSPI IO) — SMC — (USB) — BMC | host | `/dev/obmf*-io-*` |
-| 8. I2C Controller | TEMP IC — (I2C) — SMC — (USB) — BMC | BMC | `/dev/i2c-N` |
-| 9. I2C Target | BMC — (OBMF I2C via USB) — SMC — (I2C) — MCTP device | BMC | `i2c-27` + `mctpi2c27`, mctpreactor |
-| 10. I3C Controller | BMC — (USB) — SMC1 — (I3C) — SMC2 | BMC | `i3c-N` + `mctpi3cN` |
+Test index (click a test name to jump to it):
 
-### 1. Base bring-up test
+| Test | Hardware topology | Who initiates | BMC-side interface | EVB channel |
+|---|---|---|---|---|
+| [1. Base bring-up](#test-1-base-bring-up) | BMC — (USB) — SMC | BMC | `dmesg`, sysfs | all |
+| [2. GPIO](#test-2-gpio) | GPIO pins — SMC — (USB) — BMC | either side | `gpiochipN` | 5, 6, 7, 8 |
+| [3. IPMI](#test-3-ipmi) | Host — (eSPI / KCS) — SMC — (USB) — BMC | host | `/dev/ipmi-obmf*` | from discovery |
+| [4. SPI flash](#test-4-spi-flash) | BMC — (USB) — SMC — (SPI) — NOR flash | BMC | MTD (`npcm-spi-flash`) | 17 |
+| [5. Memory Device](#test-5-memory-device-espi-flash) | Host — (eSPI flash) — SMC — (USB) — BMC | host | MTD (`npcm-espi-flash`) | 4 |
+| [6. UART / Serial](#test-6-uart--serial) | UART peer — SMC — (USB) — BMC | either side | `/dev/ttyOBMF*`, obmc-console | from discovery |
+| [7. Port 80 / POST](#test-7-port-80--post-code) | Host — (eSPI IO) — SMC — (USB) — BMC | host | `/dev/obmf*-io-*` | from discovery |
+| [8. I2C Controller](#test-8-i2c-controller) | TEMP IC — (I2C) — SMC — (USB) — BMC | BMC | `/dev/i2c-N` | 12, 13 |
+| [9. I2C Target](#test-9-i2c-target-mctp-over-i2c) | BMC — (OBMF I2C via USB) — SMC — (I2C) — MCTP device | BMC | `i2c-27` + `mctpi2c27`, mctpreactor | 10 + 14 |
+| [10. I3C Controller](#test-10-i3c-controller-mctp-over-i3c) | BMC — (USB) — SMC1 — (I3C) — SMC2 | BMC (SMC2 for IBI and Hot-Join) | `i3c-2` + `mctpi3c2`, mctpreactor | 18 |
+
+"from discovery" means the channel has no node in the EVB overlay; it exists
+only if the SMC firmware reports it.
+
+### Test 1: Base bring-up
 
 Prerequisites: `CONFIG_USB_OBMF=y` and a DTS topology matching the physical
 USB wiring.
@@ -605,15 +704,23 @@ Pass criteria:
 - The driver prints discovery information and the final `ready` line.
 - At least the expected device nodes for your enabled channels appear.
 
-### 2. GPIO test
+[Back to contents](#table-of-contents)
+
+### Test 2: GPIO
 
 Prerequisites: `CONFIG_USB_OBMF_GPIO=y`, `CONFIG_GPIOLIB=y`
 
 The GPIO channel is exposed as a normal Linux GPIO chip. Use `libgpiod` tools.
+On the EVB, channels 5..8 register four chips (`obmf0-gpio-ch5` ..
+`obmf0-gpio-ch8`) with the line names from the overlay (`SMC1GPIO*`,
+`SMC1SGPIO0GPIO*`, `SMC1SGPIO1GPIO*`, `SMC1VWGPIO*`).
 
 ```bash
 gpiodetect | grep -i obmf
 gpioinfo gpiochipN
+
+# Find a line by its overlay name
+gpiofind SMC1GPIO0
 
 # Read an input line
 gpioget gpiochipN <offset>
@@ -629,11 +736,13 @@ gpiomon --rising-edge --falling-edge gpiochipN <offset>
 Suggested checks:
 
 - The chip label matches `obmf<device>-gpio-ch<channel>`.
-- Line names defined by firmware appear in `gpioinfo`.
+- Line names defined in the overlay appear in `gpioinfo`.
 - Reads reflect the expected input state.
 - Writes succeed only on output-capable lines.
 
-### 3. IPMI channel test
+[Back to contents](#table-of-contents)
+
+### Test 3: IPMI
 
 Prerequisites: `CONFIG_USB_OBMF_IPMI=y`; `CONFIG_USB_MON=y` and
 `CONFIG_DEBUG_FS=y` to trace with `usbmon`.
@@ -659,7 +768,9 @@ Protocol reminder for userspace handlers:
 - `read()` returns `[NetFn/LUN, IPMI_Cmd, Data...]`
 - `write()` expects `[NetFn/LUN, IPMI_Cmd, CC, Data...]`
 
-### 4. SPI flash test
+[Back to contents](#table-of-contents)
+
+### Test 4: SPI flash
 
 Prerequisites: `CONFIG_USB_OBMF_SPI=y`, `CONFIG_MTD=y`
 
@@ -670,17 +781,27 @@ Prerequisites: `CONFIG_USB_OBMF_SPI=y`, `CONFIG_MTD=y`
 > by-name path (`/dev/mtd/<name>`) over a hard-coded number.
 
 The SPI Controller channel is always host-initiated: the BMC registers a
-virtual MTD device from the `nuvoton,flash-size` / `nuvoton,flash-erasesize`
-DTS properties, and forwards each MTD op as a single SPI NOR opcode (READ /
-PP / SE / BE) to the SMC, which drives the real SPI bus.
+virtual MTD device from the channel DT node, and forwards each MTD op as a
+single SPI NOR opcode (READ / PP / SE / BE) to the SMC, which drives the real
+SPI bus.
+
+| DT property | Required | Default | EVB value |
+|---|---|---|---|
+| `nuvoton,flash-size` | yes | - | `0x4000000` (64 MiB) |
+| `nuvoton,flash-erasesize` | no | `0x1000`; `0x10000` selects block erase (BE) | `0x1000` |
+| `nuvoton,flash-cs` | no | `0` | `0x1` (SMC `spi_fiu0_cs1`) |
+| `nuvoton,mtd-name` | no | `npcm-spi-flash` | `npcm-spi-flash` |
 
 - TX is not fragmented on the BMC side; max transfer unit is 448 bytes
   (`OBMF_SPI_MAX_XFER`).
 - The SMC owns the full bus sequence (CS assert -> WREN before PP/Erase -> WIP
   polling -> CS deassert). The BMC does not issue WREN / RDSR and uses no local
   RAM or flash backing.
+- A flash size above 16 MiB (as on the EVB) selects 4-byte addressing. The
+  driver does not send EN4B, so the SMC flash must already be in 4-byte
+  address mode.
 
-DTS example:
+DTS on the EVB (channel 17):
 
 ```dts
 spi@17 {
@@ -695,8 +816,6 @@ spi@17 {
 };
 ```
 
-The SMC-side SPI flash is currently fixed to `spi_fiu0_cs1`.
-
 ```bash
 dmesg | grep -i -E 'obmf|spi|mtd|npcm-spi-flash'
 cat /proc/mtd | grep npcm-spi-flash    # note the mtdN on the left
@@ -707,16 +826,20 @@ flashcp -v /tmp/test.bin /dev/mtdN     # replace N with the matching MTD number
 
 Suggested checks:
 
+- `dmesg` shows `registered virtual SPI-NOR MTD 'npcm-spi-flash'`.
 - The configured MTD node (for example `npcm-spi-flash`) appears in `/proc/mtd`.
 - `flashcp -v` completes with a successful verify pass.
 
-### 5. Memory Device test
+[Back to contents](#table-of-contents)
+
+### Test 5: Memory Device (eSPI flash)
 
 Prerequisites: `CONFIG_USB_OBMF_MEM_DEV=y`, `CONFIG_MTD=y`,
 `CONFIG_SPI_NPCM_FLASH=y` for the eSPI-backed MTD device.
 
 > **Warning:** the commands in this section read/write raw MTD devices. See
-> the warning in the SPI flash test; always resolve the MTD device by name.
+> the warning in [Test 4](#test-4-spi-flash); always resolve the MTD device by
+> name.
 
 The Memory Device channel (OBMF-ICP v1.0.0 RC1 section 4.12, Channel Type
 `0x0A`) is always device-initiated (Producer/Responder): the SMC pushes
@@ -724,11 +847,11 @@ Memory Read/Write/Erase commands, and the BMC maps them onto the MTD device
 named by `nuvoton,mtd-name` (default `npcm-espi-flash`). This channel replaces
 the SPI Controller channel's former `espi` mode.
 
-> **Note:** the EVB overlay in this layer currently declares the eSPI flash
-> as `spi@4` with `nuvoton,flash-type = "espi"` (the former `espi` mode).
-> Which form the kernel accepts depends on the pinned `SRCREV` of the
-> `NPCM-6.12-OBMF-dev` branch; use `mem-dev@4` as shown below once the
-> kernel revision includes the Memory Device channel.
+On the EVB, the backing MTD device is the NPCM eSPI flash driver
+(`&espi_flash`) using the 64 MiB reserved memory at `0x10000000`. The
+channel 4 node in the overlay is named `spi@4` and still carries
+`nuvoton,flash-type = "espi"`; the kernel ignores both the name and that
+property and reads only `reg` and `nuvoton,mtd-name`.
 
 Request format (device -> BMC):
 
@@ -744,7 +867,7 @@ Channel-specific status codes: `0x40` access denied, `0x41` unsupported size,
 `MEM_DEV_CFG` (`CAPABILITIES` at offset `0x00`): `WRITEABLE` (bit 0) and
 `NO_ERASE` (bit 1).
 
-DTS example:
+DTS example (equivalent to the EVB `spi@4` node):
 
 ```dts
 mem-dev@4 {
@@ -764,31 +887,48 @@ hexdump -C /dev/mtd/npcm-espi-flash
 
 Suggested checks:
 
+- `dmesg` shows `registered Memory Device (MTD: npcm-espi-flash, ...)`.
 - `npcm-espi-flash` (or equivalent mapped MTD node) appears in `/proc/mtd`.
 - After remote write, hexdump shows the expected updated values.
 - After remote erase, hexdump shows the `0xff` fill pattern in the erased region.
 - Requests that violate size/alignment/write-protect constraints get the
   matching `0x41`/`0x42`/`0x43` status instead of being silently applied.
 
-### 6. UART / Serial test
+[Back to contents](#table-of-contents)
+
+### Test 6: UART / Serial
 
 Prerequisites: `CONFIG_USB_OBMF_SERIAL=y`, `CONFIG_TTY=y`
 
-The Serial channel appears as `/dev/ttyOBMF<device>_<channel>` and can be used
-by normal Linux tty tools.
+Each Serial channel appears as `/dev/ttyOBMF<device>_<n>` and can be used by
+normal Linux tty tools. `<n>` is the serial port index on that OBMF device
+(the first Serial channel reported by the SMC is `_0`, the second `_1`, ...),
+not the channel ID; `dmesg` shows the mapping as `chX: registered ttyOBMF<n>`.
+Serial channels need no DT node. Ports default to 115200 8N1.
+
+On the EVB the SMC bridges two UARTs:
+
+| BMC tty | OBMF channel | SMC UART | Where the UART peer connects |
+|---|---|---|---|
+| `ttyOBMF0_0` | 2 | `uart1` (CR_UART2) | Externally looped back to eSPI UARTB; no physical pins |
+| `ttyOBMF0_1` | 16 | `uart2` (CR_UART3) | CR_SIN3 (GPIOC0) / CR_SOUT3 (GPIOC1) on the SMC, 3.3 V; wire a USB-serial adapter here for the RX test |
+
+The SMC forwards UART data only while the BMC has enabled the channel; bytes
+that arrive on the UART before that are dropped.
 
 ```bash
 dmesg | grep -i -E 'obmf|ttyOBMF|serial'
 ls /dev/ttyOBMF*
 
-stty -F /dev/ttyOBMF<device>_<channel> 115200 raw -echo
-cat /dev/ttyOBMF<device>_<channel>
+stty -F /dev/ttyOBMF<device>_<n> 115200 raw -echo
+cat /dev/ttyOBMF<device>_<n>
 ```
 
 #### Host console (obmc-console)
 
 On the `arbel-evb-obmf` distro, `obmc-console` also serves `ttyOBMF0_0` and
-`ttyOBMF0_1` as host consoles, next to the EVB UART consoles:
+`ttyOBMF0_1` (the first two Serial channels of OBMF device 0) as host
+consoles, next to the EVB UART consoles:
 
 | Console | Server config | SSH port |
 |---|---|---|
@@ -839,7 +979,13 @@ Suggested checks:
 - TX path: BMC-written data, including input typed in the SSH console session,
   is accepted and forwarded to the UART peer.
 
-### 7. Port 80 / POST code test
+Status (2026-10-22): on channel 16, data written by the BMC reaches the SMC
+`uart2` TX. The RX path (UART peer -> BMC) has not been tested yet: it needs a
+peer wired to CR_SIN3/CR_SOUT3.
+
+[Back to contents](#table-of-contents)
+
+### Test 7: Port 80 / POST code
 
 Prerequisites: `CONFIG_USB_OBMF=y` (the IO channel is part of the OBMF core).
 
@@ -856,7 +1002,9 @@ snoopd -v -b 4 -d /dev/obmf<device>-io-<channel> &
 Trigger boot progress on the remote platform and observe POST code changes on
 the BMC. Captured codes should change in sequence during remote boot.
 
-### 8. I2C Controller test
+[Back to contents](#table-of-contents)
+
+### Test 8: I2C Controller
 
 Prerequisites: `CONFIG_USB_OBMF_I2C=y` and `CONFIG_I2C=y`; SMC firmware
 (OpenBIC) with I2C Controller Optimized Channel support; DTS with the OBMF I2C
@@ -939,7 +1087,9 @@ Suggested checks:
 - `i2ctransfer` reads return valid data without errors.
 - hwmon sysfs entries are accessible and return sensible values.
 
-### 9. I2C Target test
+[Back to contents](#table-of-contents)
+
+### Test 9: I2C Target (MCTP over I2C)
 
 Hardware topology: BMC — (OBMF I2C via USB) — SMC — (I2C) — MCTP device
 
@@ -954,6 +1104,10 @@ pair:
   `0x12`. The SMC receives it as an I2C target and forwards it over the I2C
   Target channel 14, which delivers it to the paired adapter `i2c-27`, where
   the `mctp-i2c-controller` client hands it to `mctpi2c27`.
+
+Channels 11 (`i2c-28`, BMC address `0x14`) and 15 form a second pair with the
+same layout; `mctp-config-obmf` and entity-manager only configure the
+`i2c-27` pair.
 
 Prerequisites: `CONFIG_USB_OBMF_I2C=y`, `CONFIG_I2C_SLAVE=y`, `CONFIG_MCTP=y`
 and `CONFIG_MCTP_TRANSPORT_I2C=y` (all enabled for the OBMF distro); kernel
@@ -1060,6 +1214,7 @@ pldmtool base GetPLDMTypes -m <EID>
 
 Suggested checks:
 
+- `dmesg` shows `ch14: registered I2C target (paired with i2c-27)`.
 - `mctpd` publishes an endpoint for the device under
   `/au/com/codeconstruct/mctp1/networks/1/endpoints/<EID>` without manual
   `mctp addr`/`route`/`neigh` commands.
@@ -1072,16 +1227,37 @@ To trace the OBMF I2C Controller and Target channel frames on USB:
 cat /sys/kernel/debug/usb/usbmon/1u &
 ```
 
-### 10. I3C Controller test
+[Back to contents](#table-of-contents)
 
-Hardware topology: BMC (OBMF host) — (USB) — SMC1 (i3c5 controller) — (I3C) — (i3c5 target) SMC2
+### Test 10: I3C Controller (MCTP over I3C)
 
-Prerequisites: `CONFIG_USB_OBMF_I3C=y` and `CONFIG_I3C=y`; `CONFIG_MCTP=y` and
-`CONFIG_MCTP_TRANSPORT_I3C=y`; `CONFIG_USB_OBMF_I2C=y` as well if the channel
-reports an associated I2C channel (`SET_ASSOC_I2C`); SMC1 as the I3C
-controller and SMC2 attached as an I3C target.
+Hardware topology: BMC (OBMF host) — (USB) — SMC1 (`i3c4` controller, balls
+A9/B9) — (I3C, 3.3 V) — SMC2 (I3C target)
 
-DTS configuration (OBMF host side):
+SMC1 drives the bus with its `i3c4` controller, which is I3C5 in the NPCM400F
+datasheet: SCL on ball B9 (GPIO82), SDA on ball A9 (GPIO83). These pins are on
+the VSB supply, so the bus runs at 3.3 V only. SMC2 is an MCTP endpoint with
+PID `0x063212345607`, BCR `0x66` and DCR `0xCC`, and joins the bus with a
+Hot-Join request.
+
+Prerequisites:
+
+- BMC: `CONFIG_USB_OBMF_I3C=y` and `CONFIG_I3C=y`; `CONFIG_MCTP=y` and
+  `CONFIG_MCTP_TRANSPORT_I3C=y`; `CONFIG_USB_OBMF_I2C=y` as well if the
+  channel reports an associated I2C channel (`SET_ASSOC_I2C`). All are enabled
+  on the OBMF distro.
+- SMC1: OpenBIC `smc-npcm400-obmf` firmware that includes these changes (all
+  three are needed for IBI and Hot-Join to work):
+  - `meta-nuvoton: smc-npcm400-obmf: move the OBMF I3C Controller channel to i3c4`
+  - `meta-nuvoton: common: obmf: re-register I3C IBI callbacks after Hot-Join`
+  - `meta-nuvoton: common: obmf: notify the BMC of I3C Hot-Join`, which needs
+    `drivers: i3c: npcm4: add a Hot-Join completion callback` in
+    `zephyr_nuvoton`
+- SMC2: running an MCTP I3C target. It answers each request with an IBI whose
+  mandatory data byte is `0xAE`, then waits for the controller to read the
+  response.
+
+DTS configuration (OBMF host side, as in the EVB overlay):
 
 ```dts
 &ehci1 {
@@ -1125,34 +1301,73 @@ ls /sys/bus/i3c/devices/
 `i3c-2` is the OBMF I3C master, and `2-63212345607` is the SMC2 target on that
 bus (bus number followed by the device PID).
 
-> The bus number (`bus-2` / `i3c-2`) and the derived MCTP link name
-> (`mctpi3c2`) are assigned dynamically, and the PID comes from the SMC2
-> firmware. **Your numbers will differ**; take them from your own `dmesg`,
-> `ls /sys/bus/i3c/devices/` and `mctp link show` output.
+> The I3C bus number (`bus-2` / `i3c-2`) and the derived MCTP link name
+> (`mctpi3c2`) are assigned dynamically. `mctp-config-obmf` and
+> `npcm400_evb_i3c_obmf.json` both assume bus 2. If your system reports a
+> different bus, fix both files.
 
-On the OBMF distro, `mctp-config-obmf` has already brought `mctpi3c2` up with
-local EID 8 and MTU 243 when `mctpd` started. Check it:
+No manual MCTP network configuration is needed. At boot:
+
+1. `mctpd` starts, and `mctp-config-obmf` assigns local EID 8 to `mctpi3c2`,
+   brings the link up and sets the MTU to 243.
+2. entity-manager probes `npcm400_evb_i3c_obmf.json`, which publishes SMC2 as
+   an `MCTPI3CTarget`:
+
+   ```json
+   {
+       "Exposes": [
+           {
+               "Address": [6, 50, 18, 52, 86, 7],
+               "Bus": "2",
+               "Name": "MCTP I3C Device 0",
+               "Type": "MCTPI3CTarget"
+           }
+       ],
+       "Name": "NPCM400 SMC EVB with MCTP I3C (OBMF)",
+       "Probe": "TRUE",
+       ...
+   }
+   ```
+
+   `Address` is the target PID (`0x06 0x32 0x12 0x34 0x56 0x07`), not its
+   dynamic address, so the configuration still matches after a Hot-Join moves
+   the device. `Bus` is the I3C bus number; mctpreactor maps it to the MCTP
+   link `mctpi3c<Bus>`.
+3. `xyz.openbmc_project.mctpreactor.service` calls mctpd `AssignEndpoint` with
+   that PID on `mctpi3c2`. `mctpd` assigns the EID, adds the route and
+   neighbour, and publishes the endpoint on D-Bus.
+
+Verify on the BMC:
 
 ```bash
-mctp link show mctpi3c2
-mctp addr show dev mctpi3c2
+mctp link show mctpi3c2                     # up, mtu 243
+mctp addr show dev mctpi3c2                 # local EID 8
+journalctl -u xyz.openbmc_project.mctpreactor.service -u mctpd
+busctl tree au.com.codeconstruct.MCTP1      # .../networks/1/endpoints/<EID>
+mctp neigh show                             # <EID> dev mctpi3c2, lladdr = SMC2 PID
 ```
 
-If your I3C bus number is not 2, run `mctp link set mctpi3cN up` and
-`mctp addr add 8 dev mctpi3cN` by hand (and fix `mctp-config-obmf`).
+Use the EID that `mctpd` assigned (10 on the EVB) to check MCTP/PLDM
+connectivity over the I3C channel:
 
-Add the route and neighbour entry for the remote endpoint on SMC2.
-`0x06:32:12:34:56:07` is the PID (link-layer address) of the SMC2 I3C target
-(`2-63212345607`):
+```bash
+pldmtool base GetTID -m 10
+pldmtool base GetPLDMTypes -m 10
+```
+
+```json
+{
+    "Response": 134
+}
+```
+
+Manual setup (only if the image has no `npcm400_evb_i3c_obmf.json`, or to
+debug mctpreactor): add the route and neighbour entry for SMC2 and learn the
+endpoint by hand:
 
 ```bash
 mctp route add 10 via mctpi3c2
 mctp neigh add 10 dev mctpi3c2 lladdr 0x06:32:12:34:56:07
-```
-
-Learn the remote endpoint:
-
-```bash
 busctl call au.com.codeconstruct.MCTP1 \
     /au/com/codeconstruct/mctp1/interfaces/mctpi3c2 \
     au.com.codeconstruct.MCTP.BusOwner1 LearnEndpoint ay 6 0x06 0x32 0x12 0x34 0x56 0x07
@@ -1164,16 +1379,74 @@ Expected output:
 yisb 10 1 "/au/com/codeconstruct/mctp1/networks/1/endpoints/10" true
 ```
 
-Verify MCTP/PLDM connectivity over the I3C channel:
+#### MCTP over I3C data flow (IBI)
 
-```bash
-pldmtool base GetTID -m 10
+Every MCTP message from SMC2 back to the BMC rides on an IBI:
+
+```text
+BMC (mctp-i3c)          SMC1 (OBMF ch18)               SMC2 (I3C target)
+     |  EXECUTE_SEQUENCE:     |                               |
+     |  private write ------->|-- private SDR write --------->|  MCTP request
+     |                        |<-- IBI, MDB 0xAE -------------|  response ready
+     |<-- IBI Notification ---|                               |
+     |    (cmd 5, MDB 0xAE)   |                               |
+     |  ACK {05 00} --------->|                               |
+     |  EXECUTE_SEQUENCE:     |                               |
+     |  private read -------->|-- private SDR read ---------->|
+     |<-- response data ------|<-- MCTP response -------------|
 ```
 
-```json
-{
-    "Response": 134
-}
+- SMC1 forwards the raw IBI payload; it does not read from SMC2 by itself.
+  The BMC decides to read.
+- The BMC must ACK every SMC-initiated event on ch18. Until it does, SMC1
+  cannot send the next IBI or Hot-Join notification on that channel.
+- If `pldmtool` times out while the BMC log shows its requests going out,
+  SMC1 is not forwarding IBIs. Check that SMC1 has the IBI re-registration
+  change listed in the prerequisites.
+
+#### Hot-Join
+
+When SMC2 resets, it rejoins the bus with a Hot-Join request:
+
+1. SMC1's `i3c4` driver ACKs the Hot-Join and runs DAA by itself. SMC2 may
+   get a different dynamic address (for example `0x0a` instead of `0x09`),
+   and SMC1 re-attaches it with a new descriptor.
+2. SMC1 re-registers the IBI for SMC2, matching it by PID, and sends an
+   `I3C_EVT_HOTJOIN_NOTIFICATION` (cmd 6) on ch18. Per OBMF-ICP v1.0.0 RC1
+   section 4.8.1 the event has no parameters or payload:
+   `06 00 00 00 00 00`.
+3. The BMC driver ACKs it (`{06 00}`) and queues `i3c_master_do_daa()`, which
+   sends DO_DAA to SMC1. SMC1 runs RSTDAA + ENTDAA and returns the device
+   list. On the EVB, SMC2 ends up back at `0x09`.
+4. MCTP traffic resumes on the next request without restarting any BMC
+   service (verified on the EVB, where SMC2 gets `0x09` back).
+
+Test: with MCTP traffic running (for example a `pldmtool` loop), reset SMC2.
+
+On the SMC1 console, expect (log prefixes and timestamps omitted):
+
+```text
+<inf> i3c_npcm4: DAA: device 0 assigned to 0x0a
+<inf> i3c_npcm4: Hot-join DAA done: 1 device(s) assigned
+<inf> obmf: I3C Hot-Join: notified BMC
+<inf> i3c_npcm4: DAA: device 0 assigned to 0x09
+<inf> obmf: bus_init: DAA assigned 1 device(s)
+<inf> obmf: Register an I3C device: 0x09 pid=0x63212345607 bcr=0x66 dcr=0xcc
+<inf> obmf: I3C IBI registered and enabled for dev@09 on bus 4
+```
+
+A single `i3c_npcm4: priv transfer error: -5` can show up while SMC2 is at
+its temporary address: a BMC write that was already on its way to the old
+address gets NACKed. It is expected during the address change.
+
+The BMC-side messages are `dev_dbg`. Enable them before the test:
+
+```bash
+echo 'file drivers/usb/class/obmf/obmf-i3c.c +p' > /sys/kernel/debug/dynamic_debug/control
+dmesg -w | grep ch18
+# ch18: Hot-Join received
+# ch18: Hot-Join: starting DAA
+# ch18: DAA found 1 device(s)
 ```
 
 Suggested checks:
@@ -1182,5 +1455,11 @@ Suggested checks:
   `i3c-N` entry exists under `/sys/bus/i3c/devices/`.
 - The remote target appears as an `<bus>-<PID>` device node.
 - The OBMF I3C channel appears as an `mctpi3c*` link in `mctp link show`.
-- `LearnEndpoint` returns the assigned EID and a valid endpoint object path.
+- `mctpd` publishes an endpoint for SMC2 without manual `mctp`/`busctl`
+  commands, and `mctp neigh show` lists it on `mctpi3c2`.
 - `pldmtool base GetTID` returns a valid TID from the remote endpoint on SMC2.
+- After an SMC2 reset, the SMC1 console shows the Hot-Join sequence above, the
+  BMC log shows `Hot-Join received`, and `pldmtool` works again without
+  restarting any BMC service.
+
+[Back to contents](#table-of-contents)
