@@ -10,6 +10,8 @@ SYSTEMD_SUBSTITUTIONS:remove = "OBMC_CONSOLE_HOST_TTY:${OBMC_CONSOLE_HOST_TTY}:$
 
 # Declare port spcific conf and service files
 HOST_CONSOLE_TTY = "ttyS1 ttyS4 ttyS5"
+# OBMF serial channels (ssh ports 2230/2231)
+HOST_CONSOLE_TTY:append:df-obmf = " ttyOBMF0_0 ttyOBMF0_1"
 CONSOLE_CONF_FMT = "file://server.{0}.conf"
 SRC_URI:append = " ${@compose_list(d, 'CONSOLE_CONF_FMT', 'HOST_CONSOLE_TTY')}"
 CONSOLE_SSH_SOCKET_FILE_FMT = "file://${PN}-{0}-ssh.socket"

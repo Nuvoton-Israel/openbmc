@@ -66,6 +66,7 @@ Recipes use the override to add the following only for this distro:
 | Device Tree | `nuvoton-npcm845-evb-obmf.dtso` is applied on `nuvoton-npcm845-evb.dtb` at build time to produce `nuvoton-npcm845-evb-obmf.dtb` (`KERNEL_DEVICETREE`) |
 | mctp | `mctp-config-obmf` replaces the default `mctp-config` (see below) |
 | entity-manager | `nuvoton_npcm400_evb_i2c-obmf.json` replaces the default `nuvoton_npcm400_evb_i2c.json`: the NPCM400 MCTP I2C device is on bus 27 (the OBMF I2C channel) with `"Probe": "TRUE"`, so `xyz.openbmc_project.mctpreactor.service` sets up the endpoint at boot |
+| obmc-console | Adds the `ttyOBMF0_0` and `ttyOBMF0_1` host consoles, reachable over SSH on ports 2230 and 2231 (see [6. UART / Serial test](#6-uart--serial-test)) |
 
 Other distros (`arbel-evb-entity`, `arbel-evb-emmc`, ...) do not get any of
 these changes.
@@ -773,8 +774,8 @@ Suggested checks:
 
 Prerequisites: `CONFIG_USB_OBMF_SERIAL=y`, `CONFIG_TTY=y`
 
-The Serial channel appears as `/dev/ttyOBMF*` and can be used by normal Linux
-tty tools.
+The Serial channel appears as `/dev/ttyOBMF<device>_<channel>` and can be used
+by normal Linux tty tools.
 
 ```bash
 dmesg | grep -i -E 'obmf|ttyOBMF|serial'
@@ -784,11 +785,59 @@ stty -F /dev/ttyOBMF<device>_<channel> 115200 raw -echo
 cat /dev/ttyOBMF<device>_<channel>
 ```
 
+#### Host console (obmc-console)
+
+On the `arbel-evb-obmf` distro, `obmc-console` also serves `ttyOBMF0_0` and
+`ttyOBMF0_1` as host consoles, next to the EVB UART consoles:
+
+| Console | Server config | SSH port |
+|---|---|---|
+| `ttyS1` | `/etc/obmc-console/server.ttyS1.conf` | 2200 |
+| `ttyS4` | `/etc/obmc-console/server.ttyS4.conf` | 2220 |
+| `ttyS5` | `/etc/obmc-console/server.ttyS5.conf` | 2222 |
+| `ttyOBMF0_0` | `/etc/obmc-console/server.ttyOBMF0_0.conf` | 2230 |
+| `ttyOBMF0_1` | `/etc/obmc-console/server.ttyOBMF0_1.conf` | 2231 |
+
+Each OBMF console runs at 115200 baud and logs to
+`/var/log/obmc-console-OBMF0_<n>.log`. The files are in
+`recipes-phosphor/console/obmc-console/`, and the bbappend adds the two
+consoles to `HOST_CONSOLE_TTY` only on the `df-obmf` override.
+
+Check the console servers on the BMC:
+
+```bash
+systemctl status obmc-console@ttyOBMF0_0 obmc-console@ttyOBMF0_1
+systemctl list-sockets | grep obmc-console
+cat /var/log/obmc-console-OBMF0_0.log
+```
+
+Connect from a remote machine (`~.` closes the session):
+
+```bash
+ssh -p 2230 root@<bmc-ip>   # ttyOBMF0_0
+ssh -p 2231 root@<bmc-ip>   # ttyOBMF0_1
+```
+
+Or attach on the BMC itself:
+
+```bash
+obmc-console-client -c /etc/obmc-console/server.ttyOBMF0_0.conf
+```
+
+The console server needs `/dev/ttyOBMF0_<n>` to exist when it starts. If the
+OBMF device enumerates after the server has given up, restart it:
+
+```bash
+systemctl restart obmc-console@ttyOBMF0_0
+```
+
 Suggested checks:
 
 - `/dev/ttyOBMF*` appears after OBMF discovery and remains available.
-- RX path: remote-originated data is visible on the BMC.
-- TX path: BMC-written data is accepted and forwarded.
+- RX path: remote-originated data is visible on the BMC (raw `cat`, the SSH
+  console session and the console log).
+- TX path: BMC-written data, including input typed in the SSH console session,
+  is accepted and forwarded to the UART peer.
 
 ### 7. Port 80 / POST code test
 
