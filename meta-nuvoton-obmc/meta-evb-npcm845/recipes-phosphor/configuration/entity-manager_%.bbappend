@@ -5,6 +5,12 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 NPCM400_I2C_JSON = "nuvoton_npcm400_evb_i2c.json"
 NPCM400_I2C_JSON:df-obmf = "nuvoton_npcm400_evb_i2c-obmf.json"
 
+# The OBMF distro also reaches SMC2 as an MCTP I3C target on the OBMF I3C
+# channel (i3c-2, mctpi3c2).
+NPCM400_I3C_JSON = ""
+NPCM400_I3C_JSON:df-obmf = "npcm400_evb_i3c_obmf.json"
+SRC_URI:append:df-obmf = " file://${NPCM400_I3C_JSON}"
+
 SRC_URI:append = " \
     file://baseboard.fru.bin \
     file://nuvoton_npcm8xx_evb.json \
@@ -24,4 +30,8 @@ do_install:append () {
         ${D}${datadir}/entity-manager/configurations/nuvoton/npcm400_evb_usb.json
     install -m 0644 -D ${UNPACKDIR}/${NPCM400_I2C_JSON} \
         ${D}${datadir}/entity-manager/configurations/nuvoton/npcm400_evb_i2c.json
+    if [ -n "${NPCM400_I3C_JSON}" ]; then
+        install -m 0644 -D ${UNPACKDIR}/${NPCM400_I3C_JSON} \
+            ${D}${datadir}/entity-manager/configurations/nuvoton/${NPCM400_I3C_JSON}
+    fi
 }
