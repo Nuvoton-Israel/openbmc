@@ -28,3 +28,6 @@ DEFAULT_TTY_IDLE_TIMEOUT = "0"
 
 # curl for exercising the Composite EAT Redfish API on target
 IMAGE_INSTALL:append:df-composite-eat = " curl"
+
+# OBMF-ICP driver-level stress test (obmf-stress -h)
+IMAGE_INSTALL:append:df-obmf = " obmf-stress"

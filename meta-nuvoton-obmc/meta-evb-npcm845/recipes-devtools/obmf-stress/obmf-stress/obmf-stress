@@ -1,0 +1,263 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+#
+# obmf-stress - driver-level functional and stress test of an OBMF-ICP
+# device (SMC) seen through the BMC obmf driver.
+#
+# Every OBMF device node is found from sysfs: I2C adapters named "OBMF<n> I2C
+# ch<c>", gpiochips labelled "obmf<n>-gpio-ch<c>", the "npcm-spi-flash" MTD
+# and /dev/ttyOBMF*.  The default run is read-only towards the platform: it
+# reads GPIO inputs and the SPI flash, and touches I2C targets only at the
+# address given with -a.  Writing to the serial channel and rebinding the
+# driver must be asked for.
+#
+# Exit status: number of failed checks (at most 255).
+
+usage() {
+	cat <<EOF
+usage: obmf-stress [options]
+  -a ADDR   I2C target that answers reads on the first OBMF I2C adapter
+            (e.g. 0x10); without it the I2C data tests are skipped
+  -b BUS    use this OBMF I2C adapter instead of the first one
+  -n ADDR   unused I2C address, expected to NACK (e.g. 0x66)
+  -d SECS   duration of the parallel stress phase (default 60, 0 = skip)
+  -r COUNT  unbind/bind the obmf driver COUNT times (default 0)
+  -t        also write to /dev/ttyOBMF*_0 (the data reaches the host UART)
+  -h        this help
+EOF
+}
+
+I2C_ADDR= I2C_BUS= NACK_ADDR= DURATION=60 REBINDS=0 TTY_TEST=
+while getopts "a:b:n:d:r:th" opt; do
+	case $opt in
+	a) I2C_ADDR=$OPTARG ;;
+	b) I2C_BUS=$OPTARG ;;
+	n) NACK_ADDR=$OPTARG ;;
+	d) DURATION=$OPTARG ;;
+	r) REBINDS=$OPTARG ;;
+	t) TTY_TEST=1 ;;
+	*) usage; exit 1 ;;
+	esac
+done
+
+PASS=0 FAIL=0 SKIP=0
+TMP=$(mktemp -d /tmp/obmf-stress.XXXXXX) || exit 255
+trap 'rm -rf "$TMP"' EXIT
+
+pass() { PASS=$((PASS + 1)); echo "PASS  $*"; }
+fail() { FAIL=$((FAIL + 1)); echo "FAIL  $*"; }
+skip() { SKIP=$((SKIP + 1)); echo "SKIP  $*"; }
+check() { # check <description> <command...>
+	d=$1; shift
+	if "$@" >"$TMP/out" 2>&1; then pass "$d"; else
+		fail "$d"; sed 's/^/      /' "$TMP/out" | tail -3; fi
+}
+
+# ---- discovery of the OBMF device nodes -----------------------------------
+
+find_iface() {
+	for d in /sys/bus/usb/drivers/obmf/*:*; do
+		[ -e "$d" ] && { basename "$d"; return; }
+	done
+	for d in /sys/bus/usb/devices/*:*; do
+		[ "$(cat "$d/bInterfaceClass" 2>/dev/null)" = ef ] &&
+		[ "$(cat "$d/bInterfaceSubClass" 2>/dev/null)" = 09 ] &&
+			{ basename "$d"; return; }
+	done
+}
+
+discover() {
+	IFACE=$(find_iface)
+	I2C_BUSES=$(i2cdetect -l 2>/dev/null |
+		awk '/OBMF[0-9]+ I2C ch/ { sub("i2c-", "", $1); print $1 }')
+	BUS=${I2C_BUS:-$(echo "$I2C_BUSES" | head -n 1)}
+	GPIOCHIPS=$(for c in /sys/bus/gpio/devices/gpiochip*; do
+		[ -e "$c" ] || continue
+		case $(cat "$c/label" 2>/dev/null || basename "$c") in
+		obmf*) basename "$c" ;;
+		esac
+	done)
+	[ -n "$GPIOCHIPS" ] || GPIOCHIPS=$(gpiodetect 2>/dev/null |
+		awk '/\[obmf/ { print $1 }')
+	SPI_MTD=$(awk -F: '/"npcm-spi-flash"/ { print $1 }' /proc/mtd)
+	TTY=$(ls /dev/ttyOBMF*_0 2>/dev/null | head -n 1)
+}
+
+# Up to 4 input lines of a gpiochip, as "chip off off ..."
+gpio_inputs() {
+	gpioinfo "$1" 2>/dev/null |
+		awk -v c="$1" '/line +[0-9]+:/ && / input / {
+			sub(":", "", $2); l = l " " $2; if (++n == 4) exit }
+			END { if (n) print c l }'
+}
+
+spi_sum() {
+	dd if="/dev/$SPI_MTD" bs=4096 count=2 2>/dev/null | md5sum | cut -d' ' -f1
+}
+
+dmesg_lines() { dmesg | wc -l; }
+
+# ---- functional checks ----------------------------------------------------
+
+functional() {
+	echo "== OBMF interface $IFACE"
+	check "obmf driver bound to $IFACE" test -e "/sys/bus/usb/drivers/obmf/$IFACE"
+
+	echo "== I2C Controller channel (OBMF-ICP 5.6)"
+	if [ -z "$BUS" ]; then
+		skip "no OBMF I2C adapter"
+	else
+		if [ -n "$I2C_ADDR" ]; then
+			check "i2c-$BUS: read 4 bytes at $I2C_ADDR" \
+				i2ctransfer -y "$BUS" "r4@$I2C_ADDR"
+			check "i2c-$BUS: read 248 bytes at $I2C_ADDR" \
+				i2ctransfer -y "$BUS" "r248@$I2C_ADDR"
+		else
+			skip "I2C reads (no -a ADDR)"
+		fi
+		if [ -n "$NACK_ADDR" ]; then
+			if i2ctransfer -y "$BUS" "r1@$NACK_ADDR" >"$TMP/out" 2>&1; then
+				fail "i2c-$BUS: read at $NACK_ADDR should NACK"
+			elif grep -q "No such device or address" "$TMP/out"; then
+				pass "i2c-$BUS: NACK at $NACK_ADDR reported as ENXIO"
+			else
+				fail "i2c-$BUS: NACK at $NACK_ADDR: $(tail -1 "$TMP/out")"
+			fi
+		fi
+		# Rejected by the adapter quirk before it reaches the bus
+		data=$(i=0; while [ $i -lt 253 ]; do printf "0 "; i=$((i+1)); done)
+		# shellcheck disable=SC2086
+		if i2ctransfer -y "$BUS" "w253@${I2C_ADDR:-0x7f}" $data \
+				>"$TMP/out" 2>&1; then
+			fail "i2c-$BUS: 253-byte write should be refused"
+		else
+			pass "i2c-$BUS: 253-byte write refused (one OBMF message)"
+		fi
+	fi
+
+	echo "== GPIO channels (OBMF-ICP 5.4)"
+	[ -n "$GPIOCHIPS" ] || skip "no OBMF gpiochip"
+	for c in $GPIOCHIPS; do
+		set -- $(gpio_inputs "$c")
+		if [ $# -lt 2 ]; then
+			skip "$c: no input lines"
+			continue
+		fi
+		chip=$1; shift
+		check "$chip: read inputs $*" gpioget "$chip" "$@"
+	done
+
+	echo "== SPI Controller channel (OBMF-ICP 5.10)"
+	if [ -z "$SPI_MTD" ]; then
+		skip "no npcm-spi-flash MTD"
+	else
+		a=$(spi_sum) b=$(spi_sum)
+		check "$SPI_MTD: two 8 KiB reads are identical" \
+			test -n "$a" -a "$a" = "$b"
+		SPI_REF=$a
+	fi
+
+	echo "== Serial channel (OBMF-ICP 5.5)"
+	if [ -z "$TTY" ]; then
+		skip "no /dev/ttyOBMF*_0"
+	elif [ -z "$TTY_TEST" ]; then
+		skip "$TTY write (needs -t)"
+	else
+		stty -F "$TTY" raw -echo 2>/dev/null
+		check "$TTY: 64 KiB write" \
+			dd if=/dev/urandom of="$TTY" bs=1024 count=64
+	fi
+}
+
+# ---- parallel stress ------------------------------------------------------
+
+loop() { # loop <name> <seconds>
+	n=0 f=0 end=$(( $(date +%s) + $2 ))
+	while [ "$(date +%s)" -lt $end ]; do
+		case $1 in
+		i2c) i2ctransfer -y "$BUS" "r16@$I2C_ADDR" ;;
+		gpio) gpioget $GPIO_ARGS ;;
+		spi) [ "$(spi_sum)" = "$SPI_REF" ] ;;
+		tty) head -c 300 /dev/urandom > "$TTY" ;;
+		esac >/dev/null 2>&1 || f=$((f + 1))
+		n=$((n + 1))
+	done
+	echo "$1 $n $f" > "$TMP/loop.$1"
+}
+
+stress() {
+	[ "$DURATION" -gt 0 ] || { skip "parallel stress (-d 0)"; return; }
+	echo "== Parallel stress on independent channels, ${DURATION}s" \
+	     "(OBMF-ICP Table 1 req 14/15)"
+	GPIO_ARGS=$(for c in $GPIOCHIPS; do gpio_inputs "$c"; done | head -n 1)
+	loops=
+	[ -n "$I2C_ADDR" ] && [ -n "$BUS" ] && loops="$loops i2c"
+	[ -n "$GPIO_ARGS" ] && loops="$loops gpio"
+	[ -n "$SPI_REF" ] && loops="$loops spi"
+	[ -n "$TTY_TEST" ] && [ -n "$TTY" ] && loops="$loops tty"
+	[ -n "$loops" ] || { skip "no channel to stress"; return; }
+	for l in $loops; do loop "$l" "$DURATION" & done
+	wait
+	for l in $loops; do
+		read -r name n f < "$TMP/loop.$l"
+		if [ "$f" -eq 0 ]; then pass "stress $name: $n iterations, 0 failures"
+		else fail "stress $name: $n iterations, $f failures"; fi
+	done
+}
+
+# ---- driver rebind ---------------------------------------------------------
+
+rebind() {
+	[ "$REBINDS" -gt 0 ] || return
+	echo "== Driver unbind/bind x$REBINDS (OBMF-ICP 5.15 discovery)"
+	[ -n "$IFACE" ] || { fail "no OBMF interface to rebind"; return; }
+	i=1
+	while [ $i -le "$REBINDS" ]; do
+		echo "$IFACE" > /sys/bus/usb/drivers/obmf/unbind 2>/dev/null
+		if echo "$IFACE" > /sys/bus/usb/drivers/obmf/bind 2>"$TMP/out"; then
+			pass "rebind $i: discovery completed"
+		else
+			fail "rebind $i: $(cat "$TMP/out")"
+			echo "$IFACE" > /sys/bus/usb/drivers/obmf/bind 2>/dev/null
+		fi
+		i=$((i + 1))
+	done
+	discover
+	echo "== After rebinds"
+	[ -n "$BUS" ] && [ -n "$I2C_ADDR" ] &&
+		check "i2c-$BUS: read 4 bytes at $I2C_ADDR" \
+			i2ctransfer -y "$BUS" "r4@$I2C_ADDR"
+	[ -n "$SPI_MTD" ] && check "$SPI_MTD: data unchanged" \
+		test "$(spi_sum)" = "$SPI_REF"
+}
+
+# ---- main -------------------------------------------------------------------
+
+discover
+if [ -z "$IFACE" ]; then
+	echo "no OBMF-ICP USB interface found" >&2
+	exit 255
+fi
+DMESG_START=$(dmesg_lines)
+
+functional
+stress
+rebind
+
+echo "== Kernel log"
+dmesg | tail -n +"$((DMESG_START + 1))" > "$TMP/dmesg"
+if grep -Eiq "oops|bug:|call trace|kasan|refcount" "$TMP/dmesg"; then
+	fail "kernel reported a crash or warning:"
+	grep -Ei "oops|bug:|call trace" "$TMP/dmesg" | head -5
+else
+	pass "no kernel oops or warning"
+fi
+for m in "no request waiting" "does not answer the outstanding" \
+	 "stale Bulk IN" "discovery failed"; do
+	c=$(grep -c "$m" "$TMP/dmesg")
+	[ "$c" -gt 0 ] && echo "      $c x \"$m\""
+done
+
+echo "== Summary: $PASS passed, $FAIL failed, $SKIP skipped"
+[ $FAIL -gt 255 ] && FAIL=255
+exit $FAIL
