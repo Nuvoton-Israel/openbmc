@@ -5,6 +5,174 @@
             "Bus": "27",
             "Name": "MCTP I2C Device 0",
             "Type": "MCTPI2CTarget"
+        },
+        {
+            "Address": "0x48",
+            "Bus": 33,
+            "Name": "SMC2_I2C30_Temp1",
+            "Thresholds": [
+                {
+                    "Direction": "greater than",
+                    "Name": "upper critical",
+                    "Severity": 1,
+                    "Value": 85.0
+                },
+                {
+                    "Direction": "greater than",
+                    "Name": "upper non critical",
+                    "Severity": 0,
+                    "Value": 75.0
+                }
+            ],
+            "Type": "TMP75"
+        },
+        {
+            "Address": "0x48",
+            "Bus": 34,
+            "Name": "SMC2_I2C30_Temp2",
+            "Thresholds": [
+                {
+                    "Direction": "greater than",
+                    "Name": "upper critical",
+                    "Severity": 1,
+                    "Value": 85.0
+                },
+                {
+                    "Direction": "greater than",
+                    "Name": "upper non critical",
+                    "Severity": 0,
+                    "Value": 75.0
+                }
+            ],
+            "Type": "TMP75"
+        },
+        {
+            "Address": "0x48",
+            "Bus": 35,
+            "Name": "SMC2_I2C30_Temp3",
+            "Thresholds": [
+                {
+                    "Direction": "greater than",
+                    "Name": "upper critical",
+                    "Severity": 1,
+                    "Value": 85.0
+                },
+                {
+                    "Direction": "greater than",
+                    "Name": "upper non critical",
+                    "Severity": 0,
+                    "Value": 75.0
+                }
+            ],
+            "Type": "TMP75"
+        },
+        {
+            "Address": "0x48",
+            "Bus": 36,
+            "Name": "SMC2_I2C30_Temp4",
+            "Thresholds": [
+                {
+                    "Direction": "greater than",
+                    "Name": "upper critical",
+                    "Severity": 1,
+                    "Value": 85.0
+                },
+                {
+                    "Direction": "greater than",
+                    "Name": "upper non critical",
+                    "Severity": 0,
+                    "Value": 75.0
+                }
+            ],
+            "Type": "TMP75"
+        },
+        {
+            "Address": "0x49",
+            "Bus": 37,
+            "Name": "SMC2_I2C30_Temp5",
+            "Thresholds": [
+                {
+                    "Direction": "greater than",
+                    "Name": "upper critical",
+                    "Severity": 1,
+                    "Value": 85.0
+                },
+                {
+                    "Direction": "greater than",
+                    "Name": "upper non critical",
+                    "Severity": 0,
+                    "Value": 75.0
+                }
+            ],
+            "Type": "TMP75"
+        },
+        {
+            "Address": "0x4a",
+            "Bus": 38,
+            "Name": "SMC2_I2C30_Temp6",
+            "Thresholds": [
+                {
+                    "Direction": "greater than",
+                    "Name": "upper critical",
+                    "Severity": 1,
+                    "Value": 85.0
+                },
+                {
+                    "Direction": "greater than",
+                    "Name": "upper non critical",
+                    "Severity": 0,
+                    "Value": 75.0
+                }
+            ],
+            "Type": "TMP75"
+        },
+        {
+            "Address": "0x4c",
+            "Bus": 39,
+            "Name": "SMC2_I2C30_Temp7",
+            "Thresholds": [
+                {
+                    "Direction": "greater than",
+                    "Name": "upper critical",
+                    "Severity": 1,
+                    "Value": 85.0
+                },
+                {
+                    "Direction": "greater than",
+                    "Name": "upper non critical",
+                    "Severity": 0,
+                    "Value": 75.0
+                }
+            ],
+            "Type": "TMP75"
+        },
+        {
+            "Address": "0x4d",
+            "Bus": 40,
+            "Name": "SMC2_I2C30_Temp8",
+            "Thresholds": [
+                {
+                    "Direction": "greater than",
+                    "Name": "upper critical",
+                    "Severity": 1,
+                    "Value": 85.0
+                },
+                {
+                    "Direction": "greater than",
+                    "Name": "upper non critical",
+                    "Severity": 0,
+                    "Value": 75.0
+                }
+            ],
+            "Type": "TMP75"
+        },
+        {
+            "Address": "0x23",
+            "Bus": 30,
+            "Name": "SMC2_NCT7363_Fan1",
+            "Type": "I2CFan",
+            "Index": 0,
+            "MaxReading": 14000
         }
     ],
     "Name": "NPCM400 SMC EVB with MCTP I2C (OBMF)",
