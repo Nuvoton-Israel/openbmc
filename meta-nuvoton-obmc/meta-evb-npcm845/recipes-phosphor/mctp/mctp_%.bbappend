@@ -8,6 +8,7 @@ MCTP_CONFIG_SRC:df-obmf = "mctp-config-obmf"
 SRC_URI:append = " file://${MCTP_CONFIG_SRC}"
 SRC_URI:append = " file://setup-eid.conf"
 SRC_URI:append = " file://90-mctp.rules"
+SRC_URI:append:df-obmf = " file://91-mctp-obmf-mtu.rules"
 
 # Fix: static-EID endpoints report a UUID over MCTP but it never reaches
 # D-Bus because the requested/received EID mismatch path publishes the peer
@@ -19,6 +20,7 @@ SRC_URI:append:df-composite-eat = " file://0003-mctpd-attach-Common.UUID-when-le
 
 FILES:${PN} += "${systemd_system_unitdir}/*"
 FILES:${PN} += "${sysconfdir}/udev/rules.d/90-mctp.rules"
+FILES:${PN}:append:df-obmf = " ${sysconfdir}/udev/rules.d/91-mctp-obmf-mtu.rules"
 FILES:${PN} += "${@bb.utils.contains('MCTPD_ROLE', 'endpoint', '${sysconfdir}/mctpd.conf', '', d)}"
 
 # mctpd role: "bus-owner" (default) or "endpoint". Override in conf/local.conf.
@@ -46,4 +48,8 @@ do_install:append () {
         install -d ${D}${sysconfdir}
         install -m 0644 ${UNPACKDIR}/mctpd-endpoint.conf ${D}${sysconfdir}/mctpd.conf
     fi
+}
+
+do_install:append:df-obmf () {
+    install -m 0644 ${UNPACKDIR}/91-mctp-obmf-mtu.rules ${D}${sysconfdir}/udev/rules.d
 }

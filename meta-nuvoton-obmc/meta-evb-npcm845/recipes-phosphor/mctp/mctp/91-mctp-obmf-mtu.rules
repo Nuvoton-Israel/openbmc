@@ -1,0 +1,10 @@
+# The OBMF I2C Controller channel carries one MCTP packet per OBMF request.
+# SMC1 advertises a 252-byte MAX_REQUEST_PAYLOAD_SIZE (OBMF-ICP 1.0.0
+# Section 5.15, Table 65), so the default MCTP-over-I2C MTU of 254 produces
+# 258-byte writes that the driver refuses. The mctpi2c* interfaces appear
+# only after the OBMF driver registers its channels, so mctp-config cannot
+# set the MTU at boot; set it when the interface is added.
+ACTION=="add", SUBSYSTEM=="net", KERNEL=="mctpi2c*", KERNELS=="1-1:1.1", \
+  RUN+="/usr/bin/mctp link set %k mtu 240"
+ACTION=="add", SUBSYSTEM=="net", KERNEL=="mctpi3c2", \
+  RUN+="/usr/bin/mctp link set %k mtu 240"

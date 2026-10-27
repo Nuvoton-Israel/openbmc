@@ -4,11 +4,11 @@ localEid=8
 
 mctp addr add ${localEid} dev mctpi3c2
 mctp link set mctpi3c2 up
-mctp link set mctpi3c2 mtu 243
+mctp link set mctpi3c2 mtu 240
 
 mctp addr add ${localEid} dev mctpi2c27
 mctp link set mctpi2c27 up
-mctp link set mctpi2c27 mtu 243
+mctp link set mctpi2c27 mtu 240
 
 mctp addr add ${localEid} dev mctpusb0
 mctp link set mctpusb0 up
