@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Tim <tim@localhost>
+Subject: [PATCH] arm64: dts: nuvoton: npcm845-evb: enable JTAG Master 2
+
+Enable jtm2. Its pinctrl (jm2_pins) sets MFSEL5.JM2SEL so the JS_* pins
+on J_JTAGS_A35 are driven by JTAG Master 2 instead of the JTAG2 slave.
+
+Upstream-Status: Inappropriate [EVB test]
+---
+diff --git a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+index c567b09..f20fc6f 100644
+--- a/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
++++ b/arch/arm64/boot/dts/nuvoton/nuvoton-npcm845-evb.dts
+@@ -436,6 +436,15 @@
+ 	status = "okay";
+ };
+ 
++/*
++ * JTAG Master 2: pinctrl jm2_pins sets MFSEL5.JM2SEL (bit 1), which moves
++ * the JS_TCK/TMS/TDI/TDO/nTRST pins (J_JTAGS_A35 header) from the
++ * JTAG2 slave to JTAG Master 2. JTAG2 slave is unavailable while enabled.
++ */
++&jtm2 {
++	status = "okay";
++};
++
+ &rng {
+ 	status = "okay";
+ };

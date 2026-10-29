@@ -68,3 +68,6 @@ SRC_URI:append = " file://0016-arm64-npcm845-evb-i3c-tuning-changes.patch"
 
 # i3c: master: add 'detach' sysfs interface (used by nuv-ocp-recovery)
 SRC_URI:append = " file://0017-i3c-master-Add-sysfs-interface-to-detach-I3C-device.patch"
+
+# Enable JTAG Master 2 (JTM2) -> shares the J_JTAGS_A35 header with A35 JTAG1 slave
+SRC_URI:append = " file://0018-arm64-dts-nuvoton-npcm845-evb-enable-jtm2.patch"
