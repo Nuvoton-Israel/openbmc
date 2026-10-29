@@ -16,6 +16,9 @@ SRC_URI:append = " \
     file://npcm500_evb.cfg \
     file://caliptra_mcu.cfg \
     file://cm7_jtm1.cfg \
+    file://cm7_jtm0.cfg \
+    file://caliptra_mcu_jtm0.cfg \
+    file://caliptra_mcu_jtm1.cfg \
     file://rtc_switch.tcl \
 "
 
@@ -26,6 +29,9 @@ do_install:append() {
     install -m 0644 ${UNPACKDIR}/npcm500_evb.cfg ${D}${datadir}/openocd/scripts/npcm500_evb.cfg
     install -m 0644 ${UNPACKDIR}/caliptra_mcu.cfg ${D}${datadir}/openocd/scripts/caliptra_mcu.cfg
     install -m 0644 ${UNPACKDIR}/cm7_jtm1.cfg ${D}${datadir}/openocd/scripts/cm7_jtm1.cfg
+    install -m 0644 ${UNPACKDIR}/cm7_jtm0.cfg ${D}${datadir}/openocd/scripts/cm7_jtm0.cfg
+    install -m 0644 ${UNPACKDIR}/caliptra_mcu_jtm0.cfg ${D}${datadir}/openocd/scripts/caliptra_mcu_jtm0.cfg
+    install -m 0644 ${UNPACKDIR}/caliptra_mcu_jtm1.cfg ${D}${datadir}/openocd/scripts/caliptra_mcu_jtm1.cfg
     install -m 0644 ${UNPACKDIR}/rtc_switch.tcl ${D}${datadir}/openocd/scripts/rtc_switch.tcl
 }
 
