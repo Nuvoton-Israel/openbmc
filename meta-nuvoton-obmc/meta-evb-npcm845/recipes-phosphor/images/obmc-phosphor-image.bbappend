@@ -31,3 +31,11 @@ IMAGE_INSTALL:append:df-composite-eat = " curl"
 
 # OBMF-ICP driver-level stress test (obmf-stress -h)
 IMAGE_INSTALL:append:df-obmf = " obmf-stress"
+
+# Redfish Satellite BMC: ECM link towards the Aggregator BMC.
+# usb-network-ecm is dropped because it uses the same 192.168.7.1/24 address;
+# usb-emmc-storage is dropped to keep the USB device controllers free for the satellite link.
+# usb-network-rndis and obmc-ikvm (HID gadget) are not used on a satellite.
+IMAGE_INSTALL:append:df-satellite = " usb-satellite-link"
+IMAGE_INSTALL:remove:df-satellite = "usb-network-ecm usb-emmc-storage usb-network-rndis"
+IMAGE_FEATURES:remove:df-satellite = "obmc-ikvm"

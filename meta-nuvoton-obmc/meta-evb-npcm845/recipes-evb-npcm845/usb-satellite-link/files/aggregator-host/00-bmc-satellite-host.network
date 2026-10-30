@@ -1,0 +1,12 @@
+# Aggregator BMC side: install as /etc/systemd/network/00-bmc-satellite-host.network
+# Assigns 192.168.7.2/24 to the ECM link to the satellite (matched by host_addr).
+
+[Match]
+MACAddress=02:00:a1:b2:c3:02
+
+[Network]
+Address=192.168.7.2/24
+LinkLocalAddressing=no
+IPv6AcceptRA=no
+ConfigureWithoutCarrier=yes
+RequiredForOnline=no

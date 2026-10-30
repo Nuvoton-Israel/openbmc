@@ -22,7 +22,7 @@ For more product questions, please contact us at:
 | NPCM750 | EVB | `meta-evb-npcm750` | `. setup evb-npcm750-stage` | default, `poleg-evb-entity`, `poleg-evb-emmc`, `poleg-evb-emmc-entity` |
 | NPCM750 | RunBMC + BUV | `meta-buv-runbmc` | `. setup buv-runbmc` | default, `buv-entity`, `buv-runbmc-emmc`, `buv-runbmc-emmc-entity` |
 | NPCM750 | Olympus | `meta-olympus-nuvoton` | `. setup olympus-nuvoton-stage` | default, `olympus-entity`, `olympus-emmc`, `olympus-emmc-entity` |
-| NPCM845 | EVB | `meta-evb-npcm845` | `. setup evb-npcm845-stage` | default, `arbel-evb-entity`, `arbel-evb-emmc`, `arbel-evb-emmc-entity`, `arbel-evb-composite-eat`, `arbel-evb-obmf` |
+| NPCM845 | EVB | `meta-evb-npcm845` | `. setup evb-npcm845-stage` | default, `arbel-evb-entity`, `arbel-evb-emmc`, `arbel-evb-emmc-entity`, `arbel-evb-composite-eat`, `arbel-evb-obmf`, `arbel-evb-satellite` |
 | NPCM845 | DC-SCM | `meta-scm-npcm845` | `. setup scm-npcm845` | `arbel-scm-entity`, `arbel-scm-emmc-entity` |
 
 Shared distro features live in `meta-common` (`conf/distro/include/`):
@@ -31,6 +31,7 @@ Shared distro features live in `meta-common` (`conf/distro/include/`):
 |---------|---------|-------------|
 | `composite-eat` | `composite-eat.inc` | BMC-mediated Composite EAT attestation over SPDM/MCTP (off by default) |
 | `obmf` | `obmf.inc` | OBMF (Open Boot and Management Framework) over USB: kernel `NPCM-6.12-OBMF-dev` branch, OBMF class drivers, board DT overlay, OBMF MCTP link config and entity-manager MCTP I2C endpoint on the OBMF bus |
+| `satellite` | `arbel-evb-satellite.conf` | Redfish satellite BMC: USB device towards an aggregator BMC with a CDC ECM link (`sat0`, 192.168.7.1, Redfish/bmcweb); `obmc-ikvm` and RNDIS are removed |
 | `mctp`, `spdm` | `mctp.inc`, `spdm.inc` | MCTP stack and SPDM responder/requester support |
 
 ## Latest Status
@@ -48,6 +49,13 @@ Shared distro features live in `meta-common` (`conf/distro/include/`):
   bridge relies on this MTU. The NPCM400 MCTP I2C endpoint behind the SMC is
   set up by mctpreactor from the entity-manager config on `i2c-27`. See the
   [OBMF README](meta-evb-npcm845/README-OBMF.md) for details.
+- Redfish satellite BMC: `arbel-evb-satellite` distro exposes the EVB to an
+  aggregator BMC over a USB device port with a CDC ECM link (`sat0`,
+  192.168.7.1, Redfish). An aggregator BMC with bmcweb Redfish aggregation
+  enabled can register the satellite, so the satellite Chassis and sensors
+  appear on the aggregator. The satellite is updated by pushing the
+  `*.static.mtd.tar` image to the satellite bmcweb `UpdateService/update`
+  (aggregation does not forward updates).
 - eMMC boot images (`arbel-evb-emmc`, `arbel-evb-emmc-entity`), TIP firmware
   (pre-signed by default, optional build from source), and QEMU support for
   the NPCM845 EVB.
@@ -123,6 +131,9 @@ Make BMC-mediated Composite EAT attestation target
 
 Make OBMF (Open Boot and Management Framework) target
      DISTRO=arbel-evb-obmf bitbake obmc-phosphor-image
+
+Make Redfish satellite BMC target (USB device link to an aggregator BMC)
+     DISTRO=arbel-evb-satellite bitbake obmc-phosphor-image
 
 Make entity-manager target
      DISTRO=arbel-evb-entity bitbake obmc-phosphor-image

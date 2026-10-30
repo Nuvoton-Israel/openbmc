@@ -1,0 +1,13 @@
+[Unit]
+Description=Satellite BMC USB link to Aggregator BMC (CDC ECM)
+After=systemd-udevd.service usb_network_rndis.service usb_tty.service usb_emmc_storage.service
+ConditionPathExistsGlob=/sys/class/udc/*
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=60
+ExecStart=/usr/sbin/usb_satellite_link.sh
+
+[Install]
+WantedBy=multi-user.target

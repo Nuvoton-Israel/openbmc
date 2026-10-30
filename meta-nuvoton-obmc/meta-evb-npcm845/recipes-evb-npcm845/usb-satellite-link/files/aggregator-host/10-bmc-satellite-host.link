@@ -1,0 +1,8 @@
+# Aggregator BMC side: install as /etc/systemd/network/10-bmc-satellite-host.link
+
+[Match]
+MACAddress=02:00:a1:b2:c3:02
+Type=ether
+
+[Link]
+Name=satellite0
