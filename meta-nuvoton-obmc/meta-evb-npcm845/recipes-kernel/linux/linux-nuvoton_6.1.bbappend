@@ -46,3 +46,30 @@ SRC_URI:append = " file://0010-mctp-route-hold-key-lock-in-mctp_flow_prepare_out
 
 # for npcm bic
 # SRC_URI:append = " file://0020-i3c-master-svc-add-delay-for-NPCM-BIC.patch"
+
+# OBMF (Open Boot and Management Framework) over USB: the arbel-evb-obmf
+# distro builds the same NPCM-6.1-OBMF-dev kernel as meta-vr-interposer-npcm845,
+# with the OBMF class drivers and the evb OBMF overlay (shared with 6.12)
+# applied at build time into nuvoton-npcm845-evb-obmf.dtb.
+FILESEXTRAPATHS:prepend:df-obmf := "${THISDIR}/linux-nuvoton-obmf:${THISDIR}/linux-nuvoton-612:"
+
+KBRANCH:df-obmf = "NPCM-6.1-OBMF-dev"
+SRCREV:df-obmf = "2479d5ec1bd60131658f189be678ddf90edbf2ad"
+
+SRC_URI:append:df-obmf = " \
+    file://0008-usb-class-obmf-emit-OBMF_STATE-uevents.patch \
+    file://nuvoton-npcm845-evb-obmf.dtso \
+    file://obmf.cfg \
+    "
+
+# Linux 6.1 only builds overlays from .dts sources (.dtso came in 6.2), and
+# the source must not share the name of the combined dtb.
+do_patch:append:df-obmf() {
+    dts=${S}/arch/arm64/boot/dts/nuvoton
+    cp ${UNPACKDIR}/nuvoton-npcm845-evb-obmf.dtso ${dts}/nuvoton-npcm845-evb-obmf-ovl.dts
+    if ! grep -q "nuvoton-npcm845-evb-obmf" ${dts}/Makefile; then
+        printf '%s\n' \
+            'nuvoton-npcm845-evb-obmf-dtbs := nuvoton-npcm845-evb.dtb nuvoton-npcm845-evb-obmf-ovl.dtbo' \
+            'dtb-$(CONFIG_ARCH_NPCM) += nuvoton-npcm845-evb-obmf.dtb' >> ${dts}/Makefile
+    fi
+}
