@@ -1,4 +1,4 @@
-DESCRIPTION = "NPCM400 SMC firmware programmer"
+DESCRIPTION = "NPCM400/NPCM500 SMC firmware programmer"
 LICENSE = "GPL-2.0-only"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/GPL-2.0-only;md5=801f80980d171dd6425610833a22dbe6"
 
@@ -13,7 +13,7 @@ S = "${UNPACKDIR}"
 # Or use direct download approach:
 FILENAME = "NpcmFwProg_${PV}.bmc"
 SRC_URI = "https://github.com/Nuvoton-Israel/npcmFwProg/releases/download/v${PV}/${FILENAME};name=bin"
-SRC_URI[bin.sha256sum] = "73a0100ec906dcea6871700dd5c8ee0199a05a9a6a1aed1a118e2d37f7db0b25"
+SRC_URI[bin.sha256sum] = "da86ac42d704c59168574c47521e147f8255a898cfe46a34d299668ff405df77"
 
 SRC_URI += "file://smc-fw-update.sh"
 RDEPENDS:${PN} += "bash"
