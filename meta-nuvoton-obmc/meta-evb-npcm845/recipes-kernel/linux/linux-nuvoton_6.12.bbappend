@@ -66,7 +66,7 @@ SRC_URI:append:df-composite-eat = " \
 # OBMF (Open Boot and Management Framework) over USB: OBMF kernel branch, drivers
 # and an evb overlay applied at build time into nuvoton-npcm845-evb-obmf.dtb
 KBRANCH:df-obmf = "NPCM-6.12-OBMF-dev"
-SRCREV:df-obmf = "959a9d70d0a1ce757a2a11ccf7f6fa7e590f10b8"
+SRCREV:df-obmf = "4815e26c708e57f67319db514feed96752e1d04f"
 
 SRC_URI:append:df-obmf = " \
     file://0016-hwmon-add-nct7363.patch \
