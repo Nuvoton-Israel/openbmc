@@ -23,6 +23,8 @@ SRC_URI:append = " file://0007-dts-mctp-i3c-controller.patch"
 SRC_URI:append = " file://af_mctp.cfg"
 
 SRC_URI:append = " file://0005-mtd-spi-nor-winbond-add-w25q512nwq-and-w25q01nwq.patch"
+SRC_URI:append = " file://0009-net-mctp-Ensure-keys-maintain-only-one-ref-to-corres.patch"
+SRC_URI:append = " file://0010-mctp-route-hold-key-lock-in-mctp_flow_prepare_output.patch"
 
 # CPLD UART
 # SRC_URI:append = " file://0015-support-CPLD-UART-16450.patch"
