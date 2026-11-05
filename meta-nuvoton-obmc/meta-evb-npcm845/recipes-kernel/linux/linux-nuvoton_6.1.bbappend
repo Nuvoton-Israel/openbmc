@@ -22,6 +22,8 @@ SRC_URI:append = " file://0006-dts-mctp-i2c-controller.patch"
 SRC_URI:append = " file://0007-dts-mctp-i3c-controller.patch"
 SRC_URI:append = " file://af_mctp.cfg"
 
+SRC_URI:append = " file://0005-mtd-spi-nor-winbond-add-w25q512nwq-and-w25q01nwq.patch"
+
 # CPLD UART
 # SRC_URI:append = " file://0015-support-CPLD-UART-16450.patch"
 
