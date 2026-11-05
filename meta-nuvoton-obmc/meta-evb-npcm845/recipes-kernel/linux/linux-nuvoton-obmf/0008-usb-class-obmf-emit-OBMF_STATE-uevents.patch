@@ -1,0 +1,52 @@
+From: Joseph Liu <kwliu@nuvoton.com>
+Subject: [PATCH] usb: class: obmf: emit OBMF_STATE uevents when channels are ready or removed
+
+Userspace services bound to the I2C/I3C/MCTP/hwmon devices exported by
+an OBMF-ICP device are not rescanned when the device is hot plugged.
+Send a KOBJ_CHANGE uevent with OBMF_STATE=ready after the last channel
+is registered and OBMF_STATE=removing before teardown starts.
+
+Upstream-Status: Inappropriate [OBMF-ICP development branch]
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+diff --git a/drivers/usb/class/obmf/obmf-core.c b/drivers/usb/class/obmf/obmf-core.c
+index fedb996a6775..e8b695850a82 100644
+--- a/drivers/usb/class/obmf/obmf-core.c
++++ b/drivers/usb/class/obmf/obmf-core.c
+@@ -378,6 +378,20 @@ static void obmf_unregister_channel(struct obmf_channel *ch)
+ /* USB probe                                                           */
+ /* ------------------------------------------------------------------ */
+ 
++/*
++ * Let userspace know when every channel is (un)registered so services that
++ * bind to the exported I2C/I3C/MCTP/hwmon devices can be restarted.
++ */
++static void obmf_send_state_uevent(struct usb_interface *intf,
++				   const char *state)
++{
++	char buf[32];
++	char *envp[] = { buf, NULL };
++
++	snprintf(buf, sizeof(buf), "OBMF_STATE=%s", state);
++	kobject_uevent_env(&intf->dev.kobj, KOBJ_CHANGE, envp);
++}
++
+ static int obmf_probe(struct usb_interface *intf,
+ 		      const struct usb_device_id *id)
+ {
+@@ -587,6 +601,7 @@ static int obmf_probe(struct usb_interface *intf,
+ 	dev_info(&intf->dev,
+ 		 "OBMF-ICP obmf%d ready: %d channels, ver 0x%04x\n",
+ 		 odev->device_index, odev->num_channels - 1, odev->bcd_version);
++	obmf_send_state_uevent(intf, "ready");
+ 	return 0;
+ 
+ err_transport:
+@@ -615,6 +630,7 @@ static void obmf_disconnect(struct usb_interface *intf)
+ 	dev_info(&intf->dev, "OBMF-ICP disconnecting\n");
+ 
+ 	odev->disconnected = true;
++	obmf_send_state_uevent(intf, "removing");
+ 
+ 	/* Unregister all subsystem adapters (reverse order) */
+ 	for (i = odev->num_channels - 1; i >= 1; i--) {
