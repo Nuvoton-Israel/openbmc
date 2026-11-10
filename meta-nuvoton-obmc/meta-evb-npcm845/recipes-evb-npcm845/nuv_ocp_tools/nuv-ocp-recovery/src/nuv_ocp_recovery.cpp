@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <ctype.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -1792,10 +1793,11 @@ static int detach_i3c_bus_devices(int bus_number)
 /**
  * Read PROT_CAP from an I3C target with a single transfer.
  *
- * Used to confirm that the recovery target candidate supports streaming boot;
- * it is never called for Caliptra's main target (see
- * find_i3c_virtual_device()).  It does not go through
- * get_device_capabilities()/i3c_block_read() for two reasons:
+ * Used to confirm that the recovery target picked by select_recovery_target()
+ * supports streaming boot.  It is never called for Caliptra's main target.
+ *
+ * It does not go through get_device_capabilities()/i3c_block_read() for two
+ * reasons:
  *
  * - i3c_block_read() retries a failed transfer up to six times with a 1s
  *   sleep in between.  A failed probe is already covered by the caller
@@ -1881,21 +1883,125 @@ static uint16_t probe_prot_cap(const std::string &cdev, uint8_t dyn_addr)
 	return (uint16_t)r_data[2 + 10] | ((uint16_t)r_data[2 + 11] << 8);
 }
 
+/*
+ * An I3C target enumerated on a bus: its sysfs name ("<bus>-<provisional_id>")
+ * and its BCR.
+ */
+struct i3c_target {
+	std::string name;
+	uint8_t bcr;
+};
+
+/**
+ * Tell Caliptra's recovery target apart from its main target by BCR.
+ *
+ * Caliptra puts two targets on the bus, the recovery (virtual) target and the
+ * main target, which only carries MCTP.  Their BCRs depend on the i3c-core
+ * version: recovery 0x30 and main 0x36 on newer versions, recovery 0x36 and
+ * main 0x26 on older ones.
+ *
+ * 0x36 is the main target on one version and the recovery target on another,
+ * so a single BCR does not tell which target is which.  The two BCRs are
+ * compared instead:
+ *
+ * - Both have the virtual-target bit (BCR[4]), as on newer versions: the main
+ *   target is the one that is also IBI request capable (BCR[1]), and the
+ *   recovery target is the other one.  Exactly one of them must have BCR[1].
+ * - Only one has BCR[4], as on older versions: it is the recovery target.
+ * - Anything else, including neither having BCR[4]: refuse.
+ *
+ * Exactly two targets must be on the bus.  With only one, the rules above can
+ * pick the wrong target: on a newer version, if only the main target (0x36) is
+ * enumerated, "only one has BCR[4]" would choose it.  On the NPCM500, a single
+ * private write addressed to the main target during recovery was observed to
+ * corrupt the image size the ROM reads from INDIRECT_FIFO_CTRL of the recovery
+ * target, failing the whole recovery.
+ *
+ * Only the BCRs read from sysfs are used; nothing is sent to any target.
+ *
+ * @param bus_number I3C bus number, used in messages.
+ * @param targets    Every target enumerated on the bus.
+ *
+ * @return Index of the recovery target in targets, or -1 if it cannot be told
+ * apart from the main target.
+ */
+static int select_recovery_target(int bus_number, const std::vector<i3c_target> &targets)
+{
+	std::string list;
+
+	/* "2-fffe005a00a5 bcr 0x36, 2-fffe005a10a5 bcr 0x30", for messages. */
+	for (const auto &t : targets) {
+		char bcr_hex[8];
+
+		snprintf(bcr_hex, sizeof(bcr_hex), "0x%02x", t.bcr);
+		if (!list.empty()) {
+			list += ", ";
+		}
+		list += t.name + " bcr " + bcr_hex;
+	}
+
+	if (targets.size() != 2) {
+		fprintf(stderr, "bus %d has %zu i3c target(s) (%s), need exactly Caliptra's "
+			"recovery and main targets to tell them apart by BCR\n",
+			bus_number, targets.size(), list.c_str());
+		return -1;
+	}
+
+	bool virt0 = (targets[0].bcr & I3C_BCR_VIRTUAL_TARGET) != 0;
+	bool virt1 = (targets[1].bcr & I3C_BCR_VIRTUAL_TARGET) != 0;
+	bool ibi0 = (targets[0].bcr & I3C_BCR_IBI_REQUEST_CAPABLE) != 0;
+	bool ibi1 = (targets[1].bcr & I3C_BCR_IBI_REQUEST_CAPABLE) != 0;
+
+	if (virt0 && virt1) {
+		if (ibi0 == ibi1) {
+			fprintf(stderr, "bus %d (%s): both targets have BCR[4] but %s BCR[1], "
+				"cannot tell the recovery target from the main target\n",
+				bus_number, list.c_str(), ibi0 ? "both have" : "neither has");
+			return -1;
+		}
+
+		int idx = ibi0 ? 1 : 0;
+
+		fprintf(stderr, "bus %d (%s): both targets have BCR[4], "
+			"taking %s, the one without BCR[1]\n",
+			bus_number, list.c_str(), targets[idx].name.c_str());
+		return idx;
+	}
+
+	if (virt0 != virt1) {
+		int idx = virt0 ? 0 : 1;
+
+		fprintf(stderr, "bus %d (%s): only %s has BCR[4], taking it\n",
+			bus_number, list.c_str(), targets[idx].name.c_str());
+		return idx;
+	}
+
+	fprintf(stderr, "bus %d (%s): neither target has BCR[4], "
+		"cannot tell the recovery target from the main target\n",
+		bus_number, list.c_str());
+	return -1;
+}
+
 /**
  * Locate the I3C recovery target device for a given bus number.
  *
- * Scans /sys/bus/i3c/devices/ for a target named "<bus>-<provisional_id>" with
- * the virtual-target bit (BCR[4]) set.  Caliptra puts two such targets on the
- * bus: the recovery (virtual) target with BCR 0x30 and the main target with
- * BCR 0x36, which only carries MCTP.  The main target is told apart by its
- * IBI-request-capable bit (BCR[1]) and is never sent anything; the remaining
- * candidate is asked for PROT_CAP and taken if it supports streaming
- * (flashless) boot.  The matching character device path is returned.
+ * 1. Read the BCR of every target named "<bus>-<provisional_id>" under
+ *    /sys/bus/i3c/devices/.  Nothing is sent to any target in this step.
+ * 2. Pick the recovery target by comparing the BCRs (see
+ *    select_recovery_target()).  With only_name set (-d), the picked target
+ *    must be that one.  The other targets on the bus are still read, since
+ *    the decision needs both of Caliptra's targets.
+ * 3. Check that the picked target has a dynamic address and an i3cdev
+ *    character node, ask it for PROT_CAP and take it if it supports streaming
+ *    (flashless) boot.  The matching character device path is returned.
+ *
+ * On any failure, -1 is returned without sending anything to the other
+ * target; the caller re-triggers discovery and calls this again.
  *
  * @param bus_number      I3C bus number.
- * @param only_name       Sysfs name ("<bus>-<provisional_id>") of the one
- *                        target to consider, or empty to consider every
- *                        target on the bus.
+ * @param only_name       Sysfs name ("<bus>-<provisional_id>") of the target
+ *                        the caller requires, or empty to accept the target
+ *                        picked by BCR.
  * @param dev_path        Output: "/dev/i3c-<bus>-<provisional_id>" on success.
  * @param targets_present Output: true if the bus has any enumerated target at
  *                        all, whether or not it qualifies.
@@ -1908,6 +2014,7 @@ static int find_i3c_virtual_device(int bus_number, const std::string &only_name,
 	namespace fs = std::filesystem;
 	std::error_code ec;
 	std::string prefix = std::to_string(bus_number) + "-";
+	std::vector<i3c_target> targets;
 
 	targets_present = false;
 
@@ -1928,125 +2035,124 @@ static int find_i3c_virtual_device(int bus_number, const std::string &only_name,
 
 		targets_present = true;
 
-		if (!only_name.empty() && name != only_name) {
-			continue;
-		}
-
 		std::ifstream bcr_in(entry.path() / "bcr");
-		if (!bcr_in.is_open()) {
-			continue;
-		}
-
 		std::string bcr_str;
-		std::getline(bcr_in, bcr_str);
-		if (bcr_str.empty()) {
-			continue;
+		if (bcr_in.is_open()) {
+			std::getline(bcr_in, bcr_str);
 		}
-
-		/* sysfs prints bcr as hex (e.g. "0x33"); base 16 handles the optional 0x. */
-		unsigned long bcr = strtoul(bcr_str.c_str(), NULL, 16);
 
 		/*
-		 * Never send a private transfer to Caliptra's main target: it
-		 * sets BCR[4] too, but unlike the recovery target it is IBI
-		 * capable (BCR[1]).  On the NPCM500, a single private write
-		 * addressed to the main target during recovery was observed to
-		 * corrupt the image size the ROM reads from INDIRECT_FIFO_CTRL
-		 * of the recovery target, failing the whole recovery.
+		 * The kernel prints bcr as bare hex ("%x", e.g. "36"); base 16
+		 * also accepts an optional 0x.  getline() has dropped the
+		 * newline, so a valid value is parsed to its end.  strtoul()
+		 * also skips leading whitespace and accepts a sign, which a
+		 * valid value never has, so the first character must be a hex
+		 * digit.
 		 */
-		if ((bcr & I3C_BCR_VIRTUAL_TARGET) && (bcr & I3C_BCR_IBI_REQUEST_CAPABLE)) {
-			fprintf(stderr,
-				"i3c device %s: bcr 0x%02lx is the IBI-capable main target, not probing\n",
-				name.c_str(), bcr);
-			continue;
+		char *bcr_end = NULL;
+		unsigned long bcr = strtoul(bcr_str.c_str(), &bcr_end, 16);
+
+		/*
+		 * Every target on the bus takes part in the decision, so a
+		 * target whose BCR cannot be read makes this scan inconclusive.
+		 * Skipping it could leave exactly two targets that are not
+		 * Caliptra's pair.
+		 */
+		if (bcr_str.empty() || !isxdigit((unsigned char)bcr_str[0]) ||
+		    bcr_end == bcr_str.c_str() || *bcr_end != '\0' || bcr > 0xff) {
+			fprintf(stderr, "i3c device %s: cannot read bcr (\"%s\")\n",
+				name.c_str(), bcr_str.c_str());
+			return -1;
 		}
 
-		if (bcr & I3C_BCR_VIRTUAL_TARGET) {
-			std::string cdev = std::string("/dev/i3c-") + name;
+		targets.push_back({name, (uint8_t)bcr});
+	}
 
-			/*
-			 * The bcr match only proves the sysfs entry exists; a
-			 * stale/half-attached target can advertise the virtual
-			 * bit while lacking a dynamic address and an i3cdev
-			 * character node (open()/dynamic_address then fail).
-			 * Require the device to be fully usable before accepting
-			 * it, otherwise skip it so the caller re-triggers
-			 * discovery to re-enumerate the target.
-			 */
-			std::ifstream da_in(entry.path() / "dynamic_address");
-			std::string da_str;
-			if (da_in.is_open()) {
-				std::getline(da_in, da_str);
-			}
+	if (!targets_present) {
+		fprintf(stderr, "no i3c targets enumerated on bus %d\n", bus_number);
+		return -1;
+	}
 
-			if (da_str.empty()) {
-				fprintf(stderr,
-					"i3c device %s: bcr 0x%02lx but no dynamic_address, skipping\n",
-					name.c_str(), bcr);
-				continue;
-			}
+	int idx = select_recovery_target(bus_number, targets);
+	if (idx < 0) {
+		return -1;
+	}
 
-			if (access(cdev.c_str(), F_OK) != 0) {
-				fprintf(stderr,
-					"i3c device %s: char node %s not ready, skipping\n",
-					name.c_str(), cdev.c_str());
-				continue;
-			}
+	const i3c_target &target = targets[idx];
+	std::string cdev = std::string("/dev/i3c-") + target.name;
 
-			/*
-			 * Confirm that the candidate really is a recovery
-			 * target with streaming boot support.  sysfs exports
-			 * dynamic_address as bare hex digits ("0a"), hence
-			 * base 16.
-			 */
-			uint8_t dyn_addr = (uint8_t)strtoul(da_str.c_str(), NULL, 16);
-			uint16_t caps = probe_prot_cap(cdev, dyn_addr);
-
-			if (!(caps & PROT_CAP2_FLASHLESS_BOOT_VALUE)) {
-				fprintf(stderr,
-					"i3c device %s: PROT_CAP 0x%04x has no streaming boot support, skipping\n",
-					name.c_str(), caps);
-				continue;
-			}
-
-			dev_path = cdev;
-			fprintf(stderr,
-				"found i3c recovery device %s (bcr 0x%02lx, dynamic_address 0x%s, PROT_CAP 0x%04x)\n",
-				dev_path.c_str(), bcr, da_str.c_str(), caps);
-			return 0;
-		}
+	if (!only_name.empty() && target.name != only_name) {
+		fprintf(stderr, "i3c device %s is not the recovery target picked by BCR (%s), "
+			"not using it\n", only_name.c_str(), target.name.c_str());
+		return -1;
 	}
 
 	/*
-	 * Tell "nothing on the bus" apart from "targets that do not qualify":
-	 * the first means the NPCM500 has not been enumerated (yet).
+	 * The bcr match only proves the sysfs entry exists; a stale/half-attached
+	 * target can still be listed while lacking a dynamic address and an
+	 * i3cdev character node (open()/dynamic_address then fail).  Require the
+	 * device to be fully usable before accepting it, otherwise let the
+	 * caller re-trigger discovery to re-enumerate the target.
 	 */
-	if (!targets_present) {
-		fprintf(stderr, "no i3c targets enumerated on bus %d\n", bus_number);
-	} else {
-		fprintf(stderr, "no i3c recovery device with streaming boot support found for bus %d\n",
-			bus_number);
+	std::ifstream da_in(fs::path(I3C_SYSFS_DEVICES) / target.name / "dynamic_address");
+	std::string da_str;
+	if (da_in.is_open()) {
+		std::getline(da_in, da_str);
 	}
-	return -1;
+
+	if (da_str.empty()) {
+		fprintf(stderr, "i3c device %s: bcr 0x%02x but no dynamic_address\n",
+			target.name.c_str(), target.bcr);
+		return -1;
+	}
+
+	if (access(cdev.c_str(), F_OK) != 0) {
+		fprintf(stderr, "i3c device %s: char node %s not ready\n",
+			target.name.c_str(), cdev.c_str());
+		return -1;
+	}
+
+	/*
+	 * Confirm that the picked target really is a recovery target with
+	 * streaming boot support.  sysfs exports dynamic_address as bare hex
+	 * digits ("0a"), hence base 16.
+	 */
+	uint8_t dyn_addr = (uint8_t)strtoul(da_str.c_str(), NULL, 16);
+	uint16_t caps = probe_prot_cap(cdev, dyn_addr);
+
+	if (!(caps & PROT_CAP2_FLASHLESS_BOOT_VALUE)) {
+		fprintf(stderr, "i3c device %s: PROT_CAP 0x%04x has no streaming boot support\n",
+			target.name.c_str(), caps);
+		return -1;
+	}
+
+	dev_path = cdev;
+	fprintf(stderr,
+		"found i3c recovery device %s (bcr 0x%02x, dynamic_address 0x%s, PROT_CAP 0x%04x)\n",
+		dev_path.c_str(), target.bcr, da_str.c_str(), caps);
+	return 0;
 }
 
 /**
  * Get the recovery target on a bus ready for the recovery transfer.
  *
- * 1. If the bus already has enumerated targets, ask them for PROT_CAP and use
- *    the one that supports streaming boot.  Nothing is detached or
- *    re-discovered in that case.
- * 2. If targets are enumerated but none of them qualifies, they are treated
- *    as stale (e.g. the NPCM500 was reset and lost its dynamic address while
- *    the kernel still holds the old one) and all of them are detached, once.
+ * 1. If the bus already has enumerated targets, pick the recovery target among
+ *    them by BCR, ask it for PROT_CAP and use it if it supports streaming boot
+ *    (see find_i3c_virtual_device()).  Nothing is detached or re-discovered in
+ *    that case.
+ * 2. If targets are enumerated but no recovery target qualifies (e.g. only one
+ *    of Caliptra's two targets is enumerated, or the NPCM500 was reset and
+ *    lost its dynamic address while the kernel still holds the old one), they
+ *    are treated as stale and all of them are detached, once.
  * 3. Trigger discovery and look again, repeating both until the timeout: the
  *    NPCM500 may not be on the bus yet, and right after it joins it may not
  *    serve PROT_CAP yet.  The targets are not detached again inside this
  *    loop, since that would remove a target that has just joined.
  *
  * @param bus_number I3C bus number.
- * @param only_name  Sysfs name ("<bus>-<provisional_id>") of the one target to
- *                   accept, or empty to accept any target on the bus.
+ * @param only_name  Sysfs name ("<bus>-<provisional_id>") of the target the
+ *                   caller requires, or empty to accept the target picked by
+ *                   BCR.
  * @param dev_path   Output: "/dev/i3c-<bus>-<provisional_id>" on success.
  *
  * @return 0 on success or -1 on failure.
@@ -2155,6 +2261,16 @@ int main (int argc, char *argv[])
 				fprintf(stderr, "found at %ld\n", (result - device_name));
 			}
 
+			/*
+			 * tmp holds everything after the first '-'.  Refuse a
+			 * device path too long for it instead of overflowing the
+			 * stack buffer.
+			 */
+			if (strlen(result + 1) >= sizeof(tmp)) {
+				fprintf(stderr, "i3c device path too long: %s\n", device_name);
+				return 1;
+			}
+
 			strncpy(tmp, (device_name + (result - device_name) + 1), (strlen(device_name) - 
 						(result - device_name) - 1));
 			tmp[(strlen(device_name) - (result - device_name) - 1)] = '\0';
@@ -2165,8 +2281,9 @@ int main (int argc, char *argv[])
 
 			/*
 			 * Manual -d path: before any i3c transfer, make sure the
-			 * given target is on the bus and answers PROT_CAP, the
-			 * same way the -j path does for the config's bus.  tmp is
+			 * given target is on the bus, is the recovery target
+			 * picked by BCR and answers PROT_CAP, the same way the -j
+			 * path does for the config's bus.  tmp is
 			 * "<bus>-<pid>", so the bus number is its leading digits.
 			 * A detach and rediscovery may change the target's
 			 * dynamic address, so this must run before
@@ -2191,6 +2308,20 @@ int main (int argc, char *argv[])
 				}
 
 				if (acquire_recovery_device((int)bus, tmp, found_path) != 0) {
+					return 1;
+				}
+
+				/*
+				 * The checks above were made on the target named by
+				 * tmp, but the transfers below open device_name.
+				 * Refuse a path that is not that target's i3cdev
+				 * node (e.g. another prefix or a symlink), so the
+				 * device used is the one that was checked.
+				 */
+				if (found_path != device_name) {
+					fprintf(stderr, "%s is not the i3c device node of the "
+						"recovery target %s, refusing\n",
+						device_name, found_path.c_str());
 					return 1;
 				}
 			}
