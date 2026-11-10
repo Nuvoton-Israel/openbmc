@@ -1555,7 +1555,7 @@ void print_help(void)
 	printf ("  -v       :  Verbose output for command processing.  Specify multiple times to increase.\n");
 	printf ("  -w       :  Execute a raw write transaction.  Default is to execute a read.\n");
 	printf ("  -W       :  Maximum number of bytes to write to a CMS in each command.  Defaults to 252 bytes.\n");
-	printf ("  -j       :  config file name. Example: /usr/share/lion-recover/lion-recover-config.json\n");
+	printf ("  -j       :  config file name. Example: /usr/share/nuv-ocp-recovery/recovery-config.json\n");
 	printf ("  -D       :  Device recovery dbus object, example: /xyz/openbmc_project/device/LION.  Default is empty.\n");
 	printf ("  -t       :  Target to update, it could be either \"LION\" or \"HSP#\" where \"#\" is the 1-based indexing for the HSP device.  Default: \"LION\".\n");
 #endif
