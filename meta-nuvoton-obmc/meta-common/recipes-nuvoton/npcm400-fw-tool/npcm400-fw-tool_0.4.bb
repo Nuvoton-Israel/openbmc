@@ -13,7 +13,7 @@ S = "${UNPACKDIR}"
 # Or use direct download approach:
 FILENAME = "NpcmFwProg_${PV}.bmc"
 SRC_URI = "https://github.com/Nuvoton-Israel/npcmFwProg/releases/download/v${PV}/${FILENAME};name=bin"
-SRC_URI[bin.sha256sum] = "da86ac42d704c59168574c47521e147f8255a898cfe46a34d299668ff405df77"
+SRC_URI[bin.sha256sum] = "4d4c9c2fbcebba0ae716d01aac368874195ddcb41ee9e5c506b97b6e91bfb527"
 
 SRC_URI += "file://smc-fw-update.sh"
 RDEPENDS:${PN} += "bash"
