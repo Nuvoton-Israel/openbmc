@@ -16,7 +16,6 @@ SRC_URI:append = " \
     file://nuvoton_npcm8xx_evb.json \
     file://nuvoton_npcm400_evb_usb.json \
     file://${NPCM400_I2C_JSON} \
-    file://0001-schemas-Describe-MCTP-USB-targets.patch \
     "
 
 do_install:append () {

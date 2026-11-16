@@ -1,11 +1,14 @@
 {
     "Exposes": [
         {
-            "Configuration": "1",
-            "InterfaceNum": "0",
+            "Board": "NPCM400 SMC EVB with MCTP USB",
+            "Configuration": 1,
+            "Interface": 0,
             "Name": "MCTP USB Device 0",
-            "Port": "1",
-            "RootHubPath": "/sys/devices/platform/ahb/f0828100.usb",
+            "Port": [
+                1
+            ],
+            "RootHubPosition": 0,
             "Type": "MCTPUSBDevice"
         }
     ],

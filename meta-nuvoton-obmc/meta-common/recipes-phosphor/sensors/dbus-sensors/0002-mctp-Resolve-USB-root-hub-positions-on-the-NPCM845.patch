@@ -1,0 +1,93 @@
+From 4a36301340ad05258251cd050c2e085d64b60c76 Mon Sep 17 00:00:00 2001
+From: Joseph Liu <kwliu@nuvoton.com>
+Date: Mon, 16 Nov 2026 14:41:11 +0800
+Subject: [PATCH 2/2] mctp: Resolve USB root hub positions on the NPCM845
+
+The MCTPUSBDevice RootHubPosition is resolved through a per-SOC table of
+USB host controllers, chosen by /sys/bus/soc/devices/soc0/family. The
+NPCM845 does not register a soc bus device, so every USB MCTP device on
+it was rejected as an unsupported SOC.
+
+Fall back to the device tree root compatible list when soc0 is absent,
+and map the NPCM845 EHCI controllers at f0828100 and f082a100 to
+positions 0 and 1. The OHCI companions are not listed, as for the
+AST2600.
+
+Upstream-Status: Pending
+Signed-off-by: Joseph Liu <kwliu@nuvoton.com>
+---
+ src/mctp/MCTPEndpoint.cpp | 34 +++++++++++++++++++++++++++++-----
+ 1 file changed, 29 insertions(+), 5 deletions(-)
+
+diff --git a/src/mctp/MCTPEndpoint.cpp b/src/mctp/MCTPEndpoint.cpp
+index e2adcd8..1b363d6 100644
+--- a/src/mctp/MCTPEndpoint.cpp
++++ b/src/mctp/MCTPEndpoint.cpp
+@@ -14,6 +14,7 @@
+ #include <sdbusplus/message.hpp>
+ #include <sdbusplus/message/native_types.hpp>
+ 
++#include <algorithm>
+ #include <array>
+ #include <cassert>
+ #include <charconv>
+@@ -627,6 +628,13 @@ static std::span<const std::string_view> rootHubsForSoc(
+         "/sys/devices/platform/soc@14000000/14123000.usb",
+     };
+ 
++    // The NPCM845 EHCI controllers. Their OHCI companions at f0829000 and
++    // f082b000 serve the same ports at lower speed and are not listed.
++    static constexpr std::array<std::string_view, 2> npcm845RootHubs = {
++        "/sys/devices/platform/ahb/f0828100.usb",
++        "/sys/devices/platform/ahb/f082a100.usb",
++    };
++
+     if (socFamily.contains("AST2600") || socFamily.contains("AST2620"))
+     {
+         return ast2600RootHubs;
+@@ -635,6 +643,10 @@ static std::span<const std::string_view> rootHubsForSoc(
+     {
+         return ast2700RootHubs;
+     }
++    if (socFamily.contains("nuvoton,npcm845"))
++    {
++        return npcm845RootHubs;
++    }
+ 
+     return {};
+ }
+@@ -643,14 +655,26 @@ static std::span<const std::string_view> rootHubsForSoc(
+ // nullopt, having logged why, if the SOC or the position is not supported.
+ static std::optional<std::string_view> rootHubPathForPosition(size_t position)
+ {
++    std::string socFamily;
+     std::ifstream socFamilyFile("/sys/bus/soc/devices/soc0/family");
+-    if (!socFamilyFile)
++    if (socFamilyFile)
+     {
+-        error("Unable to read SOC family information");
+-        return std::nullopt;
++        std::getline(socFamilyFile, socFamily);
++    }
++    else
++    {
++        // Not every SOC registers a soc bus device; the NPCM845 does not.
++        // Fall back to the root compatible list of the device tree.
++        std::ifstream compatibleFile("/sys/firmware/devicetree/base/compatible");
++        if (!compatibleFile)
++        {
++            error("Unable to read SOC family information");
++            return std::nullopt;
++        }
++        socFamily.assign(std::istreambuf_iterator<char>(compatibleFile),
++                         std::istreambuf_iterator<char>());
++        std::ranges::replace(socFamily, '\0', ' ');
+     }
+-    std::string socFamily;
+-    std::getline(socFamilyFile, socFamily);
+ 
+     const std::span<const std::string_view> rootHubs =
+         rootHubsForSoc(socFamily);
+-- 
+2.43.0
+
