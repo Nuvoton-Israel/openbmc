@@ -45,7 +45,6 @@ RDEPENDS:${PN}-system = " \
     usb-emmc-storage \
     loadmcu \
     openssl-bin \
-    openssl-engines \
     phosphor-power-systemd-links-monitor \
     phosphor-power-utils \
     phosphor-power \

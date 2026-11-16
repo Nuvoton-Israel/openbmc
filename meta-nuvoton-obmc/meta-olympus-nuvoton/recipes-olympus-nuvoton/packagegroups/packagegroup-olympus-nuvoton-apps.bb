@@ -50,7 +50,6 @@ RDEPENDS:${PN}-system = " \
         phosphor-sel-logger \
         phosphor-image-signing \
         openssl-bin \
-        openssl-engines \
         loadsvf \
         asd \
         iptables \

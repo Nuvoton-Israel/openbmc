@@ -44,7 +44,6 @@ RDEPENDS:${PN}-system = " \
         iperf3 \
         ipmitool \
         openssl-bin \
-        openssl-engines \
         phosphor-host-postd \
         phosphor-sel-logger \
         rsyslog \
