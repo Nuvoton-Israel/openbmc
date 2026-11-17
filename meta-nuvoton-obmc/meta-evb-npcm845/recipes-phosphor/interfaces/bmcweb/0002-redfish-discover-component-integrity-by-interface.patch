@@ -1,4 +1,4 @@
-From aa311a5cb0d0a4f495336cc7bc53494281e3f7d1 Mon Sep 17 00:00:00 2001
+From 1bb2969df632407d0e8031e8398a49e60e9fc6b9 Mon Sep 17 00:00:00 2001
 From: helloxiling <helloxiling@users.noreply.github.com>
 Date: Sun, 13 Sep 2026 21:10:58 -0700
 Subject: [PATCH 2/5] redfish: discover component integrity by interface

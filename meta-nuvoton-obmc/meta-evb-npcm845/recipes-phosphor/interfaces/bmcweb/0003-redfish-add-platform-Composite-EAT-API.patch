@@ -1,4 +1,4 @@
-From 0b933b6aecd7b98af31c85980055a95aa50317ba Mon Sep 17 00:00:00 2001
+From 369f878be0a5f3f9c28225e5b830813069b6dcc9 Mon Sep 17 00:00:00 2001
 From: xilingsun <xilingsun@microsoft.com>
 Date: Mon, 14 Sep 2026 12:15:38 -0700
 Subject: [PATCH 3/5] redfish: add platform Composite EAT API
@@ -22,10 +22,10 @@ Upstream-Status: Pending [Not submitted to upstream yet]
  create mode 100644 test/redfish-core/lib/oem_composite_eat_test.cpp
 
 diff --git a/config/meson.build b/config/meson.build
-index 779cb888ed..1d30d4f0e4 100644
+index 20a84e8659..2ed585fa25 100644
 --- a/config/meson.build
 +++ b/config/meson.build
-@@ -29,6 +29,7 @@ feature_options = [
+@@ -28,6 +28,7 @@ feature_options = [
      'redfish-allow-rotational-fans',
      'redfish-allow-simple-update',
      'redfish-bmc-journal',
@@ -33,7 +33,7 @@ index 779cb888ed..1d30d4f0e4 100644
      'redfish-component-integrity',
      'redfish-cpu-log',
      'redfish-dbus-log',
-@@ -59,6 +60,10 @@ string_options = [
+@@ -58,6 +59,10 @@ string_options = [
  
  int_options = ['http-body-limit', 'watchdog-timeout-seconds']
  
@@ -45,7 +45,7 @@ index 779cb888ed..1d30d4f0e4 100644
  string_options_string = '\n// String options\n'
  int_options_string = '\n// Integer options\n'
 diff --git a/meson.options b/meson.options
-index 6a83378081..49e939c8af 100644
+index 88eba6098c..4a2110370e 100644
 --- a/meson.options
 +++ b/meson.options
 @@ -75,6 +75,14 @@ option(
@@ -571,17 +571,17 @@ index d2c7e3f349..1b4820c36a 100644
          requestRoutesComponentIntegrity(app);
      }
 diff --git a/test/meson.build b/test/meson.build
-index 45c70394d2..f5a44665e8 100644
+index 17676085e1..0b11765ca0 100644
 --- a/test/meson.build
 +++ b/test/meson.build
-@@ -55,6 +55,7 @@ srcfiles_unittest = files(
-     'redfish-core/lib/account_service_test.cpp',
+@@ -61,6 +61,7 @@ srcfiles_unittest = files(
+     'redfish-core/lib/cable_test.cpp',
      'redfish-core/lib/chassis_test.cpp',
      'redfish-core/lib/component_integrity_test.cpp',
 +    'redfish-core/lib/oem_composite_eat_test.cpp',
      'redfish-core/lib/ethernet_test.cpp',
      'redfish-core/lib/fabric_test.cpp',
-     'redfish-core/lib/log_services_dump_test.cpp',
+     'redfish-core/lib/manager_diagnostic_data_test.cpp',
 diff --git a/test/redfish-core/lib/oem_composite_eat_test.cpp b/test/redfish-core/lib/oem_composite_eat_test.cpp
 new file mode 100644
 index 0000000000..a83ee48414

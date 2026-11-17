@@ -1,4 +1,4 @@
-From ff0313d61c227e45342ee16ee4d1868d140e3526 Mon Sep 17 00:00:00 2001
+From 4fe5fdf41af49a900a182bbef1001b8de6e7cdbf Mon Sep 17 00:00:00 2001
 From: helloxiling <helloxiling@users.noreply.github.com>
 Date: Sun, 13 Sep 2026 20:58:34 -0700
 Subject: [PATCH 1/5] redfish: add ComponentIntegrity resources
@@ -18,10 +18,10 @@ Upstream-Status: Pending [Not submitted to upstream yet]
  create mode 100644 test/redfish-core/lib/component_integrity_test.cpp
 
 diff --git a/config/meson.build b/config/meson.build
-index ac14660c8e..779cb888ed 100644
+index e27f5f5d74..20a84e8659 100644
 --- a/config/meson.build
 +++ b/config/meson.build
-@@ -29,6 +29,7 @@ feature_options = [
+@@ -28,6 +28,7 @@ feature_options = [
      'redfish-allow-rotational-fans',
      'redfish-allow-simple-update',
      'redfish-bmc-journal',
@@ -30,7 +30,7 @@ index ac14660c8e..779cb888ed 100644
      'redfish-dbus-log',
      'redfish-dump-log',
 diff --git a/meson.options b/meson.options
-index c0831ed50f..6a83378081 100644
+index 1459295c07..88eba6098c 100644
 --- a/meson.options
 +++ b/meson.options
 @@ -67,6 +67,14 @@ option(
@@ -444,17 +444,17 @@ index 6cfeea4859..d2c7e3f349 100644
      requestRoutesStorage(app);
      requestRoutesStorageController(app);
 diff --git a/test/meson.build b/test/meson.build
-index 91fe0b387e..45c70394d2 100644
+index f7e11dd4e1..17676085e1 100644
 --- a/test/meson.build
 +++ b/test/meson.build
-@@ -54,6 +54,7 @@ srcfiles_unittest = files(
-     'redfish-core/include/utils/time_utils_test.cpp',
+@@ -60,6 +60,7 @@ srcfiles_unittest = files(
      'redfish-core/lib/account_service_test.cpp',
+     'redfish-core/lib/cable_test.cpp',
      'redfish-core/lib/chassis_test.cpp',
 +    'redfish-core/lib/component_integrity_test.cpp',
      'redfish-core/lib/ethernet_test.cpp',
      'redfish-core/lib/fabric_test.cpp',
-     'redfish-core/lib/log_services_dump_test.cpp',
+     'redfish-core/lib/manager_diagnostic_data_test.cpp',
 diff --git a/test/redfish-core/lib/component_integrity_test.cpp b/test/redfish-core/lib/component_integrity_test.cpp
 new file mode 100644
 index 0000000000..574b9d2f2a

@@ -1,4 +1,4 @@
-From 8c48a3c4375d5b53aee998a8650213eeb6881d1f Mon Sep 17 00:00:00 2001
+From 923313a53979fcd1d4eb1f8d6f21b9eb28273588 Mon Sep 17 00:00:00 2001
 From: xilingsun <xilingsun@microsoft.com>
 Date: Tue, 15 Sep 2026 18:55:19 -0700
 Subject: [PATCH 5/5] redfish: harden ComponentIntegrity and Composite EAT
