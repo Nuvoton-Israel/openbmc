@@ -5,7 +5,7 @@ IMAGE_INSTALL:append = " obmc-ikvm"
 #IMAGE_INSTALL:append = " iperf3"
 #IMAGE_INSTALL:append = " nmon"
 #IMAGE_INSTALL:append = " memtester"
-IMAGE_INSTALL:append = " ipmitool"
+#IMAGE_INSTALL:append = " ipmitool"
 #IMAGE_INSTALL:append = " phosphor-ipmi-ipmb"
 #IMAGE_INSTALL:append = " nuvoton-ipmi-oem"
 #IMAGE_INSTALL:append = " openssl-bin"
@@ -17,3 +17,7 @@ IMAGE_INSTALL:append = " rsyslog"
 IMAGE_INSTALL:append = " loadsvf"
 IMAGE_INSTALL:append = " phosphor-image-signing"
 IMAGE_INSTALL:append = " obmc-console"
+
+# Keep the read-only rootfs within the NPCM750 NOR flash ROFS partition:
+# drop the health monitor and IPMI over LAN on every npcm750 distro.
+IMAGE_FEATURES:remove = "obmc-health-monitor obmc-net-ipmi"
