@@ -88,7 +88,6 @@ RDEPENDS:${PN}-devtools = " \
     dhrystone \
     rw-perf \
     htop \
-    gptfdisk \
     parted \
     "
 
