@@ -1,4 +1,4 @@
-From 9db672f1774b501e87a05292f9fd97dfbba96a22 Mon Sep 17 00:00:00 2001
+From bbf459fc30b41cbd2668da8344b70baba4312e4f Mon Sep 17 00:00:00 2001
 From: Ban Feng <kcfeng0@nuvoton.com>
 Date: Tue, 6 Jun 2023 11:33:34 +0800
 Subject: [PATCH] Create Associations From Defined Property
@@ -7,57 +7,89 @@ Upstream-Status: Inappropriate [oe-specific]
 
 Signed-off-by: Ban Feng <kcfeng0@nuvoton.com>
 ---
- src/entity_manager/entity_manager.cpp | 30 +++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ src/entity_manager/entity_manager.cpp | 40 +++++++++++++++++++++++++--
+ src/entity_manager/entity_manager.hpp |  5 ++++
+ 2 files changed, 43 insertions(+), 2 deletions(-)
 
 diff --git a/src/entity_manager/entity_manager.cpp b/src/entity_manager/entity_manager.cpp
-index 5fcee7576..37fa879dc 100644
+index 47383db0c..06e7cad28 100644
 --- a/src/entity_manager/entity_manager.cpp
 +++ b/src/entity_manager/entity_manager.cpp
-@@ -34,6 +34,7 @@
- #include <functional>
- #include <map>
- #include <regex>
-+#include <iostream>
- constexpr const char* tempConfigDir = "/tmp/configuration/";
- constexpr const char* lastConfiguration = "/tmp/configuration/last.json";
- 
-@@ -194,6 +195,35 @@ void EntityManager::postBoardToDBus(
-         }
+@@ -97,8 +97,16 @@ void EntityManager::postToDbus(const nlohmann::json& newConfiguration)
+         postBoardToDBus(configId, *configObjectPtr, newObjects);
      }
  
-+    auto findAssociations = boardValues.find("Associations");
-+    if (findAssociations != boardValues.end() &&
-+        findAssociations->type() == nlohmann::json::value_t::array)
+-    for (const auto& [assocPath, assocPropValue] :
+-         topology.getAssocs(std::views::keys(newObjects)))
++    auto assocs = topology.getAssocs(std::views::keys(newObjects));
++    for (const auto& [boardPath, defined] : configAssocs)
 +    {
-+        std::cerr << "create Associations to " << boardNameOrig << "\n";
-+        std::vector<Association> associations;
-+        for (auto& association : *findAssociations)
++        if (newObjects.contains(boardPath))
++        {
++            assocs[boardPath].insert(defined.begin(), defined.end());
++        }
++    }
++
++    for (const auto& [assocPath, assocPropValue] : assocs)
+     {
+         auto findBoard = newObjects.find(assocPath);
+         if (findBoard == newObjects.end())
+@@ -253,6 +261,34 @@ void EntityManager::postBoardToDBus(
+         dbus_interface::tryIfaceInitialize(typeIface);
+     }
+ 
++    // Associations defined in the configuration itself, e.g.
++    // "Associations": [{"Forward": "powering", "Reverse": "powered_by",
++    //                   "Path": "/xyz/openbmc_project/inventory/..."}]
++    configAssocs.erase(objectPath);
++    auto findAssociations = configValues.find("Associations");
++    if (findAssociations != configValues.end() &&
++        findAssociations->is_array())
++    {
++        for (const auto& association : *findAssociations)
 +        {
 +            auto findForward = association.find("Forward");
 +            auto findReverse = association.find("Reverse");
 +            auto findPath = association.find("Path");
-+            if (findForward != association.end() &&
-+                findReverse != association.end() &&
-+                findPath != association.end())
++            if (findForward == association.end() ||
++                findReverse == association.end() ||
++                findPath == association.end() || !findForward->is_string() ||
++                !findReverse->is_string() || !findPath->is_string())
 +            {
-+                associations.emplace_back(
-+                    findForward->get<std::string>(),
-+                    findReverse->get<std::string>(),
-+                    findPath->get<std::string>());
++                lg2::error("Invalid association in {CONFIG}", "CONFIG",
++                           configName);
++                continue;
 +            }
++            configAssocs[objectPath].emplace(findForward->get<std::string>(),
++                                             findReverse->get<std::string>(),
++                                             findPath->get<std::string>());
 +        }
-+        std::shared_ptr<sdbusplus::asio::dbus_interface> ifacePtr =
-+            dbus_interface.createInterface(
-+                boardPath, "xyz.openbmc_project.Association.Definitions",
-+                boardNameOrig);
-+        ifacePtr->register_property("Associations", associations);
-+        ifacePtr->initialize();
 +    }
 +
-     nlohmann::json::iterator exposes = boardValues.find("Exposes");
-     if (exposes == boardValues.end())
+     nlohmann::json::iterator exposes = configValues.find("Exposes");
+     if (exposes == configValues.end())
      {
--- 
-2.43.0
-
+diff --git a/src/entity_manager/entity_manager.hpp b/src/entity_manager/entity_manager.hpp
+index d52e91723..41708bab3 100644
+--- a/src/entity_manager/entity_manager.hpp
++++ b/src/entity_manager/entity_manager.hpp
+@@ -14,7 +14,9 @@
+ #include <sdbusplus/asio/object_server.hpp>
+ 
+ #include <flat_map>
++#include <map>
+ #include <optional>
++#include <set>
+ #include <string>
+ #include <unordered_set>
+ 
+@@ -48,6 +50,9 @@ class EntityManager
+     std::unordered_set<std::string> cachedBaseline;
+     nlohmann::json systemConfiguration;
+     Topology topology;
++    // Associations listed in a configuration's "Associations" array, keyed by
++    // the board path. Merged with the topology associations when published.
++    std::map<sdbusplus::object_path, std::set<Association>> configAssocs;
+     boost::asio::io_context& io;
+     ConfigCache configCache;
+ 
