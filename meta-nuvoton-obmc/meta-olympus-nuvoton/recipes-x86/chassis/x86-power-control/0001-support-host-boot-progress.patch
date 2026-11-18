@@ -13,10 +13,10 @@ Signed-off-by: Eason Yang <yhyang2@nuvoton.com>
  1 file changed, 96 insertions(+)
 
 diff --git a/src/power_control.cpp b/src/power_control.cpp
-index b58cd59..81f8819 100644
+index 02b9ebd..1840500 100644
 --- a/src/power_control.cpp
 +++ b/src/power_control.cpp
-@@ -35,6 +35,7 @@
+@@ -38,6 +38,7 @@
  #include <optional>
  #include <regex>
  #include <string_view>
@@ -24,7 +24,7 @@ index b58cd59..81f8819 100644
  
  namespace power_control
  {
-@@ -121,6 +122,7 @@ static std::string buttonDbusName = "xyz.openbmc_project.Chassis.Buttons";
+@@ -91,6 +92,7 @@ static std::string buttonDbusName = "xyz.openbmc_project.Chassis.Buttons";
  static std::string nmiDbusName = "xyz.openbmc_project.Control.Host.NMI";
  static std::string rstCauseDbusName =
      "xyz.openbmc_project.Control.Host.RestartCause";
@@ -32,7 +32,7 @@ index b58cd59..81f8819 100644
  static std::shared_ptr<sdbusplus::asio::dbus_interface> hostIface;
  static std::shared_ptr<sdbusplus::asio::dbus_interface> chassisIface;
  #ifdef CHASSIS_SYSTEM_RESET
-@@ -272,6 +274,16 @@ static void setOperatingSystemState(const OperatingSystemStateStage stage)
+@@ -246,6 +248,16 @@ static void setOperatingSystemState(const OperatingSystemStateStage stage)
                getOperatingSystemStateStage(stage));
  }
  
@@ -49,7 +49,7 @@ index b58cd59..81f8819 100644
  enum class PowerState
  {
      on,
-@@ -484,6 +496,40 @@ static uint64_t getCurrentTimeMs()
+@@ -458,6 +470,40 @@ static uint64_t getCurrentTimeMs()
              .count());
  }
  
@@ -90,7 +90,7 @@ index b58cd59..81f8819 100644
  static constexpr std::string_view getHostState(const PowerState state)
  {
      switch (state)
-@@ -1546,6 +1592,11 @@ static void currentHostStateMonitor()
+@@ -1520,6 +1566,11 @@ static void currentHostStateMonitor()
      else
      {
          pohCounterTimer.cancel();
@@ -102,8 +102,8 @@ index b58cd59..81f8819 100644
          // Set the restart cause set for this restart
          setRestartCause();
      }
-@@ -1614,6 +1665,8 @@ static void currentHostStateMonitor()
-                 // if HostState is trurned to OFF.
+@@ -1588,6 +1639,8 @@ static void currentHostStateMonitor()
+                 // if HostState is turned to OFF.
                  setOperatingSystemState(OperatingSystemStateStage::Inactive);
  
 +		setBootProgress(BootProgressStage::Unspecified);
@@ -111,7 +111,7 @@ index b58cd59..81f8819 100644
                  // Set the restart cause set for this restart
                  setRestartCause();
  #ifdef USE_ACBOOT
-@@ -2255,11 +2308,13 @@ static void postCompleteHandler(bool state)
+@@ -2229,11 +2282,13 @@ static void postCompleteHandler(bool state)
      {
          sendPowerControlEvent(Event::postCompleteAssert);
          setOperatingSystemState(OperatingSystemStateStage::Standby);
@@ -125,7 +125,7 @@ index b58cd59..81f8819 100644
      }
  }
  
-@@ -3031,6 +3086,47 @@ int main(int argc, char* argv[])
+@@ -2766,6 +2821,47 @@ int main(int argc, char* argv[])
      lg2::info("Initializing power state.");
      logStateTransition(powerState);
  
@@ -173,3 +173,5 @@ index b58cd59..81f8819 100644
      // Power Control Service
      sdbusplus::asio::object_server hostServer =
          sdbusplus::asio::object_server(conn);
+-- 
+2.43.0
