@@ -5,7 +5,7 @@ LIC_FILES_CHKSUM = "file://LICENSES/MIT.txt;md5=b1008aa4e86ef6163fc80a22d1547bea
 
 inherit systemd update-rc.d ptest pypi python_pep517 python_setuptools_build_meta useradd
 
-PYPI_PACKAGE = "gpiod_sysfs_proxy"
+DEPENDS += "python3-wheel-native"
 
 SRC_URI += " \
     file://gpiod-sysfs-proxy.init.in \

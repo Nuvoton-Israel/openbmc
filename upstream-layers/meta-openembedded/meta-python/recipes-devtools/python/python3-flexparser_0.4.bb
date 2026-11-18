@@ -8,7 +8,8 @@ SRC_URI[sha256sum] = "266d98905595be2ccc5da964fe0a2c3526fbbffdc45b65b3146d75db99
 
 inherit pypi python_setuptools_build_meta ptest-python-pytest
 
-PYPI_PACKAGE = "flexparser"
+DEPENDS += "python3-wheel-native"
+
 
 PTEST_PYTEST_DIR = "flexparser/testsuite"
 
@@ -17,3 +18,5 @@ RDEPENDS:${PN} += " \
 	python3-email \
 	python3-logging \
 "
+
+BBCLASSEXTEND = "native nativesdk"

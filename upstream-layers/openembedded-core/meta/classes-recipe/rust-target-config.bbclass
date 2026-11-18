@@ -53,12 +53,9 @@ def llvm_features_from_tune(d):
 
     if ('armv6' in mach_overrides) or ('armv6' in feat):
         f.append("+v6")
-    if 'armv5te' in feat:
+    if 'armv5' in feat:
         f.append("+strict-align")
         f.append("+v5te")
-    elif 'armv5' in feat:
-        f.append("+strict-align")
-        f.append("+v5")
 
     if ('armv4' in mach_overrides) or ('armv4' in feat):
         f.append("+strict-align")
@@ -254,6 +251,7 @@ TARGET_ENDIAN[powerpc] = "big"
 TARGET_POINTER_WIDTH[powerpc] = "32"
 TARGET_C_INT_WIDTH[powerpc] = "32"
 MAX_ATOMIC_WIDTH[powerpc] = "32"
+FEATURES[powerpc] = "+secure-plt"
 
 ## powerpc64-unknown-linux-{gnu, musl}
 DATA_LAYOUT[powerpc64] = "E-m:e-Fi64-i64:64-i128:128-n32:64-S128-v256:256:256-v512:512:512"
@@ -438,6 +436,13 @@ def rust_gen_target(d, thing, wd, arch):
         elif fpu == "hard":
             tspec['abi'] = "eabihf"
             tspec['llvm-floatabi'] = "hard"
+    if arch in ["mips", "mipsel"]:
+        tspec['abi'] = "o32"
+        tspec['llvm-abiname'] = "o32"
+    elif arch in ["mips64", "mips64el"]:
+        mips_abi = "n32" if abi == "n32" else "n64"
+        tspec['abi'] = mips_abi
+        tspec['llvm-abiname'] = mips_abi
     tspec['default-uwtable'] = True
     tspec['dynamic-linking'] = True
     tspec['executables'] = True
@@ -449,6 +454,11 @@ def rust_gen_target(d, thing, wd, arch):
     tspec['panic-strategy'] = d.getVar("RUST_PANIC_STRATEGY")
     if "musl" in tspec['llvm-target']:
         tspec['crt-static-respected'] = True
+    # AArch64 AAPCS64 requires non-leaf frame pointers per
+    # https://github.com/ARM-software/abi-aa/blob/main/aapcs64/aapcs64.rst#the-frame-pointer
+    # This matches the upstream aarch64-unknown-linux-gnu target in rustc.
+    if arch == "aarch64":
+        tspec['frame-pointer'] = "non-leaf"
 
     # write out the target spec json file
     with open(wd + rustsys + '.json', 'w') as f:

@@ -2,7 +2,7 @@ SUMMARY = "Linux Bluetooth Stack Userland V5"
 DESCRIPTION = "Linux Bluetooth stack V5 userland components.  These include a system configurations, daemons, tools and system libraries."
 HOMEPAGE = "http://www.bluez.org"
 SECTION = "libs"
-LICENSE = "GPL-2.0-or-later & LGPL-2.1-or-later"
+LICENSE = "GPL-2.0-or-later AND LGPL-2.1-or-later"
 LIC_FILES_CHKSUM = "file://COPYING;md5=12f884d2ae1ff87c09e5b7ccc2c4ca7e \
                     file://COPYING.LIB;md5=fb504b67c50331fc78734fed90fb0e09 \
                     file://src/main.c;beginline=1;endline=24;md5=0ad83ca0dc37ab08af448777c581e7ac"
@@ -28,7 +28,6 @@ PACKAGECONFIG ??= "obex-profiles \
     hid-profiles \
     hog-profiles \
     tools \
-    deprecated \
     udev \
 "
 PACKAGECONFIG[obex-profiles] = "--enable-obex,--disable-obex,libical"
@@ -56,7 +55,6 @@ PACKAGECONFIG[hfp-profiles] = "--enable-hfp,--disable-hfp"
 PACKAGECONFIG[asha-profiles] = "--enable-asha,--disable-asha"
 PACKAGECONFIG[sixaxis] = "--enable-sixaxis,--disable-sixaxis"
 PACKAGECONFIG[tools] = "--enable-tools,--disable-tools"
-PACKAGECONFIG[deprecated] = "--enable-deprecated,--disable-deprecated"
 PACKAGECONFIG[mesh] = "--enable-mesh --enable-external-ell,--disable-mesh, json-c ell"
 PACKAGECONFIG[btpclient] = "--enable-btpclient --enable-external-ell,--disable-btpclient, ell"
 PACKAGECONFIG[udev] = "--enable-udev,--disable-udev,udev"
@@ -82,6 +80,8 @@ EXTRA_OECONF = "\
 "
 
 CFLAGS += "-DFIRMWARE_DIR='"${firmwaredir}"'"
+
+EXTRA_OEMAKE += "'unit_test_sdp_xml_CFLAGS=$(AM_CFLAGS) $(GLIB_CFLAGS) -DTOP_SRCDIR=\"${PTEST_PATH}\"'"
 
 # bluez5 builds a large number of useful utilities but does not
 # install them.  Specify which ones we want put into ${PN}-noinst-tools.
@@ -153,6 +153,7 @@ do_compile_ptest() {
 
 do_install_ptest() {
 	cp -r ${B}/unit/ ${D}${PTEST_PATH}
+	cp -r ${S}/unit/sdp-xml ${D}${PTEST_PATH}/unit/
 	rm -f ${D}${PTEST_PATH}/unit/*.o
 }
 

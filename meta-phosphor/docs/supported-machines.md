@@ -77,13 +77,16 @@ covered by [Jenkins](https://jenkins.openbmc.org/job/ci-openbmc/) CI testing.
 * ingrasys
   * zaius
 * intel
-  * s2600wf
+  * avcrp
+  * jncrp
 * inventec
   * starscream
   * transformers
 * nvidia
   * gb200nvl-obmc
   * nvl32-obmc
+  * vr-c2-obmc
+  * vr-nvl-obmc
 * qualcomm
   * qcom-bmc-ast2600
 * quanta

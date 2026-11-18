@@ -17,10 +17,38 @@
 
 [ -n "${gbmc_net_lib_init-}" ] && return
 
+# Prints the file to bind-mount over `target` so that it looks removed.
+# Files under /etc/systemd shadow same-named files in /run/systemd and
+# /usr/lib/systemd, and a /dev/null there is systemd's marker for a masked
+# file, which hides the lower copies too. Use the copy systemd would fall back
+# to if the file were removed, and /dev/null only when there is none.
+# Arguments:
+#   $1: Path to the target file
+#   $2: Optional root prefix for the lookup (testing)
+gbmc_net_mask_file_source() {
+  local target="$1"
+  local root="${2-}"
+  if [[ $target == /etc/systemd/* ]]; then
+    local rel="${target#/etc/systemd/}"
+    local lower
+    for lower in "$root"/run/systemd/"$rel" "$root"/usr/lib/systemd/"$rel"; do
+      [ -e "$lower" ] || [ -L "$lower" ] || continue
+      # A masked lower copy keeps the file masked
+      if [ -f "$lower" ] && [ ! -L "$lower" ]; then
+        echo "$lower"
+        return 0
+      fi
+      break
+    done
+  fi
+  echo /dev/null
+}
+
 # Safely mask or remove a filesystem target (file or directory).
 # If GBMC_AVOID_RWFS is set, avoids writing or unlinking on persistent
-# storage (RWFS) by bind-mounting /dev/null (for files) or an empty
-# directory (for directories) over the target if not already mounted.
+# storage (RWFS) by bind-mounting over the target if not already mounted,
+# an empty directory for directories and the file from
+# gbmc_net_mask_file_source for files.
 # If GBMC_AVOID_RWFS is unset, unmounts any active mount and removes the
 # target directly via rm -rf.
 # Arguments:
@@ -32,16 +60,16 @@ gbmc_net_mask_or_rm() {
     if grep -q " $target " /proc/mounts 2>/dev/null; then
       return 0
     fi
-    echo "Masking RWFS path $target from $(caller 0 2>/dev/null || echo unknown)" >&2
+    echo "Masking RWFS path $target from ${BASH_LINENO[0]} ${FUNCNAME[1]-main} ${BASH_SOURCE[1]-unknown}" >&2
     if [ -d "$target" ]; then
       local empty_dir="/run/gbmc-empty-d"
       mkdir -p "$empty_dir"
       mount --bind "$empty_dir" "$target" || return
     else
-      mount --bind /dev/null "$target" || return
+      mount --bind "$(gbmc_net_mask_file_source "$target")" "$target" || return
     fi
   else
-    echo "Removing path $target from $(caller 0 2>/dev/null || echo unknown)" >&2
+    echo "Removing path $target from ${BASH_LINENO[0]} ${FUNCNAME[1]-main} ${BASH_SOURCE[1]-unknown}" >&2
     if grep -q " $target " /proc/mounts 2>/dev/null; then
       umount "$target" 2>/dev/null || true
     fi
@@ -50,8 +78,9 @@ gbmc_net_mask_or_rm() {
 }
 
 # Safely unmask any bind-mounts over a persistent target file and write content to it.
-# Unmounts any active mount over the target, ensures the parent directory exists,
-# touches the file up front to confirm it can be written to RWFS, and writes the contents.
+# Unmounts any active mount over the target and writes the contents, leaving
+# the file alone if it already holds them. Without contents, it only makes
+# sure the file exists.
 # Arguments:
 #   $1: Path to the target file
 #   $2+: Contents to write (if provided, written separated by spaces with trailing newline)
@@ -60,7 +89,7 @@ gbmc_net_unmask_and_write() {
   shift
 
   while grep -q " $target " /proc/mounts 2>/dev/null; do
-    echo "Unmasking RWFS path $target from $(caller 0 2>/dev/null || echo unknown)" >&2
+    echo "Unmasking RWFS path $target from ${BASH_LINENO[0]} ${FUNCNAME[1]-main} ${BASH_SOURCE[1]-unknown}" >&2
     umount "$target" 2>/dev/null || break
   done
 
@@ -68,12 +97,12 @@ gbmc_net_unmask_and_write() {
     rm -f "$target" || return
   fi
 
-  mkdir -p "$(dirname "$target")" || return
-
-  touch "$target" || return
-
   if (( $# > 0 )); then
-    printf '%s\n' "$*" >"$target" || return
+    gbmc_net_write_if_changed "$*" "$target"
+    (( $? < 2 )) || return 1
+  else
+    mkdir -p "$(dirname "$target")" || return
+    touch "$target" || return
   fi
 }
 
@@ -99,7 +128,7 @@ gbmc_net_reload_queue_end() {
   if (( GBMC_NET_RELOAD_REFCOUNT > 0 )); then
     GBMC_NET_RELOAD_REFCOUNT=$(( GBMC_NET_RELOAD_REFCOUNT - 1 ))
   else
-    echo "Reload queue refcount underflow from $(caller 0 2>/dev/null || echo unknown)" >&2
+    echo "Reload queue refcount underflow from ${BASH_LINENO[0]} ${FUNCNAME[1]-main} ${BASH_SOURCE[1]-unknown}" >&2
     return 1
   fi
   if (( GBMC_NET_RELOAD_REFCOUNT == 0 )); then
@@ -130,7 +159,7 @@ gbmc_net_networkd_reload() {
   local reconf=""
   (( $# > 0 )) && reconf=" + reconfiguring ($*)"
   if (( GBMC_NET_RELOAD_REFCOUNT > 0 )); then
-    echo "Queuing networkd reload$reconf from $(caller 0 2>/dev/null || echo unknown)" >&2
+    echo "Queuing networkd reload$reconf from ${BASH_LINENO[0]} ${FUNCNAME[1]-main} ${BASH_SOURCE[1]-unknown}" >&2
     GBMC_NET_NETWORKD_RELOAD_PENDING=1
     local intf
     for intf in "$@"; do
@@ -138,7 +167,7 @@ gbmc_net_networkd_reload() {
     done
     return 0
   fi
-  echo "Requesting networkd reload$reconf from $(caller 0 2>/dev/null || echo unknown)" >&2
+  echo "Requesting networkd reload$reconf from ${BASH_LINENO[0]} ${FUNCNAME[1]-main} ${BASH_SOURCE[1]-unknown}" >&2
   _gbmc_net_networkd_reload_exec "$@"
 }
 
@@ -147,11 +176,11 @@ gbmc_net_networkd_reload() {
 # Otherwise, triggers an immediate cross-process coalesced reload of nftables.
 gbmc_net_nftables_reload() {
   if (( GBMC_NET_RELOAD_REFCOUNT > 0 )); then
-    echo "Queuing nftables reload from $(caller 0 2>/dev/null || echo unknown)" >&2
+    echo "Queuing nftables reload from ${BASH_LINENO[0]} ${FUNCNAME[1]-main} ${BASH_SOURCE[1]-unknown}" >&2
     GBMC_NET_NFTABLES_RELOAD_PENDING=1
     return 0
   fi
-  echo "Requesting nftables reload from $(caller 0 2>/dev/null || echo unknown)" >&2
+  echo "Requesting nftables reload from ${BASH_LINENO[0]} ${FUNCNAME[1]-main} ${BASH_SOURCE[1]-unknown}" >&2
   _gbmc_net_nftables_reload_exec
 }
 
@@ -192,12 +221,20 @@ gbmc_net_nftables_reload() {
 #   - status:
 #       The exit code of the last completed batch, read and returned by
 #       callers whose requests were already covered by done_gen.
+#   - dirty:
+#       Marker created before a /run or /etc config file for $svc is
+#       written or removed. Promoted to running/.dirty when a batch is
+#       claimed and cleared once $action_fn succeeds (restored if it fails
+#       or its owner dies), so a caller killed after modifying a file still
+#       triggers the reload on retry when the file contents already match.
+GBMC_NET_RELOAD_DIR=/run/gbmc-net-reload
+
 _gbmc_net_service_reload() {
   local svc="$1"
   local action_fn="$2"
   shift 2
 
-  local state_dir="/run/gbmc-net-reload/$svc"
+  local state_dir="$GBMC_NET_RELOAD_DIR/$svc"
   local mutex="$state_dir/mutex"
   mkdir -p "$state_dir/pending" || return 1
 
@@ -217,7 +254,7 @@ _gbmc_net_service_reload() {
     echo "$gen"
   ) {mfd}>"$mutex" )"
   if ! [[ "$my_gen" =~ ^[0-9]+$ ]]; then
-    echo "Failed to queue $svc reload from $(caller 0 2>/dev/null || echo unknown)" >&2
+    echo "Failed to queue $svc reload from ${BASH_LINENO[0]} ${FUNCNAME[1]-main} ${BASH_SOURCE[1]-unknown}" >&2
     return 1
   fi
 
@@ -225,7 +262,7 @@ _gbmc_net_service_reload() {
   local lfd
   exec {lfd}>"$state_dir/lock"
   if ! flock -x "$lfd"; then
-    echo "Failed to acquire $svc reload lock from $(caller 0 2>/dev/null || echo unknown)" >&2
+    echo "Failed to acquire $svc reload lock from ${BASH_LINENO[0]} ${FUNCNAME[1]-main} ${BASH_SOURCE[1]-unknown}" >&2
     exec {lfd}>&-
     return 1
   fi
@@ -243,8 +280,10 @@ _gbmc_net_service_reload() {
     for f in "$state_dir"/running/*; do
       [[ -e "$f" ]] && mv "$f" "$state_dir/pending/"
     done
+    [[ ! -e $state_dir/running/.dirty ]] || : >"$state_dir/dirty"
     rm -rf "$state_dir/running"
     mv "$state_dir/pending" "$state_dir/running" || exit 2
+    [[ ! -e $state_dir/dirty ]] || mv -f "$state_dir/dirty" "$state_dir/running/.dirty"
     mkdir -p "$state_dir/pending" || exit 2
     cat "$state_dir/req_gen"
   ) {mfd}>"$mutex" )"
@@ -272,6 +311,9 @@ _gbmc_net_service_reload() {
       flock -x "$mfd" || exit
       echo "$rc" >"$state_dir/status"
       echo "$claimed" >"$state_dir/done_gen"
+      if (( rc != 0 )) && [[ -e $state_dir/running/.dirty ]]; then
+        : >"$state_dir/dirty"
+      fi
       rm -rf "$state_dir/running"
     ) {mfd}>"$mutex" ||
       echo "Warning: failed to record $svc reload completion" >&2
@@ -281,6 +323,9 @@ _gbmc_net_service_reload() {
   return "$rc"
 }
 
+# networkd's varlink socket, created when it starts
+GBMC_NET_NETWORKD_SOCK=/run/systemd/netif/io.systemd.Network
+
 _gbmc_net_networkd_reload_action() {
   local gen="$1"
   shift
@@ -288,6 +333,11 @@ _gbmc_net_networkd_reload_action() {
   local retry
   for (( retry = 1; retry <= 10; retry++ )); do
     (( retry == 1 )) || sleep 1
+    # networkd creates its varlink socket when it starts, before it loads the
+    # configs. Without it there is nothing to reload yet. Checking for it
+    # first skips a round-trip to systemd, which stalls for as long as a
+    # daemon-reload runs (~10s at boot on some machines).
+    [[ -e $GBMC_NET_NETWORKD_SOCK ]] || return 0
     local st
     st="$(systemctl is-active systemd-networkd 2>/dev/null || true)"
     if [ "$st" = 'inactive' ]; then
@@ -315,28 +365,174 @@ _gbmc_net_networkd_reload_action() {
   return 1
 }
 
+# Set by long running event loops (gbmc-ip-monitor) to run the reloads in
+# the background instead of waiting for them, as `networkctl reload` and the
+# systemd round-trips can take seconds at boot. _gbmc_net_service_reload()
+# still serializes and coalesces them: the child takes its ticket after the
+# caller wrote the files it reloads for, so the batch covering it reads them.
+GBMC_NET_RELOAD_ASYNC=
+
+# Runs _gbmc_net_service_reload() with the arguments, in the background if
+# GBMC_NET_RELOAD_ASYNC is set.
+_gbmc_net_service_reload_maybe_async() {
+  if [[ -n $GBMC_NET_RELOAD_ASYNC ]]; then
+    _gbmc_net_service_reload "$@" &
+    return 0
+  fi
+  _gbmc_net_service_reload "$@"
+}
+
 _gbmc_net_networkd_reload_exec() {
-  _gbmc_net_service_reload "networkd" _gbmc_net_networkd_reload_action "$@"
+  _gbmc_net_service_reload_maybe_async "networkd" _gbmc_net_networkd_reload_action "$@"
 }
 
 _gbmc_net_nftables_reload_action() {
   local gen="$1"
-  # Nothing to reload, nftables loads our rules when it starts
-  if [ "$(systemctl is-active nftables 2>/dev/null || true)" = 'inactive' ]; then
-    return 0
-  fi
-  echo "Reloading nftables (gen $gen)" >&2
-  systemctl reset-failed nftables 2>/dev/null || true
-  # Non-blocking: systemd coalesces and orders the jobs for us, and we don't
-  # want a slow nftables restart stalling the netlink event loop.
-  systemctl --no-block reload-or-restart nftables
+  local retry
+  for (( retry = 1; retry <= 10; retry++ )); do
+    (( retry == 1 )) || sleep 1
+    local st
+    st="$(systemctl is-active nftables 2>/dev/null || true)"
+    if [ "${st:-inactive}" = 'inactive' ]; then
+      # Nothing to reload, nftables loads our rules when it starts
+      return 0
+    elif [ "$st" = 'activating' ] || [ "$st" = 'deactivating' ]; then
+      # systemd collapses reload-or-restart into an in-flight start job, after
+      # nft-configure.sh already globbed /run/nftables/*.rules.
+      echo "nftables is $st, waiting before reload" >&2
+      continue
+    fi
+    echo "Reloading nftables (gen $gen), try $retry" >&2
+    systemctl reset-failed nftables 2>/dev/null || true
+    # Non-blocking: systemd coalesces and orders reload jobs when active or
+    # reloading, and we don't want a slow nft load stalling callers.
+    systemctl --no-block reload-or-restart nftables && return 0
+  done
+  echo "Failed to reload nftables after 10 attempts" >&2
+  return 1
 }
 
 _gbmc_net_nftables_reload_exec() {
-  _gbmc_net_service_reload "nftables" _gbmc_net_nftables_reload_action "$@"
+  _gbmc_net_service_reload_maybe_async "nftables" _gbmc_net_nftables_reload_action "$@"
 }
 
 GBMC_INTF_ROUTE_TABLE_BASE=1000
+# Per-gateway policy routing tables on gbmcbr (3000..3999), disjoint from the
+# per-interface tables (GBMC_INTF_ROUTE_TABLE_BASE + ifindex, 1001..1999).
+# shellcheck disable=SC2034
+GBMC_BR_GW_ROUTE_TABLE_BASE=3000
+# shellcheck disable=SC2034
+GBMC_BR_GW_ROUTE_TABLE_MAX=3999
+# Routing policy rule priority for From= rules on gbmcbr RA-discovered prefixes.
+# Placed after the per-interface From= rules (GBMC_INTF_ROUTE_TABLE_BASE +
+# ifindex, 1001..1999) so a BMC that owns the upstream NIC/uplink for a prefix
+# always routes its own addresses out that uplink, while peer BMCs on gbmcbr
+# route traffic sourced from that prefix into the gateway's gbmcbr routing table.
+# shellcheck disable=SC2034
+GBMC_BR_RA_RULE_PREF=$(( GBMC_INTF_ROUTE_TABLE_BASE + 1000 ))
+# Routing policy rule priority that ends the lookup for traffic sourced from
+# an uplink's allocation, after its per-interface table. Each allocation only
+# has the single path out of its uplink, so when the uplink is down (and its
+# table is empty) the traffic is dropped rather than falling through to the
+# main table and out another uplink or back over gbmcbr.
+GBMC_INTF_RULE_END_PREF=$(( GBMC_BR_RA_RULE_PREF - 1 ))
+
+# Route metrics. The default route metrics form a preference order for
+# reaching the ToR (lower wins); the other metrics mostly keep a route we add
+# with `ip route` identical to the copy networkd installs from our drop-ins,
+# so the two merge instead of duplicating, and distinct from the kernel's own
+# prefix routes (256) and networkd's RA routes (RouteMetric=1056 on gbmcbr).
+#
+# Default routes in the main table, by uplink:
+#   700  Whichever uplink route below is sourced from the primary IP, copied
+#        to this metric so the primary address always wins source selection.
+#   800  Front panel RJ45, from a live RA (gbmc-nic-ra). Closest to the ToR.
+#   900  NCSI / in-band NIC, from a live RA (gbmc-ncsi-ra).
+#   +1000 (1800, 1900)  The same uplinks from the last RA we saw, cached in
+#        /run and /var so we have a gateway before the first live RA arrives.
+#   1536 Highest metric still eligible for the 700 copy, i.e. live uplinks
+#        only, never a cached route. Routes through gbmcbr never get copied
+#        either, whatever their metric.
+#
+# Default routes on a tray, through the head BMC over gbmcbr. The head
+# advertises each of its uplinks with its metric (see gbmc_br_adv_pfx) and the
+# tray bumps it to the next thousand, keeping the uplink digit in the tens
+# (800 -> 1080, 1800 -> 2080, see gbmc_br_tray_metric):
+#   1070, 1080, 1090  The head's live uplinks. Below the tray's own cached
+#        routes (1800+) so a head with a live ToR beats a stale cache, above
+#        its own live uplinks (800, 900) so a tray with its own ToR uses it.
+#   2080, 2090  The head's cached uplinks.
+#   2000 A head too old to encode the metric in its advertisement.
+#   2500 l2br RA routes once the head is advertising, well past every route
+#        through the head (up to 2099) so a tray never prefers l2br to it.
+#
+# Prefix routes on gbmcbr:
+#   512  Specific on-link prefixes: the /80s downstream BMCs autoconfigure in,
+#        RA prefixes we hold an address in, and the per-interface routing
+#        table (GBMC_INTF_ROUTE_TABLE_BASE + ifindex) default routes.
+#   1024 Catch-all routes for a whole allocation: unreachable for the unused
+#        rest of a /64 or /76, and the compute node's half (/65) of its /64.
+#
+# Source selection pseudo-metrics in gbmc-br-gw-src, not installed anywhere:
+#   4095 An NCSI NIC address on its own NIC before its policy rules exist.
+#   4096 No route / unknown metric.
+# shellcheck disable=SC2034
+GBMC_ROUTE_METRIC_PRIMARY=700
+# shellcheck disable=SC2034
+GBMC_ROUTE_METRIC_FRONT_PANEL=800
+# shellcheck disable=SC2034
+GBMC_ROUTE_METRIC_NCSI=900
+# shellcheck disable=SC2034
+GBMC_ROUTE_METRIC_FALLBACK_OFFSET=1000
+# shellcheck disable=SC2034
+GBMC_ROUTE_METRIC_PRIMARY_MAX=1536
+# shellcheck disable=SC2034
+GBMC_ROUTE_METRIC_TRAY_LEGACY=2000
+# shellcheck disable=SC2034
+GBMC_ROUTE_METRIC_L2BR=$(( 2 * GBMC_ROUTE_METRIC_FALLBACK_OFFSET + 500 ))
+# shellcheck disable=SC2034
+GBMC_ROUTE_METRIC_ONLINK=512
+# shellcheck disable=SC2034
+GBMC_ROUTE_METRIC_CATCHALL=1024
+# shellcheck disable=SC2034
+GBMC_ROUTE_METRIC_NIC_FALLBACK=4095
+# shellcheck disable=SC2034
+GBMC_ROUTE_METRIC_UNSET=4096
+
+# Address label (RFC 6724 rule 6) for the /80 prefixes we autoconfigure an
+# address in from gbmcbr RAs. Global destinations carry the default label 1,
+# as does our primary /128, so a source with a different label only gets
+# picked for destinations inside its own /80 or when a route names it.
+# shellcheck disable=SC2034
+GBMC_SLAAC_ADDRLABEL=99
+
+# Router discovery timers, in seconds:
+#   GBMC_RA_TIMEOUT      How long each rdisc6 solicitation waits for RAs.
+#   GBMC_RA_MIN_RETRY    Solicitation interval until we have a router.
+#   GBMC_RA_RS_INTERVAL  Solicitation interval once we do.
+#   GBMC_RA_EXPIRE       Without an RA for this long a router is dropped and
+#                        the next one we heard from takes over.
+#   GBMC_BR_RA_LIFETIME  Lifetime of the router, prefixes and routes we
+#                        advertise on gbmcbr, 4 solicitation intervals so the
+#                        BMCs behind us refresh well before it runs out.
+#   GBMC_BR_RA_GRACE     How long an RA route may be missing before we act on
+#                        it. A networkd reconfigure flushes the RA routes and
+#                        strips the source off our uplink routes; it solicits a
+#                        new RA right away and we put the source back, so
+#                        waiting this long avoids tearing down addresses and
+#                        advertisements that are about to come back.
+# shellcheck disable=SC2034
+GBMC_RA_TIMEOUT=10
+# shellcheck disable=SC2034
+GBMC_RA_MIN_RETRY=10
+# shellcheck disable=SC2034
+GBMC_RA_RS_INTERVAL=30
+# shellcheck disable=SC2034
+GBMC_RA_EXPIRE=180
+# shellcheck disable=SC2034
+GBMC_BR_RA_LIFETIME=120
+# shellcheck disable=SC2034
+GBMC_BR_RA_GRACE=5
 
 # Calculate and print the deterministic routing table number for a network
 # interface based on its kernel ifindex.
@@ -350,8 +546,416 @@ GBMC_INTF_ROUTE_TABLE_BASE=1000
 gbmc_net_route_table_for_intf() {
   local intf="$1"
   local idx=
-  idx="$(cat /sys/class/net/"$intf"/ifindex)" || return
+  { read -r idx <"/sys/class/net/$intf/ifindex"; } 2>/dev/null || return
   echo $((GBMC_INTF_ROUTE_TABLE_BASE + idx))
+}
+
+# Replaces an IPv6 policy rule, removing an existing copy first so it never
+# gets duplicated.
+# Arguments:
+#   $@: ip rule selector and action (e.g. from <pfx> lookup <table> pref <n>)
+# Returns:
+#   The status of adding the rule.
+gbmc_net_rule_replace() {
+  ip -6 rule del "$@" 2>/dev/null
+  ip -6 rule add proto static "$@"
+}
+
+# Appends the networkd config for the policy rules of an uplink allocation:
+# traffic to it uses the main table, and traffic from it only ever leaves
+# through the uplink's own table, see GBMC_INTF_RULE_END_PREF.
+# Arguments:
+#   $1: Variable to append the networkd config to
+#   $2: Allocation prefix with length
+#   $3: Per-interface routing table of the uplink
+gbmc_net_intf_rules_conf() {
+  local -n _gbmc_net_intf_rules_conf="$1"
+  local _pfx="$2"
+  local _rt="$3"
+  _gbmc_net_intf_rules_conf+="[RoutingPolicyRule]"$'\n'"To=$_pfx"$'\n'"Table=main"$'\n'
+  _gbmc_net_intf_rules_conf+="Priority=$GBMC_INTF_ROUTE_TABLE_BASE"$'\n'
+  _gbmc_net_intf_rules_conf+="[RoutingPolicyRule]"$'\n'"From=$_pfx"$'\n'"Table=$_rt"$'\n'
+  _gbmc_net_intf_rules_conf+="Priority=$_rt"$'\n'
+  _gbmc_net_intf_rules_conf+="[RoutingPolicyRule]"$'\n'"From=$_pfx"$'\n'"Type=unreachable"$'\n'
+  _gbmc_net_intf_rules_conf+="Priority=$GBMC_INTF_RULE_END_PREF"$'\n'
+}
+
+# Installs (or removes) the policy rules of gbmc_net_intf_rules_conf() right
+# away, without waiting for networkd.
+# Arguments:
+#   $1: add or del
+#   $2: Allocation prefix with length
+#   $3: Per-interface routing table of the uplink
+gbmc_net_intf_rules_set() {
+  local act="$1"
+  local pfx="$2"
+  local rt="$3"
+  local rules=(
+    "to $pfx lookup main pref $GBMC_INTF_ROUTE_TABLE_BASE"
+    "from $pfx lookup $rt pref $rt"
+    "from $pfx unreachable pref $GBMC_INTF_RULE_END_PREF"
+  )
+  local rule rc=0
+  for rule in "${rules[@]}"; do
+    # shellcheck disable=SC2086
+    if [[ $act == add ]]; then
+      gbmc_net_rule_replace $rule || rc=1
+    else
+      ip -6 rule del $rule 2>/dev/null || true
+    fi
+  done
+  return $rc
+}
+
+# Enables proxy NDP on an interface and proxies the addresses on it right
+# away, without waiting for networkd to apply the config.
+# Arguments:
+#   $1: Interface
+#   $2+: Addresses to proxy
+# Returns:
+#   0 on success, non-zero if any of them failed.
+gbmc_net_proxy_ndp_add() {
+  local intf="$1"
+  shift
+  local st=0
+  sysctl net.ipv6.conf."$intf".proxy_ndp=1 >/dev/null || st=$?
+  local ip
+  for ip in "$@"; do
+    ip -6 neigh replace proxy "$ip" dev "$intf" || st=$?
+  done
+  return "$st"
+}
+
+# Marks the target service dirty before a config file under /run or /etc is
+# committed or removed so a retry still reloads if this caller exits first.
+_gbmc_net_mark_dirty_for_path() {
+  local root="${GBMC_NET_CONF_ROOT-}"
+  local svc=
+  case "$1" in
+    "$root"/run/systemd/network/*|"$root"/etc/systemd/network/*)
+      svc=networkd ;;
+    "$root"/run/nftables/*|"$root"/etc/nftables/*)
+      svc=nftables ;;
+    *) return 0 ;;
+  esac
+  local dir="$GBMC_NET_RELOAD_DIR/$svc"
+  { [[ -d $dir ]] || mkdir -p "$dir" 2>/dev/null; } &&
+    : >"$dir/dirty" 2>/dev/null || true
+}
+
+_gbmc_net_service_is_dirty() {
+  [[ -e $GBMC_NET_RELOAD_DIR/$1/dirty ||
+     -e $GBMC_NET_RELOAD_DIR/$1/running/.dirty ]]
+}
+
+# Triggers the reload for any networkd or nftables files among the paths,
+# including when an earlier caller modified a file and exited before its
+# reload finished.
+# Arguments:
+#   $1: 1 if any file changed in this call, 0 otherwise
+#   $2+: Paths to the files
+_gbmc_net_reload_for_paths() {
+  local changed="$1"
+  shift
+  local root="${GBMC_NET_CONF_ROOT-}"
+  local need_networkd=0 check_networkd_dirty=0
+  local need_nftables=0 check_nftables_dirty=0
+  local file
+  for file in "$@"; do
+    case "$file" in
+      "$root"/run/systemd/network/*|"$root"/etc/systemd/network/*)
+        need_networkd=1
+        check_networkd_dirty=1
+        ;;
+      */systemd/network/*)
+        need_networkd=1
+        ;;
+      "$root"/run/nftables/*|"$root"/etc/nftables/*)
+        need_nftables=1
+        check_nftables_dirty=1
+        ;;
+      */nftables/*)
+        need_nftables=1
+        ;;
+    esac
+  done
+  if (( need_networkd == 1 )) &&
+     { (( changed == 1 )) ||
+       { (( check_networkd_dirty == 1 )) && _gbmc_net_service_is_dirty networkd; }; }; then
+    gbmc_net_networkd_reload || true
+  fi
+  if (( need_nftables == 1 )) &&
+     { (( changed == 1 )) ||
+       { (( check_nftables_dirty == 1 )) && _gbmc_net_service_is_dirty nftables; }; }; then
+    gbmc_net_nftables_reload || true
+  fi
+}
+
+# Writes contents to files unless they already hold them, or removes the
+# files when the contents are empty, and reloads networkd or nftables when a
+# file under systemd/network or nftables changed. Use it for every networkd
+# (.network, .netdev, .link and drop-ins) and nftables file we generate, and
+# for every persistent file. Unchanged files are left alone, as networkd
+# reconfigures the interfaces of every .network file that changed on its next
+# reload. The contents go to a temporary file in the same directory first,
+# which networkd and nft ignore by its name, and are renamed over the file, so
+# readers, and the file left after a power loss, only ever hold the old or the
+# new contents. A failure on one file doesn't stop the others from being
+# written, nor the reload for those that changed.
+# Arguments:
+#   $1: Contents, empty to remove the files
+#   $2+: Paths to the files
+# Returns:
+#   0 if any file was written or removed, 1 if none changed, 2 on failure.
+gbmc_net_write_if_changed() {
+  local contents="$1"
+  shift
+  [[ -n $contents ]] || { gbmc_net_rm_if_exists "$@"; return; }
+  [[ $contents == *$'\n' ]] || contents+=$'\n'
+  local changed=0
+  local failed=0
+  local file
+  for file in "$@"; do
+    if [[ -f $file ]]; then
+      local cur=
+      IFS= read -r -d '' cur <"$file" || true
+      [[ $cur == "$contents" ]] && continue
+    fi
+    local tmp="$file.tmp.$BASHPID"
+    if { [[ -d ${file%/*} ]] || mkdir -p "${file%/*}"; } &&
+        printf '%s' "$contents" >"$tmp" &&
+        _gbmc_net_mark_dirty_for_path "$file" &&
+        mv -f "$tmp" "$file"; then
+      _gbmc_net_mark_dirty_for_path "$file"
+      changed=1
+    else
+      rm -f "$tmp"
+      failed=1
+    fi
+  done
+  _gbmc_net_reload_for_paths "$changed" "$@"
+  (( failed == 0 )) || return 2
+  (( changed == 1 )) || return 1
+}
+
+# Removes files, for the networkd and nftables files we generate, and reloads
+# networkd or nftables when a file under systemd/network or nftables was
+# removed.
+# Arguments:
+#   $@: Paths to the files
+# Returns:
+#   0 if any file was removed, 1 if none existed, 2 on failure.
+gbmc_net_rm_if_exists() {
+  local changed=0
+  local failed=0
+  local file
+  for file in "$@"; do
+    [[ -e $file || -L $file ]] || continue
+    _gbmc_net_mark_dirty_for_path "$file"
+    if rm -f "$file"; then
+      _gbmc_net_mark_dirty_for_path "$file"
+      changed=1
+    else
+      failed=1
+    fi
+  done
+  _gbmc_net_reload_for_paths "$changed" "$@"
+  (( failed == 0 )) || return 2
+  (( changed == 1 )) || return 1
+}
+
+# Writes or removes a networkd drop-in in both {00,}-bmc-<intf>.network.d
+# directories, reloading networkd when it changed.
+# Arguments:
+#   $1: Interface
+#   $2: Drop-in file name
+#   $3: Contents, empty to remove the drop-in
+# Returns:
+#   0 if a drop-in was written or removed, 1 if unchanged, 2 on failure.
+gbmc_net_networkd_write_dropin() {
+  gbmc_net_write_if_changed "$3" \
+    /run/systemd/network/{00,}-bmc-"$1".network.d/"$2"
+}
+
+# Sources picked by gbmc-br-gw-src for the main table default routes that
+# gbmc-ra configures through networkd, one file per interface and metric
+# (<dir>/<intf>/<metric>) holding "<gateway> <source>".
+#
+# networkd only keeps a route it configured across a reconfigure of its
+# interface if the kernel route still matches the [Route] exactly, including
+# the protocol (static) and the source. Otherwise it removes the route and
+# adds it back, here without a source, letting the kernel pick any address
+# (e.g. a NIC address out of the front panel) until gbmc-br-gw-src puts the
+# source back. So the source goes into the [Route] as PreferredSource= and the
+# route is installed with "proto static".
+GBMC_NET_ROUTE_SRC_DIR=/run/gbmc-net-route-src
+
+# Sets PreferredSource= in the main table [Route] sections for a gateway and
+# metric of networkd .network contents.
+# Arguments:
+#   $1: Output variable for the new contents
+#   $2: Contents
+#   $3: Gateway
+#   $4: Metric
+#   $5: Source address, empty to remove the source
+# Returns failure if no [Route] section matched.
+# The locals are prefixed so they don't shadow the output variable.
+# shellcheck disable=SC2034  # namerefs
+gbmc_net_conf_route_src() {
+  local -n conf_src_out="$1"
+  local _crs_contents="$2"
+  local _crs_gw="$3"
+  local _crs_metric="$4"
+  local _crs_src="$5"
+  conf_src_out="$_crs_contents"
+  [[ -n $_crs_contents ]] || return 1
+  local -a _crs_secs=()
+  local _crs_sec=
+  local _crs_line
+  while IFS= read -r _crs_line; do
+    if [[ $_crs_line == '['*']' && -n $_crs_sec ]]; then
+      _crs_secs+=("$_crs_sec")
+      _crs_sec=
+    fi
+    _crs_sec+="$_crs_line"$'\n'
+  done <<<"${_crs_contents%$'\n'}"
+  [[ -n $_crs_sec ]] && _crs_secs+=("$_crs_sec")
+  local _crs_out=
+  local _crs_matched=0
+  for _crs_sec in "${_crs_secs[@]}"; do
+    if [[ $_crs_sec == $'[Route]\n'* && $_crs_sec != *$'\nTable='* ]] &&
+       [[ $_crs_sec == *$'\nGateway='"$_crs_gw"$'\n'* ]] &&
+       [[ $_crs_sec == *$'\nMetric='"$_crs_metric"$'\n'* ]]; then
+      local _crs_new=
+      while IFS= read -r _crs_line; do
+        [[ $_crs_line == PreferredSource=* ]] || _crs_new+="$_crs_line"$'\n'
+      done <<<"${_crs_sec%$'\n'}"
+      [[ -z $_crs_src ]] || _crs_new+="PreferredSource=$_crs_src"$'\n'
+      _crs_sec="$_crs_new"
+      _crs_matched=1
+    fi
+    _crs_out+="$_crs_sec"
+  done
+  # Keep the contents exactly as they were without a trailing newline
+  [[ $_crs_contents == *$'\n' ]] || _crs_out="${_crs_out%$'\n'}"
+  conf_src_out="$_crs_out"
+  (( _crs_matched == 1 ))
+}
+
+# Looks up the saved source for a default route.
+# Arguments:
+#   $1: Output variable for the source, empty without one
+#   $2: Interface
+#   $3: Gateway
+#   $4: Metric
+# shellcheck disable=SC2034  # namerefs
+gbmc_net_route_src_get() {
+  local -n route_src_out="$1"
+  route_src_out=
+  local _rsg_file="$GBMC_NET_ROUTE_SRC_DIR/$2/$4"
+  [[ -f $_rsg_file ]] || return 0
+  local _rsg_gw _rsg_src
+  read -r _rsg_gw _rsg_src <"$_rsg_file" || return 0
+  [[ $_rsg_gw == "$3" ]] && route_src_out="$_rsg_src"
+  return 0
+}
+
+# Applies every saved source for an interface to networkd contents.
+# Arguments:
+#   $1: Output variable for the new contents
+#   $2: Interface
+#   $3: Contents
+# shellcheck disable=SC2034  # namerefs
+gbmc_net_route_src_apply() {
+  local -n route_apply_out="$1"
+  local _rsa_contents="$3"
+  local _rsa_file
+  for _rsa_file in "$GBMC_NET_ROUTE_SRC_DIR/$2"/*; do
+    [[ -f $_rsa_file ]] || continue
+    local _rsa_gw _rsa_src
+    read -r _rsa_gw _rsa_src <"$_rsa_file" || continue
+    gbmc_net_conf_route_src _rsa_contents "$_rsa_contents" "$_rsa_gw" \
+      "${_rsa_file##*/}" "$_rsa_src" || true
+  done
+  route_apply_out="$_rsa_contents"
+}
+
+# Takes the lock serializing the gateway drop-in updates for an interface.
+# Callers hold a reload queue reference while holding it, so the networkd
+# reload only runs once the lock is released, and give up on it after a while
+# rather than stalling gbmc-ip-monitor.
+# Arguments:
+#   $1: Output variable for the lock file descriptor
+#   $2: Interface
+gbmc_net_route_src_lock() {
+  local -n route_lock_fd="$1"
+  mkdir -p "$GBMC_NET_ROUTE_SRC_DIR" || return
+  exec {route_lock_fd}>"$GBMC_NET_ROUTE_SRC_DIR/$2.lock" || return
+  flock -x "$route_lock_fd"
+}
+
+# Writes one of the networkd gateway drop-ins (10-gateway*.conf) of an
+# interface with the saved sources applied, see GBMC_NET_ROUTE_SRC_DIR.
+# Arguments:
+#   $1: Interface
+#   $2: Drop-in file name
+#   $3: Contents, empty to remove the drop-in
+gbmc_net_gateway_conf_write() {
+  local intf="$1"
+  local name="$2"
+  local contents="$3"
+  local lfd
+  gbmc_net_reload_queue_start
+  gbmc_net_route_src_lock lfd "$intf" || true
+  [[ -z $contents ]] || gbmc_net_route_src_apply contents "$intf" "$contents"
+  gbmc_net_networkd_write_dropin "$intf" "$name" "$contents" || true
+  [[ -z ${lfd-} ]] || exec {lfd}>&-
+  gbmc_net_reload_queue_end || true
+}
+
+# Saves the source picked for a default route and sets it in the networkd
+# gateway drop-ins of its interface. The saved source is only touched when a
+# drop-in configures the route or it was saved for the same gateway, so a
+# stale route at the same metric doesn't clobber the current one.
+# Arguments:
+#   $1: Interface
+#   $2: Gateway
+#   $3: Metric
+#   $4: Source address, empty to remove the source
+# Returns failure if the route isn't configured through networkd.
+gbmc_net_route_src_set() {
+  local intf="$1"
+  local gw="$2"
+  local metric="$3"
+  local src="$4"
+  local lfd
+  gbmc_net_reload_queue_start
+  gbmc_net_route_src_lock lfd "$intf" || true
+  local found=0
+  local file
+  for file in /run/systemd/network/{00,}-bmc-"$intf".network.d/10-gateway*.conf; do
+    [[ -f $file ]] || continue
+    local contents=
+    IFS= read -r -d '' contents <"$file" || true
+    local new
+    gbmc_net_conf_route_src new "$contents" "$gw" "$metric" "$src" || continue
+    found=1
+    gbmc_net_write_if_changed "$new" "$file" || true
+  done
+  local state="$GBMC_NET_ROUTE_SRC_DIR/$intf/$metric"
+  local saved_gw=
+  [[ ! -f $state ]] || read -r saved_gw _ <"$state" || true
+  if (( found == 1 )) || [[ $saved_gw == "$gw" ]]; then
+    if [[ -n $src ]]; then
+      { [[ -d ${state%/*} ]] || mkdir -p "${state%/*}"; } &&
+        printf '%s %s\n' "$gw" "$src" >"$state"
+    else
+      rm -f "$state"
+    fi
+  fi
+  [[ -z ${lfd-} ]] || exec {lfd}>&-
+  gbmc_net_reload_queue_end || true
+  (( found == 1 ))
 }
 
 gbmc_net_lib_init=1

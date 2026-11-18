@@ -33,7 +33,7 @@ Transitioning to a custom environment for systems development
    Layer Index <>` to find and acquire the best BSP for your
    target board. The Yocto Project layer index BSPs are regularly validated. The
    best place to get your first BSP is from your silicon manufacturer or board
-   vendor – they can point you to their most qualified efforts. In general, for
+   vendor - they can point you to their most qualified efforts. In general, for
    Intel silicon use ``meta-intel``, for Texas Instruments use ``meta-ti``, and so
    forth. Choose a BSP that has been tested with the same Yocto Project release
    that you've downloaded. Be aware that some BSPs may not be immediately
@@ -61,12 +61,12 @@ Transitioning to a custom environment for systems development
 #. **Create your own layer for the BSP you're going to use**.
    It is not common that you would need to create an entire BSP from scratch
    unless you have a *really* special device. Even if you are using an existing
-   BSP, :ref:`create your own layer for the BSP <bsp-guide/bsp:creating a new
+   BSP, :ref:`create your own layer for the BSP <bsp-manual/bsp:creating a new
    bsp layer using the \`\`bitbake-layers\`\` script>`. For example, given a
    64-bit x86-based machine, copy the conf/intel-corei7-64 definition and give
    the machine a relevant name (think board name, not product name). Make sure
    the layer configuration is dependent on the ``meta-intel`` layer (or at least,
-   ``meta-intel`` remains in your ``bblayers.conf`` file). Now you can put your custom BSP
+   ``meta-intel`` remains in your :ref:`structure-build-conf-bblayers.conf` file). Now you can put your custom BSP
    settings into your layer and you can re-use it for different applications.
 
 #. **Write your own recipe to build additional software support that isn't
@@ -98,7 +98,7 @@ Transitioning to a custom environment for systems development
    well as the package feed and possibly the update solution. You would create
    your own distribution in a new layer inheriting from :term:`Poky` but overriding what
    needs to change for your distribution. If you find yourself adding a lot of
-   configuration to your local.conf file aside from paths and other typical
+   configuration to your :ref:`structure-build-conf-local.conf` file aside from paths and other typical
    local settings, it's time to :ref:`consider creating your own distribution
    <dev-manual/custom-distribution:creating your own distribution>`.
 

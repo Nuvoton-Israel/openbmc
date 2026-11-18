@@ -66,8 +66,8 @@ See :yocto_wiki:`Products that use the Yocto Project
 Wiki. Don't hesitate to contribute to this page if you know other such
 products.
 
-Why isn't systemd the default init system for OpenEmbedded-Core/Yocto Project or in Poky?
------------------------------------------------------------------------------------------
+Why isn't systemd the default init system in the Poky distro?
+-------------------------------------------------------------
 
 `systemd <https://systemd.io/>`__ is a desktop Linux init system with a specific
 focus that is not entirely aligned with a customisable "embedded" build
@@ -87,6 +87,61 @@ is not the only way to handle init.
 Our automated testing includes it through the ``poky-altcfg`` :term:`DISTRO` and
 we don't really need it to be the default: it is tested, it works, and people
 can choose to use it.
+
+Why don't I get an email when my patch merges?
+----------------------------------------------
+
+Where the project uses mailing lists for patch submission, many of the components
+such as bitbake and OpenEmbedded-Core haven't found it appropriate to reply on the
+mailing list for each patch that merges for two main reasons. Firstly, it would
+generate a lot of email traffic with content that may only be useful to a small
+number of people and quite annoying for other uninterested people to filter through.
+That could be avoided by only sending emails direct to the submitters.
+
+Secondly, sending such emails accurately takes time and it wasn't felt to be the
+best use of limited maintainer time. We do track patch status to some level
+in `patchwork <https://patchwork.yoctoproject.org/.>`__ and there is automated
+tooling which could extend on top of that but it hasn't been possible to fit
+that into the projects workflows with enough accuracy at this time.
+
+It is very easy to check whether a patch has merged by looking at the repository, or
+pulling and rebasing.
+
+
+Why doesn't the project use GitHub?
+-----------------------------------
+
+This is not a simple question and there is no right answer to it but there is some
+background worth appreciating.
+
+Some components within the project do accept pull requests from GitHub, others don't.
+The README in the component in question should make the process clear for that
+component. GitHub itself is a commercial operation and there are concerns about what
+happens if they change direction or decide to discontinue it as there is precedent in
+the past for that kind of thing happening. Equally, there are open alternatives to it.
+
+The bigger issue is the model. Mailing lists allow for wide peer review. The people
+performing that review are extremely valuable with experience built up over decades.
+The GitHub model doesn't really lend itself to them being able to easily see or be
+aware of changes beyond the maintainer accepting the pull request. That model also
+tends to focus on the single maintainer with total authority, which for components
+like OE-Core, simply isn't how things operate for us. Moving to such a model would
+alienate our existing reviewers and our community consensus approach to changes.
+
+Another issue is that GitHub and similar forges use the Pull Request mechanism,
+heavily leaning into reviewing and testing the Pull Request as a whole (e.g. the
+automated testing (CI) only runs on the last commit of the Pull Request, and
+per-commit reviews are painful to write and follow-up on). Using GitHub or a
+similar forge would require the project to completely change its reviewing process
+(or have two wildly different processes which would be inconsistent and confusing).
+
+So yes, for a contributor wanting to make a quick submission, GitHub and similar models
+are attractive, but they would likely come at a cost to the project's long term health.
+They can work well for the single or limited number of maintainer model, and for components
+with the setup, but not for other areas which benefit from wide peer review. We live
+in hope that tools can catch up with that, we'd even love to develop them ourselves if
+we had time but sadly, we don't at this point.
+
 
 Building environment
 ====================
@@ -119,14 +174,15 @@ of other mirrors including the Yocto Project source mirror if those
 fail.
 
 As an example, you could add a specific server for the build system to
-attempt before any others by adding something like the following to the
-``local.conf`` configuration file::
+attempt before any others by adding something like the following to
+a :term:`configuration file`::
 
    PREMIRRORS:prepend = "\
        git://.*/.* &YOCTO_DL_URL;/mirror/sources/ \
        ftp://.*/.* &YOCTO_DL_URL;/mirror/sources/ \
        http://.*/.* &YOCTO_DL_URL;/mirror/sources/ \
-       https://.*/.* &YOCTO_DL_URL;/mirror/sources/"
+       https://.*/.* &YOCTO_DL_URL;/mirror/sources/ \
+   "
 
 These changes cause the build system to intercept Git, FTP, HTTP, and
 HTTPS requests and direct them to the ``http://`` sources mirror. You
@@ -158,14 +214,15 @@ technique is useful if you want to create a mirror server. If not,
 however, the technique can simply waste time during the build.
 
 Finally, consider an example where you are behind an HTTP-only firewall.
-You could make the following changes to the ``local.conf`` configuration
-file as long as the :term:`PREMIRRORS` server is current::
+You could make the following changes to a :term:`configuration
+file` as long as the :term:`PREMIRRORS` server is current::
 
    PREMIRRORS:prepend = "\
        git://.*/.* &YOCTO_DL_URL;/mirror/sources/ \
        ftp://.*/.* &YOCTO_DL_URL;/mirror/sources/ \
        http://.*/.* &YOCTO_DL_URL;/mirror/sources/ \
-       https://.*/.* &YOCTO_DL_URL;/mirror/sources/"
+       https://.*/.* &YOCTO_DL_URL;/mirror/sources/ \
+   "
    BB_FETCH_PREMIRRORONLY = "1"
 
 These changes would cause the build system to successfully fetch source
@@ -363,7 +420,7 @@ Support Package (BSP) layer for it. For more information on how to
 create a BSP layer, see the
 ":ref:`dev-manual/layers:understanding and creating layers`"
 section in the Yocto Project Development Tasks Manual and the
-:doc:`/bsp-guide/index`.
+:doc:`/bsp-manual/index`.
 
 Usually, if the board is not completely exotic, adding support in the
 Yocto Project is fairly straightforward.
@@ -459,11 +516,11 @@ and related variables. To better understand this, consider the following
 two paths (artificially broken across lines for readability) where the
 first is relatively normal and the second is not::
 
-   /home/maxtothemax/poky-bootchart2/build/tmp/work/i586-poky-linux/zlib/
+   /home/user/poky-bootchart2/build/tmp/work/i586-poky-linux/zlib/
       1.2.8-r0/sysroot-destdir/usr/bin
 
-   /home/maxtothemax/poky-bootchart2/build/tmp/work/x86_64-linux/
-      zlib-native/1.2.8-r0/sysroot-destdir/home/maxtothemax/poky-bootchart2/
+   /home/user/poky-bootchart2/build/tmp/work/x86_64-linux/
+      zlib-native/1.2.8-r0/sysroot-destdir/home/user/poky-bootchart2/
       build/tmp/sysroots/x86_64-linux/usr/bin
 
 Even if the paths look unusual, they both are correct --- the first for
@@ -519,7 +576,7 @@ How do I disable the cursor on my touchscreen device?
 -----------------------------------------------------
 
 You need to create a form factor file as described in the
-":ref:`bsp-guide/bsp:miscellaneous bsp-specific recipe files`" section in
+":ref:`bsp-manual/bsp:miscellaneous bsp-specific recipe files`" section in
 the Yocto Project Board Support Packages (BSP) Developer's Guide. Set
 the ``HAVE_TOUCHSCREEN`` variable equal to one as follows::
 
@@ -531,7 +588,7 @@ How to always bring up connected network interfaces?
 The default interfaces file provided by the netbase recipe does
 not automatically bring up network interfaces. Therefore, you will need
 to add a BSP-specific netbase that includes an interfaces file. See the
-":ref:`bsp-guide/bsp:miscellaneous bsp-specific recipe files`" section in
+":ref:`bsp-manual/bsp:miscellaneous bsp-specific recipe files`" section in
 the Yocto Project Board Support Packages (BSP) Developer's Guide for
 information on creating these types of miscellaneous recipe files.
 

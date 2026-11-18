@@ -7,9 +7,9 @@ SRC_URI[sha256sum] = "b80b99a14bd085fcacfa15c9165f651fbb3406e66cc603abf11c575093
 
 inherit pypi setuptools3
 
-S = "${UNPACKDIR}/babel-${PV}"
+CVE_PRODUCT = "pocoo:babel"
 
-CLEANBROKEN = "1"
+S = "${UNPACKDIR}/babel-${PV}"
 
 RDEPENDS:${PN} += " \
     python3-codecs \
@@ -17,10 +17,9 @@ RDEPENDS:${PN} += " \
     python3-netserver \
     python3-numbers \
     python3-pickle \
-    python3-pytz \
-    python3-setuptools \
     python3-shell \
     python3-threading \
+    python3-zoneinfo \
 "
 
 BBCLASSEXTEND = "native nativesdk"

@@ -17,6 +17,7 @@ SRC_URI += "file://0001-cmake-Do-not-export-CC-into-gir-compiler.patch \
            file://0003-contact-Replace-the-Novell-sample-contact-with-somet.patch \
            file://0004-call-native-helpers.patch \
            file://0001-data-CMakeLists.txt-dont-create-automatic-google-log.patch \
+           file://0005-tests-camel-provider-imapx-define-_GNU_SOURCE-for-s.patch \
            file://iconv-detect.h \
            "
 
@@ -39,7 +40,7 @@ EXTRA_OECMAKE = " \
 EXTRA_OECMAKE:append:class-target = " -DG_IR_COMPILER=${STAGING_BINDIR}/g-ir-compiler-wrapper"
 EXTRA_OECMAKE:append:class-target = " -DG_IR_SCANNER=${STAGING_BINDIR}/g-ir-scanner-wrapper"
 
-PACKAGECONFIG ?= "goa oauth"
+PACKAGECONFIG ?= "goa"
 
 PACKAGECONFIG[canberra] = "-DENABLE_CANBERRA=ON,-DENABLE_CANBERRA=OFF,libcanberra"
 PACKAGECONFIG[oauth]    = "-DENABLE_OAUTH2_WEBKITGTK4=ON -DENABLE_OAUTH2_WEBKITGTK=ON,-DENABLE_OAUTH2_WEBKITGTK4=OFF -DENABLE_OAUTH2_WEBKITGTK=OFF,webkitgtk json-glib"

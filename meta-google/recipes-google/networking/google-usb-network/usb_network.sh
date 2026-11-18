@@ -23,6 +23,7 @@ ARGUMENT_LIST=(
     "product-id:"
     "product-name:"
     "host-mac:"
+    "host-mac-idx:"
     "bind-device:"
     "dev-mac:"
     "dev-type:"
@@ -30,6 +31,8 @@ ARGUMENT_LIST=(
     "iface-name:"
     "iface-alias:"
     "no-bridge:"
+    "link-up:"
+    "network-config:"
 )
 
 print_usage() {
@@ -39,6 +42,8 @@ $0 [OPTIONS] [stop|start]
         --product-id USB Product Id for the gadget.
         --product-name Product name string (en) for the gadget.
         --host-mac MAC address of the host part of the connection. Optional.
+        --host-mac-idx Index into the gbmc-mac-config MAC list to use as the
+                       host MAC, overrides --host-mac. Optional.
         --dev-mac MAC address of the device (gadget) part of the connection. Optional.
         --dev-type Type of gadget to instantiate. Default: "eem"
         --bind-device Name of the device to bind, as listed in /sys/class/udc/
@@ -46,51 +51,55 @@ $0 [OPTIONS] [stop|start]
         --iface-name name of the network interface.
         --iface-alias alias name of the network interface.
         --no-bridge don't bridge the usb link.
+        --link-up Set to 0 to leave bringing the link up to systemd-networkd,
+                  which does it once it is running from the generated network
+                  config. NCM and ECM hosts only see carrier once the link is
+                  up. Default: 1
+        --network-config Set to 0 when the image installs the systemd-networkd
+                  config of the link, instead of writing it at runtime.
+                  Default: 1
         --help  Print this help and exit.
 HELP
 }
 
 gadget_start() {
     # Always provide a basic network configuration
-    mkdir -p /run/systemd/network || return
-    cat >/run/systemd/network/+-bmc-"${IFACE_NAME}".network <<EOF
-[Match]
-Name=${IFACE_NAME}
-EOF
-
+    local network="[Match]"$'\n'"Name=${IFACE_NAME}"$'\n'
+    local link=
     if [[ -n $IFACE_ALIAS ]]; then
-        cat >/run/systemd/network/+-bmc-"${IFACE_NAME}".link <<EOF
-[Match]
-OriginalName=${IFACE_NAME}
-
-[Link]
-Alias=${IFACE_ALIAS}
-EOF
+        link="[Match]"$'\n'"OriginalName=${IFACE_NAME}"$'\n\n'
+        link+="[Link]"$'\n'"Alias=${IFACE_ALIAS}"$'\n'
     fi
 
     # Add the gbmcbr configuration if this is a relevant device
     if (( ID_VENDOR == 0x18d1 && ID_PRODUCT == 0x22b && NO_BRIDGE == 0 )); then
-        cat >>/run/systemd/network/+-bmc-"${IFACE_NAME}".network <<EOF
-[Network]
-Bridge=gbmcbr
-[Bridge]
-Cost=85
-EOF
+        network+="[Network]"$'\n'"Bridge=gbmcbr"$'\n'"[Bridge]"$'\n'"Cost=85"$'\n'
     fi
 
     # Add standard l2 bridge configuration if this is a relevant device
     if (( ID_VENDOR == 0x18d1 && ID_PRODUCT == 0x22c && NO_BRIDGE == 0 )); then
-        cat >>/run/systemd/network/+-bmc-"${IFACE_NAME}".network <<EOF
-[Network]
-Bridge=l2br
-[Bridge]
-Cost=85
-EOF
+        network+="[Network]"$'\n'"Bridge=l2br"$'\n'"[Bridge]"$'\n'"Cost=85"$'\n'
     fi
 
-    # Ignore any failures due to systemd being unavailable at boot
-    # shellcheck disable=SC2119
-    gbmc_net_networkd_reload || true
+    if (( NETWORK_CONFIG == 1 )); then
+        gbmc_net_reload_queue_start
+        local rc=0
+        gbmc_net_write_if_changed "$network" \
+            /run/systemd/network/+-bmc-"${IFACE_NAME}".network || rc=$?
+        if (( rc == 2 )); then
+            gbmc_net_reload_queue_end || true
+            return 1
+        fi
+        rc=0
+        gbmc_net_write_if_changed "$link" \
+            /run/systemd/network/+-bmc-"${IFACE_NAME}".link || rc=$?
+        if (( rc == 2 )); then
+            gbmc_net_reload_queue_end || true
+            return 1
+        fi
+        # Ignore any failures due to systemd being unavailable at boot
+        gbmc_net_reload_queue_end || true
+    fi
 
     local gadget_dir="${CONFIGFS_HOME}/usb_gadget/${GADGET_DIR_NAME}"
     mkdir -p "${gadget_dir}" || return
@@ -139,7 +148,22 @@ EOF
         ip link set dev "$IFACE_NAME" alias "$IFACE_ALIAS" || return
     fi
 
-    ip link set dev "$IFACE_NAME" up || return
+    if (( LINK_UP == 1 )); then
+        ip link set dev "$IFACE_NAME" up || return
+    fi
+}
+
+resolve_host_mac_idx() {
+    [[ -n $HOST_MAC_IDX ]] || return 0
+    local macs=()
+    if [[ $HOST_MAC_IDX =~ ^[0-9]+$ ]] &&
+            mapfile -t macs <"$MAC_LIST" &&
+            [[ -n ${macs[HOST_MAC_IDX]-} ]]; then
+        HOST_MAC_ADDR="${macs[HOST_MAC_IDX]}"
+        echo "Using host MAC $HOST_MAC_ADDR from idx $HOST_MAC_IDX" >&2
+    else
+        echo "Failed to get host MAC for idx $HOST_MAC_IDX" >&2
+    fi
 }
 
 gadget_stop() {
@@ -151,10 +175,11 @@ gadget_stop() {
       "${gadget_dir}/strings/0x409" \
       "${gadget_dir}" || true
 
-    rm -f /run/systemd/network/+-bmc-"${IFACE_NAME}".network
-    rm -f /run/systemd/network/+-bmc-"${IFACE_NAME}".link
-    # shellcheck disable=SC2119
-    gbmc_net_networkd_reload || true
+    if (( NETWORK_CONFIG == 1 )); then
+        gbmc_net_rm_if_exists \
+            /run/systemd/network/+-bmc-"${IFACE_NAME}".network \
+            /run/systemd/network/+-bmc-"${IFACE_NAME}".link || true
+    fi
 }
 
 opts="$(getopt \
@@ -174,11 +199,15 @@ STR_EN_PRODUCT=""
 DEV_MAC_ADDR=""
 DEV_TYPE="eem"
 HOST_MAC_ADDR=""
+HOST_MAC_IDX=""
+MAC_LIST=${MAC_LIST:-/run/gbmc-mac-config/gbmc-mac-list}
 BIND_DEVICE=""
 ACTION="start"
 GADGET_DIR_NAME=""
 IFACE_NAME=""
 NO_BRIDGE=0
+LINK_UP=1
+NETWORK_CONFIG=1
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --product-id)
@@ -191,6 +220,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --host-mac)
             HOST_MAC_ADDR=$2
+            shift 2
+            ;;
+        --host-mac-idx)
+            HOST_MAC_IDX=$2
             shift 2
             ;;
         --dev-mac)
@@ -219,6 +252,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --no-bridge)
             NO_BRIDGE=$2
+            shift 2
+            ;;
+        --link-up)
+            LINK_UP=$2
+            shift 2
+            ;;
+        --network-config)
+            NETWORK_CONFIG=$2
             shift 2
             ;;
         --help)
@@ -263,6 +304,22 @@ validate_safe_string "iface-name" "$IFACE_NAME"
 validate_safe_string "gadget-dir-name" "$GADGET_DIR_NAME"
 validate_safe_string "dev-type" "$DEV_TYPE"
 
+if [[ $LINK_UP != [01] ]]; then
+    echo "Error: Invalid link-up: '$LINK_UP'. Must be 0 or 1." >&2
+    exit 1
+fi
+
+if [[ $NETWORK_CONFIG != [01] ]]; then
+    echo "Error: Invalid network-config: '$NETWORK_CONFIG'. Must be 0 or 1." >&2
+    exit 1
+fi
+
+lock_file="${USB_NETWORK_LOCK:-/run/usb_network.lock}"
+if [[ ! -w $(dirname "$lock_file") ]]; then
+    lock_file="${CONFIGFS_HOME}/.usb_network.lock"
+fi
+exec {lock_fd}>"$lock_file" || exit
+flock "$lock_fd" || exit
 
 if [[ $ACTION == "stop" ]]; then
     gadget_stop
@@ -281,6 +338,8 @@ else
         echo "Bind device is missing" >&2
         exit 1
     fi
+
+    resolve_host_mac_idx
 
     rc=0
     gadget_start || rc=$?

@@ -5,6 +5,7 @@ LIC_FILES_CHKSUM = "file://${COREBASE}/meta/files/common-licenses/Apache-2.0;md5
 
 inherit systemd
 
+GBMC_NCSI_IF_NAME ??= ""
 GBMC_DHCP_RELAY ??= "${@'' if int(d.getVar('FLASH_SIZE')) < 65536 else '1'}"
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
@@ -14,15 +15,18 @@ SRC_URI += " \
   file://-bmc-gbmcbrdummy.netdev \
   file://-bmc-gbmcbrdummy.network \
   file://+-bmc-gbmcbrusb.network \
-  file://50-gbmc-br.rules \
+  file://50-gbmc-br.rules.in \
   file://gbmc-br-ula.sh \
   file://gbmc-br-from-ra.sh \
+  file://gbmc-br-withdrawn.sh \
   file://gbmc-br-hostname.sh \
   file://gbmc-br-hostname.service \
   file://gbmc-br-ra.sh.in \
   file://gbmc-br-ra.service \
-  file://gbmc-br-gw-src.sh \
-  file://gbmc-br-nft.sh \
+  file://gbmc-br-port-rs.sh \
+  file://gbmc-br-port-rs@.service \
+  file://gbmc-br-gw-src.sh.in \
+  file://gbmc-br-gw-src-test.sh \
   file://gbmc-br-dhcp.sh \
   file://50-gbmc-psu-hardreset.sh.in \
   file://51-gbmc-reboot.sh \
@@ -36,8 +40,9 @@ SRC_URI += " \
   file://gbmc-br-load-ip.service \
   file://gbmc-start-dhcp.sh \
   file://50-gbmc-br-cn-redirect.rules \
+  file://gbmc-br-dhcrelay.sh \
+  file://gbmc-br-dhcrelay-test.sh \
   ${@'' if d.getVar('GBMC_DHCP_RELAY') != '1' else 'file://gbmc-br-dhcrelay.service'} \
-  ${@'' if d.getVar('GBMC_DHCP_RELAY') != '1' else 'file://gbmc-br-dhcrelay.sh'} \
   ${@'' if d.getVar('GBMC_DHCP_RELAY') != '1' else 'file://gbmc-br-dhcrelay'} \
   ${@'' if d.getVar('GBMC_DHCP_RELAY') != '1' else 'file://50-gbmc-br-dhcp.rules'} \
   ${@'' if d.getVar('GBMC_DHCP_RELAY') != '1' else 'file://-bmc-gbmcdhcp.netdev'} \
@@ -56,6 +61,8 @@ FILES:${PN}:append = " \
   ${systemd_unitdir}/network \
   ${sysconfdir}/nftables \
   "
+
+DEPENDS += "test-sh gbmc-net-common network-sh"
 
 RDEPENDS:${PN}:append = " \
   bash \
@@ -129,12 +136,22 @@ def build_vendor_option(is_v4, dhcp_type, machine, version):
   return option_code + enterprise_id_hex + vendor_data_len_hex + vendor_data_hex
 
 GBMC_BRIDGE_INTFS ?= ""
+# Bridge ports of gbmcbr facing peers that don't tag their traffic, i.e.
+# anything but a gBMC running this firmware (hosts, NICs, ...). Every gBMC
+# sets DSCP bit 0x04 on the IPv6 traffic it sends to gbmcbr, and gbmcbr
+# trusts tagged traffic. Frames entering through these ports get tagged, and
+# the tag is cleared again when frames leave through them. So every gbmcbr
+# port has to either be listed here or face a gBMC running this firmware:
+# - Untagged traffic from an unlisted port is only accepted if it is
+#   established, ICMPv6, or allowed by gbmc_br_int_input / gbmc_br_pub_input.
+# - A listed port facing a gBMC strips the tag from our traffic to it.
+GBMC_BR_INT_IFS ?= ""
 
 L2BR_DHCP_TYPE ?= ""
 
 ethernet_bridge_install() {
   # install udev rules if any
-  if [ -z "${GBMC_BRIDGE_INTFS}"]; then
+  if [ -z "${GBMC_BRIDGE_INTFS}" ]; then
     return
   fi
   cat /dev/null > ${UNPACKDIR}/-ether-bridge.network
@@ -145,6 +162,11 @@ ethernet_bridge_install() {
 
   install -d ${D}/${sysconfdir}/systemd/network
   install -m 0644 ${UNPACKDIR}/-ether-bridge.network ${D}/${sysconfdir}/systemd/network/
+}
+
+do_compile() {
+  SYSROOT="${STAGING_DIR_HOST}" bash ${UNPACKDIR}/gbmc-br-gw-src-test.sh || exit
+  SYSROOT="${STAGING_DIR_HOST}" bash ${UNPACKDIR}/gbmc-br-dhcrelay-test.sh || exit
 }
 
 do_install() {
@@ -192,15 +214,23 @@ do_install() {
 
   nftables_dir=${D}${sysconfdir}/nftables
   install -d -m0755 "$nftables_dir"
-  install -m0644 ${UNPACKDIR}/50-gbmc-br.rules $nftables_dir/
+  if [ -n "${GBMC_BR_INT_IFS}" ]; then
+    int_ifs="${@','.join(d.getVar('GBMC_BR_INT_IFS').split())}"
+    sed "s/@INT_IFS@/$int_ifs/g" ${UNPACKDIR}/50-gbmc-br.rules.in \
+      >$nftables_dir/50-gbmc-br.rules
+  else
+    sed '/@INT_IFS@/d' ${UNPACKDIR}/50-gbmc-br.rules.in \
+      >$nftables_dir/50-gbmc-br.rules
+  fi
   install -m0644 ${UNPACKDIR}/50-gbmc-br-cn-redirect.rules $nftables_dir/
 
   mondir=${D}${datadir}/gbmc-ip-monitor
   install -d -m0755 "$mondir"
   install -m0644 ${UNPACKDIR}/gbmc-br-ula.sh "$mondir"/
   install -m0644 ${UNPACKDIR}/gbmc-br-from-ra.sh "$mondir"/
-  install -m0644 ${UNPACKDIR}/gbmc-br-gw-src.sh "$mondir"/
-  install -m0644 ${UNPACKDIR}/gbmc-br-nft.sh "$mondir"/
+  install -m0644 ${UNPACKDIR}/gbmc-br-withdrawn.sh "$mondir"/
+  sed 's,@NCSI_IF@,${GBMC_NCSI_IF_NAME},g' ${UNPACKDIR}/gbmc-br-gw-src.sh.in \
+    >"$mondir"/gbmc-br-gw-src.sh
 
   install -d -m0755 ${D}${libexecdir}
   install -m0755 ${UNPACKDIR}/gbmc-br-hostname.sh ${D}${libexecdir}/
@@ -231,6 +261,8 @@ do_install() {
   sed 's,@IP_OFFSET@,${GBMC_BR_FIXED_OFFSET},' ${UNPACKDIR}/gbmc-br-ra.sh.in >${UNPACKDIR}/gbmc-br-ra.sh
   install -m0755 ${UNPACKDIR}/gbmc-br-ra.sh ${D}${libexecdir}/
   install -m0644 ${UNPACKDIR}/gbmc-br-ra.service ${D}${systemd_system_unitdir}/
+  install -m0755 ${UNPACKDIR}/gbmc-br-port-rs.sh ${D}${libexecdir}/
+  install -m0644 ${UNPACKDIR}/gbmc-br-port-rs@.service ${D}${systemd_system_unitdir}/
 
   if [ "${GBMC_DHCP_RELAY}" = 1 ]; then
     install -m0644 ${UNPACKDIR}/gbmc-br-dhcrelay.service ${D}${systemd_system_unitdir}/

@@ -181,6 +181,13 @@ do_configure() {
     fi
 }
 
+# There's a makefile dependency race that causes occasional build
+# failures, so build this object first to avoid the race.
+# https://www.postgresql.org/message-id/CAAnfSTv_Vj9oH2vUs56KwDdbmfrOhuTb1o%2B6TXzBW_uUjOJpkg%40mail.gmail.com
+do_compile:prepend() {
+    make -C src/common jsonapi.o
+}
+
 do_compile:append() {
     oe_runmake -C contrib all
 
@@ -244,7 +251,7 @@ INITSCRIPT_PARAMS = "start 64 . stop 36 0 1 2 3 4 5 6 ."
 do_install:append() {
     # install contrib
     oe_runmake DESTDIR=${D} -C contrib install
-    oe_multilib_header pg_config.h pg_config_ext.h ecpg_config.h postgresql/server/pg_config.h postgresql/server/pg_config_ext.h
+    oe_multilib_header pg_config.h ecpg_config.h postgresql/server/pg_config.h
     # install tutorial
     install -d -m 0755 ${D}${libdir}/${BPN}/tutorial
     install ${B}/src/tutorial/* ${D}${libdir}/${BPN}/tutorial

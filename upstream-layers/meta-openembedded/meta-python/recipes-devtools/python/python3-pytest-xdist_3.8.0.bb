@@ -13,6 +13,3 @@ RDEPENDS:${PN} += " \
     python3-execnet \
     python3-pytest \
 "
-
-PYPI_PACKAGE = "pytest_xdist"
-UPSTREAM_CHECK_PYPI_PACKAGE = "${PYPI_PACKAGE}"

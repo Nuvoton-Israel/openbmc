@@ -24,13 +24,13 @@ LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://LICENSE.txt;md5=1fc37e1037ae673975fbcb96a98f7191"
 
 PV .= "+git"
-SRCREV = "79c060eea3eea1257797f15ea1608a9a9923aa6f"
+SRCREV = "7bea48e5e850ab4cafbe68d3765cdaba13a86d6f"
 SRC_URI = "git://www.bearssl.org/git/BearSSL;protocol=https;branch=master \
            file://0002-test-test_x509.c-fix-potential-overflow-issue.patch \
            "
 
 SONAME = "libbearssl.so.6"
-# without compile errors like 
+# without compile errors like
 # <..>/ld: build/obj/ghash_pclmul.o: warning: relocation against `br_ghash_pclmul' in read-only section `.text'
 CFLAGS += "-fPIC"
 

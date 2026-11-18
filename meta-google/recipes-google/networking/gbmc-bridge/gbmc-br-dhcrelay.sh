@@ -17,32 +17,54 @@
 
 # shellcheck disable=SC2034
 declare -A gbmc_br_dhcrelay_linkaddrs
+gbmc_br_dhcrelay_dirty="${gbmc_br_dhcrelay_dirty-}"
 
 gbmc_br_dhcrelay_hook() {
   # shellcheck disable=SC2154
-  if [[ $change == addr && $scope == link && $fam == inet6 && $flags != *tentative* ]]; then
-    local -n numaddrs=gbmc_br_dhcrelay_linkaddrs["$intf"]
-    if [[ -z ${numaddrs+1} ]]; then
+  if [[ $change == defer ]]; then
+    if [[ -n ${gbmc_br_dhcrelay_dirty-} ]]; then
+      gbmc_br_dhcrelay_dirty=
+      systemctl restart --no-block gbmc-br-dhcrelay.service
+    fi
+  elif [[ $change == addr && $scope == link && $fam == inet6 ]]; then
+    local -n addrs=gbmc_br_dhcrelay_linkaddrs["$intf"]
+    if [[ -z ${addrs+1} ]]; then
       return 0
     fi
-    if [[ $action == add ]]; then
-      (( numaddrs += 1 ))
+    [[ $addrs != 0 ]] || addrs=
+    local had_addrs=0
+    [[ -n $addrs ]] && had_addrs=1
+    if [[ $action == add && $flags != *tentative* ]]; then
+      [[ " $addrs " != *" $ip "* ]] || return 0
+      addrs="${addrs:+$addrs }$ip"
     else
-      (( numaddrs -= 1 ))
+      [[ " $addrs " == *" $ip "* ]] || return 0
+      local padded=" $addrs "
+      padded="${padded//" $ip "/ }"
+      padded="${padded# }"
+      addrs="${padded% }"
     fi
-    local svc=
-    svc=gbmc-br-dhcrelay.service
-    file=/run/gbmc-br-dhcrelay/uppers/"$intf"
-    if (( numaddrs == 1 )); then
-      mkdir -p "$(dirname "$file")"
-      printf 'ff02::1:2%%%s' "$intf" >"$file"
+    local has_addrs=0
+    [[ -n $addrs ]] && has_addrs=1
+    (( had_addrs != has_addrs )) || return 0
+    local dir=/run/gbmc-br-dhcrelay/uppers
+    local file="$dir/$intf"
+    if (( has_addrs == 1 )); then
+      local val="ff02::1:2%$intf"
+      if [[ -f $file && $(<"$file") == "$val" ]]; then
+        return 0
+      fi
+      local tmp="$dir/.$intf.tmp.$BASHPID"
+      [[ -d $dir ]] || mkdir -p "$dir"
+      printf '%s' "$val" >"$tmp" && mv -f "$tmp" "$file"
       echo "Adding dhcrelay upper $intf" >&2
-    elif (( numaddrs == 0 )); then
+    else
+      [[ -e $file ]] || return 0
       rm -f "$file"
       echo "Removing dhcrelay upper $intf" >&2
     fi
-    systemctl reset-failed "$svc"
-    systemctl restart --no-block "$svc"
+    gbmc_br_dhcrelay_dirty=1
+    gbmc_ip_monitor_defer
   fi
 }
 

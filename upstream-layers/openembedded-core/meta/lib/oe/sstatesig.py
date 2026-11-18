@@ -7,6 +7,7 @@ import bb.parse
 import bb.siggen
 import bb.runqueue
 import oe
+import os
 import netrc
 
 def sstate_rundepfilter(siggen, fn, recipename, task, dep, depname, dataCaches):
@@ -19,7 +20,7 @@ def sstate_rundepfilter(siggen, fn, recipename, task, dep, depname, dataCaches):
         return x.startswith("nativesdk-")
     def isKernel(mc, fn):
         inherits = " ".join(dataCaches[mc].inherits[fn])
-        return inherits.find("/module-base.bbclass") != -1 or inherits.find("/linux-kernel-base.bbclass") != -1
+        return inherits.find("/module-base.bbclass") != -1 or inherits.find("/kernel.bbclass") != -1
     def isPackageGroup(mc, fn):
         inherits = " ".join(dataCaches[mc].inherits[fn])
         return "/packagegroup.bbclass" in inherits
@@ -258,7 +259,8 @@ class SignatureGeneratorOEBasicHashMixIn(object):
             if taskhash != unihash:
                 unihashmap[tid] = "    " + self.lockedpnmap[fn] + ":" + task + ":" + taskhash + ":" + unihash
 
-        with open(sigfile, "w") as f:
+        tmpfile = sigfile + ".new"
+        with open(tmpfile, "w") as f:
             l = sorted(types)
             for t in l:
                 f.write('SIGGEN_LOCKEDSIGS_%s = "\\\n' % t)
@@ -276,6 +278,7 @@ class SignatureGeneratorOEBasicHashMixIn(object):
             for tid in sortedtid:
                 f.write(unihashmap[tid] + " \\\n")
             f.write('    "\n')
+        os.replace(tmpfile, sigfile)
 
     def dump_siglist(self, sigfile, path_prefix_strip=None):
         def strip_fn(fn):
@@ -549,6 +552,11 @@ def OEOuthashBasic(path, sigfile, task, d):
     import grp
     import re
     import fnmatch
+    import functools
+
+    # Caches to speed lookups
+    lookup_uid = functools.lru_cache(lambda uid: pwd.getpwuid(uid).pw_name)
+    lookup_gid = functools.lru_cache(lambda gid: grp.getgrgid(gid).gr_name)
 
     def update_hash(s):
         s = s.encode('utf-8')
@@ -651,8 +659,8 @@ def OEOuthashBasic(path, sigfile, task, d):
                         add_perm(stat.S_IXOTH, 'x')
 
                     try:
-                        update_hash(" %10s" % pwd.getpwuid(s.st_uid).pw_name)
-                        update_hash(" %10s" % grp.getgrgid(s.st_gid).gr_name)
+                        update_hash(" %10s" % lookup_uid(s.st_uid))
+                        update_hash(" %10s" % lookup_gid(s.st_gid))
                     except KeyError as e:
                         msg = ("KeyError: %s\nPath %s is owned by uid %d, gid %d, which doesn't match "
                             "any user/group on target. This may be due to host contamination." %

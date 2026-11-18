@@ -8,10 +8,10 @@ DEPENDS = "ncurses glib-2.0 util-linux file-replacement-native"
 RDEPENDS:${PN} = "ncurses-terminfo-base"
 RRECOMMENDS:${PN} = "ncurses-terminfo"
 
-SRC_URI = "http://ftp.midnight-commander.org/${BPN}-${PV}.tar.bz2 \
+SRC_URI = "http://ftp.midnight-commander.org/${BPN}-${PV}.tar.xz \
            file://nomandate.patch \
            "
-SRC_URI[sha256sum] = "a3ceb0af84226fedfe5f339464ff2849c3f6bf0321b72027c47b2c10e66a6dba"
+SRC_URI[sha256sum] = "cae149d42f844e5185d8c81d7db3913a8fa214c65f852200a9d896b468af164c"
 
 inherit autotools gettext pkgconfig
 
@@ -37,7 +37,7 @@ CACHED_CONFIGUREVARS += "mc_cv_have_zipinfo=yes"
 
 do_install:append () {
 	sed -i -e '1s,#!.*perl,#!${bindir}/env perl,' ${D}${libexecdir}/mc/extfs.d/*
-        
+
         rm ${D}${libexecdir}/mc/extfs.d/s3+ ${D}${libexecdir}/mc/extfs.d/uc1541
 }
 
@@ -47,8 +47,8 @@ SUMMARY:${BPN}-helpers-perl = "Midnight Commander Perl-based helper scripts"
 FILES:${BPN}-helpers-perl = "${libexecdir}/mc/extfs.d/a+ ${libexecdir}/mc/extfs.d/apt+ \
                              ${libexecdir}/mc/extfs.d/deb ${libexecdir}/mc/extfs.d/deba \
                              ${libexecdir}/mc/extfs.d/debd ${libexecdir}/mc/extfs.d/dpkg+ \
-                             ${libexecdir}/mc/extfs.d/mailfs ${libexecdir}/mc/extfs.d/patchfs \ 
-                             ${libexecdir}/mc/extfs.d/rpms+ ${libexecdir}/mc/extfs.d/ulib \ 
+                             ${libexecdir}/mc/extfs.d/mailfs ${libexecdir}/mc/extfs.d/patchfs \
+                             ${libexecdir}/mc/extfs.d/rpms+ ${libexecdir}/mc/extfs.d/ulib \
                              ${libexecdir}/mc/extfs.d/uzip"
 RDEPENDS:${BPN}-helpers-perl = "perl"
 

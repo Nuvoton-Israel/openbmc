@@ -4,7 +4,7 @@ HOMEPAGE = "https://developer.gnome.org/glib/"
 
 # pcre is under BSD;
 # docs/reference/COPYING is with a 'public domain'-like license!
-LICENSE = "LGPL-2.1-or-later & BSD-3-Clause & GCR-docs"
+LICENSE = "BSD-3-Clause AND GCR-docs AND LGPL-2.1-or-later"
 LIC_FILES_CHKSUM = "file://COPYING;md5=41890f71f740302b785c27661123bff5 \
                     file://glib/glib.h;beginline=4;endline=17;md5=72f7cc2847407f65d8981ef112e4e630 \
                     file://LICENSES/LGPL-2.1-or-later.txt;md5=41890f71f740302b785c27661123bff5 \
@@ -30,7 +30,9 @@ LEAD_SONAME = "libglib-2.0.*"
 
 GNOMEBN = "glib"
 
-inherit gettext gi-docgen gnomebase ptest-gnome upstream-version-is-even bash-completion gio-module-cache manpages gobject-introspection-data
+# GLib publishes bugfix/security-only micro releases on its stable
+# (even-minor) series.
+inherit gettext gi-docgen gnomebase ptest-gnome upstream-version-is-even bash-completion gio-module-cache manpages gobject-introspection-data upstream-stable-release-point
 
 S = "${UNPACKDIR}/${GNOMEBN}-${PV}"
 
@@ -166,7 +168,7 @@ RDEPENDS:${PN}-dev += "${PN}-utils"
 RDEPENDS:${PN}-ptest += "\
             coreutils \
             libgcc \
-            ${VIRTUAL-RUNTIME_dbus} \
+            dbus-daemon \
             desktop-file-utils \
             gnome-desktop-testing \
             tzdata \
@@ -223,8 +225,7 @@ RDEPENDS:${PN}-ptest:append:libc-glibc = "\
 
 PE = "1"
 
-SRC_URI += "\
-           file://run-ptest \
+SRC_URI += "file://run-ptest \
            file://0001-Fix-DATADIRNAME-on-uclibc-Linux.patch \
            file://0001-Remove-the-warning-about-deprecated-paths-in-schemas.patch \
            file://0001-Install-gio-querymodules-as-libexec_PROGRAM.patch \
@@ -233,14 +234,13 @@ SRC_URI += "\
            file://0001-gio-tests-resources.c-comment-out-a-build-host-only-.patch \
            file://0010-Do-not-hardcode-python-path-into-various-tools.patch \
            file://skip-timeout.patch \
-           file://CVE-2026-58016-1.patch \
-           file://CVE-2026-58016-2.patch \
+           file://skip-monotonic-time-similar.patch \
            "
 SRC_URI:append:class-native = " file://relocate-modules.patch \
                                 file://0001-meson.build-do-not-enable-pidfd-features-on-native-g.patch \
                               "
 
-SRC_URI[archive.sha256sum] = "cf3f215a640c8a4257f14317586b8f1fdd25a10a93cb4bdda147c0f9ad88e74f"
+SRC_URI[archive.sha256sum] = "17d15cac2af80a33271127408e0abc2748eb297c595c2a26409e81e14e7d1b8f"
 
 # Find any meson cross files in FILESPATH that are relevant for the current
 # build (using siteinfo) and add them to EXTRA_OEMESON.

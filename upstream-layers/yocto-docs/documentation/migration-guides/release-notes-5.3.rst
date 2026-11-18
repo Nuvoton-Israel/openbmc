@@ -253,7 +253,8 @@ New Features / Enhancements in |yocto-ver|
       the :term:`Poky` distro.
 
    -  ``linux/generate-cve-exclusions``: use data from CVEProject instead of
-      the archived https://linuxkernelcves.com.
+      the archived https://linuxkernelcves.com (see
+      https://web.archive.org/web/20240420122324/https://www.linuxkernelcves.com/).
 
    -  ``kernel-yocto``: allow annotated options to be modified. For example if
       the following kernel configuration is set::
@@ -465,7 +466,7 @@ New Features / Enhancements in |yocto-ver|
       -  The script can now run compressed images with snapshot mode. For
          example, with :term:`IMAGE_FSTYPES` containing ``ext4.zst``, you can run::
 
-            runqemu snapshot ext4.zst <image-recipe>
+            $ runqemu snapshot ext4.zst <image-recipe>
 
       -  Add support for the ``erofs`` filesystem.
 
@@ -569,7 +570,7 @@ New Features / Enhancements in |yocto-ver|
    -  Include additional information about Meson setting in the SDK environment
       setup script (host system, CPU family, etc.).
 
-   -  Add Go to :term:`SDK_TOOLCHAIN_LANGS`, except for the following
+   -  Add Go to ``SDK_TOOLCHAIN_LANGS``, except for the following
       architecture on which this is not supported:
 
       -  RISC-V 32 bits (``rv32``)
@@ -647,7 +648,7 @@ New Features / Enhancements in |yocto-ver|
          OOM kills.
 
       -  A new SDK test is now running for Go after ``go`` was added to
-         :term:`SDK_TOOLCHAIN_LANGS`.
+         ``SDK_TOOLCHAIN_LANGS``.
 
       -  Commands sent over SSH (using the ``OESSHTarget`` class) will now error
          when an SSH failure occurs. It is possible to ignore these errors by

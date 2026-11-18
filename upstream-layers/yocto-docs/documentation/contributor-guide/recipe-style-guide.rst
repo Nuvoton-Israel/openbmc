@@ -192,11 +192,11 @@ Custom tasks should be sorted similarly.
 
 Package specific variables are typically grouped together, e.g.::
 
-    RDEPENDS:${PN} = “foo”
-    RDEPENDS:${PN}-libs = “bar”
+    RDEPENDS:${PN} = "foo"
+    RDEPENDS:${PN}-libs = "bar"
 
-    RRECOMMENDS:${PN} = “one”
-    RRECOMMENDS:${PN}-libs = “two”
+    RRECOMMENDS:${PN} = "one"
+    RRECOMMENDS:${PN}-libs = "two"
 
 Recipe License Fields
 ---------------------
@@ -436,7 +436,7 @@ By default, patches created with ``git format-patch`` have a `Git` version signa
 To avoid having a `Git` signature at the end of generated or updated patches,
 you can use `Git` configuration settings::
 
-   git config --global format.signature ""
+   $ git config --global format.signature ""
 
 .. note::
    Patches generated or updated by ``devtool`` are created with no signature.

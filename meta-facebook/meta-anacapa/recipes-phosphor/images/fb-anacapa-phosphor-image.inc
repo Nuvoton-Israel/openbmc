@@ -22,5 +22,16 @@ OBMC_IMAGE_EXTRA_INSTALL:append = " \
 
 # Anapaca platform services
 OBMC_IMAGE_EXTRA_INSTALL:append = " \
+    platform-init \
     plat-svc \
+"
+
+# Enable neard for NFC tag discovery.
+OBMC_IMAGE_EXTRA_INSTALL:append = " \
+    neard \
+"
+
+# AMC datetime sync
+OBMC_IMAGE_EXTRA_INSTALL:append = " \
+    amc-datetime-sync \
 "

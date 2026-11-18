@@ -20,15 +20,25 @@ source /usr/share/gbmc-net-lib.sh || exit
 
 # shellcheck disable=SC2034
 declare -A gbmc_br_dhcrelay_linkaddrs
+gbmc_br_dhcrelay_dirty="${gbmc_br_dhcrelay_dirty-}"
+declare -A gbmc_ncsi_usb_ifindex=()
 
 gbmc_ncsi_dynamic_hook() {
   # shellcheck disable=SC2154
-  local -n numaddrs=gbmc_br_dhcrelay_linkaddrs["$intf"]
+  local -n linkaddrs=gbmc_br_dhcrelay_linkaddrs["$intf"]
   # shellcheck disable=SC2154
   if [[ "$change" = 'link' && "$action" = 'add' ]]; then
-    ip link show "$intf" | grep -q '^ *alias ncsi-usb-side$' || return
-    echo "NCSI USB Link Add $intf" >&2
+    # Builtins only: this runs for every link event, and short lived ones
+    # (e.g. USB devices udev renames right away) may already be gone
+    local alias='' idx=''
+    read -r alias 2>/dev/null <"/sys/class/net/$intf/ifalias"
+    [[ $alias == ncsi-usb-side ]] || return 0
+    read -r idx 2>/dev/null <"/sys/class/net/$intf/ifindex"
+    [[ -n $idx && $idx != "${gbmc_ncsi_usb_ifindex["$intf"]-}" ]] || return 0
+    gbmc_ncsi_usb_ifindex["$intf"]="$idx"
+    echo "NCSI USB Link Add $intf (ifindex $idx)" >&2
 
+    local contents
 read -r -d '' contents <<EOF
 table inet filter {
     chain ${intf}_input {
@@ -51,23 +61,63 @@ table inet filter {
     }
 }
 EOF
-    local rfile=/run/nftables/50-gbmc-ncsi-"$intf".rules
-    mkdir -p "$(dirname "$rfile")"
-    printf '%s' "$contents" >"$rfile"
-    gbmc_net_nftables_reload || true
+    gbmc_net_write_if_changed "$contents" \
+      /run/nftables/50-gbmc-ncsi-"$intf".rules || true
 
-    systemctl start --no-block gbmc-ncsi-ra@"$intf"
-    numaddrs=${numaddrs-0}
-  elif [[ "$change" = 'link' && "$action" = 'del' ]]; then
-    [[ -n "${numaddrs-}" ]] || return 0
-    echo "NCSI USB Link Del $intf" >&2
-    if rm /run/nftables/50-gbmc-ncsi-"$intf".rules 2>/dev/null; then
-      gbmc_net_nftables_reload || true
+    gbmc_ncsi_usb_network "$intf"
+
+    if [ -e /run/gbmc-br-dhcrelay/uppers/"$intf" ]; then
+      rm -f /run/gbmc-br-dhcrelay/uppers/"$intf"
+      # shellcheck disable=SC2034
+      gbmc_br_dhcrelay_dirty=1
+      gbmc_ip_monitor_defer
     fi
+    # shellcheck disable=SC2034
+    linkaddrs=''
+    systemctl restart --no-block gbmc-ncsi-ra@"$intf"
+  elif [[ "$change" = 'link' && "$action" = 'del' ]]; then
+    [[ -n "${gbmc_ncsi_usb_ifindex["$intf"]-}" ]] || return 0
+    echo "NCSI USB Link Del $intf" >&2
+    gbmc_net_rm_if_exists \
+      /run/nftables/50-gbmc-ncsi-"$intf".rules \
+      /run/systemd/network/-bmc-"$intf".network || true
     systemctl stop --no-block gbmc-ncsi-ra@"$intf" || true
-    rm -f /run/gbmc-br-dhcrelay/uppers/"$intf"
-    unset numaddrs
+    if [ -e /run/gbmc-br-dhcrelay/uppers/"$intf" ]; then
+      rm -f /run/gbmc-br-dhcrelay/uppers/"$intf"
+      # shellcheck disable=SC2034
+      gbmc_br_dhcrelay_dirty=1
+      gbmc_ip_monitor_defer
+    fi
+    unset 'gbmc_ncsi_usb_ifindex[$intf]'
+    unset linkaddrs
   fi
+}
+
+# The USB NCSI links all match the shared -bmc-gbmcncsiusb.network, so the
+# per-interface drop-ins in -bmc-<intf>.network.d that hold the RA gateway
+# routes, proxy NDP and policy rules never apply. Their routes and settings
+# then only exist because they were also applied with ip(8), and networkd
+# drops them as foreign whenever it reconfigures the link (reload, restart,
+# carrier loss), leaving the BMC without any route out of the interface.
+# Give each link its own runtime .network so those drop-ins apply, with the
+# settings of the shared file. networkd uses the first matching .network in
+# lexical order, so this relies on -bmc-<intf>.network sorting before
+# -bmc-gbmcncsiusb.network. That holds for the USB path (enu*) and kernel
+# (eth*) names these links get.
+# Arguments:
+#   $1: USB NCSI interface name
+gbmc_ncsi_usb_network() {
+  local intf="$1"
+  local shared=-bmc-gbmcncsiusb.network
+  local name=-bmc-"$intf".network
+  if [[ $name > "$shared" ]]; then
+    echo "NCSI USB $name sorts after $shared, its drop-ins won't apply" >&2
+  fi
+  local contents
+  contents="$(sed -e '/^#/d' -e "s/^Property=.*/Name=$intf/" \
+    /usr/lib/systemd/network/"$shared")" || return
+  # Re-enumeration keeps the same config, only reload when it changed
+  gbmc_net_write_if_changed "$contents" /run/systemd/network/"$name" || true
 }
 
 GBMC_IP_MONITOR_HOOKS+=(gbmc_ncsi_dynamic_hook)

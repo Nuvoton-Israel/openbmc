@@ -1,0 +1,49 @@
+[Unit]
+Description=USB Gadget %i
+# The UDC is a built-in platform device, so it is present as soon as configfs
+# is mounted. Don't wait on udev, entity-manager or the object mapper.
+DefaultDependencies=no
+Wants=sys-kernel-config.mount
+After=sys-kernel-config.mount systemd-modules-load.service
+# Binding the UDC attaches the gadget, and an EEM host sees carrier as soon as
+# it enumerates it. Only attach once systemd-networkd is running, so it brings
+# the link up and answers the peer's router solicitations right away, rather
+# than the peer giving up on them before networkd starts.
+After=systemd-networkd.service
+# Machines with a bare metal mode add a condition on it, see
+# BMC_USB_GADGETS_BM, instead of waiting for their bare metal setup services
+PartOf=google-usb-static.target
+# Targets only order themselves after the units they want by default when
+# those have default dependencies
+Before=google-usb-static.target
+Conflicts=shutdown.target
+Before=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+EnvironmentFile=/usr/share/google-usb-network/%i.conf
+# systemd-networkd brings the link up from the network config installed with
+# the image, keeping NCM and ECM hosts without carrier until it manages the
+# link. With the config in place when networkd starts, attaching the gadget
+# doesn't need a networkd reload.
+ExecStart=/usr/bin/usb_network.sh \
+    --product-id ${PRODUCT_ID} \
+    --product-name ${PRODUCT_NAME} \
+    --bind-device ${BIND_DEVICE} \
+    --dev-type ${DEV_TYPE} \
+    --host-mac ${HOST_MAC} \
+    --host-mac-idx ${HOST_MAC_IDX} \
+    --dev-mac ${DEV_MAC} \
+    --iface-alias ${IFACE_ALIAS} \
+    --no-bridge ${NO_BRIDGE} \
+    --link-up 0 \
+    --network-config 0 \
+    --iface-name %i
+ExecStop=/usr/bin/usb_network.sh stop \
+    --dev-type ${DEV_TYPE} \
+    --network-config 0 \
+    --iface-name %i
+
+[Install]
+WantedBy=google-usb-static.target

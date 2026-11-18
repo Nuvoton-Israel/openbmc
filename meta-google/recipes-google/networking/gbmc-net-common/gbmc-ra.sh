@@ -19,16 +19,42 @@ source /usr/share/network/lib.sh || exit
 source /usr/share/gbmc-net-lib.sh || exit
 
 : "${RA_IF:?No RA interface set}"
-: "${IP_OFFSET=?1}"
-: "${ROUTE_METRIC:?No Metric set}"
-ROUTE_METRIC_LO="$((ROUTE_METRIC+1000))"
+: "${IP_OFFSET:=1}"
+: "${ROUTE_METRIC?No Metric set}"
+# An empty ROUTE_METRIC means the RA router is only used for the interface
+# routing table, without any default routes in the main table.
+ROUTE_METRIC_LO=
+if [ -n "$ROUTE_METRIC" ]; then
+  ROUTE_METRIC_LO="$((ROUTE_METRIC + GBMC_ROUTE_METRIC_FALLBACK_OFFSET))"
+fi
 
 # We would prefer empty string but it's easier for associative array handling
 # to use invalid
 old_rtr=invalid
 old_mac=invalid
+old_rt=invalid
 old_pfx=invalid
 old_fqdn=invalid
+
+# Installs one of the router's main table default routes, with the source
+# gbmc-br-gw-src picked for it if any. The route matches its networkd
+# [Route] (proto static and the same source) so networkd keeps it when it
+# reconfigures the interface, see GBMC_NET_ROUTE_SRC_DIR.
+# Arguments:
+#   $1: Router IPv6 address
+#   $2: Route metric
+rtr_route_replace() {
+  local rtr="$1"
+  local metric="$2"
+  local args=(default via "$rtr" onlink dev "$RA_IF" metric "$metric" proto static)
+  local src
+  gbmc_net_route_src_get src "$RA_IF" "$rtr" "$metric"
+  # The saved source might not be usable (yet), install it without one
+  if [[ -n $src ]] && ip -6 route replace "${args[@]}" src "$src" 2>/dev/null; then
+    return 0
+  fi
+  ip -6 route replace "${args[@]}"
+}
 
 # Install router and gateway configuration for an RA router.
 # Writes networkd drop-ins ([Neighbor] and [Route] definitions) under
@@ -49,38 +75,43 @@ add_rtr() {
 
   # Override any existing gateway information within files
   # Make sure we cover `00-*` and `-*` files
-  for file in /run/systemd/network/{00,}-bmc-$RA_IF.network; do
-    mkdir -p "$file.d"
-    printf '[Neighbor]\nMACAddress=%s\nAddress=%s\n' \
-      "$mac" "$rtr" >"$file.d"/10-gateway.conf
-    printf '[Route]\nGateway=%s\nGatewayOnLink=true\nMetric=512\nTable=%d\n' \
-      "$rtr" "$route_table" >>"$file.d"/10-gateway.conf
-    printf '[Route]\nGateway=%s\nGatewayOnLink=true\nMetric=%d\n' \
-      "$rtr" "$ROUTE_METRIC_LO" >>"$file.d"/10-gateway.conf
-    if (( new == 1 )); then
-      printf '[Route]\nGateway=%s\nGatewayOnLink=true\nMetric=%d\n' \
-        "$rtr" "$ROUTE_METRIC" >"$file.d"/10-gateway-dyn.conf
-      mkdir -p /run/last-ra
-      printf '%s\n%s\n' "$rtr" "$mac" >"/run/last-ra/$RA_IF"
-      if [ -z "${GBMC_AVOID_RWFS-}" ]; then
-        mkdir -p /var/google/last-ra
-        printf '%s\n%s\n' "$rtr" "$mac" >"/var/google/last-ra/$RA_IF"
-      fi
-    fi
-  done
-
-  # Don't force networkd to reload as this can break phosphor-networkd
-  # Fall back to reload only if ip link commands fail
-  local st=0
-  ip -6 neigh replace "$rtr" dev "$RA_IF" lladdr "$mac" || st=$?
-  ip -6 route replace default via "$rtr" onlink dev "$RA_IF" metric 512 table "$route_table" || st=$?
-  ip -6 route replace default via "$rtr" onlink dev "$RA_IF" metric "$ROUTE_METRIC_LO" || st=$?
+  local conf route
+  printf -v conf '[Neighbor]\nMACAddress=%s\nAddress=%s\n' "$mac" "$rtr"
+  printf -v route '[Route]\nGateway=%s\nGatewayOnLink=true\nMetric=%d\nTable=%d\n' \
+    "$rtr" "$GBMC_ROUTE_METRIC_ONLINK" "$route_table"
+  conf+="$route"
+  if [ -n "$ROUTE_METRIC" ]; then
+    printf -v route '[Route]\nGateway=%s\nGatewayOnLink=true\nMetric=%d\n' \
+      "$rtr" "$ROUTE_METRIC_LO"
+    conf+="$route"
+  fi
+  gbmc_net_reload_queue_start
+  gbmc_net_gateway_conf_write "$RA_IF" 10-gateway.conf "$conf"
   if (( new == 1 )); then
-    ip -6 route replace default via "$rtr" onlink dev "$RA_IF" metric "$ROUTE_METRIC" || st=$?
+    conf=
+    if [ -n "$ROUTE_METRIC" ]; then
+      printf -v conf '[Route]\nGateway=%s\nGatewayOnLink=true\nMetric=%d\n' \
+        "$rtr" "$ROUTE_METRIC"
+    fi
+    gbmc_net_gateway_conf_write "$RA_IF" 10-gateway-dyn.conf "$conf"
+    gbmc_net_write_if_changed "$rtr"$'\n'"$mac" "/run/last-ra/$RA_IF" || true
+    if [ -z "${gbmc_net_avoid_rwfs-${GBMC_AVOID_RWFS-}}" ]; then
+      gbmc_net_write_if_changed "$rtr"$'\n'"$mac" "/var/google/last-ra/$RA_IF" || true
+    fi
   fi
-  if (( st != 0 )); then
-    gbmc_net_networkd_reload "$RA_IF" || true
+
+  # Also apply to the kernel right away
+  local rc=0
+  ip -6 neigh replace "$rtr" dev "$RA_IF" lladdr "$mac" || rc=$?
+  ip -6 route replace default via "$rtr" onlink dev "$RA_IF" metric "$GBMC_ROUTE_METRIC_ONLINK" table "$route_table" proto static || rc=$?
+  if [ -n "$ROUTE_METRIC" ]; then
+    rtr_route_replace "$rtr" "$ROUTE_METRIC_LO" || rc=$?
   fi
+  if (( new == 1 )) && [ -n "$ROUTE_METRIC" ]; then
+    rtr_route_replace "$rtr" "$ROUTE_METRIC" || rc=$?
+  fi
+  gbmc_net_reload_queue_end || rc=$?
+  return "$rc"
 }
 
 # Read the old info from persistent storage in case ToR is updating
@@ -91,12 +122,16 @@ elif [ -e "/var/google/last-ra/$RA_IF" ]; then
   rafile="/var/google/last-ra/$RA_IF"
 fi
 if [ -n "$rafile" ]; then
+  rtr='' mac=''
   exec {rafd}<"$rafile"
   read -r -u "$rafd" rtr
   read -r -u "$rafd" mac
   exec {rafd}<&-
-  echo "Loading old router $rtr($mac)" >&2
-  add_rtr "$rtr" "$mac" 0
+  # Masked (bind mounted empty) files have no router
+  if [ -n "$rtr" ]; then
+    echo "Loading old router $rtr($mac)" >&2
+    add_rtr "$rtr" "$mac" 0 || true
+  fi
 fi
 
 # Process router reachability and prefix information received via RA.
@@ -111,12 +146,6 @@ default_update_rtr() {
   local mac="$2"
   local op="${3-add}"
 
-  if ip addr show | grep -q "^[ ]*inet6 $rtr/"; then
-    echo "Router is ourself, ignoring" >&2
-    return 0
-  fi
-
-
   if [[ ${op} = "add" ]]; then
     echo "Set router $rtr on $RA_IF" >&2
     add_rtr "$rtr" "$mac" 1
@@ -124,13 +153,10 @@ default_update_rtr() {
     echo "Del router $rtr on $RA_IF" >&2
     # Override any existing gateway information within files
     # Make sure we cover `00-*` and `-*` files
-    for file in /run/systemd/network/{00,}-bmc-$RA_IF.network.d/10-gateway-dyn.conf; do
-      rm -rf "$file"
-    done
+    gbmc_net_gateway_conf_write "$RA_IF" 10-gateway-dyn.conf ''
 
-    # Fall back to reload if remove failed
-    ip -6 route del default via "$rtr" onlink dev "$RA_IF" metric "$ROUTE_METRIC" || \
-      gbmc_net_networkd_reload "$RA_IF" || true
+    [ -n "$ROUTE_METRIC" ] || return 0
+    ip -6 route del default via "$rtr" onlink dev "$RA_IF" metric "$ROUTE_METRIC" 2>/dev/null || true
   fi
 }
 
@@ -140,25 +166,32 @@ default_update_rtr() {
 default_update_fqdn() {
   local fqdn="$1"
   [ -z "$fqdn" ] && return
-  hostnamectl set-hostname "$fqdn" || true
+  hostnamectl set-hostname "$fqdn" || return
   echo "Set hostname $fqdn on $RA_IF" >&2
 }
 
+gbmc_ra_rdisc6() {
+  exec script -q -c "rdisc6 $*" /dev/null 2>/dev/null
+}
+
 # mininum retry time
-min_w=10
+min_w="$GBMC_RA_MIN_RETRY"
 # rdisc time
-r_timeout=10
+r_timeout="$GBMC_RA_TIMEOUT"
 # routing expiration time
-expire_time=180
+expire_time="$GBMC_RA_EXPIRE"
 # rs intervals
-rs_intervals=30
-declare -A rtrs
-rtrs=()
-while true; do
+rs_intervals="$GBMC_RA_RS_INTERVAL"
+declare -gA rtrs=()
+
+gbmc_ra_step() {
+  local -a data args t_pfx_b
+  local next_rs line lifetime=-1 mac='' hextet='' pfx='' host='' domain=''
+  local t_pfx t_pfx_len rtr dl fqdn rt found timeout
   # shellcheck disable=SC2206
   data=(${rtrs["${old_rtr}"]-})
   next_rs=
-  if [ -z "${data[1]}" ]; then
+  if [ -z "${data[1]-}" ]; then
     next_rs=$(( min_w + SECONDS ))
   else
     next_rs=$(( rs_intervals + SECONDS ))
@@ -202,6 +235,10 @@ while true; do
       # Only valid default routers can be considered, 0 lifetime implies
       # a non-default router
       (( lifetime > 0 )) || continue
+      if ip addr show | grep -q "^[ ]*inet6 $rtr/"; then
+        echo "Router is ourself, ignoring" >&2
+        continue
+      fi
 
       dl=$((expire_time + SECONDS))
       fqdn=
@@ -212,28 +249,33 @@ while true; do
       # We have some notoriously noisy lab environments with many routers being broadcast
       # We always prefer "fe80::1" in prod and labs for routing, so prefer that gateway.
       # We also want to take the first router we find to speed up acquisition on boot.
-      if [[ "$rtr" = "fe80::1" || "$old_rtr" = "invalid" ]]; then
-        if [[ "$rtr" != "$old_rtr" && "$mac" != "$old_mac" ]]; then
+      if [[ "$rtr" = "fe80::1" || "$old_rtr" = "invalid" || "$rtr" = "$old_rtr" ]]; then
+        rt="$(gbmc_net_route_table_for_intf "$RA_IF")" || rt=invalid
+        if [[ "$rtr" != "$old_rtr" || "$mac" != "$old_mac" || "$rt" != "$old_rt" ]]; then
           echo "Got defgw $rtr at $mac on $RA_IF" >&2
-          update_rtr "$rtr" "$mac" || true
-          old_mac="$mac"
-          old_rtr="$rtr"
+          if update_rtr "$rtr" "$mac"; then
+            old_mac="$mac"
+            old_rtr="$rtr"
+            old_rt="$rt"
+          fi
         fi
       fi
       # Only update router properties if we use this router
       [[ "$rtr" == "$old_rtr" ]] || continue
       if [[ $pfx != "$old_pfx" ]]; then
         echo "Got PFX $pfx from $rtr on $RA_IF" >&2
-        old_pfx="$pfx"
-        update_pfx "$pfx" || true
+        if update_pfx "$pfx"; then
+          old_pfx="$pfx"
+        fi
       fi
       if [[ $fqdn != "$old_fqdn" ]]; then
         echo "Got FQDN $fqdn from $rtr on $RA_IF" >&2
-        old_fqdn="$fqdn"
-        update_fqdn "$fqdn" || true
+        if update_fqdn "$fqdn"; then
+          old_fqdn="$fqdn"
+        fi
       fi
     fi
-  done < <(exec script -q -c "rdisc6 ${args[*]}" /dev/null 2>/dev/null)
+  done < <(gbmc_ra_rdisc6 "${args[@]}")
   # Purge any expired routers
   for rtr in "${!rtrs[@]}"; do
     # shellcheck disable=SC2206
@@ -254,27 +296,39 @@ while true; do
       data=(${rtrs["$rtr"]})
       mac=${data[0]}
       dl=${data[1]}
-      pfx=${data[2]}
-      fqdn=${data[3]}
-      update_rtr "$rtr" "$mac" || true
-      update_pfx "$pfx" || true
-      update_fqdn "$fqdn" || true
-      old_rtr="$rtr"
-      old_pfx="$pfx"
-      old_mac="$mac"
-      old_fqdn="$fqdn"
-      found="true"
-      break
+      pfx=${data[2]-}
+      fqdn=${data[3]-}
+      if update_rtr "$rtr" "$mac"; then
+        old_rtr="$rtr"
+        old_mac="$mac"
+        old_rt="$(gbmc_net_route_table_for_intf "$RA_IF")" || old_rt=invalid
+        if update_pfx "$pfx"; then
+          old_pfx="$pfx"
+        fi
+        if update_fqdn "$fqdn"; then
+          old_fqdn="$fqdn"
+        fi
+        found="true"
+        break
+      fi
     done
     # no other route exsits, removing the route
     if [[ "$found" = "false" ]]; then
-      update_rtr "$old_rtr" "$old_mac" "remove" || true
-      old_rtr=invalid
-      old_mac=invalid
+      if update_rtr "$old_rtr" "$old_mac" "remove"; then
+        old_rtr=invalid
+        old_mac=invalid
+        old_rt=invalid
+      fi
     fi
   fi
 
   # If rdisc6 exits early we still want to wait for the deadline before retrying
   (( timeout = next_rs - SECONDS ))
   sleep $(( timeout < 0 ? 0 : timeout ))
+}
+
+[ -n "${GBMC_RA_NO_LOOP-}" ] && return 0
+
+while true; do
+  gbmc_ra_step
 done

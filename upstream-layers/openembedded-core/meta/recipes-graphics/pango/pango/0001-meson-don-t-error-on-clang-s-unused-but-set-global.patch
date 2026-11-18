@@ -1,0 +1,33 @@
+From 919d0b32c02a7d0aa9739473349c73ac5f63ec10 Mon Sep 17 00:00:00 2001
+From: Matthias Clasen <mclasen@redhat.com>
+Date: Thu, 5 Nov 2026 11:40:45 -0500
+Subject: [PATCH] build: Don't promote unused globals to errors with clang
+
+Clang 23 includes -Wunused-but-set-global in -Wunused-but-set-variable.
+GLib type macros create parent-class globals that are legitimately unused
+in some types, so Pango fails when the latter warning group is promoted
+to an error. Keep the warning visible but do not make its global variant
+fatal.
+
+Based on a patch by David Nylander (!927).
+
+Upstream-Status: Backport [https://gitlab.gnome.org/GNOME/pango/-/issues/900]
+Signed-off-by: Ross Burton <ross.burton@arm.com>
+---
+ meson.build | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/meson.build b/meson.build
+index 9a5dc9ed1..58faa8496 100644
+--- a/meson.build
++++ b/meson.build
+@@ -148,6 +148,7 @@ elif cc.get_id() == 'gcc' or cc.get_id() == 'clang'
+     '-Werror=empty-body',
+     '-Werror=write-strings',
+     '-Werror=unused-but-set-variable',
++    '-Wno-error=unused-but-set-global',
+     '-Wundef', # FIXME: https://bugzilla.gnome.org/show_bug.cgi?id=792481
+   ]
+ 
+-- 
+GitLab

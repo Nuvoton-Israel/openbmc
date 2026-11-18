@@ -57,7 +57,6 @@ RDEPENDS:packagegroup-meta-networking-connectivity = "\
     networkmanager-openvpn \
     networkmanager \
     openconnect \
-    python3-networkmanager \
     rdate \
     rdist \
     ${@bb.utils.contains("DISTRO_FEATURES", "pam", "samba", "", d)} \
@@ -185,7 +184,6 @@ RDEPENDS:packagegroup-meta-networking-support = "\
     libtalloc \
     ipcalc \
     libtevent \
-    linux-atm \
     lksctp-tools \
     mctp \
     memcached \
@@ -251,5 +249,4 @@ RDEPENDS:packagegroup-meta-networking-support:remove:libc-musl = "ypbind-mt"
 
 EXCLUDE_FROM_WORLD = "1"
 # Empty packages, only devel headers and libs
-# nngpp
 # Use ntp and not chrony or ntimed

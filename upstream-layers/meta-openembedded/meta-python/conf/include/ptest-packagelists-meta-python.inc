@@ -19,6 +19,7 @@ PTESTS_FAST_META_PYTHON = "\
     python3-cachetools \
     python3-cbor2 \
     python3-configobj \
+    python3-construct \
     python3-pyconnman \
     python3-click \
     python3-dasbus \
@@ -35,6 +36,7 @@ PTESTS_FAST_META_PYTHON = "\
     python3-freezegun \
     python3-fsspec \
     python3-geojson \
+    python3-glances \
     python3-google-auth-oauthlib \
     python3-gpiod \
     python3-gpt-image \
@@ -87,6 +89,7 @@ PTESTS_FAST_META_PYTHON = "\
     python3-pytest-picked \
     python3-pytest-sugar \
     python3-pytoml \
+    python3-pytz \
     python3-pyyaml-include \
     python3-pydbus \
     python3-pyzmq \
@@ -100,7 +103,9 @@ PTESTS_FAST_META_PYTHON = "\
     python3-serpent \
     python3-service-identity \
     python3-setproctitle \
+    python3-simple-websocket \
     python3-simpleeval \
+    python3-six \
     python3-smpplib \
     python3-soupsieve \
     python3-sqlparse \
@@ -110,7 +115,6 @@ PTESTS_FAST_META_PYTHON = "\
     python3-time-machine \
     python3-tokenize-rt \
     python3-tomli-w \
-    python3-tomlkit \
     python3-trustme \
     python3-typeguard \
     python3-typing-inspection \
@@ -128,6 +132,7 @@ PTESTS_FAST_META_PYTHON = "\
     python3-xmltodict \
     python3-xxhash \
     python3-yarl \
+    tomcli \
 "
 
 PTESTS_SLOW_META_PYTHON = "\

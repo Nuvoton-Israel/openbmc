@@ -5,39 +5,28 @@ RUST_TEST_ARGS[doc] = "Arguments to give to the test binaries (e.g. --shuffle)"
 
 # I didn't find a cleaner way to share data between compile and install tasks
 CARGO_TEST_BINARIES_FILES ?= "${B}/test_binaries_list"
+CARGO_TEST_BUILD_JSON ?= "${B}/cargo_test_build.json"
+
+# Build the tests with the same environment as do_compile (oe_cargo_fix_env).
+cargo_ptest_build () {
+    oe_cargo_fix_env
+    export RUSTFLAGS="${RUSTFLAGS}"
+    bbnote "Building tests with cargo"
+    "${CARGO}" build --tests --message-format json-render-diagnostics ${CARGO_BUILD_FLAGS} ${PACKAGECONFIG_CONFARGS} > "${CARGO_TEST_BUILD_JSON}"
+}
 
 # Sadly, generated test binaries have no deterministic names (https://github.com/rust-lang/cargo/issues/1924)
 # This forces us to parse the cargo output in json format to find those test binaries.
 python do_compile_ptest_cargo() {
-    import subprocess
     import json
 
-    cargo = bb.utils.which(d.getVar("PATH"), d.getVar("CARGO"))
-    cargo_build_flags = d.getVar("CARGO_BUILD_FLAGS")
-    packageconfig_confargs = d.getVar("PACKAGECONFIG_CONFARGS")
-    rust_flags = d.getVar("RUSTFLAGS")
     manifest_path = d.getVar("CARGO_MANIFEST_PATH")
     project_manifest_path = os.path.normpath(manifest_path)
     manifest_dir = os.path.dirname(manifest_path)
 
-    env = os.environ.copy()
-    env['RUSTFLAGS'] = rust_flags
-    cmd = f"{cargo} build --tests --message-format json {cargo_build_flags} {packageconfig_confargs}"
-    bb.note(f"Building tests with cargo ({cmd})")
-
-    try:
-        proc = subprocess.Popen(cmd, shell=True, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    except subprocess.CalledProcessError as e:
-        bb.fatal(f"Cannot build test with cargo: {e}")
-
-    lines = []
-    for line in proc.stdout:
-        data = line.strip('\n')
-        lines.append(data)
-        bb.note(data)
-    proc.communicate()
-    if proc.returncode != 0:
-        bb.fatal(f"Unable to compile test with cargo, '{cmd}' failed")
+    bb.build.exec_func("cargo_ptest_build", d)
+    with open(d.getVar("CARGO_TEST_BUILD_JSON")) as f:
+        lines = f.read().splitlines()
 
     # Definition of the format: https://doc.rust-lang.org/cargo/reference/external-tools.html#json-messages
     test_bins = []
@@ -85,7 +74,7 @@ python do_install_ptest_cargo() {
     cargo_test_binaries_file = d.getVar('CARGO_TEST_BINARIES_FILES')
     rust_test_args = d.getVar('RUST_TEST_ARGS') or ""
 
-    ptest_dir = os.path.join(dest_dir, ptest_path.lstrip('/'))
+    ptest_dir = oe.path.join(dest_dir, ptest_path)
     os.makedirs(ptest_dir, exist_ok=True)
 
     test_bins = []
@@ -95,6 +84,8 @@ python do_install_ptest_cargo() {
 
     test_paths = []
     for test_bin in test_bins:
+        # Note that we can't strip the hash from the filename as some packages
+        # (eg librsvg) have multiple binaries with the same prefix.
         shutil.copy2(test_bin, ptest_dir)
         test_paths.append(os.path.join(ptest_path, os.path.basename(test_bin)))
 
@@ -105,7 +96,7 @@ python do_install_ptest_cargo() {
             f.write("#!/bin/sh\n")
         else:
             f.write(f"\necho \"\"\n")
-            f.write(f"echo \"## starting to run rust tests ##\"\n")               
+            f.write(f"echo \"## starting to run rust tests ##\"\n")
         f.write("if [ -z \"$rc\" ]; then rc=0; fi\n")
         for test_path in test_paths:
             script = textwrap.dedent(f"""\
@@ -118,7 +109,7 @@ python do_install_ptest_cargo() {
                 fi
             """)
             f.write(script)
-        
+
         f.write("exit $rc\n")
 
     if not script_exists:

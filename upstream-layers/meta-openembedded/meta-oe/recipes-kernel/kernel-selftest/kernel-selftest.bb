@@ -19,6 +19,10 @@ MM_PATCH = "file://0001-selftests-mm-pass-down-full-CC-and-CFLAGS-to-check_c.pat
 SRC_URI += "file://run-ptest \
             file://COPYING \
             file://0001-selftests-timers-Fix-clock_adjtime-for-newer-32-bit-.patch \
+            file://0001-selftests-filelock-zero-initialize-struct-flock-in-o.patch \
+            file://0001-selftests-filelock-fix-the-test-plan-count-in-ofdloc.patch \
+            file://0001-selftests-cgroup-memcontrol-keep-anon-page-touches-f.patch \
+            file://0001-selftests-filesystems-idmapped_tmpfile-chown-the-lay.patch \
             ${@bb.utils.contains('PACKAGECONFIG', 'mm', '${MM_PATCH}', '', d)} \
             "
 
@@ -45,7 +49,7 @@ PACKAGECONFIG[mm] = ",,libcap liburing numactl, libgcc bash"
 do_patch[depends] += "virtual/kernel:do_shared_workdir"
 do_compile[depends] += "virtual/kernel:do_install"
 
-inherit linux-kernel-base module-base kernel-arch ptest siteinfo
+inherit module-base kernel-arch ptest siteinfo
 
 DEBUG_PREFIX_MAP:remove = "-fcanon-prefix-map"
 
@@ -166,15 +170,15 @@ either install it and add it to HOSTTOOLS, or add clang-native from meta-clang t
     fi
     oe_runmake -C ${S} headers
     sed -i -e 's|^all: docs|all:|' ${S}/tools/testing/selftests/bpf/Makefile
-    sed -i -e '/mrecord-mcount/d' ${S}/Makefile
-    sed -i -e '/Wno-alloc-size-larger-than/d' ${S}/Makefile
-    sed -i -e '/Wno-alloc-size-larger-than/d' ${S}/scripts/Makefile.*
-    
+    sed -i -e '/+=[[:space:]]*-mrecord-mcount/d' ${S}/Makefile
+    sed -i -e '/+=[[:space:]]*-Wno-alloc-size-larger-than/d' ${S}/Makefile
+    sed -i -e '/+=[[:space:]]*-Wno-alloc-size-larger-than/d' ${S}/scripts/Makefile.*
+
     # Add kernel headers to CFLAGS to fix PTP selftest compilation
     # Required for PTP_MASK_CLEAR_ALL and PTP_MASK_EN_SINGLE definitions
     # introduced in kernel v6.7 (commit c5a445b)
     export CFLAGS="${CFLAGS} -I${STAGING_KERNEL_BUILDDIR}/usr/include"
-    
+
     oe_runmake -C ${S}/tools/testing/selftests TARGETS="${TEST_LIST}"
 }
 
@@ -219,7 +223,10 @@ PACKAGE_ARCH = "${MACHINE_ARCH}"
 INHIBIT_PACKAGE_DEBUG_SPLIT = "1"
 FILES:${PN} += "/usr/kernel-selftest"
 
-RDEPENDS:${PN} += "python3 perl perl-module-io-handle bash libcap libgcc"
+# coreutils provides timeout(1) with --foreground, which the kselftest runner
+# needs to enforce per-test timeouts; busybox has no timeout applet by default.
+# mount_setattr_test creates an ext4 image with mkfs.ext4.
+RDEPENDS:${PN} += "python3 perl perl-module-io-handle bash libcap libgcc coreutils e2fsprogs-mke2fs"
 
 INSANE_SKIP:${PN} += "libdir"
 
@@ -231,7 +238,3 @@ INSANE_SKIP:${PN} += "already-stripped"
 
 SECURITY_CFLAGS = ""
 COMPATIBLE_HOST:libc-musl = 'null'
-
-# It has native clang/llvm dependency, poky distro is reluctant to include them as deps
-# this helps with world builds on AB
-EXCLUDE_FROM_WORLD = "1"

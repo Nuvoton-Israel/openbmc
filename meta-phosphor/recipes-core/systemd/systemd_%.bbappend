@@ -50,12 +50,21 @@ do_install:append() {
     # A number of udev devices would unlikely be present on a BMC and have large
     # helper executables associated with them.  Delete both the helpers and the
     # rules.
-    for f in cdrom_id dmi_memory_id fido_id iocost v4l_id; do
+    for f in ata_id cdrom_id dmi_memory_id fido_id iocost v4l_id; do
         rm ${D}${libdir}/udev/${f}
     done
     for f in 60-cdrom_id.rules 70-memory.rules 60-fido-id.rules 90-iocost.rules 60-persistent-v4l.rules; do
         rm ${D}${libdir}/udev/rules.d/${f}
     done
+
+    # ata_id has no rules file on its own
+    sed -i '/IMPORT{program}="ata_id /d' ${D}${libdir}/udev/rules.d/60-persistent-storage.rules
+
+    # No BMC boots via EFI/systemd-boot (all use u-boot), so the EFI boot
+    # manager tool and the laptop hardware-ID database it carries are dead
+    # weight. Delete both.
+    rm -f ${D}${bindir}/bootctl
+    rm -rf ${D}${nonarch_libdir}/systemd/boot/hwids
 }
 
 # udev is added to the USERADD_PACKAGES due to some 'render' group
@@ -70,4 +79,4 @@ ALTERNATIVE_LINK_NAME[init] = "${base_sbindir}/init"
 ALTERNATIVE_PRIORITY[init] ?= "300"
 
 ALTERNATIVE:${PN} += "init"
-ALTERNATIVE_TARGET[init] = "${rootlibexecdir}/systemd/systemd"
+ALTERNATIVE_TARGET[init] = "${nonarch_libdir}/systemd/systemd"

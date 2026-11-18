@@ -152,7 +152,7 @@ barebox, enabling tasks such as :ref:`ref-tasks-menuconfig` and
 
 The generated barebox binaries are deployed to
 :term:`DEPLOY_DIR_IMAGE` as well as installed to ``BAREBOX_INSTALL_PATH``
-(``/boot`` by default) making them part of the recipe’s base package.
+(``/boot`` by default) making them part of the recipe's base package.
 This setup supports both using the barebox binaries as independent artifacts
 and installing them into a rootfs.
 :term:`BAREBOX_BINARY` can be used to select a distinct binary to deploy and
@@ -288,11 +288,8 @@ to ``${TMPDIR}/buildstats/``. You can analyze the elapsed time using
 chart of the entire build process and can be useful for highlighting
 bottlenecks.
 
-Collecting build statistics is enabled by default through the
-:term:`USER_CLASSES` variable from your
-``local.conf`` file. Consequently, you do not have to do anything to
-enable the class. However, if you want to disable the class, simply
-remove ":ref:`ref-classes-buildstats`" from the :term:`USER_CLASSES` list.
+If you want to enable the class, you can add ":ref:`ref-classes-buildstats`" to
+the :term:`USER_CLASSES` variable.
 
 .. _ref-classes-buildstats-summary:
 
@@ -369,7 +366,7 @@ To do so, create a recipe for your program, for example using
 make it inherit the :ref:`ref-classes-cargo` and
 :ref:`ref-classes-cargo-update-recipe-crates` and run::
 
-   bitbake -c update_crates recipe
+   $ bitbake -c update_crates recipe
 
 This creates a ``recipe-crates.inc`` file that you can include in your
 recipe::
@@ -564,7 +561,7 @@ starting with ``SPDX_``.
 
 See the description of these variables and the
 ":ref:`dev-manual/sbom:creating a software bill of materials`"
-section in the Yocto Project Development Manual for more details.
+section in the Yocto Project Development Tasks Manual for more details.
 
 .. _ref-classes-cross:
 
@@ -1319,8 +1316,7 @@ information on how to build an :term:`Initramfs`, see the
 the Yocto Project Development Tasks Manual.
 
 Various other classes are used by the :ref:`ref-classes-kernel` and :ref:`ref-classes-module` classes
-internally including the :ref:`ref-classes-kernel-arch`, :ref:`ref-classes-module-base`, and
-:ref:`ref-classes-linux-kernel-base` classes.
+internally including the :ref:`ref-classes-kernel-arch` and :ref:`ref-classes-module-base` classes.
 
 .. _ref-classes-kernel-arch:
 
@@ -1376,7 +1372,7 @@ The simplest example for building a FIT image is to add::
 
 to the machine :term:`configuration file` and to execute::
 
-   bitbake linux-yocto-fitimage
+   $ bitbake linux-yocto-fitimage
 
 This results in a ``fitImage`` file deployed to the :term:`DEPLOY_DIR_IMAGE`
 directory and a ``linux-yocto-fitimage`` package which can be installed.
@@ -1390,7 +1386,7 @@ lines to the machine configuration file::
 
 The FIT image, this time including the RT kernel, is built again by calling::
 
-   bitbake linux-yocto-fitimage
+   $ bitbake linux-yocto-fitimage
 
 For other kernels provided by other layers, the same approach would work.
 However, it is usually more intuitive to add a custom FIT image recipe next to
@@ -1599,16 +1595,6 @@ The :ref:`ref-classes-libc*` classes support recipes that build packages with ``
 The :ref:`ref-classes-license` class provides license manifest creation and license
 exclusion. This class is enabled by default using the default value for
 the :term:`INHERIT_DISTRO` variable.
-
-.. _ref-classes-linux-kernel-base:
-
-``linux-kernel-base``
-=====================
-
-The :ref:`ref-classes-linux-kernel-base` class provides common functionality for
-recipes that build out of the Linux kernel source tree. These builds
-goes beyond the kernel itself. For example, the Perf recipe also
-inherits this class.
 
 .. _ref-classes-linuxloader:
 
@@ -2013,9 +1999,9 @@ code specific to particular package types resides in these
 package-specific classes: :ref:`ref-classes-package_deb`,
 :ref:`ref-classes-package_rpm`, :ref:`ref-classes-package_ipk`.
 
-You can control the list of resulting package formats by using the
-:term:`PACKAGE_CLASSES` variable defined in your ``conf/local.conf``
-configuration file, which is located in the :term:`Build Directory`.
+You can control the list of resulting package formats by setting the
+:term:`PACKAGE_CLASSES` variable in your :ref:`structure-build-conf-local.conf`
+file or distro :term:`configuration file`.
 When defining the variable, you can specify one or more package types.
 Since images are generated from packages, a packaging class is needed
 to enable image generation. The first class listed in this variable is
@@ -2068,7 +2054,7 @@ packages are written out in a ``.deb`` file format to the
 
 This class inherits the :ref:`ref-classes-package` class and
 is enabled through the :term:`PACKAGE_CLASSES`
-variable in the ``local.conf`` file.
+variable.
 
 .. _ref-classes-package_ipk:
 
@@ -2082,7 +2068,7 @@ are written out in a ``.ipk`` file format to the
 
 This class inherits the :ref:`ref-classes-package` class and
 is enabled through the :term:`PACKAGE_CLASSES`
-variable in the ``local.conf`` file.
+variable.
 
 .. _ref-classes-package_rpm:
 
@@ -2096,7 +2082,7 @@ are written out in a ``.rpm`` file format to the
 
 This class inherits the :ref:`ref-classes-package` class and
 is enabled through the :term:`PACKAGE_CLASSES`
-variable in the ``local.conf`` file.
+variable.
 
 .. _ref-classes-packagedata:
 
@@ -2205,6 +2191,18 @@ for setuptools_rust and another "backend" for building Python Wheels.
 
 The :ref:`ref-classes-python_mesonpy` class enables building Python modules which use the
 meson-python build system.
+
+Internally this uses the :ref:`ref-classes-python_pep517` class.
+
+.. _ref-classes-python_pbr:
+
+``python_pbr``
+==============
+
+The :ref:`ref-classes-python_pbr` class enables building Python projects which
+use the `Python Build Reasonableness <https://pypi.org/project/pbr/>`__ backend.
+
+This class adds ``python3-pbr-native`` to the recipe's build-time dependencies.
 
 Internally this uses the :ref:`ref-classes-python_pep517` class.
 
@@ -2434,7 +2432,7 @@ This class is intended to be inherited by individual recipes. However,
 the class' functionality is largely disabled unless "ptest" appears in
 :term:`DISTRO_FEATURES`. See the
 ":ref:`test-manual/ptest:testing packages with ptest`"
-section in the Yocto Project Development Tasks Manual for more information
+section in the Yocto Project Test Environment Manual for more information
 on ptest.
 
 .. _ref-classes-ptest-cargo:
@@ -2458,7 +2456,7 @@ have tests intended to be executed with ``gnome-desktop-testing``.
 
 For information on setting up and running ptests, see the
 ":ref:`test-manual/ptest:testing packages with ptest`"
-section in the Yocto Project Development Tasks Manual.
+section in the Yocto Project Test Environment Manual.
 
 .. _ref-classes-ptest-python-pytest:
 
@@ -2619,7 +2617,8 @@ recipe are no longer needed. However, by default, the build system
 preserves these files for inspection and possible debugging purposes. If
 you would rather have these files deleted to save disk space as the build
 progresses, you can enable :ref:`ref-classes-rm-work` by adding the following to
-your ``local.conf`` file, which is found in the :term:`Build Directory`::
+your :ref:`structure-build-conf-local.conf` file, which is found in the
+:term:`Build Directory`::
 
    INHERIT += "rm_work"
 
@@ -2628,7 +2627,8 @@ recipe, enabling :ref:`ref-classes-rm-work` will potentially result in your
 changes to the source being lost. To exclude some recipes from having their work
 directories deleted by :ref:`ref-classes-rm-work`, you can add the names of the
 recipe or recipes you are working on to the :term:`RM_WORK_EXCLUDE` variable,
-which can also be set in your ``local.conf`` file. Here is an example::
+which can also be set in your :ref:`structure-build-conf-local.conf` file. Here
+is an example::
 
    RM_WORK_EXCLUDE += "busybox glibc"
 
@@ -2709,7 +2709,7 @@ It is used to generate a JSON specification file from the features listed in
 The :ref:`ref-classes-sanity` class checks to see if prerequisite software is present
 on the host system so that users can be notified of potential problems
 that might affect their build. The class also performs basic user
-configuration checks from the ``local.conf`` configuration file to
+configuration checks from the :ref:`structure-build-conf-local.conf` configuration file to
 prevent common mistakes that cause build failures. Distribution policy
 usually determines whether to include this class.
 
@@ -3470,6 +3470,62 @@ possible.
 See the :term:`UBOOT_CONFIG` and :term:`UBOOT_MACHINE` variables for additional
 information.
 
+.. _ref-classes-uboot-extlinux-config:
+
+``uboot-extlinux-config``
+=========================
+
+The :ref:`ref-classes-uboot-extlinux-config` class provides support for
+generating an ``extlinux.conf`` file part of the `Generic Distro Configuration Concept
+<https://docs.u-boot-project.org/en/latest/develop/distro.html#boot-configuration-files>`__
+of U-Boot.
+
+The class can be inherited in a `U-Boot <https://u-boot-project.org/>`__ recipe
+with::
+
+   inherit uboot-extlinux-config
+
+However, the class functionality is disabled by default. To enable it, set the
+:term:`UBOOT_EXTLINUX` variable to "1" from the U-Boot recipe or from a
+``bbappend`` file::
+
+   UBOOT_EXTLINUX = "1"
+
+In addition to :term:`UBOOT_EXTLINUX`, the :term:`UBOOT_EXTLINUX_ROOT` variable
+must be set to the ``root=`` parameter of the `Linux kernel command-line
+<https://docs.kernel.org/admin-guide/kernel-parameters.html>`__. For example,
+the following would set this value to the second partition of MMC block device
+0::
+
+   UBOOT_EXTLINUX_ROOT = "root=/dev/mmcblk0p2"
+
+After building the U-Boot recipe, an ``extlinux.conf`` is generated and placed
+in the deployment directory (:term:`DEPLOY_DIR_IMAGE`):
+
+.. code-block:: text
+
+   tmp/deploy/images/<MACHINE>/extlinux.conf
+
+This file can be customized using the variables beginning with
+``UBOOT_EXTLINUX_`` in the :doc:`Variables Glossary </ref-manual/variables>`
+section of the Yocto Project Reference Manual.
+
+.. note::
+
+   Multiple ``LABELS`` can be specified through the
+   :term:`UBOOT_EXTLINUX_LABELS` variable (i.e. multiple boot entries).
+   Override-style assignment should then be used to specify label-specific
+   properties. See the definition of :term:`UBOOT_EXTLINUX_LABELS` for more
+   information.
+
+.. tip::
+
+   When using the :ref:`bootloader <ref-manual/kickstart:Command: bootloader>`
+   command with WIC, you should explicitly configure the ``.wks.in`` file to use
+   the ``extlinux.conf`` file generated by this class with
+   ``--configfile="${DEPLOY_DIR_IMAGE}/extlinux.conf"``. Otherwise it generates
+   a default ``extlinux.conf`` file without taking this class into account.
+
 .. _ref-classes-uboot-sign:
 
 ``uboot-sign``
@@ -3687,7 +3743,7 @@ for details.
 The :ref:`ref-classes-upstream-stable-release-point` class automatically
 generates the :term:`UPSTREAM_STABLE_RELEASE_REGEX` variable for recipes
 whose version uses a dot-separated scheme. This enables stable point release
-upgrades — version upgrades constrained to the same stable series (e.g.
+upgrades -- version upgrades constrained to the same stable series (e.g.
 ``1.4.2`` to ``1.4.3`` but not to ``1.5.0``).
 
 The class uses the :term:`STABLE_VERSION_PARTS` variable (defaults to ``"2"``)
@@ -3724,7 +3780,7 @@ The :ref:`useradd* <ref-classes-useradd>` classes support the
 :term:`USERADD_PACKAGES`,
 :term:`USERADD_PARAM`,
 :term:`GROUPADD_PARAM`, and
-:term:`GROUPMEMS_PARAM` variables.
+:term:`USERMOD_PARAM` variables.
 
 The :ref:`useradd-staticids <ref-classes-useradd>` class supports the addition of users or groups
 that have static user identification (``uid``) and group identification
@@ -3796,7 +3852,8 @@ using the Vala programming language.
 The :ref:`ref-classes-vex` class is used to generate metadata needed by external
 tools to check for vulnerabilities, for example CVEs.
 
-In order to use this class, inherit the class in the ``local.conf`` file and it
+In order to use this class, inherit the class in your
+:ref:`structure-build-conf-local.conf` or distro :term:`configuration file` and it
 will add the ``generate_vex`` task for every recipe::
 
    INHERIT += "vex"
@@ -3807,7 +3864,7 @@ build.
 
 Example usage::
 
-   bitbake -c generate_vex openssl
+   $ bitbake -c generate_vex openssl
 
 .. _ref-classes-waf:
 

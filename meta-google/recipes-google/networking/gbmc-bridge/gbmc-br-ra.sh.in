@@ -17,7 +17,7 @@
 source /usr/share/gbmc-br-lib.sh || exit
 
 update_rtr() {
-  default_update_rtr "$@"
+  true
 }
 
 update_fqdn() {
@@ -28,15 +28,21 @@ update_fqdn() {
 update_pfx() {
   local pfx="$1"
   (( IP_OFFSET == 0 )) && return
-  gbmc_br_set_ip "$pfx" || true
+  gbmc_br_set_ip "$pfx" || return
   echo "IP $pfx set on $RA_IF" >&2
 }
 
 RA_IF=gbmcbr
 IP_OFFSET=@IP_OFFSET@
-# Use the lowest priority, except for kernel RA discovered routes.
-# We want closer NICs to provide a default route if existing.
-ROUTE_METRIC=1000
+: "${IP_OFFSET:=0}"
+# Default routes and per-gateway policy routing tables on gbmcbr are managed
+# by gbmc-br-from-ra.sh and gbmc-br-gw-src.sh.
+ROUTE_METRIC=
+
+gbmc_net_gateway_conf_write "$RA_IF" 10-gateway.conf ''
+gbmc_net_gateway_conf_write "$RA_IF" 10-gateway-dyn.conf ''
+rm -f "/run/last-ra/$RA_IF"
+gbmc_net_mask_or_rm "/var/google/last-ra/$RA_IF"
 
 echo "Waiting for ${RA_IF} configuration" >&2
 

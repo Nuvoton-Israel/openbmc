@@ -21,12 +21,15 @@ source /usr/share/gbmc-br-lib.sh || exit
 RA_IF=$1
 IP_OFFSET=1
 # NCSI is known to be closer to the ToR than bridge routes. Prefer over bridge routes.
-ROUTE_METRIC=900
+ROUTE_METRIC="$GBMC_ROUTE_METRIC_NCSI"
 
 update_rtr() {
-  local op="${3-add}"
-  busctl set-property xyz.openbmc_project.Network /xyz/openbmc_project/network/"$RA_IF" \
-    xyz.openbmc_project.Network.EthernetInterface DefaultGateway6 s "" || true
+  # phosphor-networkd persists the learned gateway for dumb NICs (ncsid in
+  # one of its nic-host* modes) in /etc and puts it back. Clear it in the
+  # background, without waiting for phosphor-networkd to come up.
+  if ncsi_is_active; then
+    systemctl start --no-block gbmc-ncsi-clear-gw@"$RA_IF".service || true
+  fi
 
   default_update_rtr "$@"
 }
@@ -56,25 +59,28 @@ update_pfx() {
 
   # DHCP Relay workaround until alternate source port is supported
   # TODO: Remove this once internal relaying cleanups land
-  gbmc-ncsi-smartnic-wa.sh "$RA_IF" || true
+  gbmc-ncsi-smartnic-wa.sh "$RA_IF" || return
 
   # The firewall needs to allow inbound traffic, we don't need to worry about
   # the primary NCSI interface because it is already handled by
   # gbmc-ncsi-br-deprecated-ips.sh
   if [ "$RA_IF" != '@NCSI_IF@' ]; then
-    cat >/run/nftables/40-gbmc-ncsi-"$RA_IF"-br.rules <<EOF
+    local rules
+    read -r -d '' rules <<EOF
 table inet filter {
   chain ${RA_IF}_forward {
     ip6 saddr != $pfx/76 ip6 daddr $pfx/76 accept
   }
 }
 EOF
-    gbmc_net_nftables_reload || true
+    gbmc_net_write_if_changed "$rules" \
+      /run/nftables/40-gbmc-ncsi-"$RA_IF"-br.rules
+    (( $? < 2 )) || return 1
   fi
 
   # We need to know which NCSI path has which route
-  mkdir -p /run/ncsi-ips
-  echo "$pfx" >/run/ncsi-ips/"$RA_IF"
+  gbmc_net_write_if_changed "$pfx" /run/ncsi-ips/"$RA_IF"
+  (( $? < 2 )) || return 1
 
   gbmc_br_set_runtime_ip "$RA_IF-ra" "$pfx"
 }

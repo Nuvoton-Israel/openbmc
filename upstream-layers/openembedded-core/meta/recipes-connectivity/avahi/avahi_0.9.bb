@@ -11,7 +11,7 @@ SECTION = "network"
 
 # major part is under LGPL-2.1-or-later, but several .dtd, .xsl, initscripts and
 # python scripts are under GPL-2.0-or-later
-LICENSE = "GPL-2.0-or-later & LGPL-2.1-or-later"
+LICENSE = "GPL-2.0-or-later AND LGPL-2.1-or-later"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=2d5025d4aa3495befef8f17206a5b0a1 \
                     file://avahi-common/address.h;endline=25;md5=b1d1d2cda1c07eb848ea7d6215712d9d \
                     file://avahi-core/dns.h;endline=23;md5=6fe82590b81aa0ddea5095b548e2fdcb \
@@ -24,6 +24,7 @@ SRC_URI = "git://github.com/avahi/avahi;protocol=https;branch=master;tag=v0.9-rc
            file://avahi-daemon.in \
            file://avahi-dnsconfd.in \
            file://0001-Fix-opening-etc-resolv.conf-error.patch \
+           file://run-ptest \
            "
 
 PV = "0.9~rc5"
@@ -47,7 +48,7 @@ PACKAGECONFIG[libevent] = "--enable-libevent,--disable-libevent,libevent"
 PACKAGECONFIG[systemd] = "--enable-libsystemd,--disable-libsystemd --without-systemdsystemunitdir,systemd"
 PACKAGECONFIG[qt5] = "--enable-qt5,--disable-qt5,qtbase"
 
-inherit autotools pkgconfig gettext gobject-introspection github-releases
+inherit autotools pkgconfig gettext gobject-introspection github-releases ptest
 
 EXTRA_OECONF = " \
              --runstatedir=${runtimedir} \
@@ -62,6 +63,7 @@ EXTRA_OECONF = " \
              --disable-python \
              --disable-doxygen-doc \
              --disable-manpages \
+             --enable-tests \
              ${EXTRA_OECONF_SYSVINIT} \
            "
 
@@ -78,6 +80,28 @@ do_compile:prepend() {
 }
 
 RRECOMMENDS:${PN}:append:libc-glibc = " avahi-libnss-mdns"
+
+AVAHI_PTESTS = " \
+    avahi-common/strlst-test \
+    avahi-common/domain-test \
+    avahi-common/alternative-test \
+    avahi-common/timeval-test \
+    avahi-common/utf8-test \
+    avahi-core/dns-spin-test \
+    avahi-core/dns-test \
+    avahi-core/hashmap-test \
+"
+
+do_install_ptest() {
+    install -d ${D}${PTEST_PATH}/tests
+    for t in ${AVAHI_PTESTS}; do
+        ${B}/libtool --mode=install install -m 0755 ${B}/$t \
+            ${D}${PTEST_PATH}/tests/$(basename $t)
+    done
+}
+
+RDEPENDS:${PN}-ptest += "libavahi-common libavahi-core"
+RDEPENDS:${PN}-ptest:remove = "${PN}"
 
 do_install() {
 	autotools_do_install
@@ -184,7 +208,7 @@ do_install:append() {
 	sed -i -e 's,@sbindir@,${sbindir},g' -e 's,@sysconfdir@,${sysconfdir},g' ${D}${sysconfdir}/init.d/avahi-*
 }
 
-# At the time the postinst runs, dbus might not be setup so only restart if running 
+# At the time the postinst runs, dbus might not be setup so only restart if running
 # Don't exit early, because update-rc.d needs to run subsequently.
 pkg_postinst:avahi-daemon () {
 if [ -z "$D" ]; then

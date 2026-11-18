@@ -19,9 +19,9 @@
         "LineName": "BRIDGE_L_STBY_PG_R",
         "EventMon": "BOTH",
         "Targets": {
-            "INIT_LOW": ["power-rail-assert-log@Anacapa_MB-BRIDGE_L_STBY_PG_R.service"],
-            "FALLING":  ["power-rail-assert-log@Anacapa_MB-BRIDGE_L_STBY_PG_R.service"],
-            "RISING":   ["power-rail-deassert-log@Anacapa_MB-BRIDGE_L_STBY_PG_R.service"]
+            "INIT_LOW": ["power-rail-assert-log@Anacapa_BRB-BRIDGE_L_STBY_PG_R.service"],
+            "FALLING":  ["power-rail-assert-log@Anacapa_BRB-BRIDGE_L_STBY_PG_R.service"],
+            "RISING":   ["power-rail-deassert-log@Anacapa_BRB-BRIDGE_L_STBY_PG_R.service"]
         },
         "Continue": true
     },
@@ -30,9 +30,9 @@
         "LineName": "BRIDGE_R_STBY_PG_R",
         "EventMon": "BOTH",
         "Targets": {
-            "INIT_LOW": ["power-rail-assert-log@Anacapa_MB-BRIDGE_R_STBY_PG_R.service"],
-            "FALLING":  ["power-rail-assert-log@Anacapa_MB-BRIDGE_R_STBY_PG_R.service"],
-            "RISING":   ["power-rail-deassert-log@Anacapa_MB-BRIDGE_R_STBY_PG_R.service"]
+            "INIT_LOW": ["power-rail-assert-log@Anacapa_BRB-BRIDGE_R_STBY_PG_R.service"],
+            "FALLING":  ["power-rail-assert-log@Anacapa_BRB-BRIDGE_R_STBY_PG_R.service"],
+            "RISING":   ["power-rail-deassert-log@Anacapa_BRB-BRIDGE_R_STBY_PG_R.service"]
         },
         "Continue": true
     },
@@ -62,9 +62,9 @@
         "LineName": "R_RTM_SW_FLT",
         "EventMon": "BOTH",
         "Targets": {
-            "INIT_HIGH": ["power-rail-assert-log@Anacapa_MB-R_RTM_SW_FLT.service"],
-            "FALLING":  ["power-rail-deassert-log@Anacapa_MB-R_RTM_SW_FLT.service"],
-            "RISING":   ["power-rail-assert-log@Anacapa_MB-R_RTM_SW_FLT.service"]
+            "INIT_HIGH": ["power-rail-assert-log@Anacapa_BRB-R_RTM_SW_FLT.service"],
+            "FALLING":  ["power-rail-deassert-log@Anacapa_BRB-R_RTM_SW_FLT.service"],
+            "RISING":   ["power-rail-assert-log@Anacapa_BRB-R_RTM_SW_FLT.service"]
         },
         "Continue": true
     },
@@ -73,9 +73,9 @@
         "LineName": "L_RTM_SW_FLT",
         "EventMon": "BOTH",
         "Targets": {
-            "INIT_HIGH": ["power-rail-assert-log@Anacapa_MB-L_RTM_SW_FLT.service"],
-            "FALLING":  ["power-rail-deassert-log@Anacapa_MB-L_RTM_SW_FLT.service"],
-            "RISING":   ["power-rail-assert-log@Anacapa_MB-L_RTM_SW_FLT.service"]
+            "INIT_HIGH": ["power-rail-assert-log@Anacapa_BRB-L_RTM_SW_FLT.service"],
+            "FALLING":  ["power-rail-deassert-log@Anacapa_BRB-L_RTM_SW_FLT.service"],
+            "RISING":   ["power-rail-assert-log@Anacapa_BRB-L_RTM_SW_FLT.service"]
         },
         "Continue": true
     },
@@ -84,9 +84,9 @@
         "LineName": "L_BNIC0_FLT",
         "EventMon": "BOTH",
         "Targets": {
-            "INIT_HIGH": ["power-rail-assert-log@Anacapa_MB-L_BNIC0_FLT.service"],
-            "FALLING":  ["power-rail-deassert-log@Anacapa_MB-L_BNIC0_FLT.service"],
-            "RISING":   ["power-rail-assert-log@Anacapa_MB-L_BNIC0_FLT.service"]
+            "INIT_HIGH": ["power-rail-assert-log@Anacapa_BRB-L_BNIC0_FLT.service"],
+            "FALLING":  ["power-rail-deassert-log@Anacapa_BRB-L_BNIC0_FLT.service"],
+            "RISING":   ["power-rail-assert-log@Anacapa_BRB-L_BNIC0_FLT.service"]
         },
         "Continue": true
     },
@@ -95,9 +95,9 @@
         "LineName": "L_BNIC1_FLT",
         "EventMon": "BOTH",
         "Targets": {
-            "INIT_HIGH": ["power-rail-assert-log@Anacapa_MB-L_BNIC1_FLT.service"],
-            "FALLING":  ["power-rail-deassert-log@Anacapa_MB-L_BNIC1_FLT.service"],
-            "RISING":   ["power-rail-assert-log@Anacapa_MB-L_BNIC1_FLT.service"]
+            "INIT_HIGH": ["power-rail-assert-log@Anacapa_BRB-L_BNIC1_FLT.service"],
+            "FALLING":  ["power-rail-deassert-log@Anacapa_BRB-L_BNIC1_FLT.service"],
+            "RISING":   ["power-rail-assert-log@Anacapa_BRB-L_BNIC1_FLT.service"]
         },
         "Continue": true
     },
@@ -106,9 +106,9 @@
         "LineName": "L_BNIC2_FLT",
         "EventMon": "BOTH",
         "Targets": {
-            "INIT_HIGH": ["power-rail-assert-log@Anacapa_MB-L_BNIC2_FLT.service"],
-            "FALLING":  ["power-rail-deassert-log@Anacapa_MB-L_BNIC2_FLT.service"],
-            "RISING":   ["power-rail-assert-log@Anacapa_MB-L_BNIC2_FLT.service"]
+            "INIT_HIGH": ["power-rail-assert-log@Anacapa_BRB-L_BNIC2_FLT.service"],
+            "FALLING":  ["power-rail-deassert-log@Anacapa_BRB-L_BNIC2_FLT.service"],
+            "RISING":   ["power-rail-assert-log@Anacapa_BRB-L_BNIC2_FLT.service"]
         },
         "Continue": true
     },
@@ -117,9 +117,9 @@
         "LineName": "L_BNIC3_FLT",
         "EventMon": "BOTH",
         "Targets": {
-            "INIT_HIGH": ["power-rail-assert-log@Anacapa_MB-L_BNIC3_FLT.service"],
-            "FALLING":  ["power-rail-deassert-log@Anacapa_MB-L_BNIC3_FLT.service"],
-            "RISING":   ["power-rail-assert-log@Anacapa_MB-L_BNIC3_FLT.service"]
+            "INIT_HIGH": ["power-rail-assert-log@Anacapa_BRB-L_BNIC3_FLT.service"],
+            "FALLING":  ["power-rail-deassert-log@Anacapa_BRB-L_BNIC3_FLT.service"],
+            "RISING":   ["power-rail-assert-log@Anacapa_BRB-L_BNIC3_FLT.service"]
         },
         "Continue": true
     },
@@ -128,9 +128,9 @@
         "LineName": "R_BNIC0_FLT",
         "EventMon": "BOTH",
         "Targets": {
-            "INIT_HIGH": ["power-rail-assert-log@Anacapa_MB-R_BNIC0_FLT.service"],
-            "FALLING":  ["power-rail-deassert-log@Anacapa_MB-R_BNIC0_FLT.service"],
-            "RISING":   ["power-rail-assert-log@Anacapa_MB-R_BNIC0_FLT.service"]
+            "INIT_HIGH": ["power-rail-assert-log@Anacapa_BRB-R_BNIC0_FLT.service"],
+            "FALLING":  ["power-rail-deassert-log@Anacapa_BRB-R_BNIC0_FLT.service"],
+            "RISING":   ["power-rail-assert-log@Anacapa_BRB-R_BNIC0_FLT.service"]
         },
         "Continue": true
     },
@@ -139,9 +139,9 @@
         "LineName": "R_BNIC1_FLT",
         "EventMon": "BOTH",
         "Targets": {
-            "INIT_HIGH": ["power-rail-assert-log@Anacapa_MB-R_BNIC1_FLT.service"],
-            "FALLING":  ["power-rail-deassert-log@Anacapa_MB-R_BNIC1_FLT.service"],
-            "RISING":   ["power-rail-assert-log@Anacapa_MB-R_BNIC1_FLT.service"]
+            "INIT_HIGH": ["power-rail-assert-log@Anacapa_BRB-R_BNIC1_FLT.service"],
+            "FALLING":  ["power-rail-deassert-log@Anacapa_BRB-R_BNIC1_FLT.service"],
+            "RISING":   ["power-rail-assert-log@Anacapa_BRB-R_BNIC1_FLT.service"]
         },
         "Continue": true
     },
@@ -150,9 +150,9 @@
         "LineName": "R_BNIC2_FLT",
         "EventMon": "BOTH",
         "Targets": {
-            "INIT_HIGH": ["power-rail-assert-log@Anacapa_MB-R_BNIC2_FLT.service"],
-            "FALLING":  ["power-rail-deassert-log@Anacapa_MB-R_BNIC2_FLT.service"],
-            "RISING":   ["power-rail-assert-log@Anacapa_MB-R_BNIC2_FLT.service"]
+            "INIT_HIGH": ["power-rail-assert-log@Anacapa_BRB-R_BNIC2_FLT.service"],
+            "FALLING":  ["power-rail-deassert-log@Anacapa_BRB-R_BNIC2_FLT.service"],
+            "RISING":   ["power-rail-assert-log@Anacapa_BRB-R_BNIC2_FLT.service"]
         },
         "Continue": true
     },
@@ -161,9 +161,9 @@
         "LineName": "R_BNIC3_FLT",
         "EventMon": "BOTH",
         "Targets": {
-            "INIT_HIGH": ["power-rail-assert-log@Anacapa_MB-R_BNIC3_FLT.service"],
-            "FALLING":  ["power-rail-deassert-log@Anacapa_MB-R_BNIC3_FLT.service"],
-            "RISING":   ["power-rail-assert-log@Anacapa_MB-R_BNIC3_FLT.service"]
+            "INIT_HIGH": ["power-rail-assert-log@Anacapa_BRB-R_BNIC3_FLT.service"],
+            "FALLING":  ["power-rail-deassert-log@Anacapa_BRB-R_BNIC3_FLT.service"],
+            "RISING":   ["power-rail-assert-log@Anacapa_BRB-R_BNIC3_FLT.service"]
         },
         "Continue": true
     },
@@ -172,9 +172,9 @@
         "LineName": "L_FNIC_FLT",
         "EventMon": "BOTH",
         "Targets": {
-            "INIT_HIGH": ["power-rail-assert-log@Anacapa_MB-L_FNIC_FLT.service"],
-            "FALLING":  ["power-rail-deassert-log@Anacapa_MB-L_FNIC_FLT.service"],
-            "RISING":   ["power-rail-assert-log@Anacapa_MB-L_FNIC_FLT.service"]
+            "INIT_HIGH": ["power-rail-assert-log@Anacapa_BRB-L_FNIC_FLT.service"],
+            "FALLING":  ["power-rail-deassert-log@Anacapa_BRB-L_FNIC_FLT.service"],
+            "RISING":   ["power-rail-assert-log@Anacapa_BRB-L_FNIC_FLT.service"]
         },
         "Continue": true
     },
@@ -186,6 +186,106 @@
             "INIT_LOW": ["power-rail-assert-log@Anacapa_MB-FM_MAIN_PWREN_RMC_EN_ISO.service"],
             "FALLING":  ["power-rail-assert-log@Anacapa_MB-FM_MAIN_PWREN_RMC_EN_ISO.service"],
             "RISING":   ["power-rail-deassert-log@Anacapa_MB-FM_MAIN_PWREN_RMC_EN_ISO.service"]
+        },
+        "Continue": true
+    },
+    {
+        "Name": "LPDB_P50V_FUSE0_TVS1",
+        "LineName": "LPDB_P50V_FUSE0_TVS1",
+        "EventMon": "BOTH",
+        "Targets": {
+            "INIT_LOW": ["power-rail-assert-log@Anacapa_PDB-LPDB_P50V_FUSE0_TVS1.service"],
+            "FALLING":  ["power-rail-assert-log@Anacapa_PDB-LPDB_P50V_FUSE0_TVS1.service"]
+        },
+        "Continue": true
+    },
+    {
+        "Name": "LPDB_P50V_FUSE0_TVS2",
+        "LineName": "LPDB_P50V_FUSE0_TVS2",
+        "EventMon": "BOTH",
+        "Targets": {
+            "INIT_LOW": ["power-rail-assert-log@Anacapa_PDB-LPDB_P50V_FUSE0_TVS2.service"],
+            "FALLING":  ["power-rail-assert-log@Anacapa_PDB-LPDB_P50V_FUSE0_TVS2.service"]
+        },
+        "Continue": true
+    },
+    {
+        "Name": "LPDB_P50V_FUSE1_TVS1",
+        "LineName": "LPDB_P50V_FUSE1_TVS1",
+        "EventMon": "BOTH",
+        "Targets": {
+            "INIT_LOW": ["power-rail-assert-log@Anacapa_PDB-LPDB_P50V_FUSE1_TVS1.service"],
+            "FALLING":  ["power-rail-assert-log@Anacapa_PDB-LPDB_P50V_FUSE1_TVS1.service"]
+        },
+        "Continue": true
+    },
+    {
+        "Name": "LPDB_P50V_FUSE1_TVS2",
+        "LineName": "LPDB_P50V_FUSE1_TVS2",
+        "EventMon": "BOTH",
+        "Targets": {
+            "INIT_LOW": ["power-rail-assert-log@Anacapa_PDB-LPDB_P50V_FUSE1_TVS2.service"],
+            "FALLING":  ["power-rail-assert-log@Anacapa_PDB-LPDB_P50V_FUSE1_TVS2.service"]
+        },
+        "Continue": true
+    },
+    {
+        "Name": "RPDB_P50V_FUSE2_TVS1",
+        "LineName": "RPDB_P50V_FUSE2_TVS1",
+        "EventMon": "BOTH",
+        "Targets": {
+            "INIT_LOW": ["power-rail-assert-log@Anacapa_PDB-RPDB_P50V_FUSE2_TVS1.service"],
+            "FALLING":  ["power-rail-assert-log@Anacapa_PDB-RPDB_P50V_FUSE2_TVS1.service"]
+        },
+        "Continue": true
+    },
+    {
+        "Name": "RPDB_P50V_FUSE2_TVS2",
+        "LineName": "RPDB_P50V_FUSE2_TVS2",
+        "EventMon": "BOTH",
+        "Targets": {
+            "INIT_LOW": ["power-rail-assert-log@Anacapa_PDB-RPDB_P50V_FUSE2_TVS2.service"],
+            "FALLING":  ["power-rail-assert-log@Anacapa_PDB-RPDB_P50V_FUSE2_TVS2.service"]
+        },
+        "Continue": true
+    },
+    {
+        "Name": "RPDB_P50V_FUSE3_TVS1",
+        "LineName": "RPDB_P50V_FUSE3_TVS1",
+        "EventMon": "BOTH",
+        "Targets": {
+            "INIT_LOW": ["power-rail-assert-log@Anacapa_PDB-RPDB_P50V_FUSE3_TVS1.service"],
+            "FALLING":  ["power-rail-assert-log@Anacapa_PDB-RPDB_P50V_FUSE3_TVS1.service"]
+        },
+        "Continue": true
+    },
+    {
+        "Name": "RPDB_P50V_FUSE3_TVS2",
+        "LineName": "RPDB_P50V_FUSE3_TVS2",
+        "EventMon": "BOTH",
+        "Targets": {
+            "INIT_LOW": ["power-rail-assert-log@Anacapa_PDB-RPDB_P50V_FUSE3_TVS2.service"],
+            "FALLING":  ["power-rail-assert-log@Anacapa_PDB-RPDB_P50V_FUSE3_TVS2.service"]
+        },
+        "Continue": true
+    },
+    {
+        "Name": "RPDB_P50V_FUSE4_TVS1",
+        "LineName": "RPDB_P50V_FUSE4_TVS1",
+        "EventMon": "BOTH",
+        "Targets": {
+            "INIT_LOW": ["power-rail-assert-log@Anacapa_PDB-RPDB_P50V_FUSE4_TVS1.service"],
+            "FALLING":  ["power-rail-assert-log@Anacapa_PDB-RPDB_P50V_FUSE4_TVS1.service"]
+        },
+        "Continue": true
+    },
+    {
+        "Name": "LPDB_P50V_FUSE5_TVS1",
+        "LineName": "LPDB_P50V_FUSE5_TVS1",
+        "EventMon": "BOTH",
+        "Targets": {
+            "INIT_LOW": ["power-rail-assert-log@Anacapa_PDB-LPDB_P50V_FUSE5_TVS1.service"],
+            "FALLING":  ["power-rail-assert-log@Anacapa_PDB-LPDB_P50V_FUSE5_TVS1.service"]
         },
         "Continue": true
     },
@@ -334,57 +434,57 @@
         "Continue": true
     },
     {
-        "Name": "HPM_EDSFF_PG",
-        "LineName": "HPM_EDSFF_PG",
+        "Name": "EDSFF_BOOT_FLT",
+        "LineName": "EDSFF_BOOT_FLT",
         "EventMon": "BOTH",
         "Targets": {
-            "INIT_LOW": ["ssd-pg-event-logger@HPM_EDSFF_PG:assert.service"],
-            "FALLING":  ["ssd-pg-event-logger@HPM_EDSFF_PG:assert.service"],
-            "RISING":   ["ssd-pg-event-logger@HPM_EDSFF_PG:deassert.service"]
+            "INIT_HIGH": ["power-rail-assert-log@Anacapa_MB-EDSFF_BOOT_FLT.service"],
+            "RISING":    ["power-rail-assert-log@Anacapa_MB-EDSFF_BOOT_FLT.service"],
+            "FALLING":   ["power-rail-deassert-log@Anacapa_MB-EDSFF_BOOT_FLT.service"]
         },
         "Continue": true
     },
     {
-        "Name": "L_EDSFF0_PG",
-        "LineName": "L_EDSFF0_PG",
+        "Name": "L_EDSFF0_FLT",
+        "LineName": "L_EDSFF0_FLT",
         "EventMon": "BOTH",
         "Targets": {
-            "INIT_LOW": ["ssd-pg-event-logger@L_EDSFF0_PG:assert.service"],
-            "FALLING":  ["ssd-pg-event-logger@L_EDSFF0_PG:assert.service"],
-            "RISING":   ["ssd-pg-event-logger@L_EDSFF0_PG:deassert.service"]
+            "INIT_HIGH": ["power-rail-assert-log@Anacapa_MB-L_EDSFF0_FLT.service"],
+            "RISING":    ["power-rail-assert-log@Anacapa_MB-L_EDSFF0_FLT.service"],
+            "FALLING":   ["power-rail-deassert-log@Anacapa_MB-L_EDSFF0_FLT.service"]
         },
         "Continue": true
     },
     {
-        "Name": "L_EDSFF1_PG",
-        "LineName": "L_EDSFF1_PG",
+        "Name": "L_EDSFF1_FLT",
+        "LineName": "L_EDSFF1_FLT",
         "EventMon": "BOTH",
         "Targets": {
-            "INIT_LOW": ["ssd-pg-event-logger@L_EDSFF1_PG:assert.service"],
-            "FALLING":  ["ssd-pg-event-logger@L_EDSFF1_PG:assert.service"],
-            "RISING":   ["ssd-pg-event-logger@L_EDSFF1_PG:deassert.service"]
+            "INIT_HIGH": ["power-rail-assert-log@Anacapa_MB-L_EDSFF1_FLT.service"],
+            "RISING":    ["power-rail-assert-log@Anacapa_MB-L_EDSFF1_FLT.service"],
+            "FALLING":   ["power-rail-deassert-log@Anacapa_MB-L_EDSFF1_FLT.service"]
         },
         "Continue": true
     },
     {
-        "Name": "R_EDSFF2_PG",
-        "LineName": "R_EDSFF2_PG",
+        "Name": "R_EDSFF2_FLT",
+        "LineName": "R_EDSFF2_FLT",
         "EventMon": "BOTH",
         "Targets": {
-            "INIT_LOW": ["ssd-pg-event-logger@R_EDSFF2_PG:assert.service"],
-            "FALLING":  ["ssd-pg-event-logger@R_EDSFF2_PG:assert.service"],
-            "RISING":   ["ssd-pg-event-logger@R_EDSFF2_PG:deassert.service"]
+            "INIT_HIGH": ["power-rail-assert-log@Anacapa_MB-R_EDSFF2_FLT.service"],
+            "RISING":    ["power-rail-assert-log@Anacapa_MB-R_EDSFF2_FLT.service"],
+            "FALLING":   ["power-rail-deassert-log@Anacapa_MB-R_EDSFF2_FLT.service"]
         },
         "Continue": true
     },
     {
-        "Name": "R_EDSFF3_PG",
-        "LineName": "R_EDSFF3_PG",
+        "Name": "R_EDSFF3_FLT",
+        "LineName": "R_EDSFF3_FLT",
         "EventMon": "BOTH",
         "Targets": {
-            "INIT_LOW": ["ssd-pg-event-logger@R_EDSFF3_PG:assert.service"],
-            "FALLING":  ["ssd-pg-event-logger@R_EDSFF3_PG:assert.service"],
-            "RISING":   ["ssd-pg-event-logger@R_EDSFF3_PG:deassert.service"]
+            "INIT_HIGH": ["power-rail-assert-log@Anacapa_MB-R_EDSFF3_FLT.service"],
+            "RISING":    ["power-rail-assert-log@Anacapa_MB-R_EDSFF3_FLT.service"],
+            "FALLING":   ["power-rail-deassert-log@Anacapa_MB-R_EDSFF3_FLT.service"]
         },
         "Continue": true
     },
@@ -577,5 +677,17 @@
             "FALLING": ["rescan-fru-device@PDB_L_PRSNT.service"],
             "RISING": ["rescan-fru-device@PDB_L_PRSNT.service"]
         }
+    },
+    {
+        "Name": "AMC_FAIL",
+        "LineName": "AMC_FAIL",
+        "EventMon": "BOTH",
+        "Targets": {
+            "RISING": ["amc-boot-failure-logger@AMC_FAIL:assert.service"],
+            "FALLING": ["amc-boot-failure-logger@AMC_FAIL:deassert.service"],
+            "INIT_HIGH": ["amc-boot-failure-logger@AMC_FAIL:assert.service"],
+            "INIT_LOW": ["amc-boot-failure-logger@AMC_FAIL:deassert.service"]
+        },
+        "Continue": true
     }
 ]

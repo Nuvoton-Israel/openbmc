@@ -11,6 +11,3 @@ RDEPENDS:${PN} = "\
     python3-freezegun (>=1.0) \
     python3-pytest (>=3.6) \
 "
-
-PYPI_PACKAGE = "pytest_freezer"
-UPSTREAM_CHECK_PYPI_PACKAGE = "${PYPI_PACKAGE}"

@@ -17,8 +17,16 @@ SRC_URI = "${KERNELORG_MIRROR}/linux/utils/util-linux/v${MAJOR_VERSION}/util-lin
            file://display_testname_for_subtest.patch \
            file://avoid_parallel_tests.patch \
            file://0001-tests-script-Disable-size-option-test.patch \
+           file://0006-tests-lsfd-accept-rw-mode-for-mmap-ed-packet-socket-.patch \
+           file://0001-tests-flock-increase-wait-for-flock-child-timeout.patch \
            "
 
-SRC_URI[sha256sum] = "03a05d3adf9602ef128f2da05b84b3205ce60c351e5737c0370f74000679ce8a"
+SRC_URI[sha256sum] = "fbd62a100ab7bb8746ba0661255c3c48185b1e9021507c624da01fbc696330ec"
 
 CVE_PRODUCT = "util-linux"
+
+CVE_STATUS[CVE-2026-3184] = "fixed-version: Fixed since 2.42"
+
+# util-linux publishes bugfix/security-only point releases on its
+# stable/v<major.minor> branches.
+inherit upstream-stable-release-point

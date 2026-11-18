@@ -1,7 +1,7 @@
 DESCRIPTION = "InfluxDB is a time series database designed to handle high write and query loads."
 HOMEPAGE = "https://www.influxdata.com/products/influxdb-overview/"
 
-LICENSE = "MIT & ${GO_MOD_LICENSES}"
+LICENSE = "MIT AND ${GO_MOD_LICENSES}"
 LIC_FILES_CHKSUM = "file://src/${GO_IMPORT}/LICENSE;md5=f39a8d10930fb37bd59adabb3b9d0bd6"
 require ${BPN}-licenses.inc
 
@@ -37,8 +37,7 @@ do_install:prepend() {
     test -e ${B}/src/${GO_IMPORT}/build.py && rm ${B}/src/${GO_IMPORT}/build.py
     test -e ${B}/src/${GO_IMPORT}/build.sh && rm ${B}/src/${GO_IMPORT}/build.sh
     rm -rf ${B}/src/${GO_IMPORT}/Dockerfile*
-
-    sed -i -e "s#usr/bin/sh#bin/sh#g" ${B}/src/${GO_IMPORT}/scripts/ci/run_perftest.sh
+    rm -rf ${B}/src/${GO_IMPORT}/.circleci ${B}/src/${GO_IMPORT}/scripts/ci
 }
 
 do_install:append() {

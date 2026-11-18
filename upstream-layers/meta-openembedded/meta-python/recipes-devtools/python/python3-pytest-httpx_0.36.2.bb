@@ -19,6 +19,3 @@ RDEPENDS:${PN}-ptest += "\
     python3-pytest-cov \
     python3-pytest-asyncio \
 "
-
-PYPI_PACKAGE = "pytest_httpx"
-UPSTREAM_CHECK_PYPI_PACKAGE = "${PYPI_PACKAGE}"

@@ -36,7 +36,7 @@ is_amc_ready() {
 
 # Power Good Status
 power_status() {
-    if [ "$(get_gpio "FM_CPU0_PWRGD")" -eq 1 ] ; then
+    if [ "$(get_gpio "host0-ready")" -eq 1 ] ; then
         echo "on"
     else
         echo "off"
@@ -123,4 +123,11 @@ power_reset() {
     set_gpio FM_CPU0_SYS_RESET_N 1
     sleep 1
     return 0
+}
+
+is_service_busy() {
+    local output active sub
+    output=$(systemctl show -p ActiveState,SubState --value "$1")
+    { read -r active; read -r sub; } <<< "$output"
+    [ "$active" != "inactive" ] && [ "$sub" != "exited" ]
 }

@@ -19,6 +19,10 @@ source /usr/share/gbmc-net-lib.sh || exit
 
 gbmc_ncsi_br_deprecated_ips_init=
 declare -A gbmc_ncsi_br_deprecated_ips_confip=()
+# Routing table each IP's rules were configured with. It depends on the ifindex
+# of the interface, which changes when the interface is recreated (e.g. a USB
+# NIC re-enumerating) even though its name stays the same.
+declare -A gbmc_ncsi_br_deprecated_ips_confrt=()
 declare -A gbmc_ncsi_br_deprecated_ips_lastip=()
 declare -A gbmc_ncsi_br_deprecated_ips_del=()
 gbmc_ncsi_br_deprecated_ips_lastncsi=
@@ -29,14 +33,13 @@ gbmc_ncsi_br_deprecated_ips_add_neighs() {
   local intf="$1"
   echo "(Re)adding neighbors for $intf" >&2
 
-  local st=0
-  sysctl net.ipv6.conf."$intf".proxy_ndp=1 >/dev/null || st=$?
+  local ips=()
   local ip
   for ip in "${!gbmc_ncsi_br_deprecated_ips_savedconf[@]}"; do
-    [[ ${gbmc_ncsi_br_deprecated_ips_savedconf["$ip"]} != $intf ]] && continue
-    ip -6 neigh replace proxy $ip dev $intf || st=$?
+    [[ ${gbmc_ncsi_br_deprecated_ips_savedconf["$ip"]} != "$intf" ]] && continue
+    ips+=("$ip")
   done
-  return $st
+  gbmc_net_proxy_ndp_add "$intf" "${ips[@]}"
 }
 
 gbmc_ncsi_br_deprecated_ips_update() {
@@ -45,7 +48,15 @@ gbmc_ncsi_br_deprecated_ips_update() {
   local intf_old="${gbmc_ncsi_br_deprecated_ips_confip["$ip"]-}"
   local del="${gbmc_ncsi_br_deprecated_ips_del["$ip"]-}"
 
-  if [ "$intf_old" = "$intf" ]; then
+  # Determine a unique routing table number for the IP
+  local rt
+  rt="$(gbmc_net_route_table_for_intf "$intf")" || rt=
+  if [ -z "$del" ] && [ -z "$rt" ]; then
+    return 0
+  fi
+  local rt_old="${gbmc_ncsi_br_deprecated_ips_confrt["$ip"]-}"
+
+  if [ "$intf_old" = "$intf" ] && [ "$rt_old" = "$rt" ]; then
     if [ "$intf" != '@NCSI_IF@' ] || [ "$gbmc_ncsi_br_deprecated_ips_confncsi" = "$gbmc_ncsi_br_deprecated_ips_lastncsi" ]; then
       return 0
     fi
@@ -65,7 +76,8 @@ gbmc_ncsi_br_deprecated_ips_update() {
   local stateless_pfx="$(ip_bytes_to_str pfx_bytes)"
   local stateless_ip=
   if [ -e /sys/class/net/gbmcbr ]; then
-    local gbmcbr_mac="$(ip link show gbmcbr | tail -n 1 | awk '{print $2}')"
+    local gbmcbr_mac=
+    read -r gbmcbr_mac </sys/class/net/gbmcbr/address || return
     local gbmcbr_eui48="$(mac_to_eui48 "$gbmcbr_mac")"
     stateless_ip="$(ip_pfx_concat "$stateless_pfx/80" "$gbmcbr_eui48")"
     stateless_ip="${stateless_ip%/*}"
@@ -78,43 +90,41 @@ gbmc_ncsi_br_deprecated_ips_update() {
     host_pfx="$(ip_bytes_to_str pfx_bytes)"
   fi
 
-  # Determine a unique routing table number for the IP
-  local rt="$(gbmc_net_route_table_for_intf "$intf")"
-
   local contents=
-  read -r -d '' contents <<EOF
+  if [ -z "$del" ]; then
+    read -r -d '' contents <<EOF
 [Network]
 IPv6ProxyNDP=yes
 IPv6ProxyNDPAddress=$pfx
 IPv6ProxyNDPAddress=$stateless_pfx
 ${host_pfx:+IPv6ProxyNDPAddress=}$host_pfx
 ${stateless_ip:+IPv6ProxyNDPAddress=}$stateless_ip
-[RoutingPolicyRule]
-To=$pfx/76
-Table=main
-Priority=$GBMC_INTF_ROUTE_TABLE_BASE
-[RoutingPolicyRule]
-From=$pfx/76
-Table=$rt
-Priority=$rt
 EOF
-  local file
-  if [ -n "$intf_old" ]; then
-    for file in /run/systemd/network/{00,}-bmc-"$intf_old".network.d/50-deprecated-"$ip".conf; do
-      rm -f "$file"
-    done
+    contents+=$'\n'
+    gbmc_net_intf_rules_conf contents "$pfx/76" "$rt"
   fi
-  for file in /run/systemd/network/{00,}-bmc-"$intf".network.d/50-deprecated-"$ip".conf; do
-    mkdir -p -m 755 "$(dirname "$file")"
-    if [ -n "$del" ]; then
-      rm -f "$file"
-    else
-      printf '%s' "$contents" >"$file"
-    fi
-  done
+  if [ -n "$intf_old" ] && [ "$intf_old" != "$intf" ]; then
+    gbmc_net_networkd_write_dropin "$intf_old" "50-deprecated-$ip.conf" '' || true
+  fi
+  gbmc_net_networkd_write_dropin "$intf" "50-deprecated-$ip.conf" "$contents" || true
 
-  local st=0
-  if [ -n "$intf_old" ]; then
+  # BMCs behind gbmcbr autoconfigure addresses in the stateless /80, route it
+  # on-link so they stay reachable over NCSI without a static address.
+  local brroute=
+  if [ -e /sys/class/net/gbmcbr ]; then
+    brroute="$stateless_pfx/80"
+    local brcontents=
+    if [ -z "$del" ]; then
+      read -r -d '' brcontents <<EOF
+[Route]
+Destination=$brroute
+Metric=$GBMC_ROUTE_METRIC_ONLINK
+EOF
+    fi
+    gbmc_net_networkd_write_dropin gbmcbr "50-deprecated-$ip.conf" "$brcontents" || true
+  fi
+
+  if [ -n "$intf_old" ] && [ "$intf_old" != "$intf" ]; then
     ip -6 neigh del proxy $pfx dev $intf_old 2>/dev/null || true
     ip -6 neigh del proxy $stateless_pfx dev $intf_old 2>/dev/null || true
     if [ -n "$host_pfx" ]; then
@@ -123,12 +133,12 @@ EOF
     if [ -n "$stateless_ip" ]; then
       ip -6 neigh del proxy $stateless_ip dev $intf_old 2>/dev/null || true
     fi
-    local rt_old="$(gbmc_net_route_table_for_intf "$intf_old")"
-    ip -6 rule del from $pfx/76 lookup $rt_old 2>/dev/null || true
   fi
-  ip -6 rule del to "$pfx/76" pref $GBMC_INTF_ROUTE_TABLE_BASE lookup main 2>/dev/null || true
-  ip -6 rule del from "$pfx/76" pref $rt lookup $rt 2>/dev/null || true
+  if [ -n "$rt_old" ] && [ "$rt_old" != "$rt" ]; then
+    ip -6 rule del from "$pfx/76" lookup "$rt_old" pref "$rt_old" 2>/dev/null || true
+  fi
   if [ -n "$del" ]; then
+    gbmc_net_intf_rules_set del "$pfx/76" "${rt:-$rt_old}"
     unset 'gbmc_ncsi_br_deprecated_ips_savedconf["$pfx"]'
     ip -6 neigh del proxy $pfx dev $intf 2>/dev/null || true
     unset 'gbmc_ncsi_br_deprecated_ips_savedconf["$stateless_pfx"]'
@@ -141,9 +151,14 @@ EOF
       unset 'gbmc_ncsi_br_deprecated_ips_savedconf["$stateless_ip"]'
       ip -6 neigh del proxy $stateless_ip dev $intf 2>/dev/null || true
     fi
+    if [ -n "$brroute" ]; then
+      ip -6 route del "$brroute" dev gbmcbr metric "$GBMC_ROUTE_METRIC_ONLINK" 2>/dev/null || true
+    fi
   else
-    ip -6 rule add proto static to "$pfx/76" pref $GBMC_INTF_ROUTE_TABLE_BASE lookup main || st=$?
-    ip -6 rule add proto static from "$pfx/76" pref $rt lookup $rt || st=$?
+    gbmc_net_intf_rules_set add "$pfx/76" "$rt" || true
+    if [ -n "$brroute" ]; then
+      ip -6 route replace "$brroute" dev gbmcbr metric "$GBMC_ROUTE_METRIC_ONLINK" || true
+    fi
     gbmc_ncsi_br_deprecated_ips_savedconf["$pfx"]="$intf"
     gbmc_ncsi_br_deprecated_ips_savedconf["$stateless_pfx"]="$intf"
     if [ -n "$host_pfx" ]; then
@@ -152,23 +167,23 @@ EOF
     if [ -n "$stateless_ip" ]; then
       gbmc_ncsi_br_deprecated_ips_savedconf["$stateless_ip"]="$intf"
     fi
-    gbmc_ncsi_br_deprecated_ips_add_neighs "$intf" || st=$?
-  fi
-  if (( st != 0 )); then
-    gbmc_net_networkd_reload "$intf"
+    gbmc_ncsi_br_deprecated_ips_add_neighs "$intf" || true
   fi
 
   if [ -n "$del" ]; then
     unset 'gbmc_ncsi_br_deprecated_ips_lastip["$ip"]'
     unset 'gbmc_ncsi_br_deprecated_ips_confip["$ip"]'
+    unset 'gbmc_ncsi_br_deprecated_ips_confrt["$ip"]'
   else
     gbmc_ncsi_br_deprecated_ips_confip["$ip"]="$intf"
+    gbmc_ncsi_br_deprecated_ips_confrt["$ip"]="$rt"
   fi
   if [ "$intf" = '@NCSI_IF@' ]; then
     gbmc_ncsi_br_deprecated_ips_confncsi="$gbmc_ncsi_br_deprecated_ips_lastncsi"
 
     local nfcontents=
-    read -r -d '' nfcontents <<EOF
+    if [ -z "$del" ]; then
+      read -r -d '' nfcontents <<EOF
 table inet filter {
   chain ncsi_input {
     ip6 saddr != $pfx/76 ip6 daddr $pfx/76 jump ncsi_gbmc_br_pub_input
@@ -179,14 +194,8 @@ table inet filter {
   }
 }
 EOF
-    local rfile=/run/nftables/45-gbmc-ncsi-br-"$ip".rules
-    mkdir -p -m 755 "$(dirname "$rfile")"
-    if [ -n "$del" ]; then
-      rm -f "$rfile"
-    else
-      printf '%s' "$nfcontents" >"$rfile"
     fi
-    gbmc_net_nftables_reload || true
+    gbmc_net_write_if_changed "$nfcontents" /run/nftables/45-gbmc-ncsi-br-"$ip".rules || true
   fi
 }
 
@@ -236,18 +245,30 @@ gbmc_ncsi_br_deprecated_ips_hook() {
       gbmc_ip_monitor_defer
     fi
   elif [ "$change" = 'link' -a "$action" = 'add' -a "$intf" = '@NCSI_IF@' ]; then
-    if ip link show '@NCSI_IF@' | grep -q '^ *alias ncsi$'; then
-      gbmc_ncsi_br_deprecated_ips_lastncsi=1
-      gbmc_ip_monitor_defer
-    else
-      gbmc_ncsi_br_deprecated_ips_lastncsi=
+    local alias= lastncsi=
+    read -r alias <"/sys/class/net/@NCSI_IF@/ifalias" 2>/dev/null || true
+    [ "$alias" = 'ncsi' ] && lastncsi=1
+    if [ "$gbmc_ncsi_br_deprecated_ips_lastncsi" != "$lastncsi" ]; then
+      gbmc_ncsi_br_deprecated_ips_lastncsi="$lastncsi"
       gbmc_ip_monitor_defer
     fi
     if [[ "$carrier" == 'UP' ]]; then
       gbmc_ncsi_br_deprecated_ips_add_neighs "$intf"
     fi
-  elif [ "$change" = 'link' -a "$action" = 'add' -a "$carrier" = 'UP' ]; then
-    if ip link show "$intf" | grep -q '^ *alias ncsi-usb-side$'; then
+  elif [ "$change" = 'link' -a "$action" = 'add' ]; then
+    # A recreated interface keeps its name but gets a new ifindex, and with it
+    # a new routing table, so the rules of its IPs have to be updated.
+    local cip
+    for cip in "${!gbmc_ncsi_br_deprecated_ips_confip[@]}"; do
+      if [ "${gbmc_ncsi_br_deprecated_ips_confip["$cip"]}" = "$intf" ]; then
+        gbmc_ip_monitor_defer
+        break
+      fi
+    done
+    local alias=
+    if [ "$carrier" = 'UP' ] &&
+        read -r alias <"/sys/class/net/$intf/ifalias" 2>/dev/null &&
+        [ "$alias" = 'ncsi-usb-side' ]; then
       gbmc_ncsi_br_deprecated_ips_add_neighs "$intf"
     fi
   fi

@@ -1,5 +1,8 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
-SRC_URI:append = " file://mctp-usb.rules"
+
+SRC_URI:append = " \
+    file://mctp-usb.rules \
+"
 
 do_install:append() {
     install -d ${D}${nonarch_base_libdir}/udev/rules.d

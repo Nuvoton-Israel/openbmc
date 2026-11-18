@@ -7,6 +7,9 @@ DEFAULTTUNE ?= "powerpc"
 
 TUNE_PKGARCH = "${TUNE_PKGARCH:tune-${DEFAULTTUNE}}"
 ABIEXTENSION ?= ""
+# Ignore how ABIEXTENSION is computed: the e500 tunes append
+# ${SPEABIEXTENSION}, which is empty unless "spe" is in TUNE_FEATURES.
+ABIEXTENSION[vardepvalue] = "${ABIEXTENSION}"
 
 # Endian
 TUNEVALID[bigendian] = "Use PowerPC Big Endian"
@@ -29,7 +32,7 @@ TUNEVALID[altivec] = "Altivec"
 TUNE_CCARGS .= "${@bb.utils.contains('TUNE_FEATURES', 'altivec', ' -maltivec', '', d)}"
 
 # Basic tune definitions
-AVAILTUNES += "powerpc powerpc-nf powerpcle powerpcle-nf" 
+AVAILTUNES += "powerpc powerpc-nf powerpcle powerpcle-nf"
 
 TUNE_FEATURES:tune-powerpc-nf = "m32 fpu-soft bigendian"
 BASE_LIB:tune-powerpc-nf = "lib"

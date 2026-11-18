@@ -8,10 +8,12 @@ SRCREV = "b6ef58f4c4c7fbe90fd1065bccf45b143345f1a6"
 PV .= "+git"
 SRC_URI = "git://github.com/civetweb/civetweb.git;branch=master;protocol=https \
            file://0001-Unittest-Link-librt-and-libm-using-l-option.patch \
+           file://0001-Fix-compilation-with-openssl-4.patch \
            "
 
 CVE_STATUS[CVE-2025-55763] = "fixed-version: The vulnerability is fixed in the used revision"
 CVE_STATUS[CVE-2025-9648] = "fixed-version: The vulnerability is fixed in the used revision"
+CVE_STATUS[CVE-2026-5789] = "not-applicable-platform: Issue only applies on Windows"
 
 # civetweb supports building with make or cmake (although cmake lacks few features)
 inherit cmake

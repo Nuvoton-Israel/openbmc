@@ -28,7 +28,7 @@
                 {
                     "ParamName": "FAN_DUTY",
                     "Desc": {
-                        "Name": "PDB_FAN_PWM",
+                        "Name": "PDB_FAN_PWM_PCT",
                         "SensorType": "fan_pwm"
                     }
                 }
@@ -118,7 +118,7 @@
                 {
                     "ParamName": "FAN_DUTY",
                     "Desc": {
-                        "Name": "PDB_FAN_PWM",
+                        "Name": "PDB_FAN_PWM_PCT",
                         "SensorType": "fan_pwm"
                     }
                 }
@@ -208,7 +208,7 @@
                 {
                     "ParamName": "FAN_DUTY",
                     "Desc": {
-                        "Name": "PDB_FAN_PWM",
+                        "Name": "PDB_FAN_PWM_PCT",
                         "SensorType": "fan_pwm"
                     }
                 }
@@ -298,7 +298,7 @@
                 {
                     "ParamName": "FAN_DUTY",
                     "Desc": {
-                        "Name": "PDB_FAN_PWM",
+                        "Name": "PDB_FAN_PWM_PCT",
                         "SensorType": "fan_pwm"
                     }
                 }
@@ -501,63 +501,6 @@
     },
     {
         "Desc": {
-            "Name": "SCM_VIRTUAL_CALIBRATED_INLET_TEMP_C",
-            "SensorType": "temperature",
-            "MaxValue": 127,
-            "MinValue": -127
-        },
-        "Threshold": {
-            "CriticalLow": 5,
-            "CriticalHigh": 45
-        },
-        "Associations": [
-            [
-                "chassis",
-                "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/Rainier_SCM"
-            ]
-        ],
-        "Params": {
-            "DbusParam": [
-                {
-                    "ParamName": "INLET_TEMP",
-                    "Desc": {
-                        "Name": "SCM_INLET_TEMP_C",
-                        "SensorType": "temperature"
-                    }
-                },
-                {
-                    "ParamName": "FAN_DUTY",
-                    "Desc": {
-                        "Name": "PDB_FAN_PWM",
-                        "SensorType": "fan_pwm"
-                    }
-                }
-            ]
-        },
-        "Expression": [
-            "var ARRAY_SIZE:=10;",
-            "var DUTY_OFS[10]:={90,80,70,60,50,40,30,20,10,0};",
-            "var CAL_OFS[10]:={-1.6,-1.7,-1.8,-1.9,-2.2,-2.4,-3.0,-3.8,-4.8,-4.8};",
-
-            "var DUTY_VALID:=ifnan(FAN_DUTY,999);",
-            "var OFFSET:=CAL_OFS[ARRAY_SIZE-1];",
-            "var FOUND:=0;",
-
-            "for(var i:=0; i<ARRAY_SIZE-1; i+=1)",
-            "{",
-            "  if((FOUND == 0) and (DUTY_VALID > DUTY_OFS[i]))",
-            "  {",
-            "    OFFSET:=CAL_OFS[i];",
-            "    FOUND:=1;",
-            "  };",
-            "};",
-
-            "INLET_TEMP + OFFSET"
-        ]
-    },
-    {
-        "Desc": {
             "Name": "SYSTEM_AIRFLOW_CFM",
             "SensorType": "airflow"
         },
@@ -573,7 +516,7 @@
                 {
                     "ParamName": "FAN_DUTY",
                     "Desc": {
-                        "Name": "PDB_FAN_PWM",
+                        "Name": "PDB_FAN_PWM_PCT",
                         "SensorType": "fan_pwm"
                     }
                 }
@@ -615,14 +558,14 @@
         },
         "Threshold": {
             "CriticalLow": 5,
-            "CriticalHigh": 95,
+            "CriticalHigh": 90,
             "HardShutdownHigh": 115
         },
         "Associations": [
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -630,7 +573,7 @@
                 {
                     "ParamName": "CPU_TEMP",
                     "Desc": {
-                        "Name": "PHX_SOC_MaxTemp",
+                        "Name": "PHX_1_SOC_MaxTemp",
                         "SensorType": "temperature"
                     }
                 }
@@ -647,7 +590,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -655,7 +598,7 @@
                 {
                     "ParamName": "SOC_TOTAL_POWER",
                     "Desc": {
-                        "Name": "PHX_SOC_TotalPower",
+                        "Name": "PHX_1_SOC_TotalPower",
                         "SensorType": "power"
                     }
                 }
@@ -680,7 +623,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -688,7 +631,7 @@
                 {
                     "ParamName": "VR_VOLT",
                     "Desc": {
-                        "Name": "PHX_VR0_V",
+                        "Name": "PHX_1_VR0_V",
                         "SensorType": "voltage"
                     }
                 }
@@ -710,7 +653,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -718,7 +661,7 @@
                 {
                     "ParamName": "VR_CURR",
                     "Desc": {
-                        "Name": "PHX_VR0_A",
+                        "Name": "PHX_1_VR0_A",
                         "SensorType": "current"
                     }
                 }
@@ -735,7 +678,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -743,7 +686,7 @@
                 {
                     "ParamName": "VR_PWR",
                     "Desc": {
-                        "Name": "PHX_VR0_W",
+                        "Name": "PHX_1_VR0_W",
                         "SensorType": "power"
                     }
                 }
@@ -764,7 +707,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -772,7 +715,7 @@
                 {
                     "ParamName": "VR_TEMP",
                     "Desc": {
-                        "Name": "PHX_VR0_T",
+                        "Name": "PHX_1_VR0_T",
                         "SensorType": "temperature"
                     }
                 }
@@ -797,7 +740,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -805,7 +748,7 @@
                 {
                     "ParamName": "VR_VOLT",
                     "Desc": {
-                        "Name": "PHX_VR1_V",
+                        "Name": "PHX_1_VR1_V",
                         "SensorType": "voltage"
                     }
                 }
@@ -827,7 +770,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -835,7 +778,7 @@
                 {
                     "ParamName": "VR_CURR",
                     "Desc": {
-                        "Name": "PHX_VR1_A",
+                        "Name": "PHX_1_VR1_A",
                         "SensorType": "current"
                     }
                 }
@@ -852,7 +795,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -860,7 +803,7 @@
                 {
                     "ParamName": "VR_PWR",
                     "Desc": {
-                        "Name": "PHX_VR1_W",
+                        "Name": "PHX_1_VR1_W",
                         "SensorType": "power"
                     }
                 }
@@ -881,7 +824,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -889,7 +832,7 @@
                 {
                     "ParamName": "VR_TEMP",
                     "Desc": {
-                        "Name": "PHX_VR1_T",
+                        "Name": "PHX_1_VR1_T",
                         "SensorType": "temperature"
                     }
                 }
@@ -914,7 +857,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -922,7 +865,7 @@
                 {
                     "ParamName": "VR_VOLT",
                     "Desc": {
-                        "Name": "PHX_VR2_V",
+                        "Name": "PHX_1_VR2_V",
                         "SensorType": "voltage"
                     }
                 }
@@ -944,7 +887,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -952,7 +895,7 @@
                 {
                     "ParamName": "VR_CURR",
                     "Desc": {
-                        "Name": "PHX_VR2_A",
+                        "Name": "PHX_1_VR2_A",
                         "SensorType": "current"
                     }
                 }
@@ -969,7 +912,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -977,7 +920,7 @@
                 {
                     "ParamName": "VR_PWR",
                     "Desc": {
-                        "Name": "PHX_VR2_W",
+                        "Name": "PHX_1_VR2_W",
                         "SensorType": "power"
                     }
                 }
@@ -998,7 +941,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1006,7 +949,7 @@
                 {
                     "ParamName": "VR_TEMP",
                     "Desc": {
-                        "Name": "PHX_VR2_T",
+                        "Name": "PHX_1_VR2_T",
                         "SensorType": "temperature"
                     }
                 }
@@ -1031,7 +974,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1039,7 +982,7 @@
                 {
                     "ParamName": "VR_VOLT",
                     "Desc": {
-                        "Name": "PHX_VR3_V",
+                        "Name": "PHX_1_VR3_V",
                         "SensorType": "voltage"
                     }
                 }
@@ -1061,7 +1004,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1069,7 +1012,7 @@
                 {
                     "ParamName": "VR_CURR",
                     "Desc": {
-                        "Name": "PHX_VR3_A",
+                        "Name": "PHX_1_VR3_A",
                         "SensorType": "current"
                     }
                 }
@@ -1086,7 +1029,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1094,7 +1037,7 @@
                 {
                     "ParamName": "VR_PWR",
                     "Desc": {
-                        "Name": "PHX_VR3_W",
+                        "Name": "PHX_1_VR3_W",
                         "SensorType": "power"
                     }
                 }
@@ -1115,7 +1058,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1123,7 +1066,7 @@
                 {
                     "ParamName": "VR_TEMP",
                     "Desc": {
-                        "Name": "PHX_VR3_T",
+                        "Name": "PHX_1_VR3_T",
                         "SensorType": "temperature"
                     }
                 }
@@ -1148,7 +1091,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1156,7 +1099,7 @@
                 {
                     "ParamName": "VR_VOLT",
                     "Desc": {
-                        "Name": "PHX_VR4_V",
+                        "Name": "PHX_1_VR4_V",
                         "SensorType": "voltage"
                     }
                 }
@@ -1178,7 +1121,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1186,7 +1129,7 @@
                 {
                     "ParamName": "VR_CURR",
                     "Desc": {
-                        "Name": "PHX_VR4_A",
+                        "Name": "PHX_1_VR4_A",
                         "SensorType": "current"
                     }
                 }
@@ -1203,7 +1146,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1211,7 +1154,7 @@
                 {
                     "ParamName": "VR_PWR",
                     "Desc": {
-                        "Name": "PHX_VR4_W",
+                        "Name": "PHX_1_VR4_W",
                         "SensorType": "power"
                     }
                 }
@@ -1232,7 +1175,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1240,7 +1183,7 @@
                 {
                     "ParamName": "VR_TEMP",
                     "Desc": {
-                        "Name": "PHX_VR4_T",
+                        "Name": "PHX_1_VR4_T",
                         "SensorType": "temperature"
                     }
                 }
@@ -1265,7 +1208,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1273,7 +1216,7 @@
                 {
                     "ParamName": "VR_VOLT",
                     "Desc": {
-                        "Name": "PHX_VR5_V",
+                        "Name": "PHX_1_VR5_V",
                         "SensorType": "voltage"
                     }
                 }
@@ -1295,7 +1238,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1303,7 +1246,7 @@
                 {
                     "ParamName": "VR_CURR",
                     "Desc": {
-                        "Name": "PHX_VR5_A",
+                        "Name": "PHX_1_VR5_A",
                         "SensorType": "current"
                     }
                 }
@@ -1320,7 +1263,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1328,7 +1271,7 @@
                 {
                     "ParamName": "VR_PWR",
                     "Desc": {
-                        "Name": "PHX_VR5_W",
+                        "Name": "PHX_1_VR5_W",
                         "SensorType": "power"
                     }
                 }
@@ -1349,7 +1292,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1357,7 +1300,7 @@
                 {
                     "ParamName": "VR_TEMP",
                     "Desc": {
-                        "Name": "PHX_VR5_T",
+                        "Name": "PHX_1_VR5_T",
                         "SensorType": "temperature"
                     }
                 }
@@ -1382,7 +1325,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1390,7 +1333,7 @@
                 {
                     "ParamName": "VR_VOLT",
                     "Desc": {
-                        "Name": "PHX_VR6_V",
+                        "Name": "PHX_1_VR6_V",
                         "SensorType": "voltage"
                     }
                 }
@@ -1412,7 +1355,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1420,7 +1363,7 @@
                 {
                     "ParamName": "VR_CURR",
                     "Desc": {
-                        "Name": "PHX_VR6_A",
+                        "Name": "PHX_1_VR6_A",
                         "SensorType": "current"
                     }
                 }
@@ -1437,7 +1380,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1445,7 +1388,7 @@
                 {
                     "ParamName": "VR_PWR",
                     "Desc": {
-                        "Name": "PHX_VR6_W",
+                        "Name": "PHX_1_VR6_W",
                         "SensorType": "power"
                     }
                 }
@@ -1466,7 +1409,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1474,7 +1417,7 @@
                 {
                     "ParamName": "VR_TEMP",
                     "Desc": {
-                        "Name": "PHX_VR6_T",
+                        "Name": "PHX_1_VR6_T",
                         "SensorType": "temperature"
                     }
                 }
@@ -1499,7 +1442,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1507,7 +1450,7 @@
                 {
                     "ParamName": "VR_VOLT",
                     "Desc": {
-                        "Name": "PHX_VR7_V",
+                        "Name": "PHX_1_VR7_V",
                         "SensorType": "voltage"
                     }
                 }
@@ -1529,7 +1472,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1537,7 +1480,7 @@
                 {
                     "ParamName": "VR_CURR",
                     "Desc": {
-                        "Name": "PHX_VR7_A",
+                        "Name": "PHX_1_VR7_A",
                         "SensorType": "current"
                     }
                 }
@@ -1554,7 +1497,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1562,7 +1505,7 @@
                 {
                     "ParamName": "VR_PWR",
                     "Desc": {
-                        "Name": "PHX_VR7_W",
+                        "Name": "PHX_1_VR7_W",
                         "SensorType": "power"
                     }
                 }
@@ -1583,7 +1526,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1591,7 +1534,7 @@
                 {
                     "ParamName": "VR_TEMP",
                     "Desc": {
-                        "Name": "PHX_VR7_T",
+                        "Name": "PHX_1_VR7_T",
                         "SensorType": "temperature"
                     }
                 }
@@ -1616,7 +1559,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1624,7 +1567,7 @@
                 {
                     "ParamName": "VR_VOLT",
                     "Desc": {
-                        "Name": "PHX_VR8_V",
+                        "Name": "PHX_1_VR8_V",
                         "SensorType": "voltage"
                     }
                 }
@@ -1646,7 +1589,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1654,7 +1597,7 @@
                 {
                     "ParamName": "VR_CURR",
                     "Desc": {
-                        "Name": "PHX_VR8_A",
+                        "Name": "PHX_1_VR8_A",
                         "SensorType": "current"
                     }
                 }
@@ -1671,7 +1614,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1679,7 +1622,7 @@
                 {
                     "ParamName": "VR_PWR",
                     "Desc": {
-                        "Name": "PHX_VR8_W",
+                        "Name": "PHX_1_VR8_W",
                         "SensorType": "power"
                     }
                 }
@@ -1700,7 +1643,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1708,7 +1651,7 @@
                 {
                     "ParamName": "VR_TEMP",
                     "Desc": {
-                        "Name": "PHX_VR8_T",
+                        "Name": "PHX_1_VR8_T",
                         "SensorType": "temperature"
                     }
                 }
@@ -1733,7 +1676,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1741,7 +1684,7 @@
                 {
                     "ParamName": "VR_VOLT",
                     "Desc": {
-                        "Name": "PHX_VR9_V",
+                        "Name": "PHX_1_VR9_V",
                         "SensorType": "voltage"
                     }
                 }
@@ -1763,7 +1706,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1771,7 +1714,7 @@
                 {
                     "ParamName": "VR_CURR",
                     "Desc": {
-                        "Name": "PHX_VR9_A",
+                        "Name": "PHX_1_VR9_A",
                         "SensorType": "current"
                     }
                 }
@@ -1788,7 +1731,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1796,7 +1739,7 @@
                 {
                     "ParamName": "VR_PWR",
                     "Desc": {
-                        "Name": "PHX_VR9_W",
+                        "Name": "PHX_1_VR9_W",
                         "SensorType": "power"
                     }
                 }
@@ -1817,7 +1760,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1825,7 +1768,7 @@
                 {
                     "ParamName": "VR_TEMP",
                     "Desc": {
-                        "Name": "PHX_VR9_T",
+                        "Name": "PHX_1_VR9_T",
                         "SensorType": "temperature"
                     }
                 }
@@ -1850,7 +1793,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1858,7 +1801,7 @@
                 {
                     "ParamName": "VR_VOLT",
                     "Desc": {
-                        "Name": "PHX_VR10_V",
+                        "Name": "PHX_1_VR10_V",
                         "SensorType": "voltage"
                     }
                 }
@@ -1880,7 +1823,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1888,7 +1831,7 @@
                 {
                     "ParamName": "VR_CURR",
                     "Desc": {
-                        "Name": "PHX_VR10_A",
+                        "Name": "PHX_1_VR10_A",
                         "SensorType": "current"
                     }
                 }
@@ -1905,7 +1848,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1913,7 +1856,7 @@
                 {
                     "ParamName": "VR_PWR",
                     "Desc": {
-                        "Name": "PHX_VR10_W",
+                        "Name": "PHX_1_VR10_W",
                         "SensorType": "power"
                     }
                 }
@@ -1934,7 +1877,7 @@
             [
                 "chassis",
                 "all_sensors",
-                    "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1942,7 +1885,7 @@
                 {
                     "ParamName": "VR_TEMP",
                     "Desc": {
-                        "Name": "PHX_VR10_T",
+                        "Name": "PHX_1_VR10_T",
                         "SensorType": "temperature"
                     }
                 }
@@ -1952,7 +1895,7 @@
     },
     {
         "Desc": {
-            "Name": "MB_DIMM_0_0_TEMP_C",
+            "Name": "MB_DIMM_A0_TEMP_C",
             "SensorType": "temperature"
         },
         "Threshold": {
@@ -1963,7 +1906,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -1971,7 +1914,7 @@
                 {
                     "ParamName": "DIMM_TEMP",
                     "Desc": {
-                        "Name": "PHX_DIMM0_Temp",
+                        "Name": "PHX_1_DIMM0_Temp",
                         "SensorType": "temperature"
                     }
                 }
@@ -1981,7 +1924,7 @@
     },
     {
         "Desc": {
-            "Name": "MB_DIMM_0_1_TEMP_C",
+            "Name": "MB_DIMM_A1_TEMP_C",
             "SensorType": "temperature"
         },
         "Threshold": {
@@ -1992,7 +1935,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -2000,7 +1943,7 @@
                 {
                     "ParamName": "DIMM_TEMP",
                     "Desc": {
-                        "Name": "PHX_DIMM1_Temp",
+                        "Name": "PHX_1_DIMM1_Temp",
                         "SensorType": "temperature"
                     }
                 }
@@ -2010,7 +1953,7 @@
     },
     {
         "Desc": {
-            "Name": "MB_DIMM_0_2_TEMP_C",
+            "Name": "MB_DIMM_A2_TEMP_C",
             "SensorType": "temperature"
         },
         "Threshold": {
@@ -2021,7 +1964,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -2029,7 +1972,7 @@
                 {
                     "ParamName": "DIMM_TEMP",
                     "Desc": {
-                        "Name": "PHX_DIMM2_Temp",
+                        "Name": "PHX_1_DIMM2_Temp",
                         "SensorType": "temperature"
                     }
                 }
@@ -2039,7 +1982,7 @@
     },
     {
         "Desc": {
-            "Name": "MB_DIMM_0_3_TEMP_C",
+            "Name": "MB_DIMM_A3_TEMP_C",
             "SensorType": "temperature"
         },
         "Threshold": {
@@ -2050,7 +1993,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -2058,7 +2001,7 @@
                 {
                     "ParamName": "DIMM_TEMP",
                     "Desc": {
-                        "Name": "PHX_DIMM3_Temp",
+                        "Name": "PHX_1_DIMM3_Temp",
                         "SensorType": "temperature"
                     }
                 }
@@ -2068,7 +2011,7 @@
     },
     {
         "Desc": {
-            "Name": "MB_DIMM_0_4_TEMP_C",
+            "Name": "MB_DIMM_A4_TEMP_C",
             "SensorType": "temperature"
         },
         "Threshold": {
@@ -2079,7 +2022,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -2087,7 +2030,7 @@
                 {
                     "ParamName": "DIMM_TEMP",
                     "Desc": {
-                        "Name": "PHX_DIMM4_Temp",
+                        "Name": "PHX_1_DIMM4_Temp",
                         "SensorType": "temperature"
                     }
                 }
@@ -2097,7 +2040,7 @@
     },
     {
         "Desc": {
-            "Name": "MB_DIMM_0_5_TEMP_C",
+            "Name": "MB_DIMM_A5_TEMP_C",
             "SensorType": "temperature"
         },
         "Threshold": {
@@ -2108,7 +2051,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -2116,7 +2059,7 @@
                 {
                     "ParamName": "DIMM_TEMP",
                     "Desc": {
-                        "Name": "PHX_DIMM5_Temp",
+                        "Name": "PHX_1_DIMM5_Temp",
                         "SensorType": "temperature"
                     }
                 }
@@ -2126,7 +2069,7 @@
     },
     {
         "Desc": {
-            "Name": "MB_DIMM_1_0_TEMP_C",
+            "Name": "MB_DIMM_B0_TEMP_C",
             "SensorType": "temperature"
         },
         "Threshold": {
@@ -2137,7 +2080,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -2145,7 +2088,7 @@
                 {
                     "ParamName": "DIMM_TEMP",
                     "Desc": {
-                        "Name": "PHX_DIMM6_Temp",
+                        "Name": "PHX_1_DIMM6_Temp",
                         "SensorType": "temperature"
                     }
                 }
@@ -2155,7 +2098,7 @@
     },
     {
         "Desc": {
-            "Name": "MB_DIMM_1_1_TEMP_C",
+            "Name": "MB_DIMM_B1_TEMP_C",
             "SensorType": "temperature"
         },
         "Threshold": {
@@ -2166,7 +2109,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -2174,7 +2117,7 @@
                 {
                     "ParamName": "DIMM_TEMP",
                     "Desc": {
-                        "Name": "PHX_DIMM7_Temp",
+                        "Name": "PHX_1_DIMM7_Temp",
                         "SensorType": "temperature"
                     }
                 }
@@ -2184,7 +2127,7 @@
     },
     {
         "Desc": {
-            "Name": "MB_DIMM_1_2_TEMP_C",
+            "Name": "MB_DIMM_B2_TEMP_C",
             "SensorType": "temperature"
         },
         "Threshold": {
@@ -2195,7 +2138,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -2203,7 +2146,7 @@
                 {
                     "ParamName": "DIMM_TEMP",
                     "Desc": {
-                        "Name": "PHX_DIMM8_Temp",
+                        "Name": "PHX_1_DIMM8_Temp",
                         "SensorType": "temperature"
                     }
                 }
@@ -2213,7 +2156,7 @@
     },
     {
         "Desc": {
-            "Name": "MB_DIMM_1_3_TEMP_C",
+            "Name": "MB_DIMM_B3_TEMP_C",
             "SensorType": "temperature"
         },
         "Threshold": {
@@ -2224,7 +2167,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -2232,7 +2175,7 @@
                 {
                     "ParamName": "DIMM_TEMP",
                     "Desc": {
-                        "Name": "PHX_DIMM9_Temp",
+                        "Name": "PHX_1_DIMM9_Temp",
                         "SensorType": "temperature"
                     }
                 }
@@ -2242,7 +2185,7 @@
     },
     {
         "Desc": {
-            "Name": "MB_DIMM_1_4_TEMP_C",
+            "Name": "MB_DIMM_B4_TEMP_C",
             "SensorType": "temperature"
         },
         "Threshold": {
@@ -2253,7 +2196,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -2261,7 +2204,7 @@
                 {
                     "ParamName": "DIMM_TEMP",
                     "Desc": {
-                        "Name": "PHX_DIMM10_Temp",
+                        "Name": "PHX_1_DIMM10_Temp",
                         "SensorType": "temperature"
                     }
                 }
@@ -2271,7 +2214,7 @@
     },
     {
         "Desc": {
-            "Name": "MB_DIMM_1_5_TEMP_C",
+            "Name": "MB_DIMM_B5_TEMP_C",
             "SensorType": "temperature"
         },
         "Threshold": {
@@ -2282,7 +2225,7 @@
             [
                 "chassis",
                 "all_sensors",
-                "/xyz/openbmc_project/inventory/system/board/PHX"
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
             ]
         ],
         "Params": {
@@ -2290,12 +2233,405 @@
                 {
                     "ParamName": "DIMM_TEMP",
                     "Desc": {
-                        "Name": "PHX_DIMM11_Temp",
+                        "Name": "PHX_1_DIMM11_Temp",
                         "SensorType": "temperature"
                     }
                 }
             ]
         },
         "Expression": "DIMM_TEMP"
+    },
+    {
+        "Desc": {
+            "Name": "MB_DIMM_A0_PWR_W",
+            "SensorType": "power"
+        },
+        "Threshold": {
+            "CriticalHigh": 14
+        },
+        "Associations": [
+            [
+                "chassis",
+                "all_sensors",
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
+            ]
+        ],
+        "Params": {
+            "DbusParam": [
+                {
+                    "ParamName": "DIMM_POWER",
+                    "Desc": {
+                        "Name": "PHX_1_DIMM0_Power",
+                        "SensorType": "power"
+                    }
+                }
+            ]
+        },
+        "Expression": "DIMM_POWER"
+    },
+    {
+        "Desc": {
+            "Name": "MB_DIMM_A1_PWR_W",
+            "SensorType": "power"
+        },
+        "Threshold": {
+            "CriticalHigh": 14
+        },
+        "Associations": [
+            [
+                "chassis",
+                "all_sensors",
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
+            ]
+        ],
+        "Params": {
+            "DbusParam": [
+                {
+                    "ParamName": "DIMM_POWER",
+                    "Desc": {
+                        "Name": "PHX_1_DIMM1_Power",
+                        "SensorType": "power"
+                    }
+                }
+            ]
+        },
+        "Expression": "DIMM_POWER"
+    },
+    {
+        "Desc": {
+            "Name": "MB_DIMM_A2_PWR_W",
+            "SensorType": "power"
+        },
+        "Threshold": {
+            "CriticalHigh": 14
+        },
+        "Associations": [
+            [
+                "chassis",
+                "all_sensors",
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
+            ]
+        ],
+        "Params": {
+            "DbusParam": [
+                {
+                    "ParamName": "DIMM_POWER",
+                    "Desc": {
+                        "Name": "PHX_1_DIMM2_Power",
+                        "SensorType": "power"
+                    }
+                }
+            ]
+        },
+        "Expression": "DIMM_POWER"
+    },
+    {
+        "Desc": {
+            "Name": "MB_DIMM_A3_PWR_W",
+            "SensorType": "power"
+        },
+        "Threshold": {
+            "CriticalHigh": 14
+        },
+        "Associations": [
+            [
+                "chassis",
+                "all_sensors",
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
+            ]
+        ],
+        "Params": {
+            "DbusParam": [
+                {
+                    "ParamName": "DIMM_POWER",
+                    "Desc": {
+                        "Name": "PHX_1_DIMM3_Power",
+                        "SensorType": "power"
+                    }
+                }
+            ]
+        },
+        "Expression": "DIMM_POWER"
+    },
+    {
+        "Desc": {
+            "Name": "MB_DIMM_A4_PWR_W",
+            "SensorType": "power"
+        },
+        "Threshold": {
+            "CriticalHigh": 14
+        },
+        "Associations": [
+            [
+                "chassis",
+                "all_sensors",
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
+            ]
+        ],
+        "Params": {
+            "DbusParam": [
+                {
+                    "ParamName": "DIMM_POWER",
+                    "Desc": {
+                        "Name": "PHX_1_DIMM4_Power",
+                        "SensorType": "power"
+                    }
+                }
+            ]
+        },
+        "Expression": "DIMM_POWER"
+    },
+    {
+        "Desc": {
+            "Name": "MB_DIMM_A5_PWR_W",
+            "SensorType": "power"
+        },
+        "Threshold": {
+            "CriticalHigh": 14
+        },
+        "Associations": [
+            [
+                "chassis",
+                "all_sensors",
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
+            ]
+        ],
+        "Params": {
+            "DbusParam": [
+                {
+                    "ParamName": "DIMM_POWER",
+                    "Desc": {
+                        "Name": "PHX_1_DIMM5_Power",
+                        "SensorType": "power"
+                    }
+                }
+            ]
+        },
+        "Expression": "DIMM_POWER"
+    },
+    {
+        "Desc": {
+            "Name": "MB_DIMM_B0_PWR_W",
+            "SensorType": "power"
+        },
+        "Threshold": {
+            "CriticalHigh": 14
+        },
+        "Associations": [
+            [
+                "chassis",
+                "all_sensors",
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
+            ]
+        ],
+        "Params": {
+            "DbusParam": [
+                {
+                    "ParamName": "DIMM_POWER",
+                    "Desc": {
+                        "Name": "PHX_1_DIMM6_Power",
+                        "SensorType": "power"
+                    }
+                }
+            ]
+        },
+        "Expression": "DIMM_POWER"
+    },
+    {
+        "Desc": {
+            "Name": "MB_DIMM_B1_PWR_W",
+            "SensorType": "power"
+        },
+        "Threshold": {
+            "CriticalHigh": 14
+        },
+        "Associations": [
+            [
+                "chassis",
+                "all_sensors",
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
+            ]
+        ],
+        "Params": {
+            "DbusParam": [
+                {
+                    "ParamName": "DIMM_POWER",
+                    "Desc": {
+                        "Name": "PHX_1_DIMM7_Power",
+                        "SensorType": "power"
+                    }
+                }
+            ]
+        },
+        "Expression": "DIMM_POWER"
+    },
+    {
+        "Desc": {
+            "Name": "MB_DIMM_B2_PWR_W",
+            "SensorType": "power"
+        },
+        "Threshold": {
+            "CriticalHigh": 14
+        },
+        "Associations": [
+            [
+                "chassis",
+                "all_sensors",
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
+            ]
+        ],
+        "Params": {
+            "DbusParam": [
+                {
+                    "ParamName": "DIMM_POWER",
+                    "Desc": {
+                        "Name": "PHX_1_DIMM8_Power",
+                        "SensorType": "power"
+                    }
+                }
+            ]
+        },
+        "Expression": "DIMM_POWER"
+    },
+    {
+        "Desc": {
+            "Name": "MB_DIMM_B3_PWR_W",
+            "SensorType": "power"
+        },
+        "Threshold": {
+            "CriticalHigh": 14
+        },
+        "Associations": [
+            [
+                "chassis",
+                "all_sensors",
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
+            ]
+        ],
+        "Params": {
+            "DbusParam": [
+                {
+                    "ParamName": "DIMM_POWER",
+                    "Desc": {
+                        "Name": "PHX_1_DIMM9_Power",
+                        "SensorType": "power"
+                    }
+                }
+            ]
+        },
+        "Expression": "DIMM_POWER"
+    },
+    {
+        "Desc": {
+            "Name": "MB_DIMM_B4_PWR_W",
+            "SensorType": "power"
+        },
+        "Threshold": {
+            "CriticalHigh": 14
+        },
+        "Associations": [
+            [
+                "chassis",
+                "all_sensors",
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
+            ]
+        ],
+        "Params": {
+            "DbusParam": [
+                {
+                    "ParamName": "DIMM_POWER",
+                    "Desc": {
+                        "Name": "PHX_1_DIMM10_Power",
+                        "SensorType": "power"
+                    }
+                }
+            ]
+        },
+        "Expression": "DIMM_POWER"
+    },
+    {
+        "Desc": {
+            "Name": "MB_DIMM_B5_PWR_W",
+            "SensorType": "power"
+        },
+        "Threshold": {
+            "CriticalHigh": 14
+        },
+        "Associations": [
+            [
+                "chassis",
+                "all_sensors",
+                "/xyz/openbmc_project/inventory/system/board/PHX_1"
+            ]
+        ],
+        "Params": {
+            "DbusParam": [
+                {
+                    "ParamName": "DIMM_POWER",
+                    "Desc": {
+                        "Name": "PHX_1_DIMM11_Power",
+                        "SensorType": "power"
+                    }
+                }
+            ]
+        },
+        "Expression": "DIMM_POWER"
+    },
+    {
+        "Desc": {
+            "Name": "SCM_VIRTUAL_CALIBRATED_INLET_TEMP_C",
+            "SensorType": "temperature",
+            "MaxValue": 127,
+            "MinValue": -127
+        },
+        "Threshold": {
+            "CriticalLow": 5,
+            "CriticalHigh": 45
+        },
+        "Associations": [
+            [
+                "chassis",
+                "all_sensors",
+                "/xyz/openbmc_project/inventory/system/board/Rainier_SCM"
+            ]
+        ],
+        "Params": {
+            "DbusParam": [
+                {
+                    "ParamName": "INLET_TEMP",
+                    "Desc": {
+                        "Name": "SCM_INLET_TEMP_C",
+                        "SensorType": "temperature"
+                    }
+                },
+                {
+                    "ParamName": "FAN_DUTY",
+                    "Desc": {
+                        "Name": "PDB_FAN_PWM_PCT",
+                        "SensorType": "fan_pwm"
+                    }
+                }
+            ]
+        },
+        "Expression": [
+            "var ARRAY_SIZE:=10;",
+            "var DUTY_OFS[10]:={90,80,70,60,50,40,30,20,10,0};",
+            "var CAL_OFS[10]:={-1.9,-2.0,-2.0,-2.2,-2.3,-2.6,-3.0,-3.5,-4.7,-6.0};",
+
+            "var DUTY_VALID:=ifnan(FAN_DUTY,999);",
+            "var OFFSET:=CAL_OFS[ARRAY_SIZE-1];",
+            "var FOUND:=0;",
+
+            "for(var i:=0; i<ARRAY_SIZE-1; i+=1)",
+            "{",
+            "  if((FOUND == 0) and (DUTY_VALID > DUTY_OFS[i]))",
+            "  {",
+            "    OFFSET:=CAL_OFS[i];",
+            "    FOUND:=1;",
+            "  };",
+            "};",
+
+            "INLET_TEMP + OFFSET"
+        ]
     }
 ]

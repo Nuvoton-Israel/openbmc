@@ -11,6 +11,7 @@ HOMEPAGE = "https://www.yoctoproject.org/"
 PTESTS = "${PTESTS_SLOW} ${PTESTS_FAST}"
 PTEST_RUNNER_TIMEOUT:virtclass-mcextend-python3-cffi = "600"
 PTEST_RUNNER_TIMEOUT:virtclass-mcextend-go = "4800"
+PTEST_RUNNER_TIMEOUT:virtclass-mcextend-icu = "2400"
 
 IMAGE_INSTALL:append = " ${MCNAME}-ptest openssh"
 
@@ -36,6 +37,9 @@ IMAGE_ROOTFS_EXTRA_SPACE:virtclass-mcextend-python3-numpy = "3048576"
 # golang go-ptest requires extra space
 IMAGE_ROOTFS_EXTRA_SPACE:virtclass-mcextend-go = "1524288"
 
+# zstd cli-tests create large temporary files (e.g. 1GB for window-resize)
+IMAGE_ROOTFS_EXTRA_SPACE:virtclass-mcextend-zstd = "1524288"
+
 # ptests need more memory than standard to avoid the OOM killer
 QB_MEM = "-m 1024"
 QB_MEM:virtclass-mcextend-lttng-tools = "-m 4096"
@@ -45,6 +49,8 @@ QB_MEM:virtclass-mcextend-python3-numpy = "-m 4096"
 QB_MEM:virtclass-mcextend-tcl = "-m 5100"
 QB_MEM:virtclass-mcextend-go = "-m 4096"
 QB_MEM:virtclass-mcextend-gnutls = "-m 1536"
+QB_MEM:virtclass-mcextend-zstd = "-m 4096"
+QB_MEM:virtclass-mcextend-icu = "-m 4096"
 
 TEST_SUITES = "ping ssh parselogs ptest"
 

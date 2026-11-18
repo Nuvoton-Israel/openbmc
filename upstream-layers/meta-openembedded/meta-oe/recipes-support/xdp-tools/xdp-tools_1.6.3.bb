@@ -5,7 +5,7 @@ with XDP eBPF programs in Linux, including tools for loading programs, packet \
 processing, monitoring, traffic generation, and benchmarking."
 
 HOMEPAGE = "https://github.com/xdp-project/xdp-tools"
-LICENSE = "GPL-2.0-only & GPL-2.0-or-later & LGPL-2.1-only & BSD-2-Clause"
+LICENSE = "BSD-2-Clause AND GPL-2.0-only AND GPL-2.0-or-later AND LGPL-2.1-only"
 LIC_FILES_CHKSUM = " \
     file://LICENSE;md5=9ee53f8d06bbdb4c11b1557ecc4f8cd5 \
     file://LICENSES/GPL-2.0;md5=994331978b428511800bfbd17eea3001 \
@@ -16,6 +16,9 @@ SRC_URI = " \
     git://github.com/xdp-project/xdp-tools.git;tag=v${PV};nobranch=1;protocol=https \
     file://0001-configure-correctly-handle-CC-when-validating-requir.patch \
     file://0002-lib-libxdp-Makefile-use-cp-fRd-to-preserve-symlinks-.patch \
+    file://0003-lib-util-avoid-struct-ethhdr-redefinition-on-musl.patch \
+    file://0004-xdp-filter-xdp-dump-avoid-struct-ethhdr-redefinitio.patch \
+    file://0005-lib-libxdp-Embed-BPF-objects-with-.incbin-instead-of.patch \
 "
 SRCREV = "8fbad9f0af621a22aa87ff2520b3735915b1f0fd"
 

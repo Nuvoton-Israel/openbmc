@@ -100,7 +100,7 @@ New Features / Enhancements in 4.1
 
    - :ref:`Support for using the regular build system as an SDK <sdk-manual/extensible:Setting up the Extensible SDK environment directly in a Yocto build>`
    - :ref:`ref-classes-image-buildinfo` class now also writes build information to SDKs
-   - New :term:`SDK_TOOLCHAIN_LANGS` variable to control support of rust / go in SDK
+   - New ``SDK_TOOLCHAIN_LANGS`` variable to control support of rust / go in SDK
    - rust-llvm: enabled :ref:`ref-classes-nativesdk` variant
    - python3-pluggy: enabled for :ref:`ref-classes-native` / :ref:`ref-classes-nativesdk`
 
@@ -191,7 +191,7 @@ Known Issues in 4.1
 ~~~~~~~~~~~~~~~~~~~
 
 - The change to :ref:`migration-4.1-complementary-deps` means that images
-  built with the ``ptest-pkgs`` :term:`IMAGE_FEATURES` don’t automatically
+  built with the ``ptest-pkgs`` :term:`IMAGE_FEATURES` don't automatically
   install ``ptest-runner``, as that package is a recommendation of the
   individual ``-ptest`` packages.  This will be resolved in the next point
   release, and can be worked around by explicitly installing ``ptest-runner``

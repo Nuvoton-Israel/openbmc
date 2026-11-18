@@ -17,6 +17,9 @@ SRC_URI = "https://download.videolan.org/pub/contrib/live555/live.${URLV}.tar.gz
 MIRRORS += "http://www.live555.com/liveMedia/public/ http://download.videolan.org/contrib/live555/ \n"
 
 SRC_URI[sha256sum] = "2c54c2e090065849d0ab8cc7b06942f4e66dde17f2a0c80ae20b907d562c937e"
+# PV is a compact date (YYYYMMDD) while upstream tarballs use live.YYYY.MM.DD,
+# which do not compare against PV; the check cannot map the two schemes.
+UPSTREAM_VERSION_UNKNOWN = "1"
 CVE_PRODUCT = "live555 live555_media_server live555:streaming_media live555:liblivemedia"
 
 S = "${UNPACKDIR}/live"
@@ -54,6 +57,17 @@ do_install() {
         install -m 0755 ${S}/testProgs/${i} ${D}${bindir}/
     done
     install -m 0755 ${S}/mediaServer/live555MediaServer ${D}${bindir}/
+
+    # Upstream ships no pkg-config file; provide one
+    install -d ${D}${libdir}/pkgconfig
+    cat > ${D}${libdir}/pkgconfig/live555.pc <<'EOF'
+Name: live555
+Description: ${DESCRIPTION}
+Version: ${PV}
+Requires: openssl
+Libs: -L${libdir} -lliveMedia -lgroupsock -lBasicUsageEnvironment -lUsageEnvironment
+Cflags: -I${includedir}/liveMedia -I${includedir}/groupsock -I${includedir}/BasicUsageEnvironment -I${includedir}/UsageEnvironment
+EOF
 }
 
 RDEPENDS:${PN}-dev = ""

@@ -1,7 +1,7 @@
 SUMMARY = "The Linux Kernel Stream Control Transmission Protocol (lksctp) project"
 HOMEPAGE = "http://lksctp.org"
 SECTION = "net"
-LICENSE = "LGPL-2.1-only & GPL-2.0-only"
+LICENSE = "GPL-2.0-only AND LGPL-2.1-only"
 
 LIC_FILES_CHKSUM = " \
     file://COPYING.lib;md5=0a1b79af951c42a9c8573533fbba9a92 \
@@ -13,6 +13,8 @@ SRCREV = "37d5f1225573b91d706a5e547d081f79963a9deb"
 SRC_URI = " \
     git://github.com/sctp/lksctp-tools.git;branch=master;protocol=https \
     file://0001-func_tests-disable-FORTIFY_SOURCE-for-test_1_to_1_re.patch \
+    file://0002-func_tests-pass-invalid-msghdr-pointers-straight-to-.patch \
+    file://0003-connectx-only-export-the-unversioned-sctp_connectx-a.patch \
     file://run-ptest \
     file://v4test.sh \
     file://v6test.sh \

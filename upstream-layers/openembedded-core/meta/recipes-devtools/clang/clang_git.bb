@@ -60,13 +60,14 @@ EXTRA_OECMAKE += "-DLLVM_ENABLE_ASSERTIONS=OFF \
                   -DFFI_INCLUDE_DIR=$(pkg-config --variable=includedir libffi) \
                   -DLLVM_BUILD_EXTERNAL_COMPILER_RT=ON \
                   -DCMAKE_SYSTEM_NAME=Linux \
-                  -DCMAKE_BUILD_TYPE=MinSizeRel \
+                  -DCMAKE_BUILD_TYPE=Release \
                   -DLLVM_VERSION_SUFFIX='${VER_SUFFIX}' \
                   -DLLVM_CMAKE_DIR=${STAGING_LIBDIR}/cmake/llvm \
                   -DLLVM_NATIVE_TOOL_DIR=${STAGING_BINDIR_NATIVE} \
                   -DLLVM_TABLEGEN_EXE=${STAGING_BINDIR_NATIVE}/llvm-tblgen \
                   -DCLANG_TABLEGEN_EXE=${STAGING_BINDIR_NATIVE}/clang-tblgen \
                   -DLLVM_INCLUDE_TESTS=OFF \
+                  -DCLANG_TOOLS_EXTRA_INCLUDE_TESTS=OFF \
                   -DCROSS_TOOLCHAIN_FLAGS_NATIVE='-DCMAKE_TOOLCHAIN_FILE=${WORKDIR}/toolchain-native.cmake' \
                   -DLLVM_LIBDIR_SUFFIX=${LLVM_LIBDIR_SUFFIX} \
                   -DCMAKE_AR=${STAGING_BINDIR_NATIVE}/llvm-ar \
@@ -74,6 +75,18 @@ EXTRA_OECMAKE += "-DLLVM_ENABLE_ASSERTIONS=OFF \
                   -DCMAKE_RANLIB=${STAGING_BINDIR_NATIVE}/llvm-ranlib \
                   -DCMAKE_STRIP=${STAGING_BINDIR_NATIVE}/llvm-strip \
 "
+
+# The generated completion model overflows ppc32's 16-bit branch range
+# ("operand out of range" from gas); use the heuristic ranking instead.
+EXTRA_OECMAKE:append:powerpc = " -DCLANGD_DECISION_FOREST=OFF"
+
+CLANG_ENABLE_TESTSUITE ??= "0"
+CLANG_TESTSUITE_FLAGS = "\
+                  -DCLANG_INCLUDE_TESTS=ON \
+                  -DLLVM_INCLUDE_TESTS=ON \
+"
+
+EXTRA_OECMAKE:append:class-target = " ${@bb.utils.contains('CLANG_ENABLE_TESTSUITE', '1', d.getVar('CLANG_TESTSUITE_FLAGS'), '', d)}"
 
 DEPENDS = "llvm-tblgen-native llvm-native llvm binutils zlib zstd libffi libxml2 libxml2-native"
 DEPENDS:append:class-target = " ${@bb.utils.contains('TC_CXX_RUNTIME', 'llvm', 'compiler-rt libcxx', '', d)}"
@@ -85,6 +98,18 @@ do_configure:prepend() {
   # Link clang-tools-extra into the clang tree as clang will look for it here
   # if it's doing a standalone build.
   ln -srf ${S}/clang-tools-extra ${S}/clang/tools/extra
+}
+
+# The tests run on the target, so lit must use the target python.
+clang_lit_target_python() {
+    sed -i 's|^config.python_executable = .*|config.python_executable = "${bindir}/python3"|' \
+        ${B}/test/lit.site.cfg.py
+}
+
+do_configure:append:class-target() {
+    if [ "${CLANG_ENABLE_TESTSUITE}" = "1" ]; then
+        clang_lit_target_python
+    fi
 }
 
 do_install:append() {

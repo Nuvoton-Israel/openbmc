@@ -7,7 +7,7 @@ SRC_URI[sha256sum] = "9756e82d5f3bf11629ffcbafb1f8a1092d3bb4789e33494032cdce9a9c
 
 inherit pypi python_setuptools_build_meta
 
-PYPI_PACKAGE = "sphinxcontrib_svg2pdfconverter"
+DEPENDS += "python3-wheel-native"
 
 RDEPENDS:${PN} = "python3-sphinx"
 # Only support sphinxcontrib.rsvgconverter for now.

@@ -73,7 +73,7 @@ require ../conf/image-uefi.conf
 
 INITRAMFS_IMAGE ?= "core-image-minimal-initramfs"
 
-do_image_complete[depends] += "${INITRAMFS_IMAGE}:do_image_complete"
+do_image_complete[depends] += "${@ '${INITRAMFS_IMAGE}:do_image_complete' if d.getVar('INITRAMFS_IMAGE') else ''}"
 
 UKIFY_CMD ?= "ukify build"
 UKI_CONFIG_FILE ?= "${UNPACKDIR}/uki.conf"
@@ -107,7 +107,6 @@ python () {
 
 # main task
 python do_uki() {
-    import glob
     import bb.process
 
     # base ukify command, can be extended if needed
@@ -127,16 +126,18 @@ python do_uki() {
     ukify_cmd += " --stub %s" % (stub)
 
     # initrd
-    uki_fstype = d.getVar("INITRAMFS_FSTYPES").split()[0]
-    initramfs_image = "%s-%s.%s" % (d.getVar('INITRAMFS_IMAGE'), d.getVar('MACHINE'), uki_fstype)
-    ukify_cmd += " --initrd=%s" % (os.path.join(deploy_dir_image, initramfs_image))
+    initramfs_image = d.getVar('INITRAMFS_IMAGE')
+    if initramfs_image:
+        uki_fstype = d.getVar("INITRAMFS_FSTYPES").split()[0]
+        initramfs_file = "%s-%s.%s" % (initramfs_image, d.getVar('MACHINE'), uki_fstype)
+        ukify_cmd += " --initrd=%s" % (os.path.join(deploy_dir_image, initramfs_file))
 
     # kernel
     kernel_filename = d.getVar('UKI_KERNEL_FILENAME') or None
     if kernel_filename:
         kernel = "%s/%s" % (deploy_dir_image, kernel_filename)
         if not os.path.exists(kernel):
-            bb.fatal(f"ERROR: cannot find %s" % (kernel))
+            bb.fatal("ERROR: cannot find %s" % (kernel))
         ukify_cmd += " --linux=%s" % (kernel)
         # not always needed, ukify can detect version from kernel binary
         kernel_version = d.getVar('KERNEL_VERSION')

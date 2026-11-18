@@ -1,12 +1,13 @@
 SUMMARY = "PKCS#11 HSM/Token Emulator"
 HOMEPAGE = "https://www.opendnssec.org/softhsm/"
-LICENSE = "BSD-2-Clause & ISC"
+LICENSE = "BSD-2-Clause AND ISC"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=ef3f77a3507c3d91e75b9f2bdaee4210"
 
 DEPENDS = "sqlite3"
 
 SRC_URI = "git://github.com/softhsm/SoftHSMv2.git;protocol=https;branch=main;tag=${PV} \
            file://0002-Prevent-accessing-of-global-c-objects-once-they-are-.patch \
+           file://0003-Fix-memory-leak-in-EdDSA-PrintableString-handling-858.patch \
 "
 SRCREV = "13e6e86b83748fef74046dbf0c91f664b7acc1c3"
 

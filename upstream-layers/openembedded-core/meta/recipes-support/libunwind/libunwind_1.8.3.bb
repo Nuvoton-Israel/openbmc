@@ -27,6 +27,8 @@ PACKAGECONFIG[zlib] = "--enable-zlibdebuginfo,--disable-zlibdebuginfo,zlib"
 PACKAGECONFIG[latexdocs] = "--enable-documentation, --disable-documentation, latex2man-native"
 
 EXTRA_OECONF = "--enable-static --disable-tests"
+EXTRA_OECONF:append:riscv64 = " --disable-cxx-exceptions"
+
 
 # http://errors.yoctoproject.org/Errors/Details/20487/
 ARM_INSTRUCTION_SET:armv4 = "arm"
@@ -50,4 +52,5 @@ BBCLASSEXTEND = "native"
 # libunwind-1.8.1/src/elfxx.c:205:44: error: passing argument 3 of '_Uppc32_get_func_addr' from incompatible pointer type [-Wincompatible-pointer-types]
 # libunwind-1.8.1/src/elfxx.c:279:52: error: passing argument 3 of '_Uppc32_get_func_addr' from incompatible pointer type [-Wincompatible-pointer-types]
 # and others
+# Fixed in https://github.com/libunwind/libunwind/commit/43e609e3f37a3c368d3732e43526ea00bd4e3609
 CFLAGS:append:powerpc:libc-musl = " -Wno-error=incompatible-pointer-types"

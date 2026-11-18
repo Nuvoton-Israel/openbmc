@@ -1,6 +1,6 @@
 SUMMARY = "RMM Firmware"
 DESCRIPTION = "RMM Firmware for Arm reference platforms"
-LICENSE = "BSD-3-Clause & MIT"
+LICENSE = "BSD-3-Clause AND MIT"
 
 SRC_URI = "gitsm://git.trustedfirmware.org/TF-RMM/tf-rmm.git;protocol=https;branch=main"
 SRCREV = "7f6bc132caef3596fbb88d3a419c2a3cb499cde2"
@@ -44,3 +44,8 @@ do_deploy() {
 }
 
 addtask deploy after do_install
+
+# FIXME - The RMM build embeds TMPDIR paths in the generated binaries.
+# Skip the buildpaths QA check until these references can be removed.
+INSANE_SKIP:${PN} += "buildpaths"
+INSANE_SKIP:${PN}-dbg += "buildpaths"

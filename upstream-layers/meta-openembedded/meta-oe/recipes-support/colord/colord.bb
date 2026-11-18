@@ -1,6 +1,6 @@
 require ${BPN}.inc
 
-inherit meson gobject-introspection gsettings gtk-doc gettext bash-completion systemd features_check useradd pkgconfig
+inherit meson gobject-introspection gsettings gtk-doc gettext bash-completion systemd features_check useradd pkgconfig vala
 
 # polkit and gobject-introspection are mandatory and cannot be configured
 REQUIRED_DISTRO_FEATURES = "polkit gobject-introspection-data"
@@ -21,7 +21,6 @@ RDEPENDS:${PN} += "hwdata"
 
 SRC_URI += " \
 	file://0001-Run-native-cd_idt8-cd_create_profile.patch \
-	file://08a32b2379fb5582f4312e59bf51a2823df56276.patch \
 "
 
 EXTRA_OEMESON += " \
@@ -30,8 +29,12 @@ EXTRA_OEMESON += " \
 	-Dpnp_ids=${datadir}/hwdata/pnp.ids \
 "
 
-PACKAGECONFIG ??= "${@bb.utils.filter('DISTRO_FEATURES', 'systemd', d)}"
+PACKAGECONFIG ??= " \
+    ${@bb.utils.filter('DISTRO_FEATURES', 'systemd', d)} \
+    ${@bb.utils.contains('GI_DATA_ENABLED', 'True', 'vapi', '', d)} \
+"
 PACKAGECONFIG[systemd] = "-Dsystemd=true, -Dsystemd=false, systemd"
+PACKAGECONFIG[vapi] = "-Dvapi=true,-Dvapi=false"
 
 SYSTEMD_SERVICE:${PN} = "colord.service"
 
@@ -40,12 +43,19 @@ FILES:${PN} += " \
     ${datadir}/polkit-1 \
     ${datadir}/glib-2.0 \
     ${datadir}/color \
+    ${datadir}/metainfo \
     ${systemd_user_unitdir} \
     ${nonarch_libdir}/tmpfiles.d \
     ${libdir}/colord-plugins \
     ${libdir}/colord-sensors \
+    ${libdir}/sysusers.d \
 "
 
+do_install:append() {
+	install -d ${D}${sysconfdir}/tmpfiles.d
+	echo "d ${localstatedir}/lib/colord 700 root root - -" > ${D}${sysconfdir}/tmpfiles.d/colord.conf
+}
+
 USERADD_PACKAGES = "${PN}"
-USERADD_PARAM:${PN} = "--system --user-group -s /bin/false colord"
+USERADD_PARAM:${PN} = "--system --user-group --shell /bin/false --no-create-home --home-dir ${localstatedir}/lib/colord colord"
 

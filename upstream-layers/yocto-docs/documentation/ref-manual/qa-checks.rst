@@ -573,14 +573,14 @@ patched file to still compile without errors.
 Use the ``devtool`` command as explained by the warning. First, unpack the
 source into devtool workspace::
 
-   devtool modify <recipe>
+   $ devtool modify <recipe>
 
 This will apply all of the patches, and create new commits out of them in
 the workspace --- with the patch context updated.
 
 Then, replace the patches in the recipe layer::
 
-   devtool finish --force-patch-refresh <recipe> <layer_path>
+   $ devtool finish --force-patch-refresh <recipe> <layer_path>
 
 The patch updates then need be reviewed (preferably with a side-by-side diff
 tool) to ensure they are indeed doing the right thing i.e.:
@@ -889,7 +889,7 @@ or "-fpic" to the compiler command-line options. For example, given
 software that reads :term:`CFLAGS` when you build it,
 you could add the following to your recipe::
 
-   CFLAGS:append = " -fPIC "
+   CFLAGS:append = " -fPIC"
 
 For more information on text relocations at runtime, see
 https://www.akkadia.org/drepper/textrelocs.html.
@@ -919,7 +919,7 @@ the variable if it is not needed.
 This check will detect if the source of the package contains some
 upstream-provided tests and, if so, that ptests are implemented for this
 recipe.  See the ":ref:`test-manual/ptest:testing packages with ptest`"
-section in the Yocto Project Development Tasks Manual. See also the
+section in the Yocto Project Test Environment Manual. See also the
 ":ref:`ref-classes-ptest`" section.
 
 .. _qa-check-unknown-configure-option:

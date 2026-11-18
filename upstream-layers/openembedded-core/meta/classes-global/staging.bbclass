@@ -34,7 +34,6 @@ SYSROOT_DIRS_IGNORE = " \
     ${mandir} \
     ${docdir} \
     ${infodir} \
-    ${datadir}/X11/locale \
     ${datadir}/applications \
     ${datadir}/bash-completion \
     ${datadir}/fonts \
@@ -650,6 +649,7 @@ do_prepare_recipe_sysroot[deptask] = "do_populate_sysroot"
 python do_prepare_recipe_sysroot () {
     bb.build.exec_func("extend_recipe_sysroot", d)
 }
+do_prepare_recipe_sysroot[vardepsexclude] += "extend_recipe_sysroot"
 addtask do_prepare_recipe_sysroot before do_configure after do_fetch
 
 python staging_taskhandler() {
@@ -665,6 +665,7 @@ python staging_taskhandler() {
         deps = d.getVarFlag(task, "depends")
         if task == "do_configure" or (deps and "populate_sysroot" in deps):
             d.prependVarFlag(task, "prefuncs", "extend_recipe_sysroot ")
+            d.appendVarFlag(task, "vardepsexclude", " extend_recipe_sysroot")
 }
 staging_taskhandler[eventmask] = "bb.event.RecipeTaskPreProcess"
 addhandler staging_taskhandler
@@ -700,4 +701,3 @@ python target_add_sysroot_deps () {
     d.setVar("HASHEQUIV_EXTRA_SIGDATA", "\n".join("%s: %s" % (k, deps[k]) for k in sorted(deps.keys())))
 }
 SSTATECREATEFUNCS += "target_add_sysroot_deps"
-

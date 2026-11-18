@@ -1,4 +1,5 @@
 SUMMARY = "SWTPM - Software TPM Emulator"
+HOMEPAGE = "https://github.com/stefanberger/swtpm"
 LICENSE = "BSD-3-Clause"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=fe8092c832b71ef20dfe4c6d3decb3a8"
 SECTION = "apps"
@@ -11,7 +12,7 @@ SRC_URI = "git://github.com/stefanberger/swtpm.git;branch=stable-0.10;protocol=h
 PE = "2"
 
 PARALLEL_MAKE = ""
-inherit autotools pkgconfig perlnative
+inherit autotools pkgconfig perlnative useradd
 
 TSS_USER = "tss"
 TSS_GROUP = "tss"

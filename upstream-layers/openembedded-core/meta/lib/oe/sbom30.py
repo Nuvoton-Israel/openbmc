@@ -97,6 +97,32 @@ class OELicenseScannedExtension(oe.spdx30.extension_Extension):
     INTERNAL = True
 
 
+class OEIncompleteExtension(oe.spdx30.extension_Extension):
+    """
+    The presence of this extension means that the Element is incomplete, and
+    should not be preferred over a completely defined Element
+    """
+
+    TYPE = OE_SPDX_BASE + "incomplete"
+    CLOSED = True
+    INTERNAL = True
+
+    @classmethod
+    def is_incomplete(cls, obj):
+        for e in obj.extension:
+            if isinstance(e, cls):
+                return True
+        return False
+
+    @classmethod
+    def is_complete(cls, obj):
+        return not cls.is_incomplete(obj)
+
+    @classmethod
+    def set(cls, obj):
+        obj.extension.append(cls())
+
+
 class OEDocumentExtension(oe.spdx30.extension_Extension):
     """
     This extension is added to a SpdxDocument to indicate various useful bits
@@ -180,6 +206,9 @@ def hash_id(_id):
 
 
 def to_list(l):
+    if l is None:
+        return None
+
     if isinstance(l, set):
         l = sorted(list(l))
 
@@ -191,21 +220,35 @@ def to_list(l):
 
 class Dedup(object):
     def __init__(self, objset):
-        self.unique = set()
-        self.dedup = {}
+        self.unique = []
+        self.dup_idx = {}
         self.objset = objset
+        self.has_duplicates = False
 
-    def find_duplicates(self, cmp, typ, **kwargs):
+    def find_duplicates(self, cmp, typ, choose=None, **kwargs):
         for o in self.objset.foreach_filter(typ, **kwargs):
-            for u in self.unique:
+            for idx, u in enumerate(self.unique):
                 if cmp(u, o):
-                    self.dedup[o] = u
+                    self.has_duplicates = True
+                    self.dup_idx[o] = idx
+                    if choose:
+                        self.unique[idx] = choose(u, o)
                     break
             else:
-                self.unique.add(o)
+                self.dup_idx[o] = len(self.unique)
+                self.unique.append(o)
 
     def get(self, o):
-        return self.dedup.get(o, o)
+        idx = self.dup_idx.get(o, -1)
+        if idx < 0:
+            return o
+        return self.unique[idx]
+
+    def duplicates(self):
+        for o, idx in self.dup_idx.items():
+            d = self.unique[idx]
+            if d is not o:
+                yield o, d
 
 
 class ObjectSet(oe.spdx30.SHACLObjectSet):
@@ -579,23 +622,34 @@ class ObjectSet(oe.spdx30.SHACLObjectSet):
         if license_list_version.count(".") < 2:
             license_list_version += ".0"
 
+        license_text = sorted(license_text_map.items(), key=lambda t: t[0])
+
+        incomplete = not license_text and "licenseref-" in license_expression.lower()
+
         spdxid = [
-            "license",
+            "license" if not incomplete else "partial-license",
             license_list_version,
             re.sub(r"[^a-zA-Z0-9_-]", "_", license_expression),
         ]
 
-        license_text = sorted(license_text_map.items(), key=lambda t: t[0])
-
         if not license_text:
-            lic = self.find_filter(
+            incomplete_lic = None
+            for lic in self.foreach_filter(
                 oe.spdx30.simplelicensing_LicenseExpression,
                 simplelicensing_licenseExpression=license_expression,
                 simplelicensing_licenseListVersion=license_list_version,
-            )
-            if lic is not None:
-                return lic
+            ):
+                if OEIncompleteExtension.is_complete(lic):
+                    return lic
+
+                if not incomplete_lic:
+                    incomplete_lic = lic
+
+            if incomplete and incomplete_lic:
+                return incomplete_lic
+
         else:
+            # Note: This branch will never be entered for incomplete licenses
             spdxid.append(spdxid_hash(*(v for _, v in license_text)))
             lic = self.find_by_id(self.new_spdxid(*spdxid))
             if lic is not None:
@@ -612,8 +666,11 @@ class ObjectSet(oe.spdx30.SHACLObjectSet):
 
         for key, value in license_text:
             lic.simplelicensing_customIdToUri.append(
-                oe.spdx30.DictionaryEntry(key=key, value=value)
+                oe.spdx30.DictionaryEntry(key=key, value=value._id)
             )
+
+        if incomplete:
+            OEIncompleteExtension.set(lic)
 
         return lic
 
@@ -950,16 +1007,16 @@ class ObjectSet(oe.spdx30.SHACLObjectSet):
 
             return True
 
-        if d.dedup:
+        if d.has_duplicates:
             for o in self.objects:
                 o.walk(visit)
 
-            for k, v in d.dedup.items():
+            for dup, replacement in d.duplicates():
                 bb.debug(
                     1,
-                    f"Removing duplicate {k.__class__.__name__} {k._id or id(k)} -> {v._id or id(v)}",
+                    f"Removing duplicate {dup.__class__.__name__} {dup._id or id(dup)} -> {replacement._id or id(replacement)}",
                 )
-                self.objects.discard(k)
+                self.objects.discard(dup)
 
             self.create_index()
 
@@ -974,6 +1031,9 @@ def load_jsonld(d, path, required=False):
         if required:
             bb.fatal("No SPDX document named %s found" % path)
         return None
+    except Exception as e:
+        bb.error(f"Unable to parse SPDX document {path}: {e}")
+        raise e
 
     if not objset.doc:
         bb.fatal("SPDX Document %s has no SPDXDocument element" % path)
@@ -1048,6 +1108,25 @@ def write_jsonld_doc(d, objset, dest):
     objset.objects.remove(objset.doc)
 
 
+def make_jsonld_link(d, fn, subdir, name, deploydir):
+    pkg_arch = d.getVar("SSTATE_PKGARCH")
+
+    link_name = jsonld_arch_path(
+        d,
+        pkg_arch,
+        subdir,
+        name,
+        deploydir=deploydir,
+    )
+    try:
+        link_name.parent.mkdir(exist_ok=True, parents=True)
+        link_name.symlink_to(os.path.relpath(fn, link_name.parent))
+    except:
+        target = link_name.readlink()
+        bb.warn(f"Unable to link {fn} as {link_name}. Already points to {target}")
+        raise
+
+
 def write_recipe_jsonld_doc(
     d,
     objset,
@@ -1055,6 +1134,7 @@ def write_recipe_jsonld_doc(
     deploydir,
     *,
     create_spdx_id_links=True,
+    create_task_link=False,
 ):
     pkg_arch = d.getVar("SSTATE_PKGARCH")
 
@@ -1062,23 +1142,7 @@ def write_recipe_jsonld_doc(
 
     def link_id(_id):
         hash_path = jsonld_hash_path(hash_id(_id))
-
-        link_name = jsonld_arch_path(
-            d,
-            pkg_arch,
-            *hash_path,
-            deploydir=deploydir,
-        )
-        try:
-            link_name.parent.mkdir(exist_ok=True, parents=True)
-            link_name.symlink_to(os.path.relpath(dest, link_name.parent))
-        except:
-            target = link_name.readlink()
-            bb.warn(
-                f"Unable to link {_id} in {dest} as {link_name}. Already points to {target}"
-            )
-            raise
-
+        make_jsonld_link(d, dest, *hash_path, deploydir)
         return hash_path[-1]
 
     objset.add_aliases()
@@ -1093,6 +1157,14 @@ def write_recipe_jsonld_doc(
         # It is really helpful for debugging if the JSON document is written
         # out, so always do that even if there is an error making the links
         write_jsonld_doc(d, objset, dest)
+
+    if create_task_link:
+        pn = d.getVar("PN")
+        current_task = "do_" + d.getVar("BB_CURRENTTASK")
+
+        make_jsonld_link(d, dest, "by-task", f"{pn}:{current_task}", deploydir)
+
+    return dest
 
 
 def find_root_obj_in_jsonld(d, subdir, fn_name, obj_type, **attr_filter):
@@ -1142,9 +1214,6 @@ def create_sbom(d, name, root_elements, add_objectsets=[]):
             + "\n  ".join(sorted(list(missing_spdxids)))
         )
 
-    # Filter out internal extensions from final SBoMs
-    objset.remove_internal_extensions()
-
     # SBoM should be the only root element of the document
     objset.doc.rootElement = [sbom]
 
@@ -1154,6 +1223,15 @@ def create_sbom(d, name, root_elements, add_objectsets=[]):
             and a.simplelicensing_licenseListVersion
             == b.simplelicensing_licenseListVersion
         )
+
+    def choose_license_expressions(current, new):
+        if OEIncompleteExtension.is_complete(current):
+            return current
+
+        if OEIncompleteExtension.is_incomplete(new):
+            return current
+
+        return new
 
     def cmp_creation_info(a, b):
         data_a = {k: a[k] for k in a}
@@ -1167,9 +1245,14 @@ def create_sbom(d, name, root_elements, add_objectsets=[]):
         dedup.find_duplicates(
             cmp_license_expression,
             oe.spdx30.simplelicensing_LicenseExpression,
+            choose=choose_license_expressions,
         )
 
+    with objset.deduplicate() as dedup:
         # Deduplicate creation info
         dedup.find_duplicates(cmp_creation_info, oe.spdx30.CreationInfo)
+
+    # Filter out internal extensions from final SBoMs
+    objset.remove_internal_extensions()
 
     return objset, sbom
