@@ -47,6 +47,7 @@ For more product questions, please contact us at:
     + [Boot Process](#boot-process)
     + [Partition Layout](#partition-layout)
     + [Troubleshooting](#troubleshooting-1)
+  * [Boot from RAM (TFTP)](#boot-from-ram-tftp)
   * [Baudrate Configuration](#baudrate-configuration)
     + [Overview](#overview)
     + [Configuration Steps](#configuration-steps)
@@ -644,6 +645,56 @@ The eMMC image uses the following partition structure:
 - Verify partition layout: `mmc part`
 - Check boot variables: `printenv bootcmd`
 - Manually load kernel: `ext4load mmc 0:2 ${loadaddr} fitImage`
+
+## Boot from RAM (TFTP)
+
+Boots OpenBMC entirely from RAM: U-Boot loads one file, `image-ramboot`,
+over TFTP and boots it. The kernel and the root filesystem are not read from
+the SPI flash or the eMMC, so this works before the flash is programmed, or
+to try an image without writing it anywhere. U-Boot itself still starts as
+usual.
+
+`image-ramboot` is built by every SPI-NOR flash distro (`openbmc-phosphor`,
+`arbel-evb-entity`, `arbel-evb-composite-eat`, `arbel-evb-obmf`,
+`arbel-evb-satellite`), next to `image-bmc`, in
+`build/evb-npcm845-stage/tmp/deploy/images/evb-npcm845-stage/`. It is a FIT
+image with the kernel, the device tree, and an initramfs that carries
+`image-rofs`. The eMMC distros do not build it.
+
+Copy `image-ramboot` to your TFTP server, stop U-Boot at its prompt (Ethernet
+on **J_RGMII**, as for [Method 2: U-Boot TFTP](#method-2-u-boot-tftp)) and
+type:
+
+```bash
+U-Boot> setenv ipaddr 192.168.0.12       # the BMC's address
+U-Boot> setenv serverip 192.168.0.128    # the TFTP server
+U-Boot> tftp 0x10000000 image-ramboot
+U-Boot> setenv bootargs earlycon=${earlycon} console=${console} overlay-filesystem-in-ram
+U-Boot> bootm 0x10000000
+```
+
+- Load it at `0x10000000`, not at the default `${loadaddr}` (`0x06208000`):
+  the kernel is unpacked to `0x06200000`, so a 50 MB file at `${loadaddr}`
+  would be overwritten while booting.
+- Use the `bootargs` above, not the default ones: `overlay-filesystem-in-ram`
+  keeps the read-write layer in RAM instead of the `rwfs` flash partition.
+- `dhcp` can replace the two `setenv ...ip` lines when the network has a
+  DHCP server.
+
+**Success:** after `Starting kernel ...` the console shows
+`Flash images found, will use but deferring flash update.` and
+`Running with read-write overlay in RAM for this boot.`, then the login
+prompt. After login, `mount` shows
+`/run/image-rofs on /run/initramfs/ro type squashfs` and `/` as an overlay.
+
+How it works: the OpenBMC initramfs moves the `/image-rofs` file it carries to
+`/run/image-rofs` and loop-mounts it as the read-only root instead of the
+`rofs` flash partition. The build step is
+`meta-nuvoton-obmc/meta-common/classes/obmc-ramboot.bbclass`, enabled in
+`conf/machine/evb-npcm845-stage.conf`.
+
+Nothing is saved: settings and logs are lost on every reboot, and the root
+filesystem (about 40 MB) stays in RAM while Linux runs.
 
 ## Baudrate Configuration
 
