@@ -37,13 +37,17 @@ PSU_MONITOR_EM_ENV_FMT = " \
 SYSTEMD_ENVIRONMENT_FILE:${PN}-monitor:append = "${@compose_list(d, 'PSU_MONITOR_ENV_FMT', 'OBMC_POWER_SUPPLY_INSTANCES')}"
 SYSTEMD_ENVIRONMENT_FILE:${PN}-monitor-em:append = "${@compose_list(d, 'PSU_MONITOR_EM_ENV_FMT', 'OBMC_POWER_SUPPLY_INSTANCES')}"
 
+# The unit goes with the package that is installed: phosphor-power-monitor
+# without entity-manager, phosphor-power-monitor-em with it. Shipping
+# power-supply-monitor@.service only in -monitor-em left the plain images
+# with a multi-user.target.requires link to a missing unit, and systemd
+# could not isolate the default target.
 FILES:${PN}-monitor = " \
-    ${@entity_enabled(d, '', '${bindir}/psu-monitor')} \
+    ${@entity_enabled(d, '', '${bindir}/psu-monitor ${systemd_system_unitdir}/power-supply-monitor@.service')} \
     "
 FILES:${PN}-monitor-em = " \
-    ${@entity_enabled(d, '${bindir}/psu-monitor', '')} \
+    ${@entity_enabled(d, '${bindir}/psu-monitor ${systemd_system_unitdir}/power-supply-monitor@.service', '')} \
     ${systemd_system_unitdir}/power-supply-monitor-em@.service \
-    ${systemd_system_unitdir}/power-supply-monitor@.service \
     "
 
 is_entity = "${@entity_enabled(d, 'yes', '')}"
