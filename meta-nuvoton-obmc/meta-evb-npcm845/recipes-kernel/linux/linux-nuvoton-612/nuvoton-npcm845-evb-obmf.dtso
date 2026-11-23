@@ -362,7 +362,7 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 
-			nuvoton,flash-size = <0x4000000>;
+			nuvoton,flash-size = <0x2000000>;
 			nuvoton,flash-erasesize = <0x1000>;
 			nuvoton,flash-cs = <0x1>;
 			nuvoton,mtd-name = "npcm-spi-flash";
