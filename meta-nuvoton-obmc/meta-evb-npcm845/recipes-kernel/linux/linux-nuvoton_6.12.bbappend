@@ -67,7 +67,7 @@ SRC_URI:append:df-composite-eat = " \
 # and an evb overlay applied at build time into nuvoton-npcm845-evb-obmf.dtb
 FILESEXTRAPATHS:prepend:df-obmf := "${THISDIR}/linux-nuvoton-obmf:"
 KBRANCH:df-obmf = "NPCM-6.12-OBMF-dev"
-SRCREV:df-obmf = "4815e26c708e57f67319db514feed96752e1d04f"
+SRCREV:df-obmf = "95e50e00023c0e65be538498d67dbfa55a1f3a54"
 
 SRC_URI:append:df-obmf = " \
     file://0008-usb-class-obmf-emit-OBMF_STATE-uevents.patch \
