@@ -49,3 +49,17 @@ do_install:append() {
     rm -f ${D}/${nonarch_base_libdir}/udev/rules.d/80-obmc-console-uart.rules
     install -D -m 0644 ${UNPACKDIR}/80-evb-npcm845-sol.rules ${D}/${nonarch_base_libdir}/udev/rules.d
 }
+
+# OBMF ttys come and go with SMC1: start the server from udev and stop it
+# with the tty, instead of restarting it until it hits the start limit.
+SRC_URI:append:df-obmf = " file://81-obmf-console.rules"
+do_install:append:df-obmf() {
+    install -m 0644 ${UNPACKDIR}/81-obmf-console.rules ${D}/${nonarch_base_libdir}/udev/rules.d
+    for i in ${HOST_CONSOLE_TTY}
+    do
+        case $i in ttyOBMF*) ;; *) continue ;; esac
+        d=${D}${systemd_unitdir}/system/${BPN}@${i}.service.d
+        install -d $d
+        printf "[Unit]\nBindsTo=dev-%s.device\nAfter=dev-%s.device\n" $i $i > $d/obmf-tty.conf
+    done
+}

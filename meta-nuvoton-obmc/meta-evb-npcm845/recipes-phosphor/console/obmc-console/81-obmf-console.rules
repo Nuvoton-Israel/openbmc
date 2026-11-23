@@ -1,0 +1,4 @@
+# Start the console server when SMC1 creates an OBMF serial tty. SMC1
+# reboots (e.g. firmware update) remove and re-create the tty, and the
+# server started at boot would otherwise stay down.
+SUBSYSTEM=="tty", KERNEL=="ttyOBMF*", TAG+="systemd", ENV{SYSTEMD_WANTS}+="obmc-console@%k.service"
