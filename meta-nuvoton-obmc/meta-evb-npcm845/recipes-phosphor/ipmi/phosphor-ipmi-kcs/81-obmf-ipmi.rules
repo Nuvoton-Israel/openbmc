@@ -1,0 +1,1 @@
+SUBSYSTEM=="misc", KERNEL=="ipmi-obmf*", TAG+="systemd", ENV{SYSTEMD_WANTS}+="phosphor-ipmi-kcs@%k.service"
