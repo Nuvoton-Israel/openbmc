@@ -767,8 +767,8 @@ uint8_t read_device_status(bool raw, uint8_t *data)
 		(data[1] <= 0xf) ? PROTOCOL_ERROR_STR[data[1]] : "");
 	fprintf(stderr, "\tRecovery Reason Code: 0x%04x%s%s\n", reason, (reason <= 0x12) ? " -> " : "",
 		(reason <= 0x12) ? RECOVERY_REASON_STR[reason] : "");
-	fprintf(stderr, "\tHeartbeat: 0x%04x\n", *((uint16_t*) &data[4]));
-	fprintf(stderr, "\tVendor Status Length: 0x%02x\n", data[6]);
+	//fprintf(stderr, "\tHeartbeat: 0x%04x\n", *((uint16_t*) &data[4]));
+	//fprintf(stderr, "\tVendor Status Length: 0x%02x\n", data[6]);
 
 	if (data[6] != 0) {
 		fprintf(stderr, "\tVendor:\n");
