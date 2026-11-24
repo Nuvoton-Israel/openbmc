@@ -22,6 +22,31 @@ SRC_URI:append = " \
     file://rtc_switch.tcl \
 "
 
+# NPCM500 A2 JTAG slave cfgs, one per JEN1#..JEN4# strap (RD table v6)
+# <JEN>_jtag1_*.cfg -> /dev/jtag0 (NPCM500 JTAG1), <JEN>_jtag2_*.cfg -> /dev/jtag1 (JTAG2)
+NPCM500_JEN_CFGS = " \
+    0001_jtag1_clp_mcu_lcc.cfg \
+    0001_jtag2_m7.cfg \
+    0010_jtag1_clp_mcu_lcc.cfg \
+    0010_jtag2_m7.cfg \
+    0011_jtag1_clp_mcu_lcc.cfg \
+    0011_jtag2_m7.cfg \
+    0100_jtag1_clp.cfg \
+    0100_jtag2_mcu.cfg \
+    0101_jtag1_mcu.cfg \
+    0101_jtag2_lcc.cfg \
+    0110_jtag1_clp_mcu_lcc.cfg \
+    0110_jtag2_m7.cfg \
+    0111_jtag1_clp_mcu_lcc.cfg \
+    0111_jtag2_m7.cfg \
+    1000_jtag1_clp_mcu_lcc.cfg \
+    1000_jtag2_m7.cfg \
+    1001_jtag1_m7_clp_mcu_lcc.cfg \
+    1010_jtag1_clp_mcu_lcc.cfg \
+    1010_jtag2_m7.cfg \
+"
+SRC_URI:append = " ${@' '.join('file://' + f for f in d.getVar('NPCM500_JEN_CFGS').split())}"
+
 do_install:append() {
     install -d ${D}${datadir}/openocd/scripts
     install -m 0644 ${UNPACKDIR}/cm4.cfg ${D}${datadir}/openocd/scripts/cm4.cfg
@@ -33,6 +58,9 @@ do_install:append() {
     install -m 0644 ${UNPACKDIR}/caliptra_mcu_jtm0.cfg ${D}${datadir}/openocd/scripts/caliptra_mcu_jtm0.cfg
     install -m 0644 ${UNPACKDIR}/caliptra_mcu_jtm1.cfg ${D}${datadir}/openocd/scripts/caliptra_mcu_jtm1.cfg
     install -m 0644 ${UNPACKDIR}/rtc_switch.tcl ${D}${datadir}/openocd/scripts/rtc_switch.tcl
+    for f in ${NPCM500_JEN_CFGS}; do
+        install -m 0644 ${UNPACKDIR}/$f ${D}${datadir}/openocd/scripts/$f
+    done
 }
 
 # Override PACKAGECONFIG to only enable linuxgpiod and npcm-jtag
