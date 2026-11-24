@@ -754,7 +754,7 @@ uint8_t read_device_status(bool raw, uint8_t *data)
 	}
 	else if (bytes != (7 + data[6])) {
 		fprintf(stderr, "%s: Invalid response length %d, with vender length %d.\n", __func__, bytes,
-			data[1]);
+			data[6]);
 		return -1;
 	}
 
