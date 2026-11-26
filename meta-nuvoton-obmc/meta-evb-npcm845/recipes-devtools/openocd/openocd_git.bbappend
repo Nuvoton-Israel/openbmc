@@ -44,6 +44,9 @@ NPCM500_JEN_CFGS = " \
     1001_jtag1_m7_clp_mcu_lcc.cfg \
     1010_jtag1_clp_mcu_lcc.cfg \
     1010_jtag2_m7.cfg \
+    ctrl_out_check.tcl \
+    lcc_common.tcl \
+    lcc_vol_unlock.tcl \
 "
 SRC_URI:append = " ${@' '.join('file://' + f for f in d.getVar('NPCM500_JEN_CFGS').split())}"
 
